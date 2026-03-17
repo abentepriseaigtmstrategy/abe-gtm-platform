@@ -115,16 +115,24 @@
 </div>
 
 <script>
+  // Supabase configuration
   const SUPABASE_URL = "https://qclvydtjsriprimcsbht.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFjbHZ5ZHRqc3JpcHJpbWNzYmh0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM3MzkxNTYsImV4cCI6MjA4OTMxNTE1Nn0.dJRXojiytadPjWQ-D77yUofti94ufYLGrKteiTy0Te0
-";
+  const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFjbHZ5ZHRqc3JpcHJpbWNzYmh0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM3MzkxNTYsImV4cCI6MjA4OTMxNTE1Nn0.dJRXojiytadPjWQ-D77yUofti94ufYLGrKteiTy0Te0";
 
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+  // Initialize Supabase client
+  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-  // Already logged in → go straight to dashboard
+  // Check if already logged in
   (async () => {
-    const { data: { session } } = await sb.auth.getSession();
-    if (session) window.location.replace('dashboard.html');
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        console.log('Already logged in, redirecting...');
+        window.location.replace('dashboard.html');
+      }
+    } catch (error) {
+      console.error('Error checking session:', error);
+    }
   })();
 
   function switchTab(tab) {
@@ -141,13 +149,39 @@ const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     const pass  = document.getElementById('in-pass').value;
     const btn   = document.getElementById('btn-in');
     const msg   = document.getElementById('msg-in');
-    if (!email || !pass) { showMsg(msg, 'Please enter your email and password.', 'error'); return; }
+    
+    if (!email || !pass) {
+      showMsg(msg, 'Please enter your email and password.', 'error');
+      return;
+    }
+    
     setLoading(btn, true);
     msg.className = 'msg';
-    const { error } = await sb.auth.signInWithPassword({ email, password: pass });
-    if (error) { showMsg(msg, error.message, 'error'); setLoading(btn, false); return; }
-    showMsg(msg, 'Signed in! Redirecting…', 'success');
-    setTimeout(() => window.location.replace('dashboard.html'), 600);
+    
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ 
+        email, 
+        password: pass 
+      });
+      
+      if (error) {
+        console.error('Sign in error:', error);
+        showMsg(msg, error.message || 'Failed to sign in. Please check your credentials.', 'error');
+        setLoading(btn, false);
+        return;
+      }
+      
+      if (data.session) {
+        showMsg(msg, 'Signed in! Redirecting…', 'success');
+        setTimeout(() => {
+          window.location.replace('dashboard.html');
+        }, 600);
+      }
+    } catch (error) {
+      console.error('Sign in error:', error);
+      showMsg(msg, 'An unexpected error occurred. Please try again.', 'error');
+      setLoading(btn, false);
+    }
   }
 
   async function signUp() {
@@ -155,20 +189,53 @@ const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
     const pass  = document.getElementById('up-pass').value;
     const btn   = document.getElementById('btn-up');
     const msg   = document.getElementById('msg-up');
-    if (!email || !pass) { showMsg(msg, 'Please enter your email and password.', 'error'); return; }
-    if (pass.length < 8)  { showMsg(msg, 'Password must be at least 8 characters.', 'error'); return; }
+    
+    if (!email || !pass) {
+      showMsg(msg, 'Please enter your email and password.', 'error');
+      return;
+    }
+    
+    if (pass.length < 8) {
+      showMsg(msg, 'Password must be at least 8 characters.', 'error');
+      return;
+    }
+    
     setLoading(btn, true);
     msg.className = 'msg';
-    const { error } = await sb.auth.signUp({ email, password: pass });
-    if (error) { showMsg(msg, error.message, 'error'); setLoading(btn, false); return; }
-    showMsg(msg, 'Account created! Check your email to confirm, then sign in.', 'success');
-    setLoading(btn, false);
+    
+    try {
+      const { data, error } = await supabase.auth.signUp({ 
+        email, 
+        password: pass 
+      });
+      
+      if (error) {
+        console.error('Sign up error:', error);
+        showMsg(msg, error.message || 'Failed to create account. Please try again.', 'error');
+        setLoading(btn, false);
+        return;
+      }
+      
+      if (data.session) {
+        showMsg(msg, 'Account created! Redirecting…', 'success');
+        setTimeout(() => {
+          window.location.replace('dashboard.html');
+        }, 600);
+      } else if (data.user) {
+        showMsg(msg, 'Account created! Check your email to confirm, then sign in.', 'success');
+      }
+    } catch (error) {
+      console.error('Sign up error:', error);
+      showMsg(msg, 'An unexpected error occurred. Please try again.', 'error');
+      setLoading(btn, false);
+    }
   }
 
   function setLoading(btn, on) {
     btn.disabled = on;
     btn.classList.toggle('loading', on);
   }
+  
   function showMsg(el, text, type) {
     el.textContent = text;
     el.className = 'msg ' + type;
