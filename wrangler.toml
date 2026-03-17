@@ -15,7 +15,7 @@ binding = "STRATEGY_CACHE"
 id      = "61d9ea1ad72b49658b1ab2fac175bbb9"
 
 [vars]
-ALLOWED_ORIGIN  = "https://ab-gtm-platform-bza.pages.dev"
+ALLOWED_ORIGIN = "https://abe-gtm-platform.pages.dev"
 SUPABASE_URL    = "https://cwcvneluhlimhlzowabv.supabase.co"
 SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3Y3ZuZWx1aGxpbWhsem93YWJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2MzAxMjAsImV4cCI6MjA4OTIwNjEyMH0.SZDS-svU-kFh_OkUq3AjQY64F-71MpbBsFd6Iin5DlQ"
 
