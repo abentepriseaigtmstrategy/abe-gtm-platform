@@ -115,9 +115,11 @@
 </div>
 
 <script>
-  const SUPABASE_URL      = 'https://cwcvneluhlimhlzowabv.supabase.co';
-  const SUPABASE_ANON_KEY = 'sb_publishable_EeDAvGbX7TpO_hgBoUZMhQ_B_nJtAbb';
-  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const SUPABASE_URL = "https://qclvydtjsriprimcsbht.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFjbHZ5ZHRqc3JpcHJpbWNzYmh0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM3MzkxNTYsImV4cCI6MjA4OTMxNTE1Nn0.dJRXojiytadPjWQ-D77yUofti94ufYLGrKteiTy0Te0
+";
+
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
   // Already logged in → go straight to dashboard
   (async () => {
