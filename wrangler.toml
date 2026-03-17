@@ -1,0 +1,24 @@
+# wrangler.toml
+# Cloudflare Pages — project root
+# Compatible date must be 2024-09-23+ for ES modules + nodejs_compat_v2
+
+name = "ab-gtm-platform"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+pages_build_output_dir = "frontend"
+
+# KV namespace — binding name MUST match what _middleware.js expects
+# Using STRATEGY_CACHE to match the code
+[[kv_namespaces]]
+binding = "STRATEGY_CACHE"
+id      = "61d9ea1ad72b49658b1ab2fac175bbb9"
+
+[vars]
+ALLOWED_ORIGIN  = "https://ab-gtm-platform-bza.pages.dev"
+SUPABASE_URL    = "https://cwcvneluhlimhlzowabv.supabase.co"
+SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3Y3ZuZWx1aGxpbWhsem93YWJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2MzAxMjAsImV4cCI6MjA4OTIwNjEyMH0.SZDS-svU-kFh_OkUq3AjQY64F-71MpbBsFd6Iin5DlQ"
+
+# Secrets — set via CLI, NEVER commit:
+#   npx wrangler pages secret put OPENAI_API_KEY        --project-name ab-gtm-platform
+#   npx wrangler pages secret put SUPABASE_SERVICE_KEY  --project-name ab-gtm-platform
