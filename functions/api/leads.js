@@ -1,0 +1,639 @@
+/**
+ * /api/leads  (v2)
+ * Cloudflare Pages Function — Lead Management Engine
+ *
+ * Improvements over v1:
+ *   - JWT auth on every action
+ *   - Deterministic ICP scoring (rule-based + AI explanation only)
+ *   - Personalised outreach with lead-specific token replacement
+ *   - CSV text parsing (no Papa dependency — pure Worker-compatible)
+ *   - HubSpot + Apollo + generic CSV export formats
+ *   - outreach_events tracking
+ *   - Input validation on every action
+ */
+
+import { verifyAuth, corsHeaders, validate, rateLimit, sanitise, errRes, okRes } from './_middleware.js';
+
+export async function onRequestPost(context) {
+  const { request, env } = context;
+  const cors = corsHeaders(env);
+
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+
+  // ── Auth ────────────────────────────────────────────────────────
+  const { user, error: authErr } = await verifyAuth(request, env);
+  if (!user) return errRes(authErr || 'Unauthorized', 401, cors);
+
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  if (!await rateLimit(`leads:${user.id}`, env, 30, 60_000)) {
+    return errRes('Too many requests. Please wait.', 429, cors);
+  }
+
+  const openaiKey   = env.OPENAI_API_KEY;
+  const supabaseUrl = env.SUPABASE_URL;
+  const supabaseKey = env.SUPABASE_SERVICE_KEY;
+
+  let body;
+  try { body = await request.json(); }
+  catch { return errRes('Invalid request body', 400, cors); }
+
+  const { action } = body;
+  if (!action) return errRes('Missing required field: action', 400, cors);
+
+  switch (action) {
+    case 'import':            return handleImport(body, user.id, supabaseUrl, supabaseKey, cors);
+    case 'score_batch':       return handleScoreBatch(body, user.id, openaiKey, supabaseUrl, supabaseKey, cors);
+    case 'generate_outreach': return handleGenerateOutreach(body, user.id, openaiKey, supabaseUrl, supabaseKey, cors);
+    case 'export_csv':        return handleExportCSV(body, user.id, supabaseUrl, supabaseKey, cors);
+    case 'get_leads':         return handleGetLeads(body, user.id, supabaseUrl, supabaseKey, cors);
+    case 'update_lead':       return handleUpdateLead(body, user.id, supabaseUrl, supabaseKey, cors);
+    case 'track_outreach':    return handleTrackOutreach(body, user.id, supabaseUrl, supabaseKey, cors);
+    case 'delete_leads':      return handleDeleteLeads(body, user.id, supabaseUrl, supabaseKey, cors);
+    default:                  return errRes(`Unknown action: ${action}`, 400, cors);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// IMPORT — parse CSV text (no external deps) and save to Supabase
+// ══════════════════════════════════════════════════════════════════
+async function handleImport(body, userId, url, key, cors) {
+  const errors = validate({
+    source_type: 'string',
+  }, body);
+  if (errors.length) return errRes(errors[0], 400, cors);
+
+  const { csv_text, leads: rawLeads, source_type = 'csv', source_file } = body;
+
+  let leads = rawLeads || [];
+
+  // Parse CSV text if provided
+  if (csv_text && typeof csv_text === 'string') {
+    leads = parseCSV(csv_text);
+  }
+
+  if (!leads.length) return errRes('No leads to import', 400, cors);
+
+  const ts = new Date().toISOString();
+  const payload = leads.slice(0, 5000).map(l => ({
+    user_id:      userId,
+    name:         sanitise(findField(l, ['name','full name','contact name','first name']), 120),
+    title:        sanitise(findField(l, ['title','job title','role','position']), 120),
+    company:      sanitise(findField(l, ['company','company name','organization','account']), 120),
+    email:        sanitise(findField(l, ['email','email address','work email']), 200),
+    linkedin_url: sanitise(findField(l, ['linkedin','linkedin url','profile url']), 300),
+    website:      sanitise(findField(l, ['website','company website','domain']), 300),
+    location:     sanitise(findField(l, ['location','city','country']), 200),
+    source_file:  source_file || null,
+    source_type,
+    status:       'unprocessed',
+    tags:         JSON.stringify(['Imported']),
+    activity_log: JSON.stringify([{
+      action:    'imported',
+      timestamp: ts,
+      note:      `Imported via ${source_type}${source_file ? ' — ' + source_file : ''}`,
+    }]),
+  })).filter(l => l.name && l.name !== '');
+
+  if (!payload.length) return errRes('No valid leads after parsing (name field required)', 400, cors);
+
+  // Chunk insert to avoid Supabase row limits
+  const CHUNK = 200;
+  let inserted = 0;
+  let duplicates = 0;
+
+  for (let i = 0; i < payload.length; i += CHUNK) {
+    const chunk = payload.slice(i, i + CHUNK);
+    const res = await sb(url, key, 'leads', 'POST',
+      JSON.stringify(chunk),
+      '?on_conflict=user_id,name,company'   // skip exact duplicates
+    );
+    if (res.ok) {
+      const saved = await res.json();
+      inserted += Array.isArray(saved) ? saved.length : chunk.length;
+    } else {
+      // Try without on_conflict for servers that don't support it
+      const res2 = await sb(url, key, 'leads', 'POST', JSON.stringify(chunk));
+      if (res2.ok) inserted += chunk.length;
+    }
+  }
+
+  duplicates = payload.length - inserted;
+  return okRes({ imported: inserted, skipped_duplicates: duplicates, total: payload.length }, cors);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// SCORE BATCH — deterministic scoring + AI explanation
+// ══════════════════════════════════════════════════════════════════
+async function handleScoreBatch(body, userId, openaiKey, url, key, cors) {
+  const errors = validate({ lead_ids: 'array|required' }, body);
+  if (errors.length) return errRes(errors[0], 400, cors);
+
+  const { lead_ids, icp_criteria } = body;
+  if (lead_ids.length > 100) return errRes('Max 100 leads per batch', 400, cors);
+
+  // Fetch leads
+  const ids  = lead_ids.slice(0, 100).map(id => `"${sanitise(id, 36)}"`).join(',');
+  const res  = await sb(url, key, 'leads', 'GET', null, `?user_id=eq.${userId}&id=in.(${ids})`);
+  if (!res.ok) return errRes('Failed to fetch leads', 500, cors);
+  const leads = await res.json();
+  if (!leads.length) return okRes({ scored: 0 }, cors);
+
+  // Score each lead deterministically
+  const icp = icp_criteria || {};
+  const scored = leads.map(l => ({
+    ...l,
+    ...deterministicScore(l, icp),
+  }));
+
+  // Optionally enrich explanation via AI (batched, non-blocking)
+  if (openaiKey && scored.length <= 20) {
+    await enrichScoreExplanations(scored, icp, openaiKey);
+  }
+
+  // Persist scores
+  await Promise.allSettled(scored.map(l =>
+    sb(url, key, 'leads', 'PATCH', JSON.stringify({
+      icp_score:    l.icp_score,
+      priority:     l.priority,
+      score_reason: l.score_reason,
+      score_details: JSON.stringify(l.score_details),
+      status: l.status === 'unprocessed' ? 'analyzed' : l.status,
+    }), `?id=eq.${l.id}&user_id=eq.${userId}`)
+  ));
+
+  return okRes({ scored: scored.length, leads: scored.map(l => ({
+    id: l.id, name: l.name, company: l.company,
+    icp_score: l.icp_score, priority: l.priority, score_reason: l.score_reason,
+  }))}, cors);
+}
+
+/**
+ * Deterministic ICP scoring.
+ * Score breakdown: Role Seniority(25) + ICP Match(25) + Company Size(20) + Industry(20) + Intent(10)
+ * AI only provides the explanation sentence — it cannot change the numeric score.
+ */
+function deterministicScore(lead, icp) {
+  const details = {
+    role_seniority:  0,   // 0–25
+    icp_match:       0,   // 0–25
+    company_size:    0,   // 0–20
+    industry_match:  0,   // 0–20
+    intent_signals:  0,   // 0–10
+  };
+
+  const title   = (lead.title   || '').toLowerCase();
+  const company = (lead.company || '').toLowerCase();
+
+  // 1. Role Seniority (25 pts)
+  if (/\b(ceo|cto|coo|cmo|cpo|founder|co-founder|president|owner)\b/.test(title))       details.role_seniority = 25;
+  else if (/\b(vp|vice president|svp|evp|gm|general manager|md|managing director)\b/.test(title)) details.role_seniority = 22;
+  else if (/\b(director|head of|chief)\b/.test(title))                                  details.role_seniority = 18;
+  else if (/\b(senior|sr\.?|lead|principal|staff)\b/.test(title))                       details.role_seniority = 12;
+  else if (/\b(manager|manager)\b/.test(title))                                          details.role_seniority = 8;
+  else if (title)                                                                         details.role_seniority = 4;
+
+  // 2. ICP Title Match (25 pts)
+  if (icp.target_titles?.length) {
+    const match = icp.target_titles.some(t => title.includes(t.toLowerCase()));
+    if (match) details.icp_match = 25;
+    else {
+      const partial = icp.target_titles.some(t => {
+        const words = t.toLowerCase().split(/\s+/);
+        return words.some(w => w.length > 3 && title.includes(w));
+      });
+      details.icp_match = partial ? 12 : 0;
+    }
+  } else {
+    // No ICP defined — give neutral score
+    details.icp_match = 12;
+  }
+
+  // 3. Company Size (20 pts) — infer from title context or explicit field
+  if (icp.min_company_size || icp.max_company_size) {
+    const size = lead.employee_count || inferCompanySize(company);
+    const min  = icp.min_company_size || 0;
+    const max  = icp.max_company_size || Infinity;
+    if (size >= min && size <= max)       details.company_size = 20;
+    else if (size >= min * 0.5)           details.company_size = 10;
+  } else {
+    details.company_size = 10; // neutral
+  }
+
+  // 4. Industry Match (20 pts)
+  if (icp.target_industries?.length) {
+    const leadIndustry = (lead.industry || '').toLowerCase();
+    const exactMatch   = icp.target_industries.some(i => leadIndustry.includes(i.toLowerCase()));
+    details.industry_match = exactMatch ? 20 : 0;
+  } else {
+    details.industry_match = 10; // neutral
+  }
+
+  // 5. Intent Signals (10 pts)
+  if (lead.intent_signals || lead.tags) {
+    const tags = (typeof lead.tags === 'string' ? JSON.parse(lead.tags) : lead.tags) || [];
+    const signals = tags.filter(t =>
+      ['hiring', 'funding', 'expansion', 'new-product', 'press', 'award'].includes(t.toLowerCase())
+    );
+    details.intent_signals = Math.min(signals.length * 3, 10);
+  }
+
+  const total    = Object.values(details).reduce((s, v) => s + v, 0);
+  const priority = total >= 75 ? 'HIGH' : total >= 50 ? 'MEDIUM' : 'LOW';
+
+  return {
+    icp_score:    total,
+    priority,
+    score_reason: `Score ${total}/100 — Seniority:${details.role_seniority} ICP:${details.icp_match} Size:${details.company_size} Industry:${details.industry_match} Intent:${details.intent_signals}`,
+    score_details: details,
+  };
+}
+
+function inferCompanySize(company) {
+  // Very rough heuristic based on known company patterns
+  const enterprise = ['microsoft','google','apple','amazon','meta','salesforce','oracle','sap','ibm','accenture'];
+  const mid        = ['hubspot','zendesk','freshworks','intercom','segment','twilio'];
+  const lc         = company.toLowerCase();
+  if (enterprise.some(e => lc.includes(e))) return 10000;
+  if (mid.some(m => lc.includes(m)))        return 1000;
+  return 100; // default to SMB
+}
+
+async function enrichScoreExplanations(leads, icp, openaiKey) {
+  const prompt = `You are a B2B sales expert. For each scored lead below, write a ONE sentence explanation of why the score is correct based on their role and company. Be specific and concise.
+
+ICP Context: ${JSON.stringify(icp)}
+
+Leads (already scored):
+${leads.map((l, i) => `${i}: ${l.name} | ${l.title} | ${l.company} | Score: ${l.icp_score}`).join('\n')}
+
+Return ONLY a JSON array with exactly ${leads.length} objects:
+[{"index":0,"reason":"One sentence explanation"}, ...]`;
+
+  try {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
+      body: JSON.stringify({ model: 'gpt-4o-mini', temperature: 0.2, max_tokens: 500,
+        messages: [{ role: 'system', content: 'Return ONLY valid JSON array.' }, { role: 'user', content: prompt }] }),
+    });
+    const d      = await res.json();
+    const raw    = d.choices?.[0]?.message?.content || '[]';
+    const clean  = raw.replace(/```json|```/g, '').trim();
+    const m      = clean.match(/\[[\s\S]*\]/);
+    const reasons = JSON.parse(m ? m[0] : clean);
+    for (const r of reasons) {
+      if (leads[r.index] && r.reason) leads[r.index].score_reason = r.reason;
+    }
+  } catch {}
+}
+
+// ══════════════════════════════════════════════════════════════════
+// GENERATE OUTREACH — personalised per lead with token replacement
+// ══════════════════════════════════════════════════════════════════
+async function handleGenerateOutreach(body, userId, openaiKey, url, key, cors) {
+  if (!openaiKey) return errRes('OpenAI not configured', 503, cors);
+
+  const errors = validate({ lead_id: 'string|required' }, body);
+  if (errors.length) return errRes(errors[0], 400, cors);
+
+  const { lead_id, gtm_context, sequence_template } = body;
+
+  // Fetch lead
+  const res = await sb(url, key, 'leads', 'GET', null,
+    `?id=eq.${sanitise(lead_id, 36)}&user_id=eq.${userId}&limit=1`);
+  if (!res.ok) return errRes('Failed to fetch lead', 500, cors);
+  const leads = await res.json();
+  if (!leads.length) return errRes('Lead not found', 404, cors);
+  const lead = leads[0];
+
+  // If we have a template from GTM Step 6, personalise it first
+  let emailTemplate = null;
+  if (sequence_template?.email_1) {
+    emailTemplate = personaliseTemplate(sequence_template.email_1, lead);
+  }
+
+  const prompt = `You are a B2B outreach expert. Write hyper-personalised cold outreach for this prospect.
+
+PROSPECT:
+Name: ${lead.name}
+First Name: ${(lead.name || '').split(' ')[0]}
+Title: ${lead.title || 'Unknown'}
+Company: ${lead.company || 'Unknown'}
+Location: ${lead.location || 'Unknown'}
+ICP Score: ${lead.icp_score || 'N/A'}/100
+Score Reason: ${lead.score_reason || 'N/A'}
+
+${gtm_context ? `COMPANY GTM CONTEXT (use this for personalisation):\n${gtm_context}\n` : ''}
+${emailTemplate ? `BASE TEMPLATE TO PERSONALISE:\nSubject: ${emailTemplate.subject}\nBody: ${emailTemplate.body}\n` : ''}
+
+Write a complete outreach sequence. Return ONLY this exact JSON:
+{
+  "email": {
+    "subject": "Subject line under 50 chars — mention their company or role",
+    "body": "3 short paragraphs. Hyper-relevant to ${lead.company || 'their company'}. Conversational, no buzzwords. First line must reference something specific about them.",
+    "cta": "Specific, low-friction CTA — e.g. '15-min call Thursday?' not 'Would you be open to a meeting?'"
+  },
+  "linkedin": {
+    "connection_note": "Under 300 chars. Reference their work. No pitch.",
+    "follow_up_day3": "Under 200 chars. Value-first, no ask.",
+    "follow_up_day7": "Under 200 chars. Soft ask."
+  },
+  "follow_up_email": {
+    "subject": "Brief reply-thread subject",
+    "body": "2 short paragraphs. Different angle from email 1."
+  },
+  "personalisation_notes": "What specific details made this personal"
+}`;
+
+  let outreach;
+  try {
+    const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
+      body: JSON.stringify({ model: 'gpt-4o-mini', temperature: 0.8, max_tokens: 1200,
+        messages: [{ role: 'system', content: 'Return ONLY valid JSON.' }, { role: 'user', content: prompt }] }),
+    });
+    const d     = await aiRes.json();
+    const raw   = d.choices?.[0]?.message?.content || '{}';
+    const clean = raw.replace(/```json|```/g, '').trim();
+    const m     = clean.match(/\{[\s\S]*\}/);
+    outreach    = JSON.parse(m ? m[0] : clean);
+  } catch (e) {
+    return errRes('Outreach generation failed: ' + e.message, 500, cors);
+  }
+
+  // Save to lead record
+  await sb(url, key, 'leads', 'PATCH', JSON.stringify({
+    outreach_email:    outreach.email?.body,
+    outreach_linkedin: outreach.linkedin?.connection_note,
+    gtm_analysis:      outreach,
+    status:            'analyzed',
+  }), `?id=eq.${lead_id}&user_id=eq.${userId}`);
+
+  return okRes({ outreach, lead_id, lead_name: lead.name }, cors);
+}
+
+/**
+ * Replace template tokens with real lead data.
+ * Supports {{name}}, {{first_name}}, {{company}}, {{title}}, {{location}}.
+ */
+function personaliseTemplate(template, lead) {
+  const firstName = (lead.name || '').split(' ')[0];
+  const replace   = (str) => (str || '')
+    .replace(/\{\{name\}\}/gi,       lead.name || '')
+    .replace(/\{\{first_name\}\}/gi, firstName)
+    .replace(/\{\{company\}\}/gi,    lead.company || '')
+    .replace(/\{\{title\}\}/gi,      lead.title || '')
+    .replace(/\{\{location\}\}/gi,   lead.location || '');
+
+  return {
+    subject: replace(template.subject),
+    body:    replace(template.body),
+    cta:     replace(template.cta),
+    angle:   template.angle,
+  };
+}
+
+// ══════════════════════════════════════════════════════════════════
+// EXPORT CSV — HubSpot / Apollo / generic
+// ══════════════════════════════════════════════════════════════════
+async function handleExportCSV(body, userId, url, key, cors) {
+  const { lead_ids, format = 'generic', filters } = body;
+
+  let query = `?user_id=eq.${userId}&order=icp_score.desc.nullslast&limit=5000`;
+  if (lead_ids?.length) query += `&id=in.(${lead_ids.map(id => `"${sanitise(id,36)}"`).join(',')})`;
+  if (filters?.priority) query += `&priority=eq.${sanitise(filters.priority, 10)}`;
+  if (filters?.status)   query += `&status=eq.${sanitise(filters.status, 20)}`;
+
+  const res = await sb(url, key, 'leads', 'GET', null, query);
+  if (!res.ok) return errRes('Failed to fetch leads', 500, cors);
+  const leads = await res.json();
+  if (!leads.length) return errRes('No leads to export', 400, cors);
+
+  const csv      = buildCSV(leads, format);
+  const filename = `leads_${format}_${new Date().toISOString().slice(0,10)}.csv`;
+
+  return okRes({ csv, filename, count: leads.length, format }, cors);
+}
+
+function buildCSV(leads, format) {
+  const COLS = {
+    generic: [
+      'First Name','Last Name','Company','Title','Email','LinkedIn URL','Website',
+      'Location','ICP Score','Priority','Score Reason','Status','Outreach Status','Notes'
+    ],
+    hubspot: [
+      'First Name','Last Name','Company Name','Job Title','Email Address',
+      'LinkedIn Bio','Website URL','City','Lead Score','Lifecycle Stage'
+    ],
+    apollo: [
+      'First Name','Last Name','Company','Title','Email','LinkedIn URL',
+      'Website','Location','Score','Stage'
+    ],
+  };
+
+  const cols = COLS[format] || COLS.generic;
+
+  const MAP = {
+    'First Name':       l => (l.name || '').split(' ')[0],
+    'Last Name':        l => (l.name || '').split(' ').slice(1).join(' '),
+    'Company':          l => l.company || '',
+    'Company Name':     l => l.company || '',
+    'Title':            l => l.title || '',
+    'Job Title':        l => l.title || '',
+    'Email':            l => l.email || '',
+    'Email Address':    l => l.email || '',
+    'LinkedIn URL':     l => l.linkedin_url || '',
+    'LinkedIn Bio':     l => l.linkedin_url || '',
+    'Website':          l => l.website || '',
+    'Website URL':      l => l.website || '',
+    'Location':         l => l.location || '',
+    'City':             l => l.location || '',
+    'ICP Score':        l => l.icp_score ?? '',
+    'Lead Score':       l => l.icp_score ?? '',
+    'Score':            l => l.icp_score ?? '',
+    'Priority':         l => l.priority || '',
+    'Score Reason':     l => l.score_reason || '',
+    'Status':           l => l.status || '',
+    'Outreach Status':  l => l.outreach_status || '',
+    'Lifecycle Stage':  l => hubspotStage(l.status),
+    'Stage':            l => l.status || '',
+    'Notes':            l => l.notes || '',
+  };
+
+  const rows = leads.map(l => cols.map(col => csvCell((MAP[col]?.(l) ?? ''))));
+  return [cols.map(csvCell), ...rows].map(r => r.join(',')).join('\r\n');
+}
+
+function hubspotStage(status) {
+  const map = { unprocessed: 'Lead', analyzed: 'Marketing Qualified Lead',
+    mapped: 'Sales Qualified Lead', archived: 'Unqualified' };
+  return map[status] || 'Lead';
+}
+function csvCell(val) {
+  const s = String(val ?? '').replace(/"/g, '""');
+  return /[,"\r\n]/.test(s) ? `"${s}"` : s;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// GET LEADS — paginated + filtered
+// ══════════════════════════════════════════════════════════════════
+async function handleGetLeads(body, userId, url, key, cors) {
+  const { status, priority, search, source_file, limit = 100, offset = 0 } = body;
+
+  let query = `?user_id=eq.${userId}&order=icp_score.desc.nullslast,created_at.desc&limit=${limit}&offset=${offset}`;
+  if (status)      query += `&status=eq.${sanitise(status, 20)}`;
+  if (priority)    query += `&priority=eq.${sanitise(priority, 10)}`;
+  if (source_file) query += `&source_file=eq.${encodeURIComponent(sanitise(source_file, 200))}`;
+  if (search)      query += `&or=(name.ilike.*${encodeURIComponent(sanitise(search, 100))}*,company.ilike.*${encodeURIComponent(sanitise(search, 100))}*,email.ilike.*${encodeURIComponent(sanitise(search, 100))}*)`;
+
+  const res = await sb(url, key, 'leads', 'GET', null, query);
+  if (!res.ok) return errRes('Failed to fetch leads', 500, cors);
+  const leads = await res.json();
+  return okRes({ leads, total: leads.length, offset, limit }, cors);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// UPDATE LEAD
+// ══════════════════════════════════════════════════════════════════
+async function handleUpdateLead(body, userId, url, key, cors) {
+  const errors = validate({ lead_id: 'string|required' }, body);
+  if (errors.length) return errRes(errors[0], 400, cors);
+
+  const ALLOWED = ['status','notes','outreach_status','tags','icp_score','priority','score_reason','last_contacted_at'];
+  const safe = {};
+  for (const k of ALLOWED) {
+    if (k in body.updates) safe[k] = body.updates[k];
+  }
+  if (!Object.keys(safe).length) return errRes('No valid update fields provided', 400, cors);
+
+  const res = await sb(url, key, 'leads', 'PATCH', JSON.stringify(safe),
+    `?id=eq.${sanitise(body.lead_id, 36)}&user_id=eq.${userId}`);
+  if (!res.ok) return errRes('Failed to update lead', 500, cors);
+  return okRes({ updated: true }, cors);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// TRACK OUTREACH EVENT
+// ══════════════════════════════════════════════════════════════════
+async function handleTrackOutreach(body, userId, url, key, cors) {
+  const errors = validate({
+    lead_id:    'string|required',
+    channel:    'string|required',
+    event_type: 'string|required',
+  }, body);
+  if (errors.length) return errRes(errors[0], 400, cors);
+
+  const { lead_id, channel, event_type, subject, body: bodyText, sequence_step = 1 } = body;
+
+  const validChannels = ['email','linkedin','call','other'];
+  const validEvents   = ['sent','opened','replied','bounced','meeting_booked'];
+  if (!validChannels.includes(channel))   return errRes(`Invalid channel: ${channel}`, 400, cors);
+  if (!validEvents.includes(event_type))  return errRes(`Invalid event_type: ${event_type}`, 400, cors);
+
+  const res = await sb(url, key, 'outreach_events', 'POST', JSON.stringify({
+    lead_id:       sanitise(lead_id, 36),
+    user_id:       userId,
+    channel,
+    event_type,
+    subject:       sanitise(subject || '', 300),
+    body_snippet:  sanitise(bodyText || '', 500),
+    sequence_step,
+  }));
+
+  // Also update lead outreach_status
+  const statusMap = { sent: 'sent', replied: 'replied', bounced: 'bounced',
+    meeting_booked: 'replied', opened: 'sent' };
+  if (statusMap[event_type]) {
+    await sb(url, key, 'leads', 'PATCH',
+      JSON.stringify({ outreach_status: statusMap[event_type], last_contacted_at: new Date().toISOString() }),
+      `?id=eq.${sanitise(lead_id, 36)}&user_id=eq.${userId}`);
+  }
+
+  return okRes({ tracked: true }, cors);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// DELETE LEADS (bulk)
+// ══════════════════════════════════════════════════════════════════
+async function handleDeleteLeads(body, userId, url, key, cors) {
+  const errors = validate({ lead_ids: 'array|required' }, body);
+  if (errors.length) return errRes(errors[0], 400, cors);
+
+  const ids = body.lead_ids.slice(0, 500).map(id => `"${sanitise(id, 36)}"`).join(',');
+  const res = await sb(url, key, 'leads', 'DELETE', null,
+    `?id=in.(${ids})&user_id=eq.${userId}`);
+  if (!res.ok) return errRes('Failed to delete leads', 500, cors);
+  return okRes({ deleted: body.lead_ids.length }, cors);
+}
+
+// ── Pure CSV parser (no external deps — Worker compatible) ─────────
+function parseCSV(text) {
+  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+  if (lines.length < 2) return [];
+
+  const headers = splitCSVLine(lines[0]).map(h => h.trim().toLowerCase());
+  const rows    = [];
+
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i].trim();
+    if (!line) continue;
+    const values = splitCSVLine(line);
+    const row    = {};
+    headers.forEach((h, j) => { row[h] = (values[j] || '').trim(); });
+    rows.push(row);
+  }
+
+  return rows;
+}
+
+function splitCSVLine(line) {
+  const result = [];
+  let current  = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') {
+      if (inQuotes && line[i + 1] === '"') {
+        current += '"';
+        i++;
+      } else {
+        inQuotes = !inQuotes;
+      }
+    } else if (c === ',' && !inQuotes) {
+      result.push(current);
+      current = '';
+    } else {
+      current += c;
+    }
+  }
+  result.push(current);
+  return result;
+}
+
+function findField(obj, keys) {
+  for (const k of keys) {
+    for (const [key, val] of Object.entries(obj)) {
+      if (key.toLowerCase().trim() === k.toLowerCase()) return String(val || '');
+    }
+  }
+  return '';
+}
+
+// ── Supabase helper ───────────────────────────────────────────────
+const sb = (url, key, table, method, body, qs = '') =>
+  fetch(`${url}/rest/v1/${table}${qs}`, {
+    method,
+    headers: {
+      'Content-Type':  'application/json',
+      apikey:          key,
+      Authorization:   `Bearer ${key}`,
+      Prefer:          method === 'POST' ? 'return=representation' : 'return=minimal',
+    },
+    body: body || undefined,
+  });
+
+export async function onRequestOptions(context) {
+  return new Response(null, { status: 204, headers: corsHeaders(context.env) });
+}
