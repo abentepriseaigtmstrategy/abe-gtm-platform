@@ -120,20 +120,19 @@
   const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFjbHZ5ZHRqc3JpcHJpbWNzYmh0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM3MzkxNTYsImV4cCI6MjA4OTMxNTE1Nn0.dJRXojiytadPjWQ-D77yUofti94ufYLGrKteiTy0Te0";
 
   // Initialize Supabase client
-  const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-  // Check if already logged in
-  (async () => {
-    try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        console.log('Already logged in, redirecting...');
-        window.location.replace('dashboard.html');
-      }
-    } catch (error) {
-      console.error('Error checking session:', error);
+// Check if already logged in
+(async () => {
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) {
+      window.location.replace('dashboard.html');
     }
-  })();
+  } catch (error) {
+    console.error(error);
+  }
+})();
 
   function switchTab(tab) {
     document.getElementById('form-in').style.display = tab === 'in' ? 'block' : 'none';
