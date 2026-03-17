@@ -1,0 +1,2698 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GTM Strategy Builder V2 · AB AI Revenue Infrastructure</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --bg:       #0B0F1A;
+      --bg-alt:   #0D1120;
+      --card:     #121827;
+      --border:   #1F2937;
+      --accent:   #a855f7;
+      --accent2:  #7c3aed;
+      --green:    #22c55e;
+      --amber:    #f59e0b;
+      --red:      #ef4444;
+      --blue:     #3b82f6;
+      --text:     #E5E7EB;
+      --muted:    #6B7280;
+      --faint:    #374151;
+      --white:    #ffffff;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      overflow-x: hidden;
+    }
+
+    /* Grid blueprint background */
+    body::before {
+      content: '';
+      position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background-image:
+        linear-gradient(rgba(168,85,247,0.02) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(168,85,247,0.02) 1px, transparent 1px);
+      background-size: 48px 48px;
+    }
+
+    /* ── TOP NAV ── */
+    #topnav {
+      position: sticky; top: 0; z-index: 100;
+      background: rgba(11,15,26,0.95);
+      backdrop-filter: blur(24px);
+      border-bottom: 1px solid rgba(31,41,55,0.6);
+      padding: 0 32px;
+      display: flex; align-items: center; justify-content: space-between;
+      height: 58px;
+    }
+
+    .nav-brand {
+      display: flex; align-items: center; gap: 12px;
+      text-decoration: none;
+    }
+    .nav-mark {
+      width: 32px; height: 32px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'Space Mono', monospace;
+      font-size: 11px; font-weight: 700; color: white;
+      flex-shrink: 0;
+    }
+    .nav-brand-text { line-height: 1.2; }
+    .nav-brand-name { font-size: 11px; font-weight: 800; color: white; }
+    .nav-brand-sub { font-family: 'Space Mono', monospace; font-size: 8px; color: var(--muted); letter-spacing: 0.14em; text-transform: uppercase; }
+
+    .nav-center {
+      display: flex; align-items: center; gap: 4px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 4px;
+    }
+
+    .nav-tab {
+      font-size: 10px; font-weight: 700; letter-spacing: 0.08em;
+      text-transform: uppercase; color: var(--muted);
+      padding: 6px 14px; border-radius: 7px;
+      cursor: pointer; transition: all 0.15s;
+      text-decoration: none; border: none; background: none;
+    }
+    .nav-tab:hover { color: white; background: rgba(255,255,255,0.04); }
+    .nav-tab.active {
+      color: white; background: rgba(168,85,247,0.12);
+      border: 1px solid rgba(168,85,247,0.25);
+    }
+    .nav-tab.active-accent { color: var(--accent); border-color: rgba(168,85,247,0.3); }
+
+    .nav-right { display: flex; align-items: center; gap: 10px; }
+
+    .status-dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 8px var(--green);
+      animation: pulse-dot 2s ease-in-out infinite;
+    }
+    @keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.4} }
+
+    .status-label { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); }
+
+    /* ── PAGE LAYOUT ── */
+    .page { position: relative; z-index: 1; display: flex; gap: 0; min-height: calc(100vh - 58px); }
+
+    /* ── LEFT SIDEBAR ── */
+    .sidebar {
+      width: 280px; flex-shrink: 0;
+      background: rgba(13,17,32,0.8);
+      border-right: 1px solid var(--border);
+      padding: 28px 0;
+      position: sticky;
+      top: 58px;
+      height: calc(100vh - 58px);
+      overflow-y: auto;
+      display: flex; flex-direction: column;
+    }
+
+    .sidebar-section-title {
+      font-size: 8px; font-weight: 900; text-transform: uppercase;
+      letter-spacing: 0.25em; color: var(--muted);
+      padding: 0 24px; margin-bottom: 12px;
+    }
+
+    .step-nav-item {
+      display: flex; align-items: center; gap: 14px;
+      padding: 12px 24px;
+      cursor: pointer; transition: all 0.15s;
+      border-left: 3px solid transparent;
+      position: relative;
+    }
+    .step-nav-item:hover { background: rgba(168,85,247,0.04); }
+    .step-nav-item.active { border-left-color: var(--accent); background: rgba(168,85,247,0.06); }
+    .step-nav-item.completed { opacity: 0.8; }
+    .step-nav-item.locked { opacity: 0.35; cursor: not-allowed; }
+
+    .step-num {
+      width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 10px; font-weight: 900; font-family: 'Space Mono', monospace;
+      border: 1.5px solid var(--faint); color: var(--muted);
+      background: transparent; transition: all 0.2s;
+    }
+    .step-nav-item.active .step-num {
+      border-color: var(--accent); color: var(--accent);
+      background: rgba(168,85,247,0.1);
+      box-shadow: 0 0 12px rgba(168,85,247,0.2);
+    }
+    .step-nav-item.completed .step-num {
+      border-color: var(--green); color: var(--green);
+      background: rgba(34,197,94,0.08);
+    }
+    .step-nav-item.running .step-num {
+      border-color: var(--amber); color: var(--amber);
+      background: rgba(245,158,11,0.08);
+      animation: spin-ring 1.2s linear infinite;
+    }
+    @keyframes spin-ring {
+      0% { box-shadow: 0 0 0 0 rgba(245,158,11,0.4); }
+      50% { box-shadow: 0 0 12px 3px rgba(245,158,11,0.2); }
+      100% { box-shadow: 0 0 0 0 rgba(245,158,11,0.4); }
+    }
+
+    .step-info { flex: 1; min-width: 0; }
+    .step-name { font-size: 11px; font-weight: 700; color: var(--text); margin-bottom: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .step-nav-item.locked .step-name { color: var(--muted); }
+    .step-desc { font-size: 9px; color: var(--muted); }
+
+    .step-status-badge {
+      font-size: 8px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em;
+      padding: 2px 7px; border-radius: 4px;
+    }
+    .badge-done { background: rgba(34,197,94,0.1); color: var(--green); border: 1px solid rgba(34,197,94,0.2); }
+    .badge-run { background: rgba(245,158,11,0.1); color: var(--amber); border: 1px solid rgba(245,158,11,0.2); }
+    .badge-ready { background: rgba(168,85,247,0.1); color: var(--accent); border: 1px solid rgba(168,85,247,0.2); }
+
+    .sidebar-footer {
+      margin-top: auto;
+      padding: 20px 24px;
+      border-top: 1px solid var(--border);
+    }
+
+    .progress-bar-wrap {
+      background: rgba(31,41,55,0.5);
+      border-radius: 100px; height: 5px;
+      overflow: hidden; margin-bottom: 8px;
+    }
+    .progress-bar-fill {
+      height: 100%; border-radius: 100px;
+      background: linear-gradient(90deg, var(--accent2), var(--accent));
+      transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+      box-shadow: 0 0 8px rgba(168,85,247,0.5);
+    }
+    .progress-label { font-size: 9px; font-weight: 700; color: var(--muted); display: flex; justify-content: space-between; }
+    .progress-label span:last-child { color: var(--accent); }
+
+    /* ── MAIN CONTENT ── */
+    .main { flex: 1; padding: 32px 40px; min-width: 0; max-width: calc(100% - 280px); }
+
+    /* ── INPUT SECTION ── */
+    .input-bar {
+      background: rgba(18,24,39,0.6);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 28px 32px;
+      margin-bottom: 32px;
+      position: relative;
+      overflow: hidden;
+    }
+    .input-bar::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, rgba(168,85,247,0.4), transparent);
+    }
+
+    .input-bar-title {
+      font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.2em;
+      color: var(--accent); margin-bottom: 20px;
+      display: flex; align-items: center; gap: 10px;
+    }
+    .input-bar-title::before {
+      content: ''; width: 4px; height: 14px;
+      background: linear-gradient(180deg, var(--accent), var(--accent2)); border-radius: 2px;
+    }
+
+    .input-row { display: flex; gap: 16px; align-items: flex-end; }
+
+    .input-group { flex: 1; }
+    .input-label {
+      font-size: 9px; font-weight: 800; text-transform: uppercase;
+      letter-spacing: 0.15em; color: var(--muted); margin-bottom: 8px; display: block;
+    }
+    .text-input {
+      width: 100%; padding: 14px 18px;
+      background: rgba(0,0,0,0.4);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 500;
+      color: var(--text); outline: none;
+      transition: all 0.2s;
+    }
+    .text-input:focus { border-color: var(--accent); background: rgba(168,85,247,0.04); box-shadow: 0 0 0 3px rgba(168,85,247,0.08); }
+    .text-input::placeholder { color: var(--faint); }
+
+    /* ── BUTTONS ── */
+    .btn {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 14px 24px; border-radius: 12px;
+      font-family: 'Inter', sans-serif; font-size: 11px; font-weight: 800;
+      letter-spacing: 0.08em; text-transform: uppercase;
+      cursor: pointer; border: none; outline: none;
+      transition: all 0.2s; white-space: nowrap;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: white;
+      box-shadow: 0 4px 20px rgba(168,85,247,0.3);
+    }
+    .btn-primary:hover:not(:disabled) {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 32px rgba(168,85,247,0.45);
+    }
+    .btn-primary:disabled {
+      opacity: 0.4; cursor: not-allowed; transform: none;
+    }
+    .btn-outline {
+      background: transparent; color: var(--muted);
+      border: 1px solid var(--border);
+    }
+    .btn-outline:hover { border-color: var(--accent); color: white; }
+    .btn-green {
+      background: linear-gradient(135deg, #16a34a, #15803d);
+      color: white; box-shadow: 0 4px 20px rgba(34,197,94,0.2);
+    }
+    .btn-green:hover:not(:disabled) { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(34,197,94,0.3); }
+    .btn-sm { padding: 8px 16px; font-size: 9px; border-radius: 8px; }
+    .btn-icon { width: 36px; height: 36px; padding: 0; border-radius: 10px; justify-content: center; }
+
+    /* ── STEP CARD ── */
+    .step-card {
+      background: rgba(18,24,39,0.5);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      margin-bottom: 24px;
+      overflow: hidden;
+      transition: all 0.3s;
+    }
+    .step-card.is-active { border-color: rgba(168,85,247,0.35); box-shadow: 0 0 32px rgba(168,85,247,0.06); }
+    .step-card.is-complete { border-color: rgba(34,197,94,0.2); }
+    .step-card.is-locked { opacity: 0.45; pointer-events: none; }
+
+    .step-card-header {
+      display: flex; align-items: center; gap: 18px;
+      padding: 22px 28px;
+      cursor: pointer;
+      transition: background 0.15s;
+      position: relative;
+    }
+    .step-card-header:hover { background: rgba(255,255,255,0.02); }
+
+    .step-icon {
+      width: 44px; height: 44px; border-radius: 12px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+      background: rgba(31,41,55,0.5);
+      border: 1px solid var(--border);
+    }
+    .step-card.is-active .step-icon { background: rgba(168,85,247,0.1); border-color: rgba(168,85,247,0.3); }
+    .step-card.is-complete .step-icon { background: rgba(34,197,94,0.08); border-color: rgba(34,197,94,0.2); }
+
+    .step-card-meta { flex: 1; }
+    .step-card-num { font-size: 8px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.2em; color: var(--muted); margin-bottom: 3px; }
+    .step-card.is-active .step-card-num { color: var(--accent); }
+    .step-card.is-complete .step-card-num { color: var(--green); }
+    .step-card-title { font-size: 15px; font-weight: 800; color: white; margin-bottom: 4px; }
+    .step-card-desc { font-size: 11px; color: var(--muted); }
+
+    .step-pill {
+      font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em;
+      padding: 5px 12px; border-radius: 20px;
+    }
+    .pill-locked { background: rgba(55,65,81,0.4); color: var(--faint); border: 1px solid var(--border); }
+    .pill-ready { background: rgba(168,85,247,0.1); color: var(--accent); border: 1px solid rgba(168,85,247,0.25); }
+    .pill-running { background: rgba(245,158,11,0.1); color: var(--amber); border: 1px solid rgba(245,158,11,0.3); animation: glow-amber 1.5s ease-in-out infinite; }
+    .pill-done { background: rgba(34,197,94,0.1); color: var(--green); border: 1px solid rgba(34,197,94,0.25); }
+    @keyframes glow-amber { 0%,100%{box-shadow:none} 50%{box-shadow:0 0 12px rgba(245,158,11,0.2)} }
+
+    /* Step body (expandable) */
+    .step-body { display: none; padding: 0 28px 28px; }
+    .step-body.open { display: block; }
+
+    .step-divider { height: 1px; background: var(--border); margin-bottom: 24px; }
+
+    /* Context chips */
+    .context-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 20px; }
+    .context-chip {
+      display: flex; align-items: center; gap: 6px;
+      background: rgba(168,85,247,0.06);
+      border: 1px solid rgba(168,85,247,0.2);
+      border-radius: 8px; padding: 5px 10px;
+      font-size: 9px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.08em; color: #c4b5fd;
+    }
+    .context-chip-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--green); }
+
+    /* Loading state */
+    .loading-state {
+      display: none;
+      align-items: center; gap: 16px;
+      padding: 32px;
+      background: rgba(0,0,0,0.3); border-radius: 16px;
+      margin: 16px 0;
+    }
+    .loading-state.show { display: flex; }
+
+    .loader-ring {
+      width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+      border: 2px solid rgba(168,85,247,0.15);
+      border-top-color: var(--accent);
+      animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .loader-text { flex: 1; }
+    .loader-headline { font-size: 12px; font-weight: 700; color: white; margin-bottom: 4px; }
+    .loader-sub { font-size: 10px; color: var(--muted); }
+
+    .loader-dots span {
+      display: inline-block; width: 4px; height: 4px; border-radius: 50%;
+      background: var(--accent); margin: 0 2px;
+      animation: dot-bounce 1.2s ease-in-out infinite;
+    }
+    .loader-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .loader-dots span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes dot-bounce { 0%,60%,100%{transform:translateY(0)} 30%{transform:translateY(-6px)} }
+
+    /* ── OUTPUT BLOCKS ── */
+    .output-section { display: none; margin-top: 4px; }
+    .output-section.show { display: block; }
+
+    .output-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px; }
+    .output-grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    .output-grid-full { grid-column: 1 / -1; }
+
+    .output-block {
+      background: rgba(0,0,0,0.35);
+      border: 1px solid rgba(255,255,255,0.05);
+      border-radius: 14px;
+      padding: 18px 20px;
+      transition: all 0.2s;
+    }
+    .output-block:hover { border-color: rgba(168,85,247,0.2); background: rgba(168,85,247,0.03); }
+
+    .output-block-label {
+      font-size: 8px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.18em;
+      color: var(--muted); margin-bottom: 10px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .output-block-label .obl-accent { color: var(--accent); }
+    .output-block-content { font-size: 12px; color: #d1d5db; line-height: 1.7; }
+    .output-block-content strong { color: white; }
+
+    /* Tag lists */
+    .tag-list { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .tag {
+      font-size: 10px; font-weight: 600; padding: 4px 10px; border-radius: 6px;
+      background: rgba(31,41,55,0.6); border: 1px solid var(--border); color: #9ca3af;
+    }
+    .tag.tag-accent { background: rgba(168,85,247,0.08); border-color: rgba(168,85,247,0.2); color: #c4b5fd; }
+    .tag.tag-green { background: rgba(34,197,94,0.08); border-color: rgba(34,197,94,0.2); color: #86efac; }
+    .tag.tag-blue { background: rgba(59,130,246,0.08); border-color: rgba(59,130,246,0.2); color: #93c5fd; }
+    .tag.tag-amber { background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.2); color: #fcd34d; }
+
+    /* Score ring */
+    .score-ring-wrap { display: flex; align-items: center; gap: 16px; }
+    .score-ring {
+      width: 64px; height: 64px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      position: relative; flex-shrink: 0;
+    }
+    .score-number { font-size: 16px; font-weight: 900; font-family: 'Space Mono', monospace; }
+
+    /* Email message block */
+    .email-block {
+      background: rgba(0,0,0,0.4);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 12px; padding: 18px 20px;
+      margin-top: 16px;
+    }
+    .email-subject { font-size: 11px; font-weight: 700; color: #c4b5fd; margin-bottom: 8px; }
+    .email-body { font-size: 12px; color: #d1d5db; line-height: 1.8; white-space: pre-wrap; }
+    .email-cta { margin-top: 12px; font-size: 11px; color: var(--green); font-weight: 700; }
+
+    /* Run button row */
+    .run-row {
+      display: flex; align-items: center; gap: 12px;
+      padding-top: 20px;
+      border-top: 1px solid rgba(31,41,55,0.5);
+      margin-top: 20px;
+    }
+    .run-row-meta { flex: 1; font-size: 10px; color: var(--muted); }
+    .run-row-meta strong { color: var(--text); }
+
+    /* ── SUMMARY PANEL ── */
+    .summary-panel {
+      display: none;
+      background: rgba(18,24,39,0.8);
+      border: 1px solid rgba(168,85,247,0.3);
+      border-radius: 20px; padding: 32px;
+      margin-top: 24px;
+      position: relative; overflow: hidden;
+    }
+    .summary-panel.show { display: block; }
+    .summary-panel::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    }
+
+    .summary-header {
+      display: flex; align-items: flex-start; justify-content: space-between;
+      margin-bottom: 28px;
+    }
+    .summary-badge {
+      background: linear-gradient(135deg, rgba(168,85,247,0.2), rgba(124,58,237,0.1));
+      border: 1px solid rgba(168,85,247,0.35);
+      border-radius: 12px; padding: 10px 18px;
+      font-family: 'Space Mono', monospace; font-size: 9px;
+      font-weight: 700; color: var(--accent); letter-spacing: 0.1em; text-transform: uppercase;
+    }
+    .summary-export-row { display: flex; gap: 10px; }
+
+    /* Error state */
+    .error-state {
+      display: none;
+      background: rgba(239,68,68,0.05);
+      border: 1px solid rgba(239,68,68,0.2);
+      border-radius: 12px; padding: 16px 20px;
+      margin-top: 12px;
+      font-size: 12px; color: #fca5a5;
+    }
+    .error-state.show { display: block; }
+
+    /* ── TOAST ── */
+    #toast {
+      position: fixed; bottom: 32px; right: 32px; z-index: 999;
+      background: rgba(18,24,39,0.95); border: 1px solid var(--accent);
+      border-radius: 14px; padding: 14px 20px;
+      font-size: 12px; font-weight: 600; color: white;
+      display: flex; align-items: center; gap: 10px;
+      transform: translateY(20px) scale(0.95); opacity: 0;
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      backdrop-filter: blur(12px);
+      max-width: 360px;
+    }
+    #toast.show { transform: none; opacity: 1; }
+    #toast.error-toast { border-color: var(--red); }
+    #toast.success-toast { border-color: var(--green); }
+
+    /* ── API CONFIG MODAL ── */
+    #apiModal {
+      display: none; position: fixed; inset: 0; z-index: 500;
+      background: rgba(0,0,0,0.75); backdrop-filter: blur(8px);
+      align-items: center; justify-content: center;
+    }
+    #apiModal.show { display: flex; }
+    .api-modal-box {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 20px; padding: 36px; width: 480px; max-width: 90vw;
+    }
+
+    /* ── EXPORT MODAL ── */
+    #exportModal {
+      display: none; position: fixed; inset: 0; z-index: 500;
+      background: rgba(0,0,0,0.75); backdrop-filter: blur(8px);
+      align-items: center; justify-content: center;
+    }
+    #exportModal.show { display: flex; }
+    .export-modal-box {
+      background: var(--card); border: 1px solid var(--border);
+      border-radius: 20px; padding: 36px; width: 560px; max-width: 90vw;
+      max-height: 85vh; overflow-y: auto;
+    }
+
+    /* Scrollbar */
+    ::-webkit-scrollbar { width: 5px; height: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #312e81; border-radius: 10px; }
+
+    /* ── SECTION DIVIDERS ── */
+    .section-eyebrow {
+      font-size: 8px; font-weight: 900; text-transform: uppercase;
+      letter-spacing: 0.25em; color: var(--accent);
+      display: flex; align-items: center; gap: 10px; margin-bottom: 6px;
+    }
+    .section-eyebrow::before { content: ''; width: 20px; height: 1px; background: var(--accent); opacity: 0.5; }
+    .section-title { font-size: 20px; font-weight: 900; color: white; letter-spacing: -0.5px; margin-bottom: 6px; }
+    .section-sub { font-size: 12px; color: var(--muted); }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 1024px) {
+      .sidebar { width: 240px; }
+      .main { padding: 24px; }
+      .output-grid { grid-template-columns: 1fr; }
+      .output-grid-3 { grid-template-columns: 1fr; }
+    }
+    @media (max-width: 768px) {
+      .sidebar { display: none; }
+      .main { max-width: 100%; padding: 20px; }
+      .input-row { flex-direction: column; }
+    }
+
+    /* Animations */
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-in { animation: fadeInUp 0.4s ease forwards; }
+
+    .token-counter {
+      font-family: 'Space Mono', monospace;
+      font-size: 9px; color: var(--muted);
+      background: rgba(0,0,0,0.3); border-radius: 6px;
+      padding: 3px 8px; display: inline-flex; align-items: center; gap: 4px;
+    }
+    .token-dot { width: 4px; height: 4px; border-radius: 50%; background: var(--accent); }
+
+    /* ── FOOTER ── */
+    .site-footer {
+      border-top: 1px solid var(--border);
+      padding: 52px 0 32px;
+      position: relative; z-index: 1;
+      background: var(--bg);
+    }
+    .footer-wrap { max-width: 1240px; margin: 0 auto; padding: 0 40px; }
+    .footer-g { display: grid; grid-template-columns: 220px 1fr; gap: 80px; margin-bottom: 44px; }
+    .fbname { font-size: 13px; font-weight: 800; color: white; margin-top: 14px; margin-bottom: 6px; }
+    .fbdesc { font-size: 11px; color: var(--muted); line-height: 1.65; max-width: 200px; }
+    .footer-cols { display: grid; grid-template-columns: repeat(4, 1fr); gap: 40px; }
+    .fctitle { font-family: 'Space Mono', monospace; font-size: 9px; font-weight: 700; letter-spacing: 0.25em; text-transform: uppercase; color: var(--muted); margin-bottom: 18px; }
+    .fcol ul { list-style: none; display: flex; flex-direction: column; gap: 11px; }
+    .fcol a { font-size: 12px; color: var(--faint); transition: color 0.15s; text-decoration: none; }
+    .fcol a:hover { color: white; }
+    .footer-btm { padding-top: 24px; border-top: 1px solid rgba(31,41,55,0.45); display: flex; align-items: center; justify-content: space-between; }
+    .footer-copy { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--faint); letter-spacing: 0.06em; }
+    .footer-status { display: flex; align-items: center; gap: 8px; }
+    .footer-status span { font-family: 'Space Mono', monospace; font-size: 10px; color: var(--muted); }
+    .sdot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse-dot 2s ease-in-out infinite; }
+    @media (max-width: 768px) {
+      .footer-g { grid-template-columns: 1fr; gap: 36px; }
+      .footer-cols { grid-template-columns: repeat(2, 1fr); gap: 28px; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── AUTH GUARD ── -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="auth-guard.js"></script>
+
+<!-- ── TOP NAV ── -->
+<nav id="topnav">
+  <a href="index.html" class="nav-brand">
+    <div class="nav-mark">AB</div>
+    <div class="nav-brand-text">
+      <div class="nav-brand-name">AI Revenue Infrastructure</div>
+      <div class="nav-brand-sub">Enterprise GTM Platform</div>
+    </div>
+  </a>
+
+  <div class="nav-center">
+    <a href="index.html" class="nav-tab">Home</a>
+    <a href="dashboard.html" class="nav-tab">Command Centre</a>
+    <button class="nav-tab active active-accent">GTM Strategy</button>
+    <a href="vault.html" class="nav-tab">Strategy Vault</a>
+    <a href="dashboard.html" onclick="sessionStorage.setItem('dash_view','saved');return true;" class="nav-tab">Repository</a>
+  </div>
+
+  <div class="nav-right">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <div class="status-dot"></div>
+      <span class="status-label">Systems Nominal</span>
+    </div>
+    <button class="btn btn-outline btn-sm" onclick="openApiModal()">⚙ Config</button>
+    <button class="btn btn-outline btn-sm" onclick="handleSignOut()" style="color:#9ca3af;">Sign Out</button>
+  </div>
+</nav>
+
+<!-- ── MAIN PAGE ── -->
+<div class="page">
+
+  <!-- ── SIDEBAR ── -->
+  <aside class="sidebar">
+    <div style="padding: 0 24px 20px;">
+      <div class="sidebar-section-title">Workflow Pipeline</div>
+    </div>
+
+    <div id="step-nav-1" class="step-nav-item active" onclick="scrollToStep(1)">
+      <div class="step-num" id="snnum-1">01</div>
+      <div class="step-info">
+        <div class="step-name">Market Research</div>
+        <div class="step-desc">Company Profile · GTM Fit</div>
+      </div>
+    </div>
+
+    <div id="step-nav-2" class="step-nav-item locked" onclick="scrollToStep(2)">
+      <div class="step-num" id="snnum-2">02</div>
+      <div class="step-info">
+        <div class="step-name">TAM Mapping</div>
+        <div class="step-desc">Segments · Sizing · Growth</div>
+      </div>
+    </div>
+
+    <div id="step-nav-3" class="step-nav-item locked" onclick="scrollToStep(3)">
+      <div class="step-num" id="snnum-3">03</div>
+      <div class="step-info">
+        <div class="step-name">ICP Modeling</div>
+        <div class="step-desc">Personas · Pain Points</div>
+      </div>
+    </div>
+
+    <div id="step-nav-4" class="step-nav-item locked" onclick="scrollToStep(4)">
+      <div class="step-num" id="snnum-4">04</div>
+      <div class="step-info">
+        <div class="step-name">Account Sourcing</div>
+        <div class="step-desc">Databases · Filters</div>
+      </div>
+    </div>
+
+    <div id="step-nav-5" class="step-nav-item locked" onclick="scrollToStep(5)">
+      <div class="step-num" id="snnum-5">05</div>
+      <div class="step-info">
+        <div class="step-name">Keyword Generation</div>
+        <div class="step-desc">Search Strings · Boolean</div>
+      </div>
+    </div>
+
+    <div id="step-nav-6" class="step-nav-item locked" onclick="scrollToStep(6)">
+      <div class="step-num" id="snnum-6">06</div>
+      <div class="step-info">
+        <div class="step-name">Messaging Creation</div>
+        <div class="step-desc">Emails · Subject Lines · CTAs</div>
+      </div>
+    </div>
+
+    <div class="sidebar-footer">
+      <div class="progress-bar-wrap">
+        <div class="progress-bar-fill" id="main-progress-fill" style="width:0%"></div>
+      </div>
+      <div class="progress-label">
+        <span>Strategy Progress</span>
+        <span id="main-progress-pct">0 / 6</span>
+      </div>
+      <div style="margin-top:14px; display:flex; flex-direction:column; gap:8px;">
+        <div class="token-counter" id="token-counter">
+          <div class="token-dot"></div>
+          <span>0 tokens used</span>
+        </div>
+        <div style="font-size:9px; color:var(--muted);">~$0.00 estimated cost</div>
+      </div>
+    </div>
+  </aside>
+
+  <!-- ── MAIN CONTENT ── -->
+  <main class="main">
+
+    <!-- Input bar -->
+    <div class="input-bar">
+      <div class="input-bar-title">Initialise Strategy Engine</div>
+      <div class="input-row">
+        <div class="input-group">
+          <label class="input-label" for="company-input">Target Company Name</label>
+          <input type="text" id="company-input" class="text-input"
+            placeholder="e.g. Salesforce, Stripe, HubSpot..."
+            oninput="onCompanyInput()" onkeypress="if(event.key==='Enter') startStrategy()" />
+        </div>
+        <div class="input-group" style="max-width:220px;">
+          <label class="input-label" for="website-input">Company Website (optional)</label>
+          <input type="text" id="website-input" class="text-input" placeholder="e.g. https://stripe.com"
+            oninput="onWebsiteInput()" />
+        </div>
+        <div class="input-group" style="max-width:180px;">
+          <label class="input-label" for="industry-input">Industry (optional)</label>
+          <input type="text" id="industry-input" class="text-input" placeholder="e.g. SaaS, Fintech..." />
+        </div>
+        <button class="btn btn-primary" id="start-btn" onclick="startStrategy()" disabled>
+          <span id="start-btn-icon">⚡</span> Launch Pipeline
+        </button>
+        <button class="btn btn-outline btn-sm btn-icon" onclick="resetAll()" title="Reset">↺</button>
+      </div>
+      <!-- Website extraction status -->
+      <div id="website-status" style="display:none;margin-top:10px;padding:8px 14px;background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.2);border-radius:8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#86efac;display:flex;align-items:center;gap:8px;">
+        <span id="website-status-dot" style="width:6px;height:6px;border-radius:50%;background:var(--green);flex-shrink:0;"></span>
+        <span id="website-status-text">Extracting company profile from website…</span>
+      </div>
+      <!-- Cache hit notice -->
+      <div id="cache-notice" style="display:none;margin-top:10px;padding:8px 14px;background:rgba(168,85,247,0.06);border:1px solid rgba(168,85,247,0.2);border-radius:8px;font-size:10px;font-weight:700;letter-spacing:0.1em;color:#c4b5fd;">
+        ⚡ Cached strategy found for this company. <button onclick="loadCachedStrategy()" style="background:none;border:none;color:var(--accent);font-size:10px;font-weight:900;cursor:pointer;text-decoration:underline;">Load it</button> or run a fresh analysis below.
+      </div>
+    </div>
+
+    <!-- Step 1: Market Research -->
+    <div class="step-card is-active" id="card-1">
+      <div class="step-card-header" onclick="toggleStep(1)">
+        <div class="step-icon">🔍</div>
+        <div class="step-card-meta">
+          <div class="step-card-num">Step 01 — Market Research</div>
+          <div class="step-card-title">Deep Market Intelligence</div>
+          <div class="step-card-desc">Company profile, market position, GTM relevance analysis</div>
+        </div>
+        <div class="step-pill pill-ready" id="pill-1">Ready</div>
+      </div>
+      <div class="step-body open" id="body-1">
+        <div class="step-divider"></div>
+
+        <div class="loading-state" id="loading-1">
+          <div class="loader-ring"></div>
+          <div class="loader-text">
+            <div class="loader-headline">Running Deep Market Research</div>
+            <div class="loader-sub">Analysing company profile, market position & GTM fit <span class="loader-dots"><span></span><span></span><span></span></span></div>
+          </div>
+        </div>
+
+        <div class="error-state" id="error-1"></div>
+
+        <div class="output-section" id="output-1">
+          <div class="output-grid">
+            <div class="output-block" id="ob-company-overview">
+              <div class="output-block-label">🏢 Company Overview</div>
+              <div class="output-block-content" id="oc-overview">—</div>
+            </div>
+            <div class="output-block" id="ob-market-pos">
+              <div class="output-block-label">📊 Market Position</div>
+              <div class="output-block-content" id="oc-market-pos">—</div>
+            </div>
+            <div class="output-block" id="ob-gtm-fit">
+              <div class="output-block-label"><span class="obl-accent">GTM Relevance Score</span></div>
+              <div id="oc-gtm-score" style="margin-top:4px;"></div>
+            </div>
+            <div class="output-block" id="ob-signals">
+              <div class="output-block-label">⚡ Growth Signals</div>
+              <div class="tag-list" id="oc-signals"></div>
+            </div>
+            <div class="output-block output-grid-full" id="ob-products">
+              <div class="output-block-label">🛠 Products & Services</div>
+              <div class="output-block-content" id="oc-products">—</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="run-row">
+          <div class="run-row-meta" id="meta-1">Enter a company name above to begin.</div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <div class="token-counter" id="tokens-1" style="display:none;">
+              <div class="token-dot"></div><span>0 tokens</span>
+            </div>
+            <button class="btn btn-primary btn-sm" id="run-btn-1" onclick="runStep(1)" disabled>
+              ▶ Run Research
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 2: TAM Mapping -->
+    <div class="step-card is-locked" id="card-2">
+      <div class="step-card-header" onclick="toggleStep(2)">
+        <div class="step-icon">🗺</div>
+        <div class="step-card-meta">
+          <div class="step-card-num">Step 02 — TAM Mapping</div>
+          <div class="step-card-title">Total Addressable Market Analysis</div>
+          <div class="step-card-desc">Market segments, sizing estimates, growth rates & opportunity ranking</div>
+        </div>
+        <div class="step-pill pill-locked" id="pill-2">Locked</div>
+      </div>
+      <div class="step-body" id="body-2">
+        <div class="step-divider"></div>
+
+        <div class="context-chips" id="ctx-chips-2"></div>
+
+        <div class="loading-state" id="loading-2">
+          <div class="loader-ring"></div>
+          <div class="loader-text">
+            <div class="loader-headline">Mapping Total Addressable Market</div>
+            <div class="loader-sub">Calculating segments, sizing & growth vectors <span class="loader-dots"><span></span><span></span><span></span></span></div>
+          </div>
+        </div>
+
+        <div class="error-state" id="error-2"></div>
+
+        <div class="output-section" id="output-2">
+          <div class="output-grid">
+            <div class="output-block">
+              <div class="output-block-label">💰 TAM Overview</div>
+              <div class="output-block-content" id="oc-tam-overview">—</div>
+            </div>
+            <div class="output-block">
+              <div class="output-block-label">📈 Growth Rate</div>
+              <div class="output-block-content" id="oc-tam-growth">—</div>
+            </div>
+            <div class="output-block output-grid-full">
+              <div class="output-block-label">🎯 Market Segments</div>
+              <div class="tag-list" id="oc-tam-segments"></div>
+            </div>
+            <div class="output-block output-grid-full">
+              <div class="output-block-label">🏆 Priority Opportunities</div>
+              <div class="output-block-content" id="oc-tam-opps">—</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="run-row">
+          <div class="run-row-meta">Uses context from <strong>Step 1</strong></div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <div class="token-counter" id="tokens-2" style="display:none;"><div class="token-dot"></div><span>0 tokens</span></div>
+            <button class="btn btn-primary btn-sm" id="run-btn-2" onclick="runStep(2)" disabled>▶ Map Market</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 3: ICP Modeling -->
+    <div class="step-card is-locked" id="card-3">
+      <div class="step-card-header" onclick="toggleStep(3)">
+        <div class="step-icon">👤</div>
+        <div class="step-card-meta">
+          <div class="step-card-num">Step 03 — ICP Modeling</div>
+          <div class="step-card-title">Ideal Customer Profile</div>
+          <div class="step-card-desc">Target personas, firmographics, pain points & buying triggers</div>
+        </div>
+        <div class="step-pill pill-locked" id="pill-3">Locked</div>
+      </div>
+      <div class="step-body" id="body-3">
+        <div class="step-divider"></div>
+        <div class="context-chips" id="ctx-chips-3"></div>
+        <div class="loading-state" id="loading-3">
+          <div class="loader-ring"></div>
+          <div class="loader-text">
+            <div class="loader-headline">Building Ideal Customer Profile</div>
+            <div class="loader-sub">Modelling personas, pain points & buying triggers <span class="loader-dots"><span></span><span></span><span></span></span></div>
+          </div>
+        </div>
+        <div class="error-state" id="error-3"></div>
+        <div class="output-section" id="output-3">
+          <div class="output-grid">
+            <div class="output-block">
+              <div class="output-block-label">🎯 Primary ICP</div>
+              <div class="output-block-content" id="oc-icp-primary">—</div>
+            </div>
+            <div class="output-block">
+              <div class="output-block-label">🤝 Secondary ICP</div>
+              <div class="output-block-content" id="oc-icp-secondary">—</div>
+            </div>
+            <div class="output-block">
+              <div class="output-block-label">🏢 Firmographics</div>
+              <div class="output-block-content" id="oc-icp-firmographic">—</div>
+            </div>
+            <div class="output-block">
+              <div class="output-block-label">⚡ Buying Triggers</div>
+              <div class="tag-list" id="oc-icp-triggers"></div>
+            </div>
+            <div class="output-block output-grid-full">
+              <div class="output-block-label">😤 Core Pain Points</div>
+              <div class="output-block-content" id="oc-icp-pains">—</div>
+            </div>
+          </div>
+        </div>
+        <div class="run-row">
+          <div class="run-row-meta">Uses context from <strong>Steps 1–2</strong></div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <div class="token-counter" id="tokens-3" style="display:none;"><div class="token-dot"></div><span>0 tokens</span></div>
+            <button class="btn btn-primary btn-sm" id="run-btn-3" onclick="runStep(3)" disabled>▶ Model ICP</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 4: Account Sourcing -->
+    <div class="step-card is-locked" id="card-4">
+      <div class="step-card-header" onclick="toggleStep(4)">
+        <div class="step-icon">🎣</div>
+        <div class="step-card-meta">
+          <div class="step-card-num">Step 04 — Account Sourcing</div>
+          <div class="step-card-title">Lead Database Strategy</div>
+          <div class="step-card-desc">Best databases, filtering strategies & account prioritisation</div>
+        </div>
+        <div class="step-pill pill-locked" id="pill-4">Locked</div>
+      </div>
+      <div class="step-body" id="body-4">
+        <div class="step-divider"></div>
+        <div class="context-chips" id="ctx-chips-4"></div>
+        <div class="loading-state" id="loading-4">
+          <div class="loader-ring"></div>
+          <div class="loader-text">
+            <div class="loader-headline">Strategising Account Sourcing</div>
+            <div class="loader-sub">Identifying databases & filtering criteria <span class="loader-dots"><span></span><span></span><span></span></span></div>
+          </div>
+        </div>
+        <div class="error-state" id="error-4"></div>
+        <div class="output-section" id="output-4">
+          <div class="output-grid">
+            <div class="output-block">
+              <div class="output-block-label">🗄 Recommended Databases</div>
+              <div class="tag-list" id="oc-src-databases"></div>
+            </div>
+            <div class="output-block">
+              <div class="output-block-label">🔧 Filter Criteria</div>
+              <div class="output-block-content" id="oc-src-filters">—</div>
+            </div>
+            <div class="output-block output-grid-full">
+              <div class="output-block-label">📋 Sourcing Playbook</div>
+              <div class="output-block-content" id="oc-src-playbook">—</div>
+            </div>
+            <div class="output-block output-grid-full">
+              <div class="output-block-label">⚠ Exclusion Criteria</div>
+              <div class="output-block-content" id="oc-src-exclusions">—</div>
+            </div>
+          </div>
+        </div>
+        <div class="run-row">
+          <div class="run-row-meta">Uses context from <strong>Steps 1–3</strong></div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <div class="token-counter" id="tokens-4" style="display:none;"><div class="token-dot"></div><span>0 tokens</span></div>
+            <button class="btn btn-primary btn-sm" id="run-btn-4" onclick="runStep(4)" disabled>▶ Source Accounts</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 5: Keyword Generation -->
+    <div class="step-card is-locked" id="card-5">
+      <div class="step-card-header" onclick="toggleStep(5)">
+        <div class="step-icon">🔑</div>
+        <div class="step-card-meta">
+          <div class="step-card-num">Step 05 — Keyword Generation</div>
+          <div class="step-card-title">Search Intelligence Engine</div>
+          <div class="step-card-desc">Search strings, Boolean queries & LinkedIn search operators</div>
+        </div>
+        <div class="step-pill pill-locked" id="pill-5">Locked</div>
+      </div>
+      <div class="step-body" id="body-5">
+        <div class="step-divider"></div>
+        <div class="context-chips" id="ctx-chips-5"></div>
+        <div class="loading-state" id="loading-5">
+          <div class="loader-ring"></div>
+          <div class="loader-text">
+            <div class="loader-headline">Generating Search Intelligence</div>
+            <div class="loader-sub">Building keyword lists & Boolean queries <span class="loader-dots"><span></span><span></span><span></span></span></div>
+          </div>
+        </div>
+        <div class="error-state" id="error-5"></div>
+        <div class="output-section" id="output-5">
+          <div class="output-grid">
+            <div class="output-block">
+              <div class="output-block-label">🔍 Primary Keywords</div>
+              <div class="tag-list" id="oc-kw-primary"></div>
+            </div>
+            <div class="output-block">
+              <div class="output-block-label">🔀 Secondary Keywords</div>
+              <div class="tag-list" id="oc-kw-secondary"></div>
+            </div>
+            <div class="output-block output-grid-full">
+              <div class="output-block-label">⚙ Boolean Query</div>
+              <div style="background:rgba(0,0,0,0.5);border:1px solid rgba(168,85,247,0.15);border-radius:8px;padding:14px 16px;margin-top:8px;">
+                <code id="oc-kw-boolean" style="font-family:'Space Mono',monospace;font-size:10px;color:#c4b5fd;line-height:1.8;white-space:pre-wrap;">—</code>
+              </div>
+            </div>
+            <div class="output-block output-grid-full">
+              <div class="output-block-label">💼 LinkedIn Search Strings</div>
+              <div class="output-block-content" id="oc-kw-linkedin">—</div>
+            </div>
+          </div>
+        </div>
+        <div class="run-row">
+          <div class="run-row-meta">Uses context from <strong>Steps 1–4</strong></div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <div class="token-counter" id="tokens-5" style="display:none;"><div class="token-dot"></div><span>0 tokens</span></div>
+            <button class="btn btn-primary btn-sm" id="run-btn-5" onclick="runStep(5)" disabled>▶ Generate Keywords</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Step 6: Messaging Creation -->
+    <div class="step-card is-locked" id="card-6">
+      <div class="step-card-header" onclick="toggleStep(6)">
+        <div class="step-icon">✉</div>
+        <div class="step-card-meta">
+          <div class="step-card-num">Step 06 — Messaging Creation</div>
+          <div class="step-card-title">Hyper-Relevant Outreach Engine</div>
+          <div class="step-card-desc">Email variations, subject lines, CTAs & follow-up sequences</div>
+        </div>
+        <div class="step-pill pill-locked" id="pill-6">Locked</div>
+      </div>
+      <div class="step-body" id="body-6">
+        <div class="step-divider"></div>
+        <div class="context-chips" id="ctx-chips-6"></div>
+        <div class="loading-state" id="loading-6">
+          <div class="loader-ring"></div>
+          <div class="loader-text">
+            <div class="loader-headline">Crafting Hyper-Relevant Messaging</div>
+            <div class="loader-sub">Building email sequences, subject lines & CTAs from all context <span class="loader-dots"><span></span><span></span><span></span></span></div>
+          </div>
+        </div>
+        <div class="error-state" id="error-6"></div>
+        <div class="output-section" id="output-6">
+          <div id="oc-messages-container"></div>
+          <div class="output-block" style="margin-top:16px;">
+            <div class="output-block-label">🔄 Follow-Up Sequence</div>
+            <div class="output-block-content" id="oc-followup">—</div>
+          </div>
+        </div>
+        <div class="run-row">
+          <div class="run-row-meta">Uses context from <strong>ALL Steps 1–5</strong> — most context-rich output</div>
+          <div style="display:flex;gap:8px;align-items:center;">
+            <div class="token-counter" id="tokens-6" style="display:none;"><div class="token-dot"></div><span>0 tokens</span></div>
+            <button class="btn btn-primary btn-sm" id="run-btn-6" onclick="runStep(6)" disabled>▶ Create Messaging</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Execution Logs Panel -->
+    <div id="exec-logs-panel" style="display:none; background:rgba(13,17,32,0.8); border:1px solid var(--border); border-radius:16px; margin-bottom:24px; overflow:hidden;">
+      <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 22px;cursor:pointer;border-bottom:1px solid rgba(31,41,55,0.5);" onclick="toggleLogs()">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <span style="font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:0.2em;color:var(--muted);">⚙ Execution Logs</span>
+          <span id="log-count-badge" style="background:rgba(168,85,247,0.1);border:1px solid rgba(168,85,247,0.2);color:var(--accent);font-size:8px;font-weight:800;padding:2px 8px;border-radius:20px;">0 events</span>
+        </div>
+        <span id="logs-chevron" style="color:var(--muted);font-size:12px;">▼</span>
+      </div>
+      <div id="logs-body" style="display:none; max-height:320px; overflow-y:auto; padding:12px 16px;">
+        <div id="logs-list" style="font-family:'Space Mono',monospace;font-size:10px;line-height:1.9;color:#9ca3af;"></div>
+      </div>
+    </div>
+
+    <!-- Summary Panel -->
+    <div class="summary-panel" id="summary-panel">
+      <div class="summary-header">
+        <div>
+          <div class="section-eyebrow">Strategy Complete</div>
+          <div class="section-title" id="summary-company-name">Company GTM Strategy</div>
+          <div class="section-sub">Complete 6-prompt orchestration — all context carried through chain</div>
+        </div>
+        <div class="summary-export-row">
+          <button class="btn btn-outline btn-sm" onclick="openExportModal()">📄 Export PDF</button>
+          <button class="btn btn-green btn-sm" onclick="copyAllToClipboard()">📋 Copy All</button>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;">
+        <div style="background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:14px;padding:20px;text-align:center;">
+          <div style="font-size:28px;font-weight:900;color:white;font-family:'Space Mono',monospace;" id="summary-tokens">0</div>
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.15em;margin-top:4px;">Total Tokens</div>
+        </div>
+        <div style="background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:14px;padding:20px;text-align:center;">
+          <div style="font-size:28px;font-weight:900;color:var(--green);font-family:'Space Mono',monospace;">6/6</div>
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.15em;margin-top:4px;">Prompts Executed</div>
+        </div>
+        <div style="background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:14px;padding:20px;text-align:center;">
+          <div style="font-size:28px;font-weight:900;color:var(--accent);font-family:'Space Mono',monospace;" id="summary-cost">$0.00</div>
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.15em;margin-top:4px;">Est. Cost (gpt-4o-mini)</div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- ── FOOTER ── -->
+<footer class="site-footer">
+  <div class="footer-wrap">
+    <div class="footer-g">
+      <div>
+        <div class="nav-mark" style="width:40px;height:40px;">AB</div>
+        <div class="fbname">AB — Enterprise AI Revenue Infrastructure</div>
+        <div class="fbdesc">Secure, server-side AI systems for executive-grade lead qualification and GTM intelligence.</div>
+      </div>
+      <div class="footer-cols">
+        <div class="fcol">
+          <div class="fctitle">Platform</div>
+          <ul role="list">
+            <li><a href="dashboard.html">Command Centre</a></li>
+            <li><a href="gtm-strategy.html">GTM Strategy V2</a></li>
+            <li><a href="login.html">Login</a></li>
+            <li><a href="index.html#demo">Request Demo</a></li>
+          </ul>
+        </div>
+        <div class="fcol">
+          <div class="fctitle">Services</div>
+          <ul role="list">
+            <li><a href="index.html#services">AI Revenue Infra</a></li>
+            <li><a href="index.html#services">Custom Automation</a></li>
+            <li><a href="index.html#services">Data Engineering</a></li>
+            <li><a href="index.html#services">GTM Intelligence</a></li>
+          </ul>
+        </div>
+        <div class="fcol">
+          <div class="fctitle">About</div>
+          <ul role="list">
+            <li><a href="index.html#audience">Who It's For</a></li>
+            <li><a href="index.html#proof">Outcomes</a></li>
+            <li><a href="index.html#demo">Contact</a></li>
+          </ul>
+        </div>
+        <div class="fcol">
+          <div class="fctitle">Connect</div>
+          <ul role="list">
+            <li><a href="https://www.linkedin.com/in/amitbhavik" target="_blank" rel="noopener noreferrer">LinkedIn</a></li>
+            <li><a href="index.html#demo">Request Demo</a></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="footer-btm">
+      <div class="footer-copy">&copy; 2025 AB — Enterprise AI Revenue Infrastructure &nbsp;&middot;&nbsp; All rights reserved</div>
+      <div class="footer-status"><div class="sdot"></div><span>All systems operational</span></div>
+    </div>
+  </div>
+</footer>
+
+<!-- ── API CONFIG MODAL ── -->
+<div id="apiModal">
+  <div class="api-modal-box">
+    <div style="font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:0.2em;color:var(--accent);margin-bottom:6px;">API Configuration</div>
+    <div style="font-size:16px;font-weight:800;color:white;margin-bottom:4px;">OpenAI API Key</div>
+    <p style="font-size:11px;color:var(--muted);margin-bottom:24px;line-height:1.7;">
+      The platform calls <code style="background:rgba(168,85,247,0.1);color:#c4b5fd;padding:2px 6px;border-radius:4px;">/api/analyze</code> by default (your Cloudflare proxy). If you want to test locally with a direct key, enter it below. <strong style="color:white;">Never commit your API key.</strong>
+    </p>
+    <div style="margin-bottom:16px;">
+      <label class="input-label">Mode</label>
+      <div style="display:flex;gap:8px;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;">
+          <input type="radio" name="api-mode" value="proxy" id="mode-proxy" checked onchange="onModeChange()" style="accent-color:var(--accent);" />
+          <span>Use Cloudflare Proxy (<code style="font-size:10px;">/api/analyze</code>)</span>
+        </label>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;margin-top:8px;cursor:pointer;">
+        <label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:12px;">
+          <input type="radio" name="api-mode" value="direct" id="mode-direct" onchange="onModeChange()" style="accent-color:var(--accent);" />
+          <span>Direct API Key (local dev only)</span>
+        </label>
+      </div>
+    </div>
+    <div id="key-input-group" style="display:none;margin-bottom:16px;">
+      <label class="input-label">OpenAI API Key</label>
+      <input type="password" id="api-key-input" class="text-input" placeholder="sk-..." style="font-family:'Space Mono',monospace;font-size:12px;" />
+      <div style="font-size:9px;color:var(--muted);margin-top:6px;">Stored in sessionStorage only. Cleared when browser closes.</div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button class="btn btn-outline btn-sm" onclick="closeApiModal()">Cancel</button>
+      <button class="btn btn-primary btn-sm" onclick="saveApiConfig()">Save Config</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── EXPORT MODAL ── -->
+<div id="exportModal">
+  <div class="export-modal-box">
+    <div style="font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:0.2em;color:var(--accent);margin-bottom:6px;">Strategy Export</div>
+    <div style="font-size:16px;font-weight:800;color:white;margin-bottom:20px;" id="export-title">Strategy Export</div>
+    <div id="export-content" style="background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:12px;padding:24px;font-size:11px;line-height:1.9;color:#d1d5db;white-space:pre-wrap;max-height:400px;overflow-y:auto;font-family:'Space Mono',monospace;"></div>
+    <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
+      <button class="btn btn-outline btn-sm" onclick="closeExportModal()">Close</button>
+      <button class="btn btn-primary btn-sm" onclick="downloadExport()">⬇ Download .txt</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── TOAST ── -->
+<div id="toast">
+  <span id="toast-icon">✓</span>
+  <span id="toast-msg">Done</span>
+</div>
+
+<script>
+/* ═══════════════════════════════════════════
+   STATE MANAGEMENT
+   Fix #4 (Assessment): Persist to sessionStorage so page refresh
+   doesn't wipe completed steps.
+═══════════════════════════════════════════ */
+
+const DEFAULT_STEPS = () => ({
+  1: { status: 'ready',  data: null, tokens: 0 },
+  2: { status: 'locked', data: null, tokens: 0 },
+  3: { status: 'locked', data: null, tokens: 0 },
+  4: { status: 'locked', data: null, tokens: 0 },
+  5: { status: 'locked', data: null, tokens: 0 },
+  6: { status: 'locked', data: null, tokens: 0 },
+});
+
+const state = {
+  company: '',
+  industry: '',
+  steps: DEFAULT_STEPS(),
+  totalTokens: 0,
+  apiMode: 'proxy',
+  apiKey: '',
+};
+
+/* ── Session Persistence ── */
+function persistState() {
+  try {
+    sessionStorage.setItem('gtm_state', JSON.stringify({
+      company:     state.company,
+      industry:    state.industry,
+      steps:       state.steps,
+      totalTokens: state.totalTokens,
+    }));
+  } catch(e) { /* quota exceeded — non-fatal */ }
+}
+
+function restoreState() {
+  try {
+    const saved = sessionStorage.getItem('gtm_state');
+    if (!saved) return false;
+    const parsed = JSON.parse(saved);
+    if (!parsed.company) return false;
+    Object.assign(state, parsed);
+    return true;
+  } catch(e) { return false; }
+}
+
+/* ── Execution Logs (Fix #6) ── */
+const execLogs = [];
+
+function addLog(level, step, msg) {
+  const ts = new Date().toLocaleTimeString('en-GB', { hour12: false });
+  const colors = { INFO: '#6b7280', OK: '#22c55e', WARN: '#f59e0b', ERR: '#ef4444', RETRY: '#a855f7' };
+  const entry = { ts, level, step, msg };
+  execLogs.push(entry);
+  const list = document.getElementById('logs-list');
+  if (!list) return;
+  const line = document.createElement('div');
+  line.style.cssText = `color:${colors[level]||'#9ca3af'};padding:1px 0;border-bottom:1px solid rgba(31,41,55,0.2);`;
+  line.innerHTML = `<span style="color:#374151">${ts}</span> <span style="font-weight:900;color:${colors[level]}">[${level}]</span> Step${step} — ${escHtml(msg)}`;
+  list.appendChild(line);
+  list.parentElement.scrollTop = list.parentElement.scrollHeight;
+  const badge = document.getElementById('log-count-badge');
+  if (badge) badge.textContent = `${execLogs.length} events`;
+  document.getElementById('exec-logs-panel').style.display = 'block';
+}
+
+function toggleLogs() {
+  const body = document.getElementById('logs-body');
+  const chev = document.getElementById('logs-chevron');
+  const open = body.style.display === 'block';
+  body.style.display = open ? 'none' : 'block';
+  chev.textContent = open ? '▼' : '▲';
+}
+
+/* ── JSON Schema Validators (Fix #1) ── */
+const STEP_SCHEMAS = {
+  1: ['company_overview','market_position','products_services','gtm_relevance_score','growth_signals'],
+  2: ['tam_overview','tam_size_estimate','growth_rate','market_segments','priority_opportunities'],
+  3: ['primary_icp','secondary_icp','firmographics','buying_triggers','core_pain_points'],
+  4: ['recommended_databases','filter_criteria','sourcing_playbook','exclusion_criteria'],
+  5: ['primary_keywords','secondary_keywords','boolean_query','linkedin_search_strings'],
+  6: ['email_1','email_2','email_3','follow_up_sequence'],
+};
+
+function validateSchema(step, data) {
+  const required = STEP_SCHEMAS[step];
+  const missing  = required.filter(k => !(k in data));
+  if (missing.length > 0) {
+    throw new SchemaError(`Missing required fields: ${missing.join(', ')}`);
+  }
+}
+
+/* ── Custom Error Types (Fix #7) ── */
+class NetworkError  extends Error { constructor(m){ super(m); this.name='NetworkError';  } }
+class ParseError    extends Error { constructor(m){ super(m); this.name='ParseError';    } }
+class SchemaError   extends Error { constructor(m){ super(m); this.name='SchemaError';   } }
+class ModelError    extends Error { constructor(m){ super(m); this.name='ModelError';    } }
+class TokenGuardError extends Error { constructor(m){ super(m); this.name='TokenGuardError'; } }
+
+/* ── Active AbortControllers map (Fix #3) ── */
+const activeControllers = {};
+
+const STEP_META = {
+  1: { icon: '🔍', label: 'Market Research' },
+  2: { icon: '🗺', label: 'TAM Mapping' },
+  3: { icon: '👤', label: 'ICP Modeling' },
+  4: { icon: '🎣', label: 'Account Sourcing' },
+  5: { icon: '🔑', label: 'Keywords' },
+  6: { icon: '✉', label: 'Messaging' },
+};
+
+/* ═══════════════════════════════════════════
+   INIT — restores persisted session
+═══════════════════════════════════════════ */
+
+(function init() {
+  // Restore API config
+  const savedMode = sessionStorage.getItem('gtm_api_mode');
+  if (savedMode) state.apiMode = savedMode;
+  const savedKey = sessionStorage.getItem('gtm_api_key');
+  if (savedKey) state.apiKey = savedKey;
+  document.getElementById('mode-proxy').checked  = state.apiMode === 'proxy';
+  document.getElementById('mode-direct').checked = state.apiMode === 'direct';
+  if (state.apiMode === 'direct') document.getElementById('key-input-group').style.display = 'block';
+
+  // Restore strategy session (Fix #4)
+  if (restoreState()) {
+    document.getElementById('company-input').value  = state.company  || '';
+    document.getElementById('industry-input').value = state.industry || '';
+    rebuildUIFromState();
+    addLog('INFO', 0, `Session restored — company: "${state.company}", steps completed: ${Object.values(state.steps).filter(s=>s.status==='complete').length}`);
+  }
+})();
+
+/* ═══════════════════════════════════════════
+   URL PARAM HANDLER
+   Handles: ?resume=STRATEGY_ID  (from vault)
+            ?company=NAME&industry=IND  (pre-fill)
+═══════════════════════════════════════════ */
+(async function handleUrlParams() {
+  // Wait for auth-guard to complete
+  const waitForAuth = () => new Promise(resolve => {
+    const iv = setInterval(() => {
+      if (window.APP?.user) { clearInterval(iv); resolve(); }
+    }, 100);
+  });
+  await waitForAuth();
+
+  const params  = new URLSearchParams(location.search);
+  const resumeId = params.get('resume');
+  const company  = params.get('company');
+  const industry = params.get('industry');
+
+  if (resumeId) {
+    // Load strategy from vault and restore all steps
+    try {
+      const token = await getAuthToken();
+      const res = await fetch('/api/gtm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ action: 'get_strategy', strategy_id: resumeId }),
+      });
+      const data = await res.json();
+      const s = data.strategy;
+      if (s) {
+        state.company    = s.company_name;
+        state.industry   = s.industry || '';
+        state.strategyId = s.id;
+        const stepMap = {
+          1: s.step_1_market, 2: s.step_2_tam, 3: s.step_3_icp,
+          4: s.step_4_sourcing, 5: s.step_5_keywords, 6: s.step_6_messaging,
+        };
+        for (let i = 1; i <= 6; i++) {
+          if (stepMap[i]) { state.steps[i].status = 'complete'; state.steps[i].data = stepMap[i]; }
+        }
+        state.totalTokens = s.total_tokens || 0;
+        document.getElementById('company-input').value  = state.company;
+        document.getElementById('industry-input').value = state.industry;
+        rebuildUIFromState();
+        persistState();
+        showToast(`Resumed strategy for "${state.company}" ✓`, 'success');
+      }
+    } catch(e) {
+      console.warn('Resume failed:', e.message);
+    }
+    // Clean URL
+    history.replaceState({}, '', location.pathname);
+    return;
+  }
+
+  if (company) {
+    document.getElementById('company-input').value  = decodeURIComponent(company);
+    document.getElementById('industry-input').value = decodeURIComponent(industry || '');
+    history.replaceState({}, '', location.pathname);
+  }
+})();
+
+
+function rebuildUIFromState() {
+  if (!state.company) return;
+  document.getElementById('start-btn').disabled   = false;
+  document.getElementById('run-btn-1').disabled   = false;
+  document.getElementById('meta-1').innerHTML     = `Ready to research <strong style="color:white">"${state.company}"</strong>`;
+
+  for (let i = 1; i <= 6; i++) {
+    const s = state.steps[i];
+    if (s.status === 'complete') {
+      setCardState(i, 'complete');
+      setPill(i, 'complete');
+      updateSidebarStep(i, 'complete');
+      showOutput(i, true);
+      renderOutput(i, s.data);
+      setTokens(i, s.tokens);
+      document.getElementById(`body-${i}`).classList.add('open');
+    } else if (s.status === 'ready' || s.status === 'error') {
+      setCardState(i, 'active');
+      setPill(i, 'ready');
+      updateSidebarStep(i, 'ready');
+      document.getElementById(`run-btn-${i}`).disabled = false;
+      document.getElementById(`card-${i}`).classList.remove('is-locked');
+      document.getElementById(`body-${i}`).classList.add('open');
+      buildContextChips(i);
+    } else if (s.status === 'locked') {
+      // stays locked
+    }
+    if (s.tokens) setTokens(i, s.tokens);
+  }
+  updateProgress();
+
+  // Show summary if all complete
+  if (Object.values(state.steps).every(s => s.status === 'complete')) showSummary();
+}
+
+/* ═══════════════════════════════════════════
+   COMPANY INPUT
+═══════════════════════════════════════════ */
+
+function onCompanyInput() {
+  const val = document.getElementById('company-input').value.trim();
+  state.company = val;
+  const startBtn = document.getElementById('start-btn');
+  const runBtn1  = document.getElementById('run-btn-1');
+  const meta1    = document.getElementById('meta-1');
+  if (val.length > 1) {
+    startBtn.disabled = false;
+    runBtn1.disabled  = false;
+    meta1.innerHTML   = `Ready to research <strong style="color:white">"${val}"</strong>`;
+  } else {
+    startBtn.disabled = true;
+    runBtn1.disabled  = true;
+    meta1.innerText   = 'Enter a company name above to begin.';
+  }
+}
+
+function startStrategy() {
+  state.company  = document.getElementById('company-input').value.trim();
+  state.industry = document.getElementById('industry-input').value.trim();
+  if (!state.company) return;
+  // Scroll to step 1 and open it
+  document.getElementById('card-1').scrollIntoView({ behavior: 'smooth' });
+  runStep(1);
+}
+
+/* ═══════════════════════════════════════════
+   UI HELPERS
+═══════════════════════════════════════════ */
+
+function toggleStep(n) {
+  const body = document.getElementById(`body-${n}`);
+  body.classList.toggle('open');
+}
+
+function scrollToStep(n) {
+  const card = document.getElementById(`card-${n}`);
+  if (card && !card.classList.contains('is-locked')) {
+    card.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.getElementById(`body-${n}`).classList.add('open');
+    setNavActive(n);
+  }
+}
+
+function setNavActive(n) {
+  for (let i = 1; i <= 6; i++) {
+    const el = document.getElementById(`step-nav-${i}`);
+    el.classList.remove('active');
+  }
+  document.getElementById(`step-nav-${n}`)?.classList.add('active');
+}
+
+function updateSidebarStep(n, status) {
+  const nav = document.getElementById(`step-nav-${n}`);
+  const num = document.getElementById(`snnum-${n}`);
+  nav.classList.remove('active', 'completed', 'locked', 'running');
+  if (status === 'ready')    { nav.classList.add('active'); }
+  if (status === 'running')  { nav.classList.add('running'); }
+  if (status === 'complete') { nav.classList.add('completed'); num.textContent = '✓'; }
+  if (status === 'locked')   { nav.classList.add('locked'); }
+}
+
+function setPill(n, status) {
+  const pill = document.getElementById(`pill-${n}`);
+  const map = {
+    locked:   ['pill-locked', 'Locked'],
+    ready:    ['pill-ready',  'Ready'],
+    running:  ['pill-running','Running'],
+    complete: ['pill-done',   'Done'],
+    error:    ['pill-locked', 'Error'],
+  };
+  const [cls, txt] = map[status] || ['pill-locked', status];
+  pill.className = `step-pill ${cls}`;
+  pill.textContent = txt;
+}
+
+function setCardState(n, state_) {
+  const card = document.getElementById(`card-${n}`);
+  card.classList.remove('is-active', 'is-complete', 'is-locked');
+  if (state_ === 'active')   card.classList.add('is-active');
+  if (state_ === 'complete') card.classList.add('is-complete');
+  if (state_ === 'locked')   card.classList.add('is-locked');
+}
+
+function showLoading(n, show) {
+  document.getElementById(`loading-${n}`).classList.toggle('show', show);
+}
+
+function showOutput(n, show) {
+  document.getElementById(`output-${n}`).classList.toggle('show', show);
+}
+
+function showError(n, err) {
+  const el = document.getElementById(`error-${n}`);
+  // Fix #7: error classification
+  let icon = '❌', hint = 'Check your API configuration and try again.';
+  if (err && err.name === 'NetworkError')    { icon = '📡'; hint = 'Network failure — check your connection or proxy endpoint.'; }
+  if (err && err.name === 'ParseError')      { icon = '⚙'; hint = 'AI returned malformed JSON — auto-retry attempted. Try again if issue persists.'; }
+  if (err && err.name === 'SchemaError')     { icon = '📋'; hint = 'AI response missing required fields — auto-retry attempted.'; }
+  if (err && err.name === 'ModelError')      { icon = '🤖'; hint = 'API rejected the request — check model name and API key quota.'; }
+  if (err && err.name === 'TokenGuardError') { icon = '⚠'; hint = 'Token limit guardrail triggered. Consider resetting and using a shorter context.'; }
+  if (err && err.name === 'AbortError')      { icon = '⛔'; hint = 'Request was cancelled by user.'; }
+  const msg = (err && err.message) ? err.message : String(err);
+  el.innerHTML = `${icon} <strong>[${(err && err.name) || 'Error'}] ${escHtml(msg)}</strong><br><small style="opacity:0.7">${hint}</small>`;
+  el.classList.add('show');
+}
+
+function clearError(n) {
+  const el = document.getElementById(`error-${n}`);
+  el.classList.remove('show');
+  el.innerHTML = '';
+}
+
+function setTokens(n, count) {
+  state.steps[n].tokens = count;
+  state.totalTokens = Object.values(state.steps).reduce((a, s) => a + s.tokens, 0);
+  const el = document.getElementById(`tokens-${n}`);
+  if (el) { el.style.display = 'inline-flex'; el.querySelector('span').textContent = `${count.toLocaleString()} tokens`; }
+  document.getElementById('token-counter').querySelector('span').textContent = `${state.totalTokens.toLocaleString()} tokens used`;
+  document.querySelector('.sidebar-footer div:last-child div:last-child').textContent = `~$${(state.totalTokens * 0.000003).toFixed(3)} estimated cost`;
+}
+
+function updateProgress() {
+  const done = Object.values(state.steps).filter(s => s.status === 'complete').length;
+  const pct  = Math.round((done / 6) * 100);
+  document.getElementById('main-progress-fill').style.width = pct + '%';
+  document.getElementById('main-progress-pct').textContent  = `${done} / 6`;
+}
+
+function unlockStep(n) {
+  if (n > 6) return;
+  const card = document.getElementById(`card-${n}`);
+  card.classList.remove('is-locked');
+  card.style.pointerEvents = '';
+  card.style.opacity = '';
+  setCardState(n, 'active');
+  setPill(n, 'ready');
+  updateSidebarStep(n, 'ready');
+  document.getElementById(`run-btn-${n}`).disabled = false;
+  document.getElementById(`step-nav-${n}`).classList.remove('locked');
+  document.getElementById(`body-${n}`).classList.add('open');
+}
+
+function buildContextChips(n) {
+  const container = document.getElementById(`ctx-chips-${n}`);
+  if (!container) return;
+  container.innerHTML = '';
+  const labels = { 1:'Market Research', 2:'TAM Map', 3:'ICP Model', 4:'Account Sourcing', 5:'Keywords' };
+  for (let i = 1; i < n; i++) {
+    if (state.steps[i].status === 'complete') {
+      const chip = document.createElement('div');
+      chip.className = 'context-chip';
+      chip.innerHTML = `<div class="context-chip-dot"></div>${STEP_META[i].icon} ${labels[i]} ✓`;
+      container.appendChild(chip);
+    }
+  }
+  if (container.children.length > 0) {
+    const label = document.createElement('div');
+    label.style.cssText = 'font-size:9px;color:var(--muted);display:flex;align-items:center;gap:6px;';
+    label.innerHTML = '🔗 Context carried from:';
+    container.insertBefore(label, container.firstChild);
+  }
+}
+
+function showToast(msg, type = 'success') {
+  const toast = document.getElementById('toast');
+  const icon  = document.getElementById('toast-icon');
+  const msgEl = document.getElementById('toast-msg');
+  toast.className = '';
+  if (type === 'success') { toast.classList.add('success-toast'); icon.textContent = '✓'; }
+  if (type === 'error')   { toast.classList.add('error-toast');   icon.textContent = '✕'; }
+  msgEl.textContent = msg;
+  toast.classList.add('show');
+  setTimeout(() => toast.classList.remove('show'), 3200);
+}
+
+/* ═══════════════════════════════════════════
+   RESET
+═══════════════════════════════════════════ */
+
+function resetAll() {
+  if (!confirm('Reset the entire strategy? All results will be cleared.')) return;
+
+  // Cancel any in-flight requests
+  Object.keys(activeControllers).forEach(n => cancelStep(parseInt(n)));
+
+  for (let i = 1; i <= 6; i++) {
+    state.steps[i] = { status: i === 1 ? 'ready' : 'locked', data: null, tokens: 0 };
+    setCardState(i, i === 1 ? 'active' : 'locked');
+    setPill(i, i === 1 ? 'ready' : 'locked');
+    showOutput(i, false);
+    showLoading(i, false);
+    clearError(i);
+    document.getElementById(`step-nav-${i}`).classList.toggle('locked', i !== 1);
+    document.getElementById(`step-nav-${i}`).classList.toggle('active', i === 1);
+    document.getElementById(`snnum-${i}`).textContent = String(i).padStart(2, '0');
+    if (document.getElementById(`tokens-${i}`)) document.getElementById(`tokens-${i}`).style.display = 'none';
+    document.getElementById(`run-btn-${i}`).disabled = i !== 1;
+    if (i > 1) {
+      document.getElementById(`body-${i}`).classList.remove('open');
+      document.getElementById(`card-${i}`).style.opacity = '';
+    } else {
+      document.getElementById(`body-1`).classList.add('open');
+    }
+    if (document.getElementById(`ctx-chips-${i}`)) document.getElementById(`ctx-chips-${i}`).innerHTML = '';
+  }
+  state.totalTokens = 0;
+  state.company = '';
+  state.industry = '';
+  document.getElementById('company-input').value = '';
+  document.getElementById('industry-input').value = '';
+  document.getElementById('token-counter').querySelector('span').textContent = '0 tokens used';
+  document.getElementById('main-progress-fill').style.width = '0%';
+  document.getElementById('main-progress-pct').textContent = '0 / 6';
+  document.getElementById('summary-panel').classList.remove('show');
+  document.getElementById('oc-messages-container').innerHTML = '';
+  document.getElementById('run-btn-1').disabled = true;
+  document.getElementById('start-btn').disabled = true;
+  document.getElementById('meta-1').innerText = 'Enter a company name above to begin.';
+  // Clear logs
+  execLogs.length = 0;
+  document.getElementById('logs-list').innerHTML = '';
+  document.getElementById('log-count-badge').textContent = '0 events';
+  document.getElementById('exec-logs-panel').style.display = 'none';
+  // Clear persisted session
+  sessionStorage.removeItem('gtm_state');
+  showToast('Strategy reset', 'success');
+}
+
+/* ═══════════════════════════════════════════
+   CONTEXT MANAGEMENT (Fix #3)
+   - Steps 1–5: full context injection
+   - Step 6: compressed summaries to avoid token explosion
+     (full chain can hit 12–20k tokens otherwise)
+═══════════════════════════════════════════ */
+
+function buildContextString(upToStep) {
+  const parts = [];
+  for (let i = 1; i < upToStep; i++) {
+    if (!state.steps[i].data) continue;
+    parts.push(`[STEP ${i} — ${STEP_META[i].label}]\n${JSON.stringify(state.steps[i].data, null, 2)}`);
+  }
+  return parts.join('\n\n');
+}
+
+/** Compressed context for Step 6 — avoids token explosion */
+function buildCompressedContext() {
+  const d = (n) => state.steps[n].data;
+  const lines = [];
+
+  if (d(1)) {
+    lines.push(`COMPANY: ${d(1).company_overview || ''}`);
+    lines.push(`MARKET POSITION: ${d(1).market_position || ''}`);
+    lines.push(`GTM SCORE: ${d(1).gtm_relevance_score || ''} — ${d(1).gtm_relevance_reasoning || ''}`);
+    lines.push(`GROWTH SIGNALS: ${(d(1).growth_signals || []).join(', ')}`);
+  }
+  if (d(2)) {
+    lines.push(`TAM: ${d(2).tam_size_estimate || ''} (${d(2).growth_rate || ''})`);
+    lines.push(`TOP SEGMENTS: ${(d(2).market_segments || []).slice(0,3).map(s=>s.name).join(', ')}`);
+    lines.push(`PRIORITY OPPS: ${d(2).priority_opportunities || ''}`);
+  }
+  if (d(3)) {
+    lines.push(`PRIMARY ICP: ${d(3).primary_icp || ''}`);
+    lines.push(`FIRMOGRAPHICS: ${d(3).firmographics || ''}`);
+    lines.push(`CORE PAINS: ${d(3).core_pain_points || ''}`);
+    lines.push(`BUYING TRIGGERS: ${(d(3).buying_triggers || []).join(', ')}`);
+    lines.push(`KEY OBJECTIONS: ${(d(3).objections || []).join(', ')}`);
+  }
+  if (d(4)) {
+    lines.push(`BEST DATABASES: ${(d(4).recommended_databases || []).slice(0,4).join(', ')}`);
+    lines.push(`FILTER CRITERIA: ${d(4).filter_criteria || ''}`);
+  }
+  if (d(5)) {
+    lines.push(`PRIMARY KEYWORDS: ${(d(5).primary_keywords || []).join(', ')}`);
+    lines.push(`BOOLEAN QUERY: ${d(5).boolean_query || ''}`);
+  }
+
+  const compressed = lines.join('\n');
+  const estTokens  = Math.round(compressed.length / 4);
+  addLog('INFO', 6, `Compressed context: ~${estTokens.toLocaleString()} tokens (vs full chain ~${Math.round(buildContextString(6).length/4).toLocaleString()})`);
+  return compressed;
+}
+
+function getPrompt(step) {
+  const co   = state.company;
+  const ind  = state.industry ? ` in the ${state.industry} industry` : '';
+
+  // Steps 1–5: full context from prior steps
+  // Step 6: compressed context to reduce token usage (Fix #3)
+  const ctx  = step === 6 ? buildCompressedContext() : buildContextString(step);
+
+  const baseInstruction = `You are a world-class B2B GTM strategist. CRITICAL: Return ONLY a valid JSON object. No markdown. No code fences. No explanation text before or after. Start your response with { and end with }.`;
+
+  const prompts = {
+    1: `${baseInstruction}
+
+Perform deep market research on "${co}"${ind}.
+
+Return this exact JSON structure:
+{
+  "company_overview": "2-3 sentence description of what they do, founded when, HQ, size",
+  "market_position": "Their competitive position, key differentiators, main competitors",
+  "products_services": "Their main products/services with brief descriptions",
+  "gtm_relevance_score": 85,
+  "gtm_relevance_reasoning": "Why this company is (or isn't) a good GTM target",
+  "growth_signals": ["signal1", "signal2", "signal3", "signal4", "signal5"],
+  "revenue_stage": "e.g. Series B / $50M+ ARR / Enterprise",
+  "employee_count": "approximate range",
+  "tech_stack_hints": ["hint1", "hint2", "hint3"]
+}`,
+
+    2: `${baseInstruction}
+
+You are doing TAM mapping for a company that wants to sell TO or partner with "${co}"${ind}.
+
+Context from Step 1:
+${ctx}
+
+Return this exact JSON structure:
+{
+  "tam_overview": "Total addressable market description and estimated size",
+  "tam_size_estimate": "e.g. $4.2B TAM",
+  "sam_estimate": "Serviceable addressable market",
+  "growth_rate": "e.g. 23% CAGR 2024-2027",
+  "growth_drivers": "Key drivers of market growth",
+  "market_segments": [
+    {"name": "Segment 1", "size": "$Xm", "priority": "High"},
+    {"name": "Segment 2", "size": "$Xm", "priority": "Medium"},
+    {"name": "Segment 3", "size": "$Xm", "priority": "Low"}
+  ],
+  "priority_opportunities": "Top 2-3 opportunity areas with strategic rationale",
+  "market_maturity": "Early / Growth / Mature / Declining"
+}`,
+
+    3: `${baseInstruction}
+
+Build an Ideal Customer Profile (ICP) for companies that sell TO or partner with "${co}"${ind}.
+
+Context from Steps 1-2:
+${ctx}
+
+Return this exact JSON structure:
+{
+  "primary_icp": "Detailed description of the primary target buyer persona - role, seniority, department",
+  "secondary_icp": "Secondary persona description",
+  "firmographics": "Company size, ARR range, industry vertical, geography, tech maturity",
+  "buying_triggers": ["trigger1", "trigger2", "trigger3", "trigger4"],
+  "core_pain_points": "The 3 most critical pain points these buyers face that our solution could address",
+  "decision_makers": ["Title 1", "Title 2", "Title 3"],
+  "deal_cycle": "Typical deal length and process",
+  "objections": ["Common objection 1", "Common objection 2", "Common objection 3"]
+}`,
+
+    4: `${baseInstruction}
+
+Create an account sourcing strategy for finding companies like "${co}"${ind} and their decision-makers.
+
+Context from Steps 1-3:
+${ctx}
+
+Return this exact JSON structure:
+{
+  "recommended_databases": ["Apollo.io", "ZoomInfo", "LinkedIn Sales Nav", "etc - specific to this use case"],
+  "filter_criteria": "Specific filters: company size, tech stack, funding stage, headcount growth etc.",
+  "sourcing_playbook": "Step-by-step account sourcing strategy - how to find and qualify accounts",
+  "exclusion_criteria": "What to filter OUT - signs this account is wrong fit",
+  "estimated_universe": "Rough estimate of how many matching accounts exist",
+  "data_enrichment_tips": "How to enrich records once sourced"
+}`,
+
+    5: `${baseInstruction}
+
+Generate a comprehensive keyword and search intelligence package for targeting "${co}"${ind} and similar companies.
+
+Context from Steps 1-4:
+${ctx}
+
+Return this exact JSON structure:
+{
+  "primary_keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5", "keyword6"],
+  "secondary_keywords": ["kw1", "kw2", "kw3", "kw4", "kw5", "kw6", "kw7", "kw8"],
+  "boolean_query": "\"keyword1\" OR \"keyword2\" AND (\"keyword3\" OR \"keyword4\") NOT \"exclusion\"",
+  "linkedin_search_strings": "Detailed LinkedIn Sales Navigator search strings with title, company size, seniority filters",
+  "intent_signals": ["signal1", "signal2", "signal3"],
+  "content_topics": ["topic for thought leadership 1", "topic 2", "topic 3"]
+}`,
+
+    6: `${baseInstruction}
+
+Create hyper-personalised outreach messaging for targeting "${co}"${ind} and similar companies.
+Use ALL context from previous steps to make this deeply relevant.
+
+Context from ALL Steps 1-5:
+${ctx}
+
+Return this exact JSON structure:
+{
+  "email_1": {
+    "angle": "Pain-led angle name",
+    "subject": "Email subject line (under 50 chars)",
+    "body": "Full email body (3-4 short paragraphs, conversational, no buzzwords)",
+    "cta": "Clear, specific CTA"
+  },
+  "email_2": {
+    "angle": "ROI/outcome-led angle name",
+    "subject": "Different subject line",
+    "body": "Full email body with different angle",
+    "cta": "Different CTA"
+  },
+  "email_3": {
+    "angle": "Social proof / FOMO angle",
+    "subject": "Third subject line",
+    "body": "Full email body",
+    "cta": "CTA focused on urgency or proof"
+  },
+  "follow_up_sequence": "Day 3: [action]. Day 7: [action]. Day 14: [action]. Day 21: [action]."
+}`,
+  };
+
+  return prompts[step];
+}
+
+/* ═══════════════════════════════════════════
+   HARDENED API WRAPPER (Fix #2 + #3)
+   - AbortController per step (cancelable)
+   - 45s timeout
+   - 1x auto-retry on parse/schema error
+   - Strict JSON extraction
+   - Error classification
+═══════════════════════════════════════════ */
+
+const TIMEOUT_MS  = 45000;
+const MAX_RETRIES = 1;
+
+async function callAPI(step, prompt, attempt = 0) {
+  // Token guardrail (Fix #6): warn if prompt >15k chars (~15k tokens)
+  if (prompt.length > 60000) { // ~15k tokens at avg 4 chars/token
+    addLog('WARN', step, `Token guardrail: prompt is ${Math.round(prompt.length/4).toLocaleString()} estimated tokens`);
+    if (attempt === 0) {
+      throw new TokenGuardError(`Prompt exceeds 15k token estimate (${Math.round(prompt.length/4).toLocaleString()} tokens). Consider compressing context.`);
+    }
+  }
+
+  // Create AbortController for this call
+  const controller = new AbortController();
+  activeControllers[step] = controller;
+
+  const timeoutId = setTimeout(() => {
+    controller.abort();
+    addLog('ERR', step, `Request timed out after ${TIMEOUT_MS/1000}s`);
+  }, TIMEOUT_MS);
+
+  try {
+    addLog('INFO', step, `Calling API (attempt ${attempt + 1}/${MAX_RETRIES + 1})`);
+    let rawText, tokens;
+
+    if (state.apiMode === 'direct' && state.apiKey) {
+      // Direct OpenAI call (local dev / testing only — key never stored in production)
+      const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${state.apiKey}`,
+        },
+        body: JSON.stringify({
+          model:       'gpt-4o-mini',
+          max_tokens:  2500,
+          temperature: 0.7,
+          messages: [
+            {
+              role:    'system',
+              content: 'You are a world-class B2B GTM strategist. You MUST return ONLY valid JSON. No markdown, no code fences, no prose. Just the raw JSON object.',
+            },
+            { role: 'user', content: prompt },
+          ],
+        }),
+      });
+
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        const msg = errBody?.error?.message || `HTTP ${res.status}`;
+        if (res.status === 401 || res.status === 403) throw new ModelError(`Auth failed: ${msg}`);
+        if (res.status === 429) throw new ModelError(`Rate limited: ${msg}`);
+        throw new NetworkError(`API returned ${res.status}: ${msg}`);
+      }
+
+      const body = await res.json();
+      rawText = body.choices?.[0]?.message?.content || '';
+      tokens  = (body.usage?.prompt_tokens || 0) + (body.usage?.completion_tokens || 0);
+      addLog('OK', step, `Received ${tokens.toLocaleString()} tokens`);
+
+    } else {
+      // Proxy mode
+      const lead = { name: 'GTM', title: 'Strategy', company: state.company };
+      const token = await getAuthToken();
+      const res  = await fetch('/api/analyze', {
+        method: 'POST',
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({ lead, customPrompt: prompt }),
+      });
+
+      if (!res.ok) {
+        const errBody = await res.json().catch(() => ({}));
+        throw new NetworkError(errBody.error || `Server error ${res.status}`);
+      }
+
+      const proxyData = await res.json();
+      rawText = JSON.stringify(proxyData);
+      tokens  = 1800; // proxy doesn't return token count
+      addLog('OK', step, `Proxy response received (~${tokens} tokens est.)`);
+    }
+
+    // ── Strict JSON parsing (Fix #1) ──
+    let data;
+    try {
+      // First: try direct parse
+      data = JSON.parse(rawText);
+    } catch {
+      // Second: extract JSON block from response
+      const match = rawText.match(/\{[\s\S]*\}/);
+      if (!match) {
+        addLog('ERR', step, `No JSON found in response: "${rawText.slice(0,120)}..."`);
+        throw new ParseError('AI response contained no JSON object');
+      }
+      try {
+        data = JSON.parse(match[0]);
+      } catch(e2) {
+        addLog('ERR', step, `JSON parse failed: ${e2.message}`);
+        throw new ParseError(`Malformed JSON: ${e2.message}`);
+      }
+    }
+
+    // ── Schema validation (Fix #1) ──
+    validateSchema(step, data);
+    addLog('OK', step, `Schema validated — all required fields present`);
+
+    return { data, tokens };
+
+  } catch(err) {
+    clearTimeout(timeoutId);
+
+    // Don't retry user-initiated cancels or guardrail errors
+    if (err.name === 'AbortError')      throw err;
+    if (err.name === 'TokenGuardError') throw err;
+    if (err.name === 'ModelError')      throw err;
+
+    // Auto-retry once on parse/schema errors (Fix #2)
+    if ((err.name === 'ParseError' || err.name === 'SchemaError') && attempt < MAX_RETRIES) {
+      addLog('RETRY', step, `${err.name} — retrying (attempt ${attempt + 2}/${MAX_RETRIES + 1})`);
+      await new Promise(r => setTimeout(r, 1500));
+      return callAPI(step, prompt, attempt + 1);
+    }
+
+    // Classify network errors
+    if (err.message?.includes('fetch') || err.message?.includes('Failed to fetch')) {
+      throw new NetworkError(err.message);
+    }
+
+    throw err;
+
+  } finally {
+    clearTimeout(timeoutId);
+    delete activeControllers[step];
+  }
+}
+
+function cancelStep(n) {
+  if (activeControllers[n]) {
+    activeControllers[n].abort();
+    addLog('WARN', n, 'Request cancelled by user');
+  }
+}
+
+/* ═══════════════════════════════════════════
+   STEP EXECUTION ENGINE
+═══════════════════════════════════════════ */
+
+async function runStep(n) {
+  if (!state.company) { showToast('Enter a company name first', 'error'); return; }
+  if (state.steps[n].status === 'running') return;
+
+  state.steps[n].status = 'running';
+  setCardState(n, 'active');
+  setPill(n, 'running');
+  updateSidebarStep(n, 'running');
+  document.getElementById(`run-btn-${n}`).disabled = true;
+  showLoading(n, true);
+  showOutput(n, false);
+  clearError(n);
+
+  // Show cancel button in loading state
+  const loadEl = document.getElementById(`loading-${n}`);
+  let cancelBtn = loadEl.querySelector('.cancel-btn');
+  if (!cancelBtn) {
+    cancelBtn = document.createElement('button');
+    cancelBtn.className = 'btn btn-outline btn-sm cancel-btn';
+    cancelBtn.style.cssText = 'font-size:9px;padding:5px 12px;margin-left:auto;flex-shrink:0;';
+    cancelBtn.textContent = '✕ Cancel';
+    cancelBtn.onclick = () => cancelStep(n);
+    loadEl.appendChild(cancelBtn);
+  }
+
+  addLog('INFO', n, `Starting "${STEP_META[n].label}" for "${state.company}"`);
+
+  try {
+    const prompt = getPrompt(n);
+    const { data, tokens } = await callAPI(n, prompt);
+
+    state.steps[n].status = 'complete';
+    state.steps[n].data   = data;
+    setTokens(n, tokens);
+    persistState(); // Fix #4
+
+    renderOutput(n, data);
+    setCardState(n, 'complete');
+    setPill(n, 'complete');
+    updateSidebarStep(n, 'complete');
+    showLoading(n, false);
+    showOutput(n, true);
+    document.getElementById(`body-${n}`).classList.add('open');
+    updateProgress();
+    addLog('OK', n, `Step ${n} complete — ${tokens.toLocaleString()} tokens`);
+
+    if (n < 6) {
+      unlockStep(n + 1);
+      buildContextChips(n + 1);
+      setTimeout(() => {
+        document.getElementById(`card-${n + 1}`).scrollIntoView({ behavior: 'smooth', block: 'start' });
+        setNavActive(n + 1);
+      }, 600);
+    } else {
+      showSummary();
+    }
+
+    showToast(`Step ${n} complete — ${STEP_META[n].label} ✓`);
+
+  } catch(err) {
+    state.steps[n].status = 'error';
+    showLoading(n, false);
+    showError(n, err);
+    setPill(n, 'error');
+    updateSidebarStep(n, 'ready');
+    setCardState(n, 'active');
+    document.getElementById(`run-btn-${n}`).disabled = false;
+    addLog('ERR', n, `${err.name}: ${err.message}`);
+    showToast(`Step ${n} failed: ${err.name}`, 'error');
+    console.error(`Step ${n} error:`, err);
+  }
+}
+
+/* ═══════════════════════════════════════════
+   OUTPUT RENDERERS
+═══════════════════════════════════════════ */
+
+function renderOutput(n, data) {
+  const renderers = {
+    1: renderStep1,
+    2: renderStep2,
+    3: renderStep3,
+    4: renderStep4,
+    5: renderStep5,
+    6: renderStep6,
+  };
+  renderers[n]?.(data);
+}
+
+function renderStep1(d) {
+  document.getElementById('oc-overview').innerHTML    = escHtml(d.company_overview || '—');
+  document.getElementById('oc-market-pos').innerHTML  = escHtml(d.market_position || '—');
+  document.getElementById('oc-products').innerHTML    = escHtml(d.products_services || '—');
+
+  const score = d.gtm_relevance_score || 0;
+  const scoreColor = score >= 80 ? '#22c55e' : score >= 60 ? '#f59e0b' : '#ef4444';
+  document.getElementById('oc-gtm-score').innerHTML = `
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:10px;">
+      <div style="font-size:36px;font-weight:900;color:${scoreColor};font-family:'Space Mono',monospace;">${score}</div>
+      <div>
+        <div style="font-size:10px;font-weight:700;color:${scoreColor};">${score >= 80 ? 'High Relevance' : score >= 60 ? 'Medium Relevance' : 'Low Relevance'}</div>
+        <div style="font-size:9px;color:var(--muted);">${escHtml(d.revenue_stage || '')}</div>
+      </div>
+    </div>
+    <div style="font-size:11px;color:#9ca3af;line-height:1.7;">${escHtml(d.gtm_relevance_reasoning || '—')}</div>
+  `;
+
+  const sigs = document.getElementById('oc-signals');
+  sigs.innerHTML = '';
+  (d.growth_signals || []).forEach(s => {
+    const t = document.createElement('div');
+    t.className = 'tag tag-accent';
+    t.textContent = s;
+    sigs.appendChild(t);
+  });
+}
+
+function renderStep2(d) {
+  document.getElementById('oc-tam-overview').innerHTML = escHtml(d.tam_overview || '—') +
+    (d.tam_size_estimate ? `<br><strong style="color:var(--accent);font-size:14px;">${escHtml(d.tam_size_estimate)}</strong>` : '');
+  document.getElementById('oc-tam-growth').innerHTML   = `<strong style="color:var(--green);font-size:18px;font-family:'Space Mono',monospace;">${escHtml(d.growth_rate || '—')}</strong><br><span style="font-size:11px;color:var(--muted);">${escHtml(d.growth_drivers || '')}</span>`;
+
+  const segs = document.getElementById('oc-tam-segments');
+  segs.innerHTML = '';
+  (d.market_segments || []).forEach(s => {
+    const priorityColors = { High: 'tag-green', Medium: 'tag-amber', Low: '' };
+    const t = document.createElement('div');
+    t.className = `tag ${priorityColors[s.priority] || ''}`;
+    t.textContent = `${s.name} · ${s.size}`;
+    segs.appendChild(t);
+  });
+
+  document.getElementById('oc-tam-opps').innerHTML = escHtml(d.priority_opportunities || '—') +
+    (d.sam_estimate ? `<br><span style="font-size:10px;color:var(--muted);">SAM: ${escHtml(d.sam_estimate)}</span>` : '');
+}
+
+function renderStep3(d) {
+  document.getElementById('oc-icp-primary').innerHTML    = escHtml(d.primary_icp || '—');
+  document.getElementById('oc-icp-secondary').innerHTML  = escHtml(d.secondary_icp || '—');
+  document.getElementById('oc-icp-firmographic').innerHTML = escHtml(d.firmographics || '—') +
+    (d.deal_cycle ? `<br><span style="font-size:9px;color:var(--muted);">Deal cycle: ${escHtml(d.deal_cycle)}</span>` : '');
+  document.getElementById('oc-icp-pains').innerHTML      = escHtml(d.core_pain_points || '—');
+
+  const trigs = document.getElementById('oc-icp-triggers');
+  trigs.innerHTML = '';
+  (d.buying_triggers || []).forEach(t => {
+    const el = document.createElement('div');
+    el.className = 'tag tag-blue';
+    el.textContent = t;
+    trigs.appendChild(el);
+  });
+}
+
+function renderStep4(d) {
+  const dbs = document.getElementById('oc-src-databases');
+  dbs.innerHTML = '';
+  (d.recommended_databases || []).forEach(db => {
+    const el = document.createElement('div');
+    el.className = 'tag tag-accent';
+    el.textContent = db;
+    dbs.appendChild(el);
+  });
+
+  document.getElementById('oc-src-filters').innerHTML   = escHtml(d.filter_criteria || '—');
+  document.getElementById('oc-src-playbook').innerHTML  = escHtml(d.sourcing_playbook || '—') +
+    (d.estimated_universe ? `<br><span style="font-size:10px;color:var(--muted);">Est. universe: ${escHtml(d.estimated_universe)}</span>` : '');
+  document.getElementById('oc-src-exclusions').innerHTML = escHtml(d.exclusion_criteria || '—');
+}
+
+function renderStep5(d) {
+  const pw = document.getElementById('oc-kw-primary');
+  pw.innerHTML = '';
+  (d.primary_keywords || []).forEach(k => {
+    const el = document.createElement('div');
+    el.className = 'tag tag-green';
+    el.textContent = k;
+    pw.appendChild(el);
+  });
+
+  const sw = document.getElementById('oc-kw-secondary');
+  sw.innerHTML = '';
+  (d.secondary_keywords || []).forEach(k => {
+    const el = document.createElement('div');
+    el.className = 'tag';
+    el.textContent = k;
+    sw.appendChild(el);
+  });
+
+  document.getElementById('oc-kw-boolean').textContent  = d.boolean_query || '—';
+  document.getElementById('oc-kw-linkedin').innerHTML   = escHtml(d.linkedin_search_strings || '—');
+}
+
+function renderStep6(d) {
+  const container = document.getElementById('oc-messages-container');
+  container.innerHTML = '';
+
+  const emails = [
+    { key: 'email_1', label: 'Email Variant A', colorClass: 'tag-accent' },
+    { key: 'email_2', label: 'Email Variant B', colorClass: 'tag-green' },
+    { key: 'email_3', label: 'Email Variant C', colorClass: 'tag-blue' },
+  ];
+
+  emails.forEach(({ key, label, colorClass }) => {
+    const email = d[key];
+    if (!email) return;
+    const block = document.createElement('div');
+    block.className = 'email-block animate-in';
+    block.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="tag ${colorClass}" style="padding:4px 10px;">${escHtml(label)}</div>
+          <div style="font-size:10px;color:var(--muted);">${escHtml(email.angle || '')}</div>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="copyEmail(this)" style="font-size:8px;padding:4px 10px;">Copy</button>
+      </div>
+      <div class="email-subject">Subject: ${escHtml(email.subject || '—')}</div>
+      <div class="email-body">${escHtml(email.body || '—')}</div>
+      <div class="email-cta">→ CTA: ${escHtml(email.cta || '—')}</div>
+    `;
+    container.appendChild(block);
+  });
+
+  document.getElementById('oc-followup').innerHTML = escHtml(d.follow_up_sequence || '—').replace(/Day \d+:/g, m => `<strong style="color:var(--accent)">${m}</strong>`);
+}
+
+/* ═══════════════════════════════════════════
+   SUMMARY + EXPORT
+═══════════════════════════════════════════ */
+
+function showSummary() {
+  const panel = document.getElementById('summary-panel');
+  panel.classList.add('show');
+  document.getElementById('summary-company-name').textContent = `${state.company} — Complete GTM Strategy`;
+  document.getElementById('summary-tokens').textContent = state.totalTokens.toLocaleString();
+  document.getElementById('summary-cost').textContent = `$${(state.totalTokens * 0.0000002).toFixed(4)}`;
+  panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  showToast('🎉 Complete GTM Strategy Generated!', 'success');
+}
+
+function buildExportText() {
+  let text = `GTM STRATEGY REPORT — ${state.company.toUpperCase()}\n`;
+  text += `Generated: ${new Date().toLocaleDateString()}\n`;
+  text += `Total Tokens: ${state.totalTokens.toLocaleString()}\n`;
+  text += '═'.repeat(60) + '\n\n';
+
+  const stepLabels = {
+    1: 'STEP 1: MARKET RESEARCH',
+    2: 'STEP 2: TAM MAPPING',
+    3: 'STEP 3: ICP MODELING',
+    4: 'STEP 4: ACCOUNT SOURCING',
+    5: 'STEP 5: KEYWORD GENERATION',
+    6: 'STEP 6: MESSAGING CREATION',
+  };
+
+  for (let i = 1; i <= 6; i++) {
+    if (state.steps[i].data) {
+      text += `${stepLabels[i]}\n${'─'.repeat(40)}\n`;
+      text += JSON.stringify(state.steps[i].data, null, 2);
+      text += '\n\n';
+    }
+  }
+  return text;
+}
+
+function openExportModal() {
+  const text = buildExportText();
+  document.getElementById('export-title').textContent = `${state.company} — GTM Strategy Export`;
+  document.getElementById('export-content').textContent = text;
+  document.getElementById('exportModal').classList.add('show');
+}
+
+function closeExportModal() {
+  document.getElementById('exportModal').classList.remove('show');
+}
+
+function downloadExport() {
+  const text = buildExportText();
+  const blob = new Blob([text], { type: 'text/plain' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `GTM_Strategy_${state.company.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.txt`;
+  a.click();
+  showToast('Strategy exported ✓');
+}
+
+function copyAllToClipboard() {
+  navigator.clipboard.writeText(buildExportText()).then(() => showToast('Copied to clipboard ✓'));
+}
+
+function copyEmail(btn) {
+  const block = btn.closest('.email-block');
+  const subject = block.querySelector('.email-subject')?.textContent || '';
+  const body    = block.querySelector('.email-body')?.textContent || '';
+  const cta     = block.querySelector('.email-cta')?.textContent || '';
+  navigator.clipboard.writeText(`${subject}\n\n${body}\n\n${cta}`).then(() => {
+    btn.textContent = '✓ Copied';
+    setTimeout(() => btn.textContent = 'Copy', 1500);
+  });
+}
+
+/* ═══════════════════════════════════════════
+   API CONFIG MODAL
+═══════════════════════════════════════════ */
+
+function openApiModal() {
+  document.getElementById('mode-proxy').checked  = state.apiMode === 'proxy';
+  document.getElementById('mode-direct').checked = state.apiMode === 'direct';
+  document.getElementById('key-input-group').style.display = state.apiMode === 'direct' ? 'block' : 'none';
+  if (state.apiKey) document.getElementById('api-key-input').value = state.apiKey;
+  document.getElementById('apiModal').classList.add('show');
+}
+
+function closeApiModal() {
+  document.getElementById('apiModal').classList.remove('show');
+}
+
+function onModeChange() {
+  const direct = document.getElementById('mode-direct').checked;
+  document.getElementById('key-input-group').style.display = direct ? 'block' : 'none';
+}
+
+function saveApiConfig() {
+  state.apiMode = document.getElementById('mode-direct').checked ? 'direct' : 'proxy';
+  state.apiKey  = document.getElementById('api-key-input').value.trim();
+  sessionStorage.setItem('gtm_api_mode', state.apiMode);
+  if (state.apiKey) sessionStorage.setItem('gtm_api_key', state.apiKey);
+  closeApiModal();
+  showToast(`Config saved — using ${state.apiMode === 'proxy' ? 'Cloudflare proxy' : 'direct API key'}`);
+}
+
+/* ═══════════════════════════════════════════
+   UTILS
+═══════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════════
+   WEBSITE EXTRACTION + VAULT INTEGRATION
+═══════════════════════════════════════════ */
+
+// Extend state with website profile + vault fields
+state.websiteProfile = null;
+state.websiteUrl     = '';
+state.strategyId     = null;
+state.userId         = null;
+
+// Get user ID from Supabase session (available after auth guard)
+(function pollForUser() {
+  if (window._currentUser?.id) {
+    state.userId = window._currentUser.id;
+  } else {
+    setTimeout(pollForUser, 500);
+  }
+})();
+
+let _websiteDebounce = null;
+
+function onWebsiteInput() {
+  const val = document.getElementById('website-input').value.trim();
+  state.websiteUrl = val;
+  clearTimeout(_websiteDebounce);
+  if (val.length > 5) {
+    _websiteDebounce = setTimeout(() => extractWebsite(val), 1200);
+  }
+}
+
+/* ── Auth token helper — gets Supabase JWT for API calls ── */
+async function getAuthToken() {
+  return await window.APP.token();
+}
+
+async function extractWebsite(url) {
+  const statusDiv = document.getElementById('website-status');
+  const statusTxt = document.getElementById('website-status-text');
+  const statusDot = document.getElementById('website-status-dot');
+
+  statusDiv.style.display = 'flex';
+  statusTxt.textContent   = 'Extracting company profile from website…';
+  statusDot.style.background = 'var(--amber)';
+  statusDiv.style.borderColor = 'rgba(245,158,11,0.3)';
+  statusDiv.style.color = '#fcd34d';
+
+  try {
+    const token = await getAuthToken();
+    const res = await fetch('/api/analyze-website', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        website_url:  url,
+        company_name: document.getElementById('company-input').value.trim() || null,
+      }),
+    });
+
+    if (!res.ok) throw new Error('Extraction failed');
+    const profile = await res.json();
+    state.websiteProfile = profile;
+
+    // Auto-fill company name if empty and we got one
+    const companyInput = document.getElementById('company-input');
+    if (!companyInput.value.trim() && profile.company_name) {
+      companyInput.value = profile.company_name;
+      state.company = profile.company_name;
+      document.getElementById('run-btn-1').disabled  = false;
+      document.getElementById('start-btn').disabled  = false;
+    }
+
+    // Auto-fill industry if empty
+    const industryInput = document.getElementById('industry-input');
+    if (!industryInput.value.trim() && profile.industry) {
+      industryInput.value = profile.industry;
+      state.industry = profile.industry;
+    }
+
+    const conf = profile.extraction_confidence || 'UNKNOWN';
+    const confColors = { HIGH: ['var(--green)','rgba(34,197,94,0.2)','#86efac'], MEDIUM: ['var(--amber)','rgba(245,158,11,0.2)','#fcd34d'], LOW: ['var(--red)','rgba(239,68,68,0.2)','#fca5a5'] };
+    const [dotColor, borderColor, textColor] = confColors[conf] || confColors.LOW;
+
+    statusDot.style.background = dotColor;
+    statusDiv.style.borderColor = borderColor;
+    statusDiv.style.color = textColor;
+    statusTxt.textContent = `${conf} confidence extraction — ${profile._meta?.chars_extracted || 0} chars from ${new URL(url.startsWith('http') ? url : 'https://' + url).hostname}`;
+
+    addLog('OK', 0, `Website extracted: ${profile._meta?.chars_extracted} chars, confidence: ${conf}`);
+    if (profile.extraction_notes) addLog('INFO', 0, profile.extraction_notes);
+
+  } catch(e) {
+    statusDot.style.background  = 'var(--muted)';
+    statusDiv.style.borderColor = 'rgba(107,114,128,0.2)';
+    statusDiv.style.color       = 'var(--muted)';
+    statusTxt.textContent = 'Website extraction unavailable — AI will use general knowledge';
+    addLog('WARN', 0, 'Website extraction failed: ' + e.message);
+    state.websiteProfile = null;
+  }
+}
+
+// ── Cache check when company name is entered ──────────────────────
+let _cacheCheckTimer = null;
+
+const _origOnCompanyInput = onCompanyInput;
+// Override onCompanyInput to add cache check
+window.onCompanyInput = function() {
+  _origOnCompanyInput();
+  const val = document.getElementById('company-input').value.trim();
+  if (val.length > 2) {
+    clearTimeout(_cacheCheckTimer);
+    _cacheCheckTimer = setTimeout(() => checkStrategyCache(val), 1000);
+  } else {
+    document.getElementById('cache-notice').style.display = 'none';
+  }
+};
+
+let _cachedStrategyData = null;
+
+async function checkStrategyCache(company) {
+  const userId = state.userId;
+  if (!userId) return;
+
+  try {
+    const token = await getAuthToken();
+    const res = await fetch('/api/gtm', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({ action: 'check_cache', company_name: company, user_id: userId }),
+    });
+    const data = await res.json();
+    if (data.cached && data.strategy) {
+      _cachedStrategyData = data.strategy;
+      document.getElementById('cache-notice').style.display = 'block';
+      addLog('INFO', 0, `Cached strategy found for "${company}" (${new Date(data.updated_at).toLocaleDateString()})`);
+    } else {
+      document.getElementById('cache-notice').style.display = 'none';
+      _cachedStrategyData = null;
+    }
+  } catch {}
+}
+
+function loadCachedStrategy() {
+  const s = _cachedStrategyData;
+  if (!s) return;
+
+  document.getElementById('cache-notice').style.display = 'none';
+  state.company  = s.company_name;
+  state.industry = s.industry || '';
+  state.strategyId = s.id;
+
+  const stepMap = {
+    1: s.step_1_market, 2: s.step_2_tam, 3: s.step_3_icp,
+    4: s.step_4_sourcing, 5: s.step_5_keywords, 6: s.step_6_messaging,
+  };
+
+  for (let i = 1; i <= 6; i++) {
+    if (stepMap[i]) {
+      state.steps[i].status = 'complete';
+      state.steps[i].data   = stepMap[i];
+    }
+  }
+  state.totalTokens = s.total_tokens || 0;
+  rebuildUIFromState();
+  persistState();
+  showToast(`Loaded cached strategy for "${s.company_name}" ✓`, 'success');
+  addLog('OK', 0, `Cached strategy loaded — ${s.steps_completed}/6 steps`);
+}
+
+// ── Auto-save to vault after each step completes ──────────────────
+// This patches into the existing runStep flow by extending the onStepComplete logic
+const _origRunStep = runStep;
+window.runStep = async function(n) {
+  await _origRunStep(n);
+  // After step completes, auto-save to vault if user is authenticated
+  if (state.steps[n]?.status === 'complete' && state.userId) {
+    autoSaveToVault();
+  }
+};
+
+let _saveTimer = null;
+async function autoSaveToVault() {
+  clearTimeout(_saveTimer);
+  _saveTimer = setTimeout(async () => {
+    try {
+      const steps = {};
+      for (let i = 1; i <= 6; i++) {
+        if (state.steps[i].data) steps[i] = state.steps[i].data;
+      }
+      const token = await getAuthToken();
+      const res = await fetch('/api/gtm', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          action:       'save_strategy',
+          user_id:      state.userId,
+          company_name: state.company,
+          industry:     state.industry || null,
+          steps,
+          total_tokens: state.totalTokens,
+        }),
+      });
+      const data = await res.json();
+      if (data.strategy_id) {
+        state.strategyId = data.strategy_id;
+        addLog('OK', 0, `Strategy auto-saved to vault (ID: ${data.strategy_id.slice(0,8)}…)`);
+      }
+    } catch(e) {
+      addLog('WARN', 0, 'Auto-save to vault failed: ' + e.message);
+    }
+  }, 2000); // debounce 2s
+}
+
+// ── Inject website profile into runStep's API call ────────────────
+// Patches callAPI to route through /api/gtm with verified profile
+const _origCallAPI = callAPI;
+window.callAPI = async function(step, prompt, attempt = 0) {
+  // Use the new /api/gtm endpoint which handles company profile injection
+  if (state.apiMode !== 'direct') {
+    const userId = state.userId;
+    const priorSteps = {};
+    for (let i = 1; i < step; i++) {
+      if (state.steps[i].data) priorSteps[i] = state.steps[i].data;
+    }
+
+    const token = await getAuthToken();
+    const res = await fetch('/api/gtm', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        action:          'run_step',
+        step,
+        company:         state.company,
+        industry:        state.industry || '',
+        prior_steps:     priorSteps,
+        company_profile: state.websiteProfile,
+        user_id:         userId,
+      }),
+    });
+
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      const msg = e.error || `Server error ${res.status}`;
+      if (res.status === 429) throw new ModelError('Rate limit reached. Please wait before running more steps.');
+      throw new NetworkError(msg);
+    }
+
+    const result = await res.json();
+    if (result.error) throw new NetworkError(result.error);
+
+    // Validate schema
+    const missing = (STEP_SCHEMAS[step] || []).filter(k => !(k in result.data));
+    if (missing.length) {
+      if (attempt < MAX_RETRIES) {
+        addLog('RETRY', step, `Missing fields: ${missing.join(', ')} — retrying`);
+        await new Promise(r => setTimeout(r, 1500));
+        return window.callAPI(step, prompt, attempt + 1);
+      }
+    }
+
+    addLog('OK', step, `Received ${result.tokens?.toLocaleString() || '~1500'} tokens via /api/gtm`);
+    return { data: result.data, tokens: result.tokens || 1500 };
+  }
+
+  // Fall through to original direct-key path
+  return _origCallAPI(step, prompt, attempt);
+};
+
+// ── Save to Vault button in summary panel ─────────────────────────
+const _origShowSummary = showSummary;
+window.showSummary = function() {
+  _origShowSummary();
+  // Add vault save button to summary if not already there
+  const panel = document.getElementById('summary-panel');
+  if (panel && !panel.querySelector('#save-to-vault-btn')) {
+    const btn = document.createElement('button');
+    btn.id = 'save-to-vault-btn';
+    btn.className = 'btn btn-primary btn-sm';
+    btn.innerHTML = '🗄 View in Strategy Vault';
+    btn.onclick = () => window.open('vault.html', '_blank');
+    const exportRow = panel.querySelector('.summary-export-row');
+    if (exportRow) exportRow.appendChild(btn);
+  }
+};
+
+/* ═══════════════════════════════════════════
+   AUTH — Sign Out
+═══════════════════════════════════════════ */
+
+async function handleSignOut() {
+  try {
+    if (window.APP?.sb) await window.APP.sb.auth.signOut({ scope: "local" });
+  } catch(_) {}
+  Object.keys(localStorage).forEach(k => {
+    if (k.startsWith("sb-") || k.includes("supabase")) localStorage.removeItem(k);
+  });
+  sessionStorage.clear();
+  window.location.replace("login.html");
+}
+
+function escHtml(str) {
+  if (typeof str !== 'string') return str;
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\n/g, '<br>');
+}
+</script>
+
+</body>
+</html>

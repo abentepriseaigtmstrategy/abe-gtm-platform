@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AB · Enterprise AI Revenue Infrastructure</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    body{background:#0B0F1A;color:#E5E7EB;font-family:Inter,sans-serif;
+      display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
+    a{color:#a855f7}
+  </style>
+</head>
+<body>
+  <p>Loading…</p>
+  <script>
+    const SUPABASE_URL      = 'https://cwcvneluhlimhlzowabv.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3Y3ZuZWx1aGxpbWhsem93YWJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2MzAxMjAsImV4cCI6MjA4OTIwNjEyMH0.SZDS-svU-kFh_OkUq3AjQY64F-71MpbBsFd6Iin5DlQ';
+    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    (async () => {
+      const { data: { session } } = await sb.auth.getSession();
+      window.location.replace(session ? 'dashboard.html' : 'login.html');
+    })();
+  </script>
+</body>
+</html>

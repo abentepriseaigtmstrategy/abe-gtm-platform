@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Sign In · AB AI Revenue Infrastructure</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --bg:#0B0F1A; --card:#121827; --border:#1F2937;
+      --accent:#a855f7; --accent2:#7c3aed;
+      --green:#22c55e; --red:#ef4444;
+      --text:#E5E7EB; --muted:#6B7280;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    html,body{height:100%}
+    body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);
+      display:flex;align-items:center;justify-content:center;min-height:100vh;overflow:hidden}
+    body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+      background-image:linear-gradient(rgba(168,85,247,.03) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(168,85,247,.03) 1px,transparent 1px);background-size:48px 48px}
+    .glow{position:fixed;top:50%;left:50%;transform:translate(-50%,-60%);
+      width:800px;height:800px;pointer-events:none;z-index:0;
+      background:radial-gradient(ellipse,rgba(124,58,237,.1) 0%,transparent 65%)}
+    .card{position:relative;z-index:1;width:100%;max-width:420px;margin:24px;
+      background:rgba(18,24,39,.8);backdrop-filter:blur(24px);
+      border:1px solid rgba(31,41,55,.8);border-radius:24px;padding:48px 40px}
+    .logo-row{display:flex;align-items:center;gap:12px;margin-bottom:36px}
+    .logo-mark{width:40px;height:40px;background:linear-gradient(135deg,var(--accent),var(--accent2));
+      border-radius:10px;display:flex;align-items:center;justify-content:center;
+      font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:white;flex-shrink:0}
+    .logo-name{font-size:13px;font-weight:800;color:white;line-height:1.2}
+    .logo-sub{font-size:9px;color:var(--muted);letter-spacing:.18em;text-transform:uppercase}
+    .title{font-size:22px;font-weight:900;color:white;letter-spacing:-.5px;margin-bottom:6px}
+    .subtitle{font-size:12px;color:var(--muted);margin-bottom:32px;line-height:1.6}
+    .tabs{display:flex;gap:4px;background:rgba(0,0,0,.3);border:1px solid var(--border);
+      border-radius:10px;padding:4px;margin-bottom:28px}
+    .tab{flex:1;padding:8px;font-size:11px;font-weight:700;text-transform:uppercase;
+      letter-spacing:.08em;color:var(--muted);border:none;background:none;
+      border-radius:7px;cursor:pointer;transition:all .15s}
+    .tab.active{background:rgba(168,85,247,.15);border:1px solid rgba(168,85,247,.3);color:white}
+    .label{display:block;font-size:9px;font-weight:900;text-transform:uppercase;
+      letter-spacing:.18em;color:var(--muted);margin-bottom:7px}
+    .input{width:100%;background:rgba(0,0,0,.4);border:1px solid var(--border);color:var(--text);
+      font-size:13px;padding:12px 14px;border-radius:10px;font-family:'Inter',sans-serif;
+      outline:none;transition:border-color .15s;margin-bottom:16px}
+    .input:focus{border-color:var(--accent)}
+    .input::placeholder{color:#4b5563}
+    .btn{width:100%;padding:13px;background:linear-gradient(135deg,var(--accent),var(--accent2));
+      color:white;border:none;border-radius:10px;font-size:11px;font-weight:800;
+      text-transform:uppercase;letter-spacing:.1em;cursor:pointer;transition:all .15s;margin-top:4px}
+    .btn:hover{opacity:.9;transform:translateY(-1px)}
+    .btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+    .btn.loading .btn-text{display:none}
+    .btn.loading .spinner{display:block}
+    .spinner{display:none;width:14px;height:14px;border:2px solid rgba(255,255,255,.3);
+      border-top-color:white;border-radius:50%;animation:spin .7s linear infinite;margin:0 auto}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    .msg{padding:12px 14px;border-radius:8px;font-size:12px;font-weight:600;margin-top:16px;display:none}
+    .msg.error{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#fca5a5;display:block}
+    .msg.success{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#86efac;display:block}
+    .footer{margin-top:28px;text-align:center;font-size:10px;color:var(--muted);line-height:1.6}
+    .secure{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:20px;
+      font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:#374151}
+    .dot{width:6px;height:6px;border-radius:50%;background:var(--green)}
+  </style>
+</head>
+<body>
+<div class="glow"></div>
+<div class="card">
+  <div class="logo-row">
+    <div class="logo-mark">AB</div>
+    <div>
+      <div class="logo-name">AB</div>
+      <div class="logo-sub">Enterprise AI Revenue Infrastructure</div>
+    </div>
+  </div>
+  <div class="title">Welcome back</div>
+  <div class="subtitle">Sign in to your GTM Intelligence Platform</div>
+  <div class="tabs">
+    <button class="tab active" id="tab-in"  onclick="switchTab('in')">Sign In</button>
+    <button class="tab"        id="tab-up"  onclick="switchTab('up')">Sign Up</button>
+  </div>
+
+  <!-- Sign In -->
+  <div id="form-in">
+    <label class="label">Email Address</label>
+    <input type="email" class="input" id="in-email" placeholder="you@company.com"
+      onkeypress="if(event.key==='Enter')signIn()" />
+    <label class="label">Password</label>
+    <input type="password" class="input" id="in-pass" placeholder="••••••••"
+      onkeypress="if(event.key==='Enter')signIn()" />
+    <button class="btn" id="btn-in" onclick="signIn()">
+      <span class="btn-text">Sign In</span><div class="spinner"></div>
+    </button>
+    <div class="msg" id="msg-in"></div>
+  </div>
+
+  <!-- Sign Up -->
+  <div id="form-up" style="display:none">
+    <label class="label">Email Address</label>
+    <input type="email" class="input" id="up-email" placeholder="you@company.com" />
+    <label class="label">Password</label>
+    <input type="password" class="input" id="up-pass" placeholder="Min. 8 characters"
+      onkeypress="if(event.key==='Enter')signUp()" />
+    <button class="btn" id="btn-up" onclick="signUp()">
+      <span class="btn-text">Create Account</span><div class="spinner"></div>
+    </button>
+    <div class="msg" id="msg-up"></div>
+  </div>
+
+  <div class="footer">Powered by Supabase Auth · All data encrypted at rest.</div>
+  <div class="secure"><div class="dot"></div>Secure · Server-side AI · No data sold</div>
+</div>
+
+<script>
+  const SUPABASE_URL      = 'https://cwcvneluhlimhlzowabv.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_EeDAvGbX7TpO_hgBoUZMhQ_B_nJtAbb';
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  // Already logged in → go straight to dashboard
+  (async () => {
+    const { data: { session } } = await sb.auth.getSession();
+    if (session) window.location.replace('dashboard.html');
+  })();
+
+  function switchTab(tab) {
+    document.getElementById('form-in').style.display = tab === 'in' ? 'block' : 'none';
+    document.getElementById('form-up').style.display = tab === 'up' ? 'block' : 'none';
+    document.getElementById('tab-in').classList.toggle('active', tab === 'in');
+    document.getElementById('tab-up').classList.toggle('active', tab === 'up');
+    document.getElementById('msg-in').className = 'msg';
+    document.getElementById('msg-up').className = 'msg';
+  }
+
+  async function signIn() {
+    const email = document.getElementById('in-email').value.trim();
+    const pass  = document.getElementById('in-pass').value;
+    const btn   = document.getElementById('btn-in');
+    const msg   = document.getElementById('msg-in');
+    if (!email || !pass) { showMsg(msg, 'Please enter your email and password.', 'error'); return; }
+    setLoading(btn, true);
+    msg.className = 'msg';
+    const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+    if (error) { showMsg(msg, error.message, 'error'); setLoading(btn, false); return; }
+    showMsg(msg, 'Signed in! Redirecting…', 'success');
+    setTimeout(() => window.location.replace('dashboard.html'), 600);
+  }
+
+  async function signUp() {
+    const email = document.getElementById('up-email').value.trim();
+    const pass  = document.getElementById('up-pass').value;
+    const btn   = document.getElementById('btn-up');
+    const msg   = document.getElementById('msg-up');
+    if (!email || !pass) { showMsg(msg, 'Please enter your email and password.', 'error'); return; }
+    if (pass.length < 8)  { showMsg(msg, 'Password must be at least 8 characters.', 'error'); return; }
+    setLoading(btn, true);
+    msg.className = 'msg';
+    const { error } = await sb.auth.signUp({ email, password: pass });
+    if (error) { showMsg(msg, error.message, 'error'); setLoading(btn, false); return; }
+    showMsg(msg, 'Account created! Check your email to confirm, then sign in.', 'success');
+    setLoading(btn, false);
+  }
+
+  function setLoading(btn, on) {
+    btn.disabled = on;
+    btn.classList.toggle('loading', on);
+  }
+  function showMsg(el, text, type) {
+    el.textContent = text;
+    el.className = 'msg ' + type;
+  }
+</script>
+</body>
+</html>

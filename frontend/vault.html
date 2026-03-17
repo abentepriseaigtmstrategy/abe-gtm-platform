@@ -1,0 +1,621 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Strategy Vault · AB AI Revenue Infrastructure</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="auth-guard.js"></script>
+
+  <style>
+    :root {
+      --bg: #0B0F1A; --bg-alt: #0D1120; --card: #121827;
+      --border: #1F2937; --accent: #a855f7; --accent2: #7c3aed;
+      --green: #22c55e; --amber: #f59e0b; --red: #ef4444; --blue: #3b82f6;
+      --text: #E5E7EB; --muted: #6B7280; --white: #ffffff;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+    body::before {
+      content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background-image: linear-gradient(rgba(168,85,247,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(168,85,247,0.02) 1px, transparent 1px);
+      background-size: 48px 48px;
+    }
+
+    /* NAV */
+    #topnav { position: sticky; top: 0; z-index: 100; background: rgba(11,15,26,0.95); backdrop-filter: blur(24px); border-bottom: 1px solid rgba(31,41,55,0.6); padding: 0 32px; display: flex; align-items: center; justify-content: space-between; height: 58px; }
+    .nav-brand { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+    .nav-mark { width: 32px; height: 32px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-family: 'Space Mono', monospace; font-size: 11px; font-weight: 700; color: white; }
+    .nav-brand-name { font-size: 11px; font-weight: 800; color: white; }
+    .nav-brand-sub { font-size: 8px; color: var(--muted); letter-spacing: 0.14em; text-transform: uppercase; }
+    .nav-tabs { display: flex; align-items: center; gap: 4px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 10px; padding: 4px; }
+    .nav-tab { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding: 6px 14px; border-radius: 7px; cursor: pointer; text-decoration: none; transition: all 0.15s; border: none; background: none; }
+    .nav-tab:hover { color: white; background: rgba(255,255,255,0.04); }
+    .nav-tab.active { color: white; background: rgba(168,85,247,0.12); border: 1px solid rgba(168,85,247,0.25); }
+    .nav-right { display: flex; align-items: center; gap: 10px; }
+    .btn { display: inline-flex; align-items: center; gap: 7px; padding: 8px 18px; font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; border-radius: 8px; cursor: pointer; border: none; transition: all 0.15s; text-decoration: none; }
+    .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: white; }
+    .btn-primary:hover { opacity: .9; transform: translateY(-1px); }
+    .btn-outline { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+    .btn-outline:hover { border-color: var(--accent); color: white; }
+    .btn-sm { padding: 5px 12px; font-size: 9px; }
+    .btn-ghost { background: transparent; color: var(--muted); border: none; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; cursor: pointer; }
+    .btn-ghost:hover { color: white; }
+
+    /* PAGE LAYOUT */
+    .page-wrap { position: relative; z-index: 1; max-width: 1400px; margin: 0 auto; padding: 40px 32px; }
+    .page-header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 32px; }
+    .page-title { font-size: 28px; font-weight: 900; color: white; letter-spacing: -0.8px; }
+    .page-sub { font-size: 10px; text-transform: uppercase; letter-spacing: 0.25em; color: var(--accent); font-weight: 700; margin-bottom: 6px; }
+
+    /* STATS ROW */
+    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+    .stat-card { background: rgba(18,24,39,0.7); border: 1px solid var(--border); border-radius: 16px; padding: 22px 24px; }
+    .stat-value { font-size: 28px; font-weight: 900; color: white; font-family: 'Space Mono', monospace; letter-spacing: -1px; }
+    .stat-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.18em; color: var(--muted); font-weight: 700; margin-top: 4px; }
+
+    /* TOOLBAR */
+    .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+    .search-wrap { flex: 1; position: relative; }
+    .search-input { width: 100%; background: rgba(18,24,39,0.8); border: 1px solid var(--border); color: var(--text); font-size: 11px; padding: 10px 14px 10px 38px; border-radius: 10px; font-family: 'Inter', sans-serif; outline: none; transition: border-color 0.15s; }
+    .search-input:focus { border-color: var(--accent); }
+    .search-input::placeholder { color: var(--muted); }
+    .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 14px; color: var(--muted); pointer-events: none; }
+    .filter-select { background: rgba(18,24,39,0.8); border: 1px solid var(--border); color: var(--text); font-size: 10px; font-weight: 700; padding: 10px 14px; border-radius: 10px; font-family: 'Inter', sans-serif; outline: none; cursor: pointer; text-transform: uppercase; letter-spacing: 0.08em; }
+    .filter-select:focus { border-color: var(--accent); }
+    .filter-select option { background: #121827; }
+
+    /* VAULT GRID */
+    .vault-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    @media (max-width: 1100px) { .vault-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 700px)  { .vault-grid { grid-template-columns: 1fr; } }
+
+    .vault-card { background: rgba(18,24,39,0.7); border: 1px solid var(--border); border-radius: 16px; padding: 22px 24px; cursor: pointer; transition: all 0.2s; position: relative; }
+    .vault-card:hover { border-color: rgba(168,85,247,0.4); background: rgba(168,85,247,0.04); transform: translateY(-2px); }
+    .vault-card-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
+    .vault-company { font-size: 15px; font-weight: 800; color: white; letter-spacing: -0.3px; }
+    .vault-industry { font-size: 9px; text-transform: uppercase; letter-spacing: 0.15em; color: var(--muted); font-weight: 700; margin-top: 3px; }
+    .vault-score { font-size: 22px; font-weight: 900; font-family: 'Space Mono', monospace; }
+    .vault-score.high { color: var(--green); }
+    .vault-score.med  { color: var(--amber); }
+    .vault-score.low  { color: var(--red); }
+    .vault-score-label { font-size: 8px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); text-align: right; }
+
+    .vault-meta { display: flex; gap: 12px; margin-bottom: 14px; }
+    .vault-meta-item { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); }
+    .vault-meta-item span { color: var(--text); }
+
+    .vault-icp { font-size: 10px; color: var(--muted); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 8px; }
+    .vault-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(31,41,55,0.5); }
+    .vault-steps { display: flex; gap: 4px; }
+    .step-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); }
+    .step-dot.done { background: var(--green); }
+    .vault-date { font-size: 9px; color: var(--muted); font-family: 'Space Mono', monospace; }
+    .vault-actions { display: flex; gap: 6px; opacity: 0; transition: opacity 0.15s; margin-top: 14px; }
+    .vault-card:hover .vault-actions { opacity: 1; }
+
+    .status-badge { font-size: 8px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; padding: 3px 9px; border-radius: 5px; }
+    .status-complete    { background: rgba(34,197,94,0.1); color: var(--green); border: 1px solid rgba(34,197,94,0.2); }
+    .status-in_progress { background: rgba(245,158,11,0.1); color: var(--amber); border: 1px solid rgba(245,158,11,0.2); }
+    .status-archived    { background: rgba(107,114,128,0.1); color: var(--muted); border: 1px solid rgba(107,114,128,0.2); }
+
+    /* LOADING / EMPTY */
+    #loading-grid { text-align: center; padding: 80px 20px; }
+    .spinner { width: 36px; height: 36px; border: 3px solid rgba(168,85,247,0.2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 16px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #empty-state { display: none; text-align: center; padding: 80px 20px; }
+    .empty-icon { font-size: 48px; margin-bottom: 16px; }
+
+    /* STRATEGY DRAWER */
+    .drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 200; opacity: 0; pointer-events: none; transition: opacity 0.25s; }
+    .drawer-overlay.show { opacity: 1; pointer-events: all; }
+    #strategy-drawer { position: fixed; top: 0; right: -680px; width: 680px; height: 100vh; background: var(--bg-alt); border-left: 1px solid var(--border); z-index: 201; transition: right 0.3s cubic-bezier(0.4,0,0.2,1); display: flex; flex-direction: column; overflow: hidden; }
+    #strategy-drawer.open { right: 0; }
+    .drawer-header { padding: 28px 32px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    .drawer-company { font-size: 20px; font-weight: 900; color: white; letter-spacing: -0.5px; margin-bottom: 4px; }
+    .drawer-meta { font-size: 10px; color: var(--muted); margin-bottom: 16px; line-height: 1.6; }
+    .drawer-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .drawer-body { flex: 1; overflow-y: auto; padding: 20px 32px 32px; }
+    .drawer-close { position: absolute; top: 20px; right: 20px; width: 32px; height: 32px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: var(--muted); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+    .drawer-close:hover { color: white; border-color: var(--accent); }
+
+    /* DRAWER STEPS */
+    .drawer-step { border: 1px solid var(--border); border-radius: 12px; margin-bottom: 10px; overflow: hidden; }
+    .drawer-step-header { display: flex; align-items: center; gap: 10px; padding: 14px 16px; cursor: pointer; background: rgba(18,24,39,0.5); transition: background 0.15s; user-select: none; }
+    .drawer-step-header:hover { background: rgba(168,85,247,0.05); }
+    .drawer-step-num { width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: white; font-size: 10px; font-weight: 900; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .drawer-step-title { font-size: 12px; font-weight: 800; color: white; }
+    .drawer-step-body { display: none; padding: 16px; background: rgba(0,0,0,0.2); }
+    .drawer-step-body.open { display: block; }
+
+    /* DRAWER FIELDS */
+    .dfield { margin-bottom: 12px; }
+    .dfield-label { font-size: 8px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.18em; color: var(--muted); margin-bottom: 4px; }
+    .dfield-value { font-size: 11px; color: #D1D5DB; line-height: 1.7; background: rgba(0,0,0,0.3); border-radius: 6px; padding: 10px 12px; border-left: 3px solid var(--accent); }
+    .dtag-row { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+    .dtag { font-size: 9px; font-weight: 600; padding: 3px 9px; border-radius: 5px; background: rgba(168,85,247,0.1); color: var(--accent); border: 1px solid rgba(168,85,247,0.2); }
+    .dtag.green { background: rgba(34,197,94,0.1); color: var(--green); border-color: rgba(34,197,94,0.2); }
+    .email-card { background: rgba(168,85,247,0.05); border: 1px solid rgba(168,85,247,0.2); border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; }
+    .email-card-angle { font-size: 8px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.15em; color: var(--accent); margin-bottom: 6px; }
+    .email-card-subj  { font-size: 11px; font-weight: 800; color: white; margin-bottom: 8px; }
+    .email-card-body  { font-size: 11px; color: #D1D5DB; line-height: 1.6; white-space: pre-wrap; margin-bottom: 8px; }
+    .email-card-cta   { font-size: 10px; font-weight: 700; color: var(--accent); padding-top: 8px; border-top: 1px solid rgba(168,85,247,0.15); }
+
+    /* TOAST */
+    #toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(80px); background: rgba(18,24,39,0.95); border: 1px solid var(--border); color: var(--text); font-size: 11px; font-weight: 700; padding: 12px 24px; border-radius: 10px; backdrop-filter: blur(16px); z-index: 999; transition: transform 0.3s; white-space: nowrap; }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+    #toast.success { border-color: rgba(34,197,94,0.4); color: var(--green); }
+    #toast.error   { border-color: rgba(239,68,68,0.4);  color: var(--red); }
+  </style>
+</head>
+<body>
+
+<nav id="topnav">
+  <a href="dashboard.html" class="nav-brand">
+    <div class="nav-mark">AB</div>
+    <div>
+      <div class="nav-brand-name">AB</div>
+      <div class="nav-brand-sub">Enterprise AI Revenue Infrastructure</div>
+    </div>
+  </a>
+  <div class="nav-tabs">
+    <a href="dashboard.html"     class="nav-tab">Command Centre</a>
+    <a href="gtm-strategy.html"  class="nav-tab">GTM Builder</a>
+    <a href="vault.html"         class="nav-tab active">Strategy Vault</a>
+    <a href="accounts.html"      class="nav-tab">Accounts</a>
+    <a href="leads.html"         class="nav-tab">Leads</a>
+  </div>
+  <div class="nav-right">
+    <button onclick="exportAllCSV()" class="btn btn-outline btn-sm">Export CSV</button>
+    <button onclick="refreshVault()" class="btn btn-outline btn-sm">↻ Refresh</button>
+    <a href="gtm-strategy.html" class="btn btn-primary btn-sm">+ New Strategy</a>
+    <button onclick="handleSignOut()" class="btn btn-outline btn-sm">Sign Out</button>
+  </div>
+</nav>
+
+<div class="page-wrap">
+  <div class="page-header">
+    <div>
+      <div class="page-sub">Strategy Vault</div>
+      <div class="page-title">All GTM Reports</div>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-value" id="stat-total">—</div><div class="stat-label">Total Strategies</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-complete">—</div><div class="stat-label">Complete</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-avg-score">—</div><div class="stat-label">Avg GTM Score</div></div>
+    <div class="stat-card"><div class="stat-value" id="stat-tokens">—</div><div class="stat-label">Total Tokens Used</div></div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input class="search-input" id="search-input" placeholder="Search by company or industry…" oninput="debounceSearch()" />
+    </div>
+    <select class="filter-select" id="filter-status" onchange="applyFilters()">
+      <option value="">All Statuses</option>
+      <option value="complete">Complete</option>
+      <option value="in_progress">In Progress</option>
+      <option value="archived">Archived</option>
+    </select>
+  </div>
+
+  <!-- Loading -->
+  <div id="loading-grid">
+    <div class="spinner"></div>
+    <p style="color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.2em">Loading vault…</p>
+  </div>
+
+  <!-- Empty -->
+  <div id="empty-state">
+    <div class="empty-icon">🗄</div>
+    <p style="color:var(--muted);font-size:14px;margin-bottom:20px">No strategies saved yet.</p>
+    <a href="gtm-strategy.html" class="btn btn-primary">Generate Your First GTM Strategy</a>
+  </div>
+
+  <!-- Grid -->
+  <div id="vault-grid" class="vault-grid" style="display:none"></div>
+</div>
+
+<!-- Drawer overlay -->
+<div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
+
+<!-- Strategy drawer -->
+<div id="strategy-drawer">
+  <button class="drawer-close" onclick="closeDrawer()">✕</button>
+  <div class="drawer-header">
+    <div class="drawer-company" id="drawer-company">—</div>
+    <div class="drawer-meta"    id="drawer-meta">—</div>
+    <div class="drawer-actions" id="drawer-actions"></div>
+  </div>
+  <div class="drawer-body" id="drawer-body"></div>
+</div>
+
+<!-- Toast -->
+<div id="toast">✓ <span id="toast-msg">Done</span></div>
+
+<script>
+/* ─────────────────────────────────────────────────────────────────
+   VAULT STATE
+───────────────────────────────────────────────────────────────── */
+let allStrategies = [];
+let _searchTimer  = null;
+
+/* ─────────────────────────────────────────────────────────────────
+   HELPER: authenticated API call (always includes Bearer token)
+───────────────────────────────────────────────────────────────── */
+async function apiCall(endpoint, body) {
+  const token = await window.APP.token();
+  const res = await fetch(endpoint, {
+    method:  'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   INIT — wait for auth-guard then load
+───────────────────────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', () => {
+  const interval = setInterval(() => {
+    if (window.APP?.user) {
+      clearInterval(interval);
+      loadVault();
+    }
+  }, 100);
+});
+
+async function loadVault() {
+  try {
+    const data = await apiCall('/api/gtm', { action: 'get_vault', limit: 100, offset: 0 });
+    allStrategies = data.strategies || [];
+    renderVault(allStrategies);
+    updateStats(allStrategies);
+  } catch(e) {
+    document.getElementById('loading-grid').style.display = 'none';
+    document.getElementById('empty-state').style.display  = 'block';
+    showToast('Failed to load vault: ' + e.message, 'error');
+  }
+}
+
+function refreshVault() { loadVault(); showToast('Refreshing…'); }
+
+/* ─────────────────────────────────────────────────────────────────
+   RENDER VAULT GRID
+───────────────────────────────────────────────────────────────── */
+function renderVault(strategies) {
+  document.getElementById('loading-grid').style.display = 'none';
+  const grid  = document.getElementById('vault-grid');
+  const empty = document.getElementById('empty-state');
+
+  if (!strategies.length) {
+    grid.style.display  = 'none';
+    empty.style.display = 'block';
+    return;
+  }
+
+  empty.style.display = 'none';
+  grid.style.display  = 'grid';
+
+  grid.innerHTML = strategies.map(s => {
+    const score      = s.gtm_score;
+    const scoreClass = score >= 80 ? 'high' : score >= 60 ? 'med' : 'low';
+    const steps      = s.steps_completed || 0;
+    const date       = new Date(s.updated_at).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+    const statusKey  = (s.status || 'in_progress').replace(' ', '_');
+
+    return `
+    <div class="vault-card" onclick="openDrawer('${s.id}')">
+      <div class="vault-card-header">
+        <div>
+          <div class="vault-company">${esc(s.company_name)}</div>
+          <div class="vault-industry">${esc(s.industry || 'General Market')}</div>
+        </div>
+        <div style="text-align:right;">
+          ${score
+            ? `<div class="vault-score ${scoreClass}">${score}</div><div class="vault-score-label">GTM Score</div>`
+            : `<span class="status-badge status-${statusKey}">${s.status || 'in progress'}</span>`
+          }
+        </div>
+      </div>
+      <div class="vault-meta">
+        <div class="vault-meta-item"><span>${steps}/6</span> Steps</div>
+        ${s.tam_size ? `<div class="vault-meta-item">TAM <span>${esc(s.tam_size)}</span></div>` : ''}
+        <div class="vault-meta-item"><span>${(s.total_tokens || 0).toLocaleString()}</span> Tokens</div>
+      </div>
+      ${s.primary_icp ? `<div class="vault-icp">${esc(s.primary_icp)}</div>` : ''}
+      <div class="vault-footer">
+        <div class="vault-steps">
+          ${[1,2,3,4,5,6].map(i => `<div class="step-dot ${i <= steps ? 'done' : ''}"></div>`).join('')}
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="status-badge status-${statusKey}">${(s.status||'in progress').replace('_',' ')}</span>
+          <span class="vault-date">${date}</span>
+        </div>
+      </div>
+      <div class="vault-actions" onclick="event.stopPropagation()">
+        <button class="btn btn-primary btn-sm" onclick="openDrawer('${s.id}')">Open</button>
+        <a href="report.html?id=${s.id}" class="btn btn-outline btn-sm" onclick="event.stopPropagation()">Full Report</a>
+        <button class="btn btn-outline btn-sm" onclick="exportStrategy('${s.id}');event.stopPropagation()">PDF</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="archiveStrategy('${s.id}');event.stopPropagation()">Archive</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function updateStats(strategies) {
+  document.getElementById('stat-total').textContent    = strategies.length;
+  document.getElementById('stat-complete').textContent = strategies.filter(s => s.status === 'complete').length;
+  const scores = strategies.map(s => s.gtm_score).filter(Boolean);
+  document.getElementById('stat-avg-score').textContent = scores.length
+    ? Math.round(scores.reduce((a,b) => a+b, 0) / scores.length)
+    : '—';
+  const tok = strategies.reduce((sum, s) => sum + (s.total_tokens || 0), 0);
+  document.getElementById('stat-tokens').textContent = tok > 1000 ? (tok / 1000).toFixed(1) + 'k' : tok;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   SEARCH + FILTER
+───────────────────────────────────────────────────────────────── */
+function debounceSearch() {
+  clearTimeout(_searchTimer);
+  _searchTimer = setTimeout(applyFilters, 300);
+}
+
+function applyFilters() {
+  const q      = document.getElementById('search-input').value.toLowerCase().trim();
+  const status = document.getElementById('filter-status').value;
+  const filtered = allStrategies.filter(s => {
+    const matchQ = !q || s.company_name.toLowerCase().includes(q) || (s.industry || '').toLowerCase().includes(q);
+    const matchS = !status || s.status === status;
+    return matchQ && matchS;
+  });
+  renderVault(filtered);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   STRATEGY DRAWER
+───────────────────────────────────────────────────────────────── */
+let _openStrategyId = null;
+
+async function openDrawer(strategyId) {
+  _openStrategyId = strategyId;
+  document.getElementById('strategy-drawer').classList.add('open');
+  document.getElementById('drawer-overlay').classList.add('show');
+  document.getElementById('drawer-company').textContent = 'Loading…';
+  document.getElementById('drawer-meta').textContent    = '';
+  document.getElementById('drawer-body').innerHTML      = '<div style="padding:40px;color:var(--muted);text-align:center;">Loading strategy…</div>';
+
+  try {
+    const data = await apiCall('/api/gtm', { action: 'get_strategy', strategy_id: strategyId });
+    if (data.error) throw new Error(data.error);
+    renderDrawer(data.strategy);
+  } catch(e) {
+    document.getElementById('drawer-body').innerHTML = `<div style="padding:20px;color:var(--red);">Failed to load: ${e.message}</div>`;
+  }
+}
+
+function closeDrawer() {
+  document.getElementById('strategy-drawer').classList.remove('open');
+  document.getElementById('drawer-overlay').classList.remove('show');
+  _openStrategyId = null;
+}
+
+function renderDrawer(s) {
+  document.getElementById('drawer-company').textContent = s.company_name;
+  document.getElementById('drawer-meta').textContent    =
+    `${s.industry || 'General Market'} · ${s.steps_completed}/6 Steps · ${(s.total_tokens||0).toLocaleString()} tokens · ${new Date(s.updated_at).toLocaleDateString('en-GB')}`;
+
+  document.getElementById('drawer-actions').innerHTML = `
+    <a href="report.html?id=${s.id}" class="btn btn-primary btn-sm">📄 Full Report</a>
+    <button class="btn btn-outline btn-sm" onclick="exportStrategy('${s.id}')">⬇ Export PDF</button>
+    <button class="btn btn-outline btn-sm" onclick="copyStrategyText('${s.id}')">📋 Copy All</button>
+    <a href="gtm-strategy.html?resume=${s.id}" class="btn btn-outline btn-sm">↻ Re-run</a>
+  `;
+
+  const steps = [
+    { n:1, label:'Market Research',  data: s.step_1_market    },
+    { n:2, label:'TAM Mapping',      data: s.step_2_tam       },
+    { n:3, label:'ICP Modeling',     data: s.step_3_icp       },
+    { n:4, label:'Account Sourcing', data: s.step_4_sourcing  },
+    { n:5, label:'Keywords',         data: s.step_5_keywords  },
+    { n:6, label:'Messaging',        data: s.step_6_messaging },
+  ];
+
+  document.getElementById('drawer-body').innerHTML = steps.map(({ n, label, data }) => `
+    <div class="drawer-step">
+      <div class="drawer-step-header" onclick="toggleDrawerStep(${n})">
+        <div class="drawer-step-num">${n}</div>
+        <div class="drawer-step-title">${label}</div>
+        <div style="margin-left:auto;font-size:10px;color:${data ? 'var(--green)' : 'var(--muted)'}">
+          ${data ? '✓ Complete' : '— Not run'}
+        </div>
+        <span style="margin-left:8px;color:var(--muted);font-size:12px;" id="chevron-${n}">▼</span>
+      </div>
+      <div class="drawer-step-body" id="step-body-${n}">
+        ${data ? renderStepContent(n, data) : '<div style="padding:10px 0;font-size:11px;color:var(--muted);">This step has not been run yet.</div>'}
+      </div>
+    </div>
+  `).join('');
+}
+
+function toggleDrawerStep(n) {
+  const body = document.getElementById(`step-body-${n}`);
+  const chev = document.getElementById(`chevron-${n}`);
+  const isOpen = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  if (chev) chev.textContent = isOpen ? '▼' : '▲';
+}
+
+function renderStepContent(n, d) {
+  if (!d) return '';
+  const field  = (lbl, val) => val ? `<div class="dfield"><div class="dfield-label">${lbl}</div><div class="dfield-value">${esc(String(val))}</div></div>` : '';
+  const tags   = (lbl, arr) => arr?.length ? `<div class="dfield"><div class="dfield-label">${lbl}</div><div class="dtag-row">${arr.map(t=>`<span class="dtag">${esc(t)}</span>`).join('')}</div></div>` : '';
+  const tagsG  = (lbl, arr) => arr?.length ? `<div class="dfield"><div class="dfield-label">${lbl}</div><div class="dtag-row">${arr.map(t=>`<span class="dtag green">${esc(t)}</span>`).join('')}</div></div>` : '';
+
+  switch(n) {
+    case 1: return field('Overview', d.company_overview) + field('Market Position', d.market_position) + field('Products/Services', d.products_services) + field('GTM Score', d.gtm_relevance_score ? `${d.gtm_relevance_score}/100 — ${d.gtm_relevance_reasoning||''}` : null) + tags('Growth Signals', d.growth_signals) + tags('Tech Stack', d.tech_stack_hints);
+    case 2: return field('TAM Overview', d.tam_overview) + `<div class="dfield"><div class="dfield-label">Key Metrics</div><div class="dtag-row"><span class="dtag green">${esc(d.tam_size_estimate||'—')}</span><span class="dtag">${esc(d.growth_rate||'—')}</span></div></div>` + field('Priority Opportunities', d.priority_opportunities);
+    case 3: return field('Primary ICP', d.primary_icp) + field('Firmographics', d.firmographics) + field('Core Pain Points', d.core_pain_points) + tags('Buying Triggers', d.buying_triggers) + tags('Decision Makers', d.decision_makers) + tags('Objections', d.objections);
+    case 4: return tagsG('Recommended Databases', d.recommended_databases) + field('Filter Criteria', d.filter_criteria) + field('Sourcing Playbook', d.sourcing_playbook) + field('Exclusion Criteria', d.exclusion_criteria);
+    case 5: return tagsG('Primary Keywords', d.primary_keywords) + tags('Secondary Keywords', d.secondary_keywords) + field('Boolean Query', d.boolean_query) + field('LinkedIn String', d.linkedin_search_strings);
+    case 6: return ['email_1','email_2','email_3'].map(k => {
+      const em = d[k]; if (!em) return '';
+      return `<div class="email-card"><div class="email-card-angle">${esc(em.angle||k)}</div><div class="email-card-subj">Subject: ${esc(em.subject||'—')}</div><div class="email-card-body">${esc(em.body||'—')}</div><div class="email-card-cta">→ ${esc(em.cta||'—')}</div></div>`;
+    }).join('') + field('Follow-up Sequence', d.follow_up_sequence) + field('LinkedIn Message', d.linkedin_message);
+    default: return `<pre style="font-size:10px;color:var(--muted);white-space:pre-wrap;">${JSON.stringify(d,null,2)}</pre>`;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   PDF EXPORT — handles both pdf_base64 and html2pdf fallback
+───────────────────────────────────────────────────────────────── */
+async function exportStrategy(strategyId) {
+  showToast('Generating PDF…');
+  try {
+    // Step 1: fetch full strategy
+    const { strategy } = await apiCall('/api/gtm', { action: 'get_strategy', strategy_id: strategyId });
+    if (!strategy) throw new Error('Strategy not found');
+
+    // Step 2: call export-pdf
+    const token = await window.APP.token();
+    const pRes  = await fetch('/api/export-pdf', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body:    JSON.stringify({ strategy }),
+    });
+    const pData = await pRes.json();
+    if (!pRes.ok) throw new Error(pData.error || 'Export failed');
+
+    if (pData.pdf_base64) {
+      // Binary PDF from pdf-lib
+      const link    = document.createElement('a');
+      link.href     = 'data:application/pdf;base64,' + pData.pdf_base64;
+      link.download = pData.filename || 'GTM_Report.pdf';
+      link.click();
+    } else if (pData.html && pData.mode === 'html2pdf') {
+      // HTML fallback
+      const container = document.createElement('div');
+      container.style.position = 'absolute';
+      container.style.left     = '-9999px';
+      container.innerHTML = pData.html;
+      document.body.appendChild(container);
+      await html2pdf().set({
+        margin:      [10, 10, 10, 10],
+        filename:    pData.filename || 'GTM_Report.pdf',
+        html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+        jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak:   { mode: ['avoid-all','css'] },
+      }).from(container).save();
+      document.body.removeChild(container);
+    }
+
+    showToast('PDF downloaded ✓', 'success');
+  } catch(e) {
+    showToast('Export failed: ' + e.message, 'error');
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   ARCHIVE — via API (not direct Supabase SDK)
+───────────────────────────────────────────────────────────────── */
+async function archiveStrategy(strategyId) {
+  if (!confirm('Archive this strategy? You can restore it later.')) return;
+  try {
+    await apiCall('/api/gtm', { action: 'archive_strategy', strategy_id: strategyId });
+    allStrategies = allStrategies.filter(s => s.id !== strategyId);
+    renderVault(allStrategies);
+    updateStats(allStrategies);
+    closeDrawer();
+    showToast('Strategy archived', 'success');
+  } catch(e) {
+    showToast('Archive failed: ' + e.message, 'error');
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   EXPORT CSV LIST
+───────────────────────────────────────────────────────────────── */
+function exportAllCSV() {
+  if (!allStrategies.length) { showToast('No strategies to export', 'error'); return; }
+  const headers = ['Company','Industry','GTM Score','TAM Size','Steps Complete','Status','Tokens','Updated'];
+  const rows = allStrategies.map(s => [
+    s.company_name, s.industry || '', s.gtm_score || '', s.tam_size || '',
+    `${s.steps_completed || 0}/6`, s.status || '', s.total_tokens || 0,
+    new Date(s.updated_at).toLocaleDateString('en-GB'),
+  ]);
+  const csv  = [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
+  a.download = `strategy_vault_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  showToast(`Exported ${allStrategies.length} strategies ✓`, 'success');
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   COPY STRATEGY TEXT
+───────────────────────────────────────────────────────────────── */
+async function copyStrategyText(strategyId) {
+  try {
+    const { strategy: s } = await apiCall('/api/gtm', { action: 'get_strategy', strategy_id: strategyId });
+    let text = `GTM STRATEGY — ${s.company_name}\n${'='.repeat(50)}\n\n`;
+    const names = {
+      step_1_market:    'MARKET RESEARCH',
+      step_2_tam:       'TAM MAPPING',
+      step_3_icp:       'ICP MODELING',
+      step_4_sourcing:  'ACCOUNT SOURCING',
+      step_5_keywords:  'KEYWORDS',
+      step_6_messaging: 'MESSAGING',
+    };
+    for (const [k, label] of Object.entries(names)) {
+      if (s[k]) text += `${label}\n${'-'.repeat(30)}\n${JSON.stringify(s[k], null, 2)}\n\n`;
+    }
+    await navigator.clipboard.writeText(text);
+    showToast('Copied to clipboard ✓', 'success');
+  } catch(e) {
+    showToast('Copy failed: ' + e.message, 'error');
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   SIGN OUT
+───────────────────────────────────────────────────────────────── */
+async function handleSignOut() {
+  try { await window.APP.sb?.auth.signOut({ scope: 'local' }); } catch(_) {}
+  Object.keys(localStorage).forEach(k => {
+    if (k.startsWith('sb-') || k.includes('supabase')) localStorage.removeItem(k);
+  });
+  sessionStorage.clear();
+  window.location.replace('login.html');
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   UTILS
+───────────────────────────────────────────────────────────────── */
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.className = type;
+  document.getElementById('toast-msg').textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3200);
+}
+
+function esc(str) {
+  if (typeof str !== 'string') return String(str || '');
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Lead Manager · AB AI Revenue Infrastructure</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root {
+      --bg:#0B0F1A; --card:#121827; --border:#1F2937;
+      --accent:#a855f7; --accent2:#7c3aed; --green:#22c55e;
+      --amber:#f59e0b; --red:#ef4444; --blue:#3b82f6;
+      --text:#E5E7EB; --muted:#6B7280; --white:#fff;
+    }
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+    body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+      background-image:linear-gradient(rgba(168,85,247,.02) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(168,85,247,.02) 1px,transparent 1px);background-size:48px 48px}
+
+    /* NAV */
+    #topnav{position:sticky;top:0;z-index:100;background:rgba(11,15,26,.95);
+      backdrop-filter:blur(24px);border-bottom:1px solid rgba(31,41,55,.6);
+      padding:0 32px;display:flex;align-items:center;justify-content:space-between;height:58px}
+    .nav-brand{display:flex;align-items:center;gap:12px;text-decoration:none}
+    .nav-mark{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),var(--accent2));
+      border-radius:8px;display:flex;align-items:center;justify-content:center;
+      font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:white}
+    .nbname{font-size:11px;font-weight:800;color:white}
+    .nbsub{font-size:8px;color:var(--muted);letter-spacing:.14em;text-transform:uppercase}
+    .nav-tabs{display:flex;align-items:center;gap:4px;background:rgba(255,255,255,.03);
+      border:1px solid var(--border);border-radius:10px;padding:4px}
+    .nav-tab{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+      color:var(--muted);padding:6px 14px;border-radius:7px;cursor:pointer;
+      text-decoration:none;transition:all .15s;border:none;background:none}
+    .nav-tab:hover{color:white;background:rgba(255,255,255,.04)}
+    .nav-tab.active{color:white;background:rgba(168,85,247,.12);border:1px solid rgba(168,85,247,.25)}
+
+    /* LAYOUT */
+    .wrap{position:relative;z-index:1;max-width:1500px;margin:0 auto;padding:36px 32px}
+    .ph{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:28px}
+    .ptitle{font-size:26px;font-weight:900;color:white;letter-spacing:-.6px}
+    .psub{font-size:10px;text-transform:uppercase;letter-spacing:.25em;color:var(--accent);font-weight:700;margin-bottom:5px}
+
+    /* STATS */
+    .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:28px}
+    .sc{background:rgba(18,24,39,.7);border:1px solid var(--border);border-radius:14px;padding:18px 20px}
+    .sv{font-size:24px;font-weight:900;font-family:'Space Mono',monospace;color:white}
+    .sl{font-size:9px;text-transform:uppercase;letter-spacing:.18em;color:var(--muted);font-weight:700;margin-top:3px}
+
+    /* TOOLBAR */
+    .toolbar{display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+    .sw{position:relative;flex:1;min-width:200px}
+    .si{width:100%;background:rgba(18,24,39,.8);border:1px solid var(--border);color:var(--text);
+      font-size:11px;padding:9px 12px 9px 34px;border-radius:10px;outline:none;font-family:'Inter',sans-serif}
+    .si:focus{border-color:var(--accent)}
+    .si::placeholder{color:var(--muted)}
+    .si-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:13px;pointer-events:none}
+    .fs{background:rgba(18,24,39,.8);border:1px solid var(--border);color:var(--text);
+      font-size:10px;font-weight:700;padding:9px 13px;border-radius:10px;
+      outline:none;cursor:pointer;text-transform:uppercase;letter-spacing:.08em}
+    .fs:focus{border-color:var(--accent)}
+    .fs option{background:#121827}
+    .btn{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;font-size:10px;
+      font-weight:800;letter-spacing:.08em;text-transform:uppercase;border-radius:8px;
+      cursor:pointer;border:none;transition:all .15s}
+    .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:white}
+    .btn-green{background:rgba(34,197,94,.15);color:var(--green);border:1px solid rgba(34,197,94,.3)}
+    .btn-outline{background:transparent;color:var(--muted);border:1px solid var(--border)}
+    .btn-outline:hover{border-color:var(--accent);color:white}
+    .btn-sm{padding:6px 12px;font-size:9px}
+    .btn-danger{background:rgba(239,68,68,.15);color:var(--red);border:1px solid rgba(239,68,68,.3)}
+
+    /* TABLE */
+    .tbl-wrap{background:rgba(18,24,39,.7);border:1px solid var(--border);border-radius:16px;overflow:hidden}
+    .tbl-scroll{max-height:620px;overflow-y:auto;scrollbar-width:thin;scrollbar-color:#312e81 #0f172a}
+    .tbl-scroll::-webkit-scrollbar{width:6px}
+    .tbl-scroll::-webkit-scrollbar-thumb{background:#312e81;border-radius:10px}
+    table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
+    th{background:rgba(15,23,42,1);font-weight:700;font-size:9px;letter-spacing:.1em;
+      color:#64748b;padding:14px 16px;border-bottom:1px solid var(--border);
+      text-align:left;text-transform:uppercase;position:sticky;top:0;z-index:10;white-space:nowrap}
+    td{padding:12px 16px;font-size:11px;border-bottom:1px solid rgba(31,41,55,.3);
+      overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+    tr:hover td{background:rgba(168,85,247,.03)}
+
+    /* BADGES */
+    .priority-HIGH{color:var(--green);font-weight:800}
+    .priority-MEDIUM{color:var(--amber);font-weight:800}
+    .priority-LOW{color:var(--muted);font-weight:700}
+    .status-badge{font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.08em;
+      padding:2px 8px;border-radius:4px}
+    .sb-analyzed{background:rgba(168,85,247,.1);color:var(--accent);border:1px solid rgba(168,85,247,.2)}
+    .sb-unprocessed{background:rgba(107,114,128,.1);color:var(--muted);border:1px solid rgba(107,114,128,.2)}
+    .sb-mapped{background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.2)}
+
+    /* BULK BAR */
+    #bulk-bar{background:linear-gradient(135deg,rgba(168,85,247,.12),rgba(99,102,241,.08));
+      border:1px solid rgba(168,85,247,.25);border-radius:14px;padding:10px 18px;
+      display:flex;align-items:center;gap:10px;margin-bottom:12px;animation:slideDown .2s ease}
+    @keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+    .ck{accent-color:var(--accent);width:13px;height:13px;cursor:pointer}
+
+    /* IMPORT MODAL */
+    .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(6px);
+      z-index:200;display:flex;align-items:center;justify-content:center;padding:24px}
+    .modal-box{background:#0D1120;border:1px solid var(--border);border-radius:24px;
+      padding:36px;width:100%;max-width:540px}
+    .modal-title{font-size:18px;font-weight:900;color:white;margin-bottom:4px}
+    .modal-sub{font-size:10px;text-transform:uppercase;letter-spacing:.2em;color:var(--accent);margin-bottom:24px}
+    .form-label{font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.18em;
+      color:var(--muted);margin-bottom:6px;display:block}
+    .form-input{width:100%;background:rgba(0,0,0,.4);border:1px solid var(--border);color:var(--text);
+      font-size:12px;padding:11px 14px;border-radius:10px;font-family:'Inter',sans-serif;outline:none;margin-bottom:16px}
+    .form-input:focus{border-color:var(--accent)}
+    .drop-zone{border:2px dashed rgba(168,85,247,.3);border-radius:12px;padding:32px;
+      text-align:center;cursor:pointer;transition:all .2s;margin-bottom:16px}
+    .drop-zone:hover,.drop-zone.over{border-color:var(--accent);background:rgba(168,85,247,.04)}
+    .drop-icon{font-size:28px;margin-bottom:10px}
+    .drop-label{font-size:12px;color:var(--muted);margin-bottom:6px}
+    .drop-hint{font-size:10px;color:var(--muted);opacity:.6}
+
+    #toast{position:fixed;bottom:24px;right:24px;background:rgba(18,24,39,.95);
+      border:1px solid var(--border);border-radius:12px;padding:12px 18px;font-size:11px;
+      font-weight:700;color:white;z-index:300;opacity:0;transform:translateY(8px);
+      transition:all .25s;pointer-events:none}
+    #toast.show{opacity:1;transform:none}
+    #toast.success{border-color:rgba(34,197,94,.4);color:var(--green)}
+    #toast.error{border-color:rgba(239,68,68,.4);color:var(--red)}
+
+    .empty-row td{text-align:center;padding:48px;color:var(--muted);font-weight:700;
+      text-transform:uppercase;letter-spacing:.15em;font-size:10px}
+    .skeleton-row td{background:rgba(255,255,255,.03);animation:pulse 1.5s ease-in-out infinite}
+    @keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}
+  </style>
+</head>
+<body>
+
+<!-- AUTH GUARD -->
+<script src="auth-guard.js"></script>
+
+<nav id="topnav">
+  <a href="index.html" class="nav-brand">
+    <div class="nav-mark">AB</div>
+    <div><div class="nbname">AB</div><div class="nbsub">Enterprise AI Revenue Infrastructure</div></div>
+  </a>
+  <div class="nav-tabs">
+    <a href="dashboard.html"    class="nav-tab">Command Centre</a>
+    <a href="gtm-strategy.html" class="nav-tab">GTM Strategy</a>
+    <a href="vault.html"        class="nav-tab">Strategy Vault</a>
+    <a href="accounts.html"     class="nav-tab">Account Intel</a>
+    <button class="nav-tab active">Lead Manager</button>
+  </div>
+  <div style="display:flex;gap:8px">
+    <button class="btn btn-primary btn-sm" onclick="openImport()">⬆ Import CSV</button>
+    <button class="btn btn-outline btn-sm" onclick="handleSignOut()">Sign Out</button>
+  </div>
+</nav>
+
+<div class="wrap">
+  <div class="ph">
+    <div>
+      <div class="psub">Lead Intelligence</div>
+      <div class="ptitle">Lead Manager</div>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-outline" id="score-btn" onclick="scoreBatch()" style="display:none">🎯 Score Selected</button>
+      <button class="btn btn-green"   id="outreach-btn" onclick="generateOutreach()" style="display:none">✉ Generate Outreach</button>
+      <button class="btn btn-outline" onclick="exportLeads()">⬇ Export CSV</button>
+    </div>
+  </div>
+
+  <!-- Stats -->
+  <div class="stats">
+    <div class="sc"><div class="sv" id="s-total">—</div><div class="sl">Total Leads</div></div>
+    <div class="sc"><div class="sv" id="s-high"  style="color:var(--green)">—</div><div class="sl">High Priority</div></div>
+    <div class="sc"><div class="sv" id="s-analyzed" style="color:var(--accent)">—</div><div class="sl">Analyzed</div></div>
+    <div class="sc"><div class="sv" id="s-outreach" style="color:var(--blue)">—</div><div class="sl">Outreach Sent</div></div>
+    <div class="sc"><div class="sv" id="s-replied" style="color:var(--amber)">—</div><div class="sl">Replied</div></div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="sw">
+      <span class="si-icon">🔍</span>
+      <input type="text" class="si" id="search" placeholder="Search name, company, email…" oninput="debounceSearch()" />
+    </div>
+    <select class="fs" id="filter-priority" onchange="loadLeads()">
+      <option value="">All Priorities</option>
+      <option value="HIGH">🟢 High</option>
+      <option value="MEDIUM">🟡 Medium</option>
+      <option value="LOW">🔴 Low</option>
+    </select>
+    <select class="fs" id="filter-status" onchange="loadLeads()">
+      <option value="">All Statuses</option>
+      <option value="unprocessed">Unprocessed</option>
+      <option value="analyzed">Analyzed</option>
+      <option value="mapped">Mapped</option>
+    </select>
+    <select class="fs" id="filter-outreach" onchange="loadLeads()">
+      <option value="">All Outreach</option>
+      <option value="not_sent">Not Sent</option>
+      <option value="sent">Sent</option>
+      <option value="replied">Replied</option>
+    </select>
+    <button class="btn btn-outline btn-sm" onclick="loadLeads()">↺</button>
+  </div>
+
+  <!-- Bulk action bar -->
+  <div id="bulk-bar" style="display:none">
+    <span id="bulk-count" style="font-size:10px;font-weight:900;color:#c4b5fd;text-transform:uppercase;letter-spacing:.1em"></span>
+    <div style="flex:1"></div>
+    <button class="btn btn-sm btn-green"  onclick="scoreBatch()">🎯 Score</button>
+    <button class="btn btn-sm btn-outline" onclick="exportSelected()">⬇ Export</button>
+    <button class="btn btn-sm btn-danger" onclick="deleteSelected()">🗑 Delete</button>
+    <button class="btn btn-sm btn-outline" onclick="clearSelection()">✕</button>
+  </div>
+
+  <!-- Table -->
+  <div class="tbl-wrap">
+    <div class="tbl-scroll">
+      <table>
+        <thead>
+          <tr>
+            <th style="width:3%"><input type="checkbox" class="ck" id="select-all" onchange="toggleAll(this.checked)"></th>
+            <th style="width:14%">Name</th>
+            <th style="width:16%">Company</th>
+            <th style="width:11%">Title</th>
+            <th style="width:6%">ICP</th>
+            <th style="width:6%">Intent</th>
+            <th style="width:7%">Priority</th>
+            <th style="width:8%">Status</th>
+            <th style="width:9%">Outreach</th>
+            <th style="width:8%">Updated</th>
+            <th style="width:12%">Actions</th>
+          </tr>
+        </thead>
+        <tbody id="leads-body">
+          <tr class="skeleton-row"><td colspan="11" style="padding:48px;text-align:center;color:var(--muted)">Loading…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <div id="pagination" style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;font-size:10px;color:var(--muted)">
+    <span id="pg-info"></span>
+    <div style="display:flex;gap:8px">
+      <button class="btn btn-outline btn-sm" id="pg-prev" onclick="changePage(-1)" disabled>← Prev</button>
+      <button class="btn btn-outline btn-sm" id="pg-next" onclick="changePage(1)">Next →</button>
+    </div>
+  </div>
+</div>
+
+<!-- IMPORT MODAL -->
+<div id="import-modal" class="modal-overlay" style="display:none">
+  <div class="modal-box">
+    <div class="modal-title">Import Leads</div>
+    <div class="modal-sub">CSV · Apollo Export · Manual List</div>
+    <div class="drop-zone" id="drop-zone" onclick="document.getElementById('csv-file').click()"
+      ondragover="event.preventDefault();this.classList.add('over')"
+      ondragleave="this.classList.remove('over')"
+      ondrop="handleDrop(event)">
+      <div class="drop-icon">📂</div>
+      <div class="drop-label">Drop CSV file here or click to browse</div>
+      <div class="drop-hint">Supports: CSV, Excel (Apollo / generic format)</div>
+      <input type="file" id="csv-file" accept=".csv,.xlsx" style="display:none" onchange="handleFileSelect(this)">
+    </div>
+    <div id="import-preview" style="display:none;margin-bottom:16px">
+      <div style="font-size:10px;font-weight:700;color:var(--green);margin-bottom:8px" id="import-preview-count"></div>
+    </div>
+    <div style="display:flex;gap:10px;justify-content:flex-end">
+      <button class="btn btn-outline" onclick="closeImport()">Cancel</button>
+      <button class="btn btn-primary" id="import-confirm" onclick="confirmImport()" disabled>Import Leads</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast">✓ <span id="toast-msg"></span></div>
+
+<script>
+/* ─── State ─────────────────────────────────── */
+let _leads   = [];
+let _selected = new Set();
+let _offset  = 0;
+let _limit   = 100;
+let _total   = 0;
+let _csv     = null;
+let _searchTimer = null;
+
+/* ─── Init ──────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', () => setTimeout(() => { if(window.APP.user) init(); else setTimeout(()=>init(), 600); }, 400));
+
+async function init() { await loadLeads(); }
+
+/* ─── Load leads ────────────────────────────── */
+async function loadLeads() {
+  const token    = await getToken();
+  const priority = document.getElementById('filter-priority').value;
+  const status   = document.getElementById('filter-status').value;
+  const outreach = document.getElementById('filter-outreach').value;
+  const search   = document.getElementById('search').value.trim();
+
+  try {
+    const res = await api('/api/leads', {
+      action: 'get_leads', priority: priority||undefined, status: status||undefined,
+      search: search||undefined, limit: _limit, offset: _offset,
+    }, token);
+    _leads = res.leads || [];
+    _total = res.total || _leads.length;
+    renderTable(_leads);
+    updateStats(_leads);
+    updatePagination();
+  } catch(e) {
+    document.getElementById('leads-body').innerHTML =
+      `<tr><td colspan="11" style="text-align:center;padding:40px;color:var(--red)">${e.message}</td></tr>`;
+  }
+}
+
+function debounceSearch() { clearTimeout(_searchTimer); _searchTimer = setTimeout(loadLeads, 350); }
+function changePage(dir)  { _offset = Math.max(0, _offset + dir * _limit); loadLeads(); }
+
+function updatePagination() {
+  const start = _offset + 1;
+  const end   = Math.min(_offset + _leads.length, _total);
+  document.getElementById('pg-info').textContent = `Showing ${start}–${end} of ${_total}`;
+  document.getElementById('pg-prev').disabled = _offset === 0;
+  document.getElementById('pg-next').disabled = _offset + _leads.length >= _total;
+}
+
+/* ─── Render table ──────────────────────────── */
+function renderTable(leads) {
+  const body = document.getElementById('leads-body');
+  if (!leads.length) {
+    body.innerHTML = `<tr class="empty-row"><td colspan="11">No leads found</td></tr>`;
+    return;
+  }
+  body.innerHTML = leads.map(l => {
+    const icp    = l.icp_score    ?? '—';
+    const intent = l.intent_score ?? '—';
+    const prio   = l.priority     || '—';
+    const date   = l.updated_at ? new Date(l.updated_at).toLocaleDateString('en-GB',{day:'2-digit',month:'short'}) : '—';
+    const statusCls = `sb-${l.status||'unprocessed'}`;
+    return `
+    <tr id="row-${l.id}">
+      <td><input type="checkbox" class="ck row-ck" value="${l.id}" onchange="toggleRow(this)"></td>
+      <td class="font-bold" style="color:white;font-weight:700">${esc(l.name||'—')}</td>
+      <td style="color:#c4b5fd">${esc(l.company||'—')}</td>
+      <td>${esc(l.title||'—')}</td>
+      <td class="priority-${icp>=75?'HIGH':icp>=50?'MEDIUM':'LOW'}">${icp}${icp!=='—'?'%':''}</td>
+      <td style="color:${getIntentColor(intent)};font-weight:800">${intent}${intent!=='—'?'':''}</td>
+      <td class="priority-${prio}">${prio}</td>
+      <td><span class="status-badge ${statusCls}">${l.status||'unprocessed'}</span></td>
+      <td style="color:${getOutreachColor(l.outreach_status)}">${l.outreach_status||'not_sent'}</td>
+      <td style="color:var(--muted);font-family:'Space Mono',monospace;font-size:9px">${date}</td>
+      <td>
+        <div style="display:flex;gap:4px">
+          <button class="btn btn-sm btn-outline" onclick="scoreOne('${l.id}')">Score</button>
+          <button class="btn btn-sm btn-outline" onclick="genOutreach('${l.id}')">Outreach</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function getIntentColor(s) { return s >= 60 ? 'var(--red)' : s >= 30 ? 'var(--amber)' : 'var(--muted)'; }
+function getOutreachColor(s) {
+  return s === 'replied' ? 'var(--green)' : s === 'sent' ? 'var(--blue)' : 'var(--muted)';
+}
+
+function updateStats(leads) {
+  document.getElementById('s-total').textContent    = _total;
+  document.getElementById('s-high').textContent     = leads.filter(l=>l.priority==='HIGH').length;
+  document.getElementById('s-analyzed').textContent = leads.filter(l=>l.status==='analyzed'||l.status==='mapped').length;
+  document.getElementById('s-outreach').textContent = leads.filter(l=>l.outreach_status==='sent'||l.outreach_status==='replied').length;
+  document.getElementById('s-replied').textContent  = leads.filter(l=>l.outreach_status==='replied').length;
+}
+
+/* ─── Selection ─────────────────────────────── */
+function toggleAll(checked) {
+  document.querySelectorAll('.row-ck').forEach(ck => { ck.checked = checked; toggleRow(ck); });
+}
+function toggleRow(ck) {
+  if (ck.checked) _selected.add(ck.value); else _selected.delete(ck.value);
+  updateBulkBar();
+}
+function clearSelection() {
+  _selected.clear();
+  document.querySelectorAll('.row-ck').forEach(ck => ck.checked = false);
+  document.getElementById('select-all').checked = false;
+  updateBulkBar();
+}
+function updateBulkBar() {
+  const n = _selected.size;
+  document.getElementById('bulk-bar').style.display = n > 0 ? 'flex' : 'none';
+  document.getElementById('bulk-count').textContent = `${n} lead${n!==1?'s':''} selected`;
+  document.getElementById('score-btn').style.display   = n > 0 ? 'inline-flex' : 'none';
+  document.getElementById('outreach-btn').style.display = n === 1 ? 'inline-flex' : 'none';
+}
+
+/* ─── Scoring ────────────────────────────────── */
+async function scoreBatch() {
+  if (!_selected.size) return;
+  const token = await getToken();
+  showToast(`Scoring ${_selected.size} leads…`);
+  try {
+    await api('/api/leads', { action: 'score_batch', lead_ids: [..._selected] }, token);
+    showToast('Leads scored ✓', 'success');
+    loadLeads();
+    clearSelection();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function scoreOne(leadId) {
+  const token = await getToken();
+  showToast('Scoring…');
+  try {
+    await api('/api/leads', { action: 'score_batch', lead_ids: [leadId] }, token);
+    showToast('Scored ✓', 'success');
+    loadLeads();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+/* ─── Outreach ───────────────────────────────── */
+async function generateOutreach() {
+  const [leadId] = _selected;
+  if (!leadId) return;
+  genOutreach(leadId);
+}
+async function genOutreach(leadId) {
+  const token = await getToken();
+  showToast('Generating personalised outreach…');
+  try {
+    const res = await api('/api/leads', { action: 'generate_outreach', lead_id: leadId }, token);
+    const o = res.outreach;
+    alert(`✉ Outreach for ${res.lead_name}\n\nSUBJECT: ${o.email?.subject}\n\n${o.email?.body}\n\nCTA: ${o.email?.cta}\n\n─\n\nLinkedIn: ${o.linkedin?.connection_note}`);
+    showToast('Outreach generated ✓', 'success');
+    loadLeads();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+/* ─── Export ─────────────────────────────────── */
+async function exportLeads() {
+  const token = await getToken();
+  showToast('Preparing export…');
+  try {
+    const res = await api('/api/leads', { action: 'export_csv', format: 'generic' }, token);
+    downloadBlob(res.csv, res.filename, 'text/csv');
+    showToast(`Exported ${res.count} leads ✓`, 'success');
+  } catch(e) { showToast(e.message, 'error'); }
+}
+async function exportSelected() {
+  const token = await getToken();
+  try {
+    const res = await api('/api/leads', { action: 'export_csv', lead_ids: [..._selected], format: 'generic' }, token);
+    downloadBlob(res.csv, res.filename, 'text/csv');
+    showToast(`Exported ${res.count} leads ✓`, 'success');
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+/* ─── Delete ─────────────────────────────────── */
+async function deleteSelected() {
+  if (!confirm(`Delete ${_selected.size} selected lead(s)? This cannot be undone.`)) return;
+  const token = await getToken();
+  try {
+    await api('/api/leads', { action: 'delete_leads', lead_ids: [..._selected] }, token);
+    showToast('Leads deleted ✓', 'success');
+    clearSelection();
+    loadLeads();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+/* ─── Import ─────────────────────────────────── */
+function openImport()  { document.getElementById('import-modal').style.display = 'flex'; }
+function closeImport() { document.getElementById('import-modal').style.display = 'none'; _csv = null; }
+
+function handleDrop(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.remove('over');
+  const file = e.dataTransfer.files[0];
+  if (file) readFile(file);
+}
+function handleFileSelect(input) { if (input.files[0]) readFile(input.files[0]); }
+
+function readFile(file) {
+  const reader = new FileReader();
+  reader.onload = evt => {
+    _csv = evt.target.result;
+    const lines = _csv.split('\n').filter(l => l.trim()).length;
+    document.getElementById('import-preview').style.display = 'block';
+    document.getElementById('import-preview-count').textContent = `✓ ${file.name} — ~${lines - 1} leads detected`;
+    document.getElementById('import-confirm').disabled = false;
+  };
+  reader.readAsText(file);
+}
+
+async function confirmImport() {
+  if (!_csv) return;
+  const token = await getToken();
+  document.getElementById('import-confirm').disabled = true;
+  showToast('Importing leads…');
+  try {
+    const res = await api('/api/leads', { action: 'import', csv_text: _csv, source_type: 'csv' }, token);
+    showToast(`Imported ${res.imported} leads ✓`, 'success');
+    closeImport();
+    loadLeads();
+  } catch(e) {
+    showToast(e.message, 'error');
+    document.getElementById('import-confirm').disabled = false;
+  }
+}
+
+/* ─── Utils ──────────────────────────────────── */
+async function api(endpoint, body, token) {
+  const res = await fetch(endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+}
+async function getToken() {
+  const { data: { session } } = await window.APP.sb.auth.getSession();
+  return session?.access_token || '';
+}
+function downloadBlob(content, filename, type) {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([content], { type }));
+  a.download = filename; a.click();
+}
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.className = type;
+  document.getElementById('toast-msg').textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3200);
+}
+function esc(s) {
+  if (typeof s !== 'string') return String(s||'');
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+async function handleSignOut() {
+  try { await window.APP.sb.auth.signOut({ scope: 'local' }); } catch(_) {}
+  Object.keys(localStorage).forEach(k => { if(k.startsWith('sb-')||k.includes('supabase')) localStorage.removeItem(k); });
+  window.location.replace('login.html');
+}
+</script>
+</body>
+</html>

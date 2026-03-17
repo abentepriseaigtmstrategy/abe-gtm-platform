@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Strategy Report · AB AI Revenue Infrastructure</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="auth-guard.js"></script>
+  <style>
+    :root{--bg:#0B0F1A;--card:#121827;--border:#1F2937;--accent:#a855f7;--accent2:#7c3aed;
+      --green:#22c55e;--amber:#f59e0b;--red:#ef4444;--text:#E5E7EB;--muted:#6B7280}
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
+    body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+      background-image:linear-gradient(rgba(168,85,247,.02) 1px,transparent 1px),
+      linear-gradient(90deg,rgba(168,85,247,.02) 1px,transparent 1px);background-size:48px 48px}
+
+    /* NAV */
+    #topnav{position:sticky;top:0;z-index:100;background:rgba(11,15,26,.95);
+      backdrop-filter:blur(24px);border-bottom:1px solid rgba(31,41,55,.6);
+      padding:0 32px;display:flex;align-items:center;justify-content:space-between;height:58px}
+    .nav-brand{display:flex;align-items:center;gap:12px;text-decoration:none}
+    .nav-mark{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),var(--accent2));
+      border-radius:8px;display:flex;align-items:center;justify-content:center;
+      font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:white}
+    .nbname{font-size:11px;font-weight:800;color:white}
+    .nbsub{font-size:8px;color:var(--muted);letter-spacing:.14em;text-transform:uppercase}
+    .nav-right{display:flex;align-items:center;gap:10px}
+    .btn{display:inline-flex;align-items:center;gap:7px;padding:8px 18px;font-size:10px;
+      font-weight:800;letter-spacing:.08em;text-transform:uppercase;border-radius:8px;
+      cursor:pointer;border:none;transition:all .15s}
+    .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:white}
+    .btn-primary:hover{opacity:.9;transform:translateY(-1px)}
+    .btn-outline{background:transparent;color:var(--muted);border:1px solid var(--border)}
+    .btn-outline:hover{border-color:var(--accent);color:white}
+    .btn:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
+
+    /* LAYOUT */
+    .wrap{position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:40px 32px}
+    .ph{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:36px;gap:24px}
+    .ph-left .label{font-size:10px;text-transform:uppercase;letter-spacing:.25em;color:var(--accent);font-weight:700;margin-bottom:6px}
+    .ph-left .title{font-size:30px;font-weight:900;color:white;letter-spacing:-.8px}
+    .ph-left .meta{font-size:11px;color:var(--muted);margin-top:6px}
+    .ph-actions{display:flex;gap:10px;flex-shrink:0}
+
+    /* LOADING */
+    #loading-state{text-align:center;padding:100px 32px}
+    .spinner{width:40px;height:40px;border:3px solid rgba(168,85,247,.2);border-top-color:var(--accent);
+      border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 20px}
+    @keyframes spin{to{transform:rotate(360deg)}}
+    #error-state{display:none;text-align:center;padding:100px 32px}
+    .error-icon{font-size:48px;margin-bottom:16px}
+
+    /* SCORE STRIP */
+    .score-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:32px}
+    .sc{background:rgba(18,24,39,.7);border:1px solid var(--border);border-radius:14px;padding:20px 22px}
+    .sv{font-size:26px;font-weight:900;font-family:'Space Mono',monospace;color:white;letter-spacing:-1px}
+    .sl{font-size:9px;text-transform:uppercase;letter-spacing:.18em;color:var(--muted);font-weight:700;margin-top:4px}
+    .sv.green{color:var(--green)} .sv.amber{color:var(--amber)} .sv.purple{color:var(--accent)}
+
+    /* SECTIONS */
+    .section{background:rgba(18,24,39,.6);border:1px solid var(--border);border-radius:16px;
+      padding:28px 32px;margin-bottom:20px}
+    .sec-header{display:flex;align-items:center;gap:12px;margin-bottom:20px}
+    .sec-num{width:28px;height:28px;border-radius:50%;background:var(--accent);color:white;
+      font-size:10px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+    .sec-title{font-size:15px;font-weight:800;color:white}
+
+    .field{margin-bottom:14px}
+    .fl{font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.18em;color:var(--muted);margin-bottom:5px}
+    .fv{font-size:12px;color:#D1D5DB;line-height:1.7;background:rgba(0,0,0,.3);
+      border-radius:8px;padding:12px 14px;border-left:3px solid var(--accent)}
+    .fv.green{border-color:var(--green)} .fv.amber{border-color:var(--amber)}
+
+    .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px}
+    .tag{font-size:10px;font-weight:600;padding:4px 10px;border-radius:6px;
+      background:rgba(168,85,247,.1);color:var(--accent);border:1px solid rgba(168,85,247,.2)}
+    .tag.green{background:rgba(34,197,94,.1);color:var(--green);border-color:rgba(34,197,94,.2)}
+    .tag.blue{background:rgba(59,130,246,.1);color:#60a5fa;border-color:rgba(59,130,246,.2)}
+
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px}
+    .metric-box{background:rgba(0,0,0,.3);border-radius:10px;padding:16px 18px;border:1px solid var(--border)}
+    .mv{font-size:22px;font-weight:900;font-family:'Space Mono',monospace;color:white}
+    .ml{font-size:8px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-top:3px}
+
+    .email-card{background:rgba(0,0,0,.3);border:1px solid rgba(168,85,247,.2);border-radius:10px;
+      padding:16px 18px;margin-bottom:12px}
+    .ea{font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.15em;color:var(--accent);margin-bottom:6px}
+    .es{font-size:12px;font-weight:800;color:white;margin-bottom:8px}
+    .ebo{font-size:11px;color:#D1D5DB;line-height:1.7;white-space:pre-wrap}
+    .ec{font-size:10px;font-weight:700;color:var(--accent);margin-top:10px;padding-top:10px;
+      border-top:1px solid rgba(168,85,247,.15)}
+  </style>
+</head>
+<body>
+<nav id="topnav">
+  <a href="dashboard.html" class="nav-brand">
+    <div class="nav-mark">AB</div>
+    <div><div class="nbname">AB</div><div class="nbsub">Enterprise AI Revenue Infrastructure</div></div>
+  </a>
+  <div class="nav-right">
+    <a href="vault.html" class="btn btn-outline">← Vault</a>
+    <button id="btn-export" class="btn btn-primary" onclick="exportPDF()" disabled>Export PDF</button>
+    <button onclick="window.APP.signOut()" class="btn btn-outline">Sign Out</button>
+  </div>
+</nav>
+
+<div class="wrap">
+  <!-- Loading -->
+  <div id="loading-state">
+    <div class="spinner"></div>
+    <p style="color:var(--muted);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.2em">Loading report…</p>
+  </div>
+
+  <!-- Error -->
+  <div id="error-state">
+    <div class="error-icon">⚠️</div>
+    <p id="error-msg" style="color:var(--muted);font-size:14px;margin-bottom:20px"></p>
+    <a href="vault.html" class="btn btn-primary">Back to Vault</a>
+  </div>
+
+  <!-- Report content (hidden until loaded) -->
+  <div id="report-content" style="display:none">
+    <div class="ph">
+      <div class="ph-left">
+        <div class="label">GTM Strategy Report</div>
+        <div class="title" id="r-company"></div>
+        <div class="meta" id="r-meta"></div>
+      </div>
+      <div class="ph-actions">
+        <a href="vault.html" class="btn btn-outline">← Vault</a>
+        <button id="btn-export2" class="btn btn-primary" onclick="exportPDF()">Export PDF</button>
+      </div>
+    </div>
+
+    <!-- Score strip -->
+    <div class="score-strip">
+      <div class="sc"><div class="sv green" id="r-score">—</div><div class="sl">GTM Score</div></div>
+      <div class="sc"><div class="sv purple" id="r-tam">—</div><div class="sl">TAM Size</div></div>
+      <div class="sc"><div class="sv amber" id="r-cagr">—</div><div class="sl">CAGR</div></div>
+      <div class="sc"><div class="sv" id="r-steps">—</div><div class="sl">Steps</div></div>
+    </div>
+
+    <!-- Sections rendered by JS -->
+    <div id="sections-container"></div>
+  </div>
+</div>
+
+<script>
+// ── Load report ──────────────────────────────────────────────────
+async function loadReport() {
+  const params = new URLSearchParams(location.search);
+  const id = params.get('id');
+
+  if (!id) {
+    showError('No report ID specified. Please open from the Vault.');
+    return;
+  }
+
+  try {
+    const data = await window.APP.api('/api/vault?id=' + encodeURIComponent(id), null, 'GET');
+    const report = data.report;
+    if (!report) { showError('Report not found.'); return; }
+    renderReport(report);
+  } catch (e) {
+    showError('Failed to load report: ' + e.message);
+  }
+}
+
+// ── Render ────────────────────────────────────────────────────────
+function renderReport(r) {
+  const s1 = r.step_1_market    || {};
+  const s2 = r.step_2_tam       || {};
+  const s3 = r.step_3_icp       || {};
+  const s4 = r.step_4_sourcing  || {};
+  const s5 = r.step_5_keywords  || {};
+  const s6 = r.step_6_messaging || {};
+
+  document.getElementById('r-company').textContent = r.company_name || '—';
+  document.getElementById('r-meta').textContent =
+    (r.industry ? r.industry + ' · ' : '') +
+    'Generated ' + new Date(r.updated_at || r.created_at).toLocaleDateString('en-GB', { year:'numeric', month:'long', day:'numeric' });
+
+  const score = s1.gtm_relevance_score;
+  const scoreEl = document.getElementById('r-score');
+  scoreEl.textContent = score ? String(score) : '—';
+  if (score >= 80) scoreEl.className = 'sv green';
+  else if (score >= 60) scoreEl.className = 'sv amber';
+  else if (score) scoreEl.className = 'sv';
+
+  document.getElementById('r-tam').textContent   = s2.tam_size_estimate || '—';
+  document.getElementById('r-cagr').textContent  = s2.growth_rate || '—';
+  document.getElementById('r-steps').textContent = (r.steps_completed || 6) + '/6';
+
+  const container = document.getElementById('sections-container');
+  container.innerHTML = [
+    renderSection(1, 'Market Research', s1, [
+      field('Company Overview', s1.company_overview),
+      field('Market Position', s1.market_position),
+      field('GTM Reasoning', s1.gtm_relevance_reasoning),
+      tagRow('Growth Signals', s1.growth_signals, 'green'),
+      tagRow('Tech Stack', s1.tech_stack_hints, 'blue'),
+    ]),
+    renderSection(2, 'TAM Mapping', s2, [
+      `<div class="grid2">
+        <div class="metric-box"><div class="mv">${esc(s2.tam_size_estimate||'—')}</div><div class="ml">Total Addressable Market</div></div>
+        <div class="metric-box"><div class="mv">${esc(s2.growth_rate||'—')}</div><div class="ml">CAGR</div></div>
+      </div>`,
+      field('TAM Overview', s2.tam_overview),
+      field('Priority Opportunities', s2.priority_opportunities),
+    ]),
+    renderSection(3, 'ICP Profile', s3, [
+      field('Primary ICP', s3.primary_icp),
+      field('Firmographics', s3.firmographics),
+      field('Core Pain Points', s3.core_pain_points),
+      tagRow('Buying Triggers', s3.buying_triggers, 'blue'),
+      tagRow('Decision Makers', s3.decision_makers),
+      tagRow('Objections', s3.objections),
+    ]),
+    renderSection(4, 'Account Sourcing', s4, [
+      tagRow('Recommended Databases', s4.recommended_databases, 'green'),
+      field('Filter Criteria', s4.filter_criteria),
+      field('Sourcing Playbook', s4.sourcing_playbook),
+      field('Exclusion Criteria', s4.exclusion_criteria),
+    ]),
+    renderSection(5, 'Keywords', s5, [
+      tagRow('Primary Keywords', s5.primary_keywords, 'green'),
+      tagRow('Secondary Keywords', s5.secondary_keywords),
+      field('Boolean Query', s5.boolean_query),
+      field('LinkedIn String', s5.linkedin_search_strings),
+    ]),
+    renderSection(6, 'Outreach Messaging', s6, [
+      emailCard(s6.email_1, 'Email A'),
+      emailCard(s6.email_2, 'Email B'),
+      emailCard(s6.email_3, 'Email C'),
+      field('Follow-up Sequence', s6.follow_up_sequence),
+      field('LinkedIn Message', s6.linkedin_message),
+    ]),
+  ].filter(Boolean).join('');
+
+  document.getElementById('loading-state').style.display = 'none';
+  document.getElementById('report-content').style.display = 'block';
+  document.getElementById('btn-export').disabled  = false;
+  document.getElementById('btn-export2').disabled = false;
+
+  // Store strategy on window for export
+  window._strategy = r;
+}
+
+function renderSection(num, title, data, parts) {
+  if (!data || !Object.keys(data).length) return '';
+  return `<div class="section">
+    <div class="sec-header">
+      <div class="sec-num">${num}</div>
+      <div class="sec-title">${title}</div>
+    </div>
+    ${parts.filter(Boolean).join('')}
+  </div>`;
+}
+
+function field(label, val, cls='') {
+  if (!val) return '';
+  return `<div class="field">
+    <div class="fl">${esc(label)}</div>
+    <div class="fv ${cls}">${esc(String(val)).replace(/\n/g,'<br>')}</div>
+  </div>`;
+}
+
+function tagRow(label, arr, cls='') {
+  if (!arr?.length) return '';
+  return `<div class="field">
+    <div class="fl">${esc(label)}</div>
+    <div class="tags">${arr.map(t=>`<span class="tag ${cls}">${esc(String(t))}</span>`).join('')}</div>
+  </div>`;
+}
+
+function emailCard(em, label) {
+  if (!em) return '';
+  return `<div class="email-card">
+    <div class="ea">${esc(em.angle || label)}</div>
+    <div class="es">Subject: ${esc(em.subject||'—')}</div>
+    <div class="ebo">${esc(em.body||'—')}</div>
+    <div class="ec">→ ${esc(em.cta||'—')}</div>
+  </div>`;
+}
+
+function esc(str) {
+  if (typeof str !== 'string') return String(str||'');
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+function showError(msg) {
+  document.getElementById('loading-state').style.display = 'none';
+  document.getElementById('error-msg').textContent = msg;
+  document.getElementById('error-state').style.display = 'block';
+}
+
+// ── PDF Export ────────────────────────────────────────────────────
+async function exportPDF() {
+  const btn = document.getElementById('btn-export') || document.getElementById('btn-export2');
+  if (btn) { btn.disabled = true; btn.textContent = 'Generating…'; }
+
+  try {
+    // Try server-side pdf-lib first
+    const data = await window.APP.api('/api/export-pdf', { strategy: window._strategy });
+
+    if (data.pdf_base64) {
+      const link = document.createElement('a');
+      link.href     = 'data:application/pdf;base64,' + data.pdf_base64;
+      link.download = data.filename || 'GTM_Report.pdf';
+      link.click();
+    } else if (data.html && data.mode === 'html2pdf') {
+      // Fallback
+      const opt = {
+        margin:       [10, 10, 10, 10],
+        filename:     data.filename || 'GTM_Report.pdf',
+        image:        { type: 'jpeg', quality: 0.95 },
+        html2canvas:  { scale: 2, useCORS: true },
+        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      };
+      await html2pdf().set(opt).from(data.html).save();
+    }
+  } catch (e) {
+    alert('PDF export failed: ' + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = 'Export PDF'; }
+  }
+}
+
+// ── Init ──────────────────────────────────────────────────────────
+// auth-guard.js sets visibility once auth is confirmed; then we load the report
+const _guardInterval = setInterval(() => {
+  if (window.APP?.user) {
+    clearInterval(_guardInterval);
+    // Patch APP.api to support GET
+    const _origApi = window.APP.api.bind(window.APP);
+    window.APP.api = async function(endpoint, body, method = 'POST') {
+      if (method === 'GET') {
+        const token = await window.APP.token();
+        const res = await fetch(endpoint, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+        return data;
+      }
+      return _origApi(endpoint, body);
+    };
+    loadReport();
+  }
+}, 100);
+</script>
+</body>
+</html>
