@@ -214,7 +214,11 @@ async function handleGetVault(body, userId, supabaseUrl, supabaseKey, cors) {
 
   // Use summary view — lighter payload
   const res = await sbFetch(supabaseUrl, supabaseKey, 'strategy_summary', 'GET', null, query);
-  if (!res.ok) return errRes('Failed to fetch vault', 500, cors);
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => 'unreadable');
+    console.error('VAULT_ERROR:', res.status, errBody);
+    return errRes('Failed to fetch vault: ' + errBody, 500, cors);
+  }
   const data = await res.json();
 
   // Get total count (for pagination UI)
