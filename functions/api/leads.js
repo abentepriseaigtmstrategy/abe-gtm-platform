@@ -477,20 +477,66 @@ function csvCell(val) {
 
 // ══════════════════════════════════════════════════════════════════
 // GET LEADS — paginated + filtered
+// FIX Bug 4: Added outreach_status filter (was captured in UI but never applied)
+// FIX Bug 5: Returns real DB total count via separate count query, not just page length
 // ══════════════════════════════════════════════════════════════════
 async function handleGetLeads(body, userId, url, key, cors) {
-  const { status, priority, search, source_file, limit = 100, offset = 0 } = body;
+  const { status, priority, outreach_status, search, source_file, limit = 100, offset = 0 } = body;
 
-  let query = `?user_id=eq.${userId}&order=icp_score.desc.nullslast,created_at.desc&limit=${limit}&offset=${offset}`;
-  if (status)      query += `&status=eq.${sanitise(status, 20)}`;
-  if (priority)    query += `&priority=eq.${sanitise(priority, 10)}`;
-  if (source_file) query += `&source_file=eq.${encodeURIComponent(sanitise(source_file, 200))}`;
-  if (search)      query += `&or=(name.ilike.*${encodeURIComponent(sanitise(search, 100))}*,company.ilike.*${encodeURIComponent(sanitise(search, 100))}*,email.ilike.*${encodeURIComponent(sanitise(search, 100))}*)`;
+  // Base filter (same for both data + count queries)
+  let baseFilter = `?user_id=eq.${userId}`;
+  if (status)          baseFilter += `&status=eq.${sanitise(status, 20)}`;
+  if (priority)        baseFilter += `&priority=eq.${sanitise(priority, 10)}`;
+  if (outreach_status) baseFilter += `&outreach_status=eq.${sanitise(outreach_status, 20)}`; // ← FIX Bug 4
+  if (source_file)     baseFilter += `&source_file=eq.${encodeURIComponent(sanitise(source_file, 200))}`;
+  if (search)          baseFilter += `&or=(name.ilike.*${encodeURIComponent(sanitise(search, 100))}*,company.ilike.*${encodeURIComponent(sanitise(search, 100))}*,email.ilike.*${encodeURIComponent(sanitise(search, 100))}*)`;
 
-  const res = await sb(url, key, 'leads', 'GET', null, query);
+  // Data query — paginated
+  const dataQuery = baseFilter + `&order=icp_score.desc.nullslast,created_at.desc&limit=${limit}&offset=${offset}`;
+  const res = await sb(url, key, 'leads', 'GET', null, dataQuery);
   if (!res.ok) return errRes('Failed to fetch leads', 500, cors);
   const leads = await res.json();
-  return okRes({ leads, total: leads.length, offset, limit }, cors);
+
+  // ── FIX Bug 5: Accurate total count via Supabase count header ──────
+  // We fetch count=exact in a HEAD-style GET — no data returned, just count in header
+  let total = leads.length + offset; // safe fallback if count query fails
+  try {
+    const countRes = await fetch(`${url}/rest/v1/leads${baseFilter}&select=id`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: key,
+        Authorization: `Bearer ${key}`,
+        Prefer: 'count=exact',
+        'Range-Unit': 'items',
+        Range: '0-0',   // Only fetch 1 row — we only need the count header
+      },
+    });
+    const contentRange = countRes.headers.get('Content-Range'); // e.g. "0-0/1247"
+    if (contentRange) {
+      const parts = contentRange.split('/');
+      if (parts[1] && parts[1] !== '*') total = parseInt(parts[1], 10) || total;
+    }
+  } catch (_) { /* fallback total already set above */ }
+
+  // ── Server-side aggregate counts for stats (across full dataset) ───
+  // These power the 5 stat cards at the top — always accurate regardless of pagination
+  let counts = {};
+  try {
+    const allRes = await sb(url, key, 'leads', 'GET', null,
+      `?user_id=eq.${userId}&select=priority,status,outreach_status&limit=5000`);
+    if (allRes.ok) {
+      const all = await allRes.json();
+      counts = {
+        high:     all.filter(l => l.priority === 'HIGH').length,
+        analyzed: all.filter(l => l.status === 'analyzed' || l.status === 'mapped').length,
+        outreach: all.filter(l => l.outreach_status === 'sent' || l.outreach_status === 'replied').length,
+        replied:  all.filter(l => l.outreach_status === 'replied').length,
+      };
+    }
+  } catch (_) {}
+
+  return okRes({ leads, total, offset, limit, counts }, cors);
 }
 
 // ══════════════════════════════════════════════════════════════════
