@@ -143,6 +143,21 @@
     .email-card-body  { font-size: 11px; color: #D1D5DB; line-height: 1.6; white-space: pre-wrap; margin-bottom: 8px; }
     .email-card-cta   { font-size: 10px; font-weight: 700; color: var(--accent); padding-top: 8px; border-top: 1px solid rgba(168,85,247,0.15); }
 
+    /* PDF SECTION SELECTOR MODAL */
+    .pdf-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(6px); z-index: 300; display: flex; align-items: center; justify-content: center; padding: 24px; }
+    .pdf-modal { background: #0D1120; border: 1px solid var(--border); border-radius: 20px; padding: 32px; width: 100%; max-width: 480px; }
+    .pdf-modal-title { font-size: 18px; font-weight: 900; color: white; letter-spacing: -.4px; margin-bottom: 4px; }
+    .pdf-modal-sub { font-size: 10px; text-transform: uppercase; letter-spacing: .2em; color: var(--accent); font-weight: 700; margin-bottom: 24px; }
+    .pdf-section-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
+    .pdf-section-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; transition: all .15s; }
+    .pdf-section-item:hover { border-color: rgba(168,85,247,.4); background: rgba(168,85,247,.04); }
+    .pdf-section-item input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; flex-shrink: 0; cursor: pointer; }
+    .pdf-section-item label { font-size: 11px; font-weight: 700; color: var(--text); cursor: pointer; flex: 1; }
+    .pdf-section-item .pdf-step-num { width: 22px; height: 22px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent2)); color: white; font-size: 9px; font-weight: 900; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .pdf-section-item.checked { border-color: rgba(168,85,247,.35); background: rgba(168,85,247,.06); }
+    .pdf-modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+    .pdf-progress { margin-top: 16px; font-size: 11px; color: var(--muted); text-align: center; display: none; }
+
     /* TOAST */
     #toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(80px); background: rgba(18,24,39,0.95); border: 1px solid var(--border); color: var(--text); font-size: 11px; font-weight: 700; padding: 12px 24px; border-radius: 10px; backdrop-filter: blur(16px); z-index: 999; transition: transform 0.3s; white-space: nowrap; }
     #toast.show { transform: translateX(-50%) translateY(0); }
@@ -162,10 +177,10 @@
   </a>
   <div class="nav-tabs">
     <a href="dashboard.html"     class="nav-tab">Command Centre</a>
-    <a href="gtm-strategy.html"  class="nav-tab">GTM Builder</a>
+    <a href="gtm-strategy.html"  class="nav-tab">GTM Strategy</a>
     <a href="vault.html"         class="nav-tab active">Strategy Vault</a>
-    <a href="accounts.html"      class="nav-tab">Accounts</a>
-    <a href="leads.html"         class="nav-tab">Leads</a>
+    <a href="accounts.html"      class="nav-tab">Account Intelligence</a>
+    <a href="leads.html"         class="nav-tab">Lead Manager</a>
   </div>
   <div class="nav-right">
     <button onclick="exportAllCSV()" class="btn btn-outline btn-sm">Export CSV</button>
@@ -234,6 +249,51 @@
     <div class="drawer-actions" id="drawer-actions"></div>
   </div>
   <div class="drawer-body" id="drawer-body"></div>
+</div>
+
+<!-- PDF Section Selector Modal -->
+<div id="pdf-modal" style="display:none" class="pdf-modal-overlay">
+  <div class="pdf-modal">
+    <div class="pdf-modal-title">Export PDF Report</div>
+    <div class="pdf-modal-sub">Select sections to include</div>
+    <div class="pdf-section-list" id="pdf-section-list">
+      <div class="pdf-section-item checked" onclick="togglePdfSection(this,1)">
+        <input type="checkbox" id="ps1" checked>
+        <div class="pdf-step-num">1</div>
+        <label for="ps1">Market Research & Company Overview</label>
+      </div>
+      <div class="pdf-section-item checked" onclick="togglePdfSection(this,2)">
+        <input type="checkbox" id="ps2" checked>
+        <div class="pdf-step-num">2</div>
+        <label for="ps2">TAM Mapping & Market Sizing</label>
+      </div>
+      <div class="pdf-section-item checked" onclick="togglePdfSection(this,3)">
+        <input type="checkbox" id="ps3" checked>
+        <div class="pdf-step-num">3</div>
+        <label for="ps3">Ideal Customer Profile (ICP)</label>
+      </div>
+      <div class="pdf-section-item checked" onclick="togglePdfSection(this,4)">
+        <input type="checkbox" id="ps4" checked>
+        <div class="pdf-step-num">4</div>
+        <label for="ps4">Account Sourcing Strategy</label>
+      </div>
+      <div class="pdf-section-item checked" onclick="togglePdfSection(this,5)">
+        <input type="checkbox" id="ps5" checked>
+        <div class="pdf-step-num">5</div>
+        <label for="ps5">Intent Keywords & Boolean Search</label>
+      </div>
+      <div class="pdf-section-item checked" onclick="togglePdfSection(this,6)">
+        <input type="checkbox" id="ps6" checked>
+        <div class="pdf-step-num">6</div>
+        <label for="ps6">Outreach Messaging & Email Sequences</label>
+      </div>
+    </div>
+    <div class="pdf-modal-actions">
+      <button class="btn btn-outline" onclick="closePdfModal()">Cancel</button>
+      <button class="btn btn-primary" id="pdf-generate-btn" onclick="confirmPdfExport()">⬇ Generate PDF</button>
+    </div>
+    <div class="pdf-progress" id="pdf-progress">⏳ Building your report… this takes 10–20 seconds</div>
+  </div>
 </div>
 
 <!-- Toast -->
@@ -481,65 +541,149 @@ function renderStepContent(n, d) {
 /* ─────────────────────────────────────────────────────────────────
    PDF EXPORT — handles both pdf_base64 and html2pdf fallback
 ───────────────────────────────────────────────────────────────── */
-async function exportStrategy(strategyId) {
-  showToast('Generating PDF…');
+/* ─────────────────────────────────────────────────────────────────
+   PDF EXPORT — section selector + fixed html2pdf rendering
+───────────────────────────────────────────────────────────────── */
+let _pdfStrategyId = null;
+
+// Step 1: open the section selector modal
+function exportStrategy(strategyId) {
+  _pdfStrategyId = strategyId;
+  // Reset all checkboxes to checked
+  [1,2,3,4,5,6].forEach(n => {
+    const cb   = document.getElementById(`ps${n}`);
+    const item = cb?.closest('.pdf-section-item');
+    if (cb)   cb.checked = true;
+    if (item) item.classList.add('checked');
+  });
+  document.getElementById('pdf-progress').style.display = 'none';
+  document.getElementById('pdf-generate-btn').disabled  = false;
+  document.getElementById('pdf-generate-btn').textContent = '⬇ Generate PDF';
+  document.getElementById('pdf-modal').style.display = 'flex';
+}
+
+function togglePdfSection(item, n) {
+  const cb = document.getElementById(`ps${n}`);
+  if (!cb) return;
+  // Only toggle if click wasn't directly on checkbox (checkbox handles itself)
+  if (event.target !== cb) cb.checked = !cb.checked;
+  item.classList.toggle('checked', cb.checked);
+}
+
+function closePdfModal() {
+  document.getElementById('pdf-modal').style.display = 'none';
+  _pdfStrategyId = null;
+}
+
+// Step 2: user confirms — build filtered PDF
+async function confirmPdfExport() {
+  if (!_pdfStrategyId) return;
+
+  const selectedSteps = [1,2,3,4,5,6].filter(n =>
+    document.getElementById(`ps${n}`)?.checked
+  );
+  if (!selectedSteps.length) {
+    showToast('Select at least one section', 'error');
+    return;
+  }
+
+  const btn = document.getElementById('pdf-generate-btn');
+  const prog = document.getElementById('pdf-progress');
+  btn.disabled = true;
+  btn.textContent = 'Building…';
+  prog.style.display = 'block';
+
   try {
-    // Step 1: fetch full strategy
-    const { strategy } = await apiCall('/api/gtm', { action: 'get_strategy', strategy_id: strategyId });
+    // Fetch full strategy from API
+    const { strategy } = await apiCall('/api/gtm', { action: 'get_strategy', strategy_id: _pdfStrategyId });
     if (!strategy) throw new Error('Strategy not found');
 
-    // Step 2: call export-pdf
+    // Zero out steps the user didn't select so export-pdf skips them
+    const filtered = { ...strategy };
+    if (!selectedSteps.includes(1)) filtered.step_1_market    = null;
+    if (!selectedSteps.includes(2)) filtered.step_2_tam       = null;
+    if (!selectedSteps.includes(3)) filtered.step_3_icp       = null;
+    if (!selectedSteps.includes(4)) filtered.step_4_sourcing  = null;
+    if (!selectedSteps.includes(5)) filtered.step_5_keywords  = null;
+    if (!selectedSteps.includes(6)) filtered.step_6_messaging = null;
+
+    // Call export-pdf API
     const token = await window.APP.token();
     const pRes  = await fetch('/api/export-pdf', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body:    JSON.stringify({ strategy }),
+      body:    JSON.stringify({ strategy: filtered }),
     });
     const pData = await pRes.json();
     if (!pRes.ok) throw new Error(pData.error || 'Export failed');
 
     if (pData.pdf_base64) {
-      // Binary PDF from pdf-lib
       const link    = document.createElement('a');
       link.href     = 'data:application/pdf;base64,' + pData.pdf_base64;
       link.download = pData.filename || 'GTM_Report.pdf';
       link.click();
     } else if (pData.html && pData.mode === 'html2pdf') {
-      // HTML fallback
-      const container = document.createElement('div');
-      container.style.left     = '-9999px';
-      container.style.position = 'fixed';
-      container.style.top      = '0';
-      container.style.zIndex   = '-9999';
-      container.innerHTML = pData.html;
-      document.body.appendChild(container);
-      // FIX Bug #6: Upgraded html2pdf settings for crisp, professional A4 output.
-      // scale:3 gives ~300 dpi equivalent, pagebreak css mode respects .pb classes.
-      await html2pdf().set({
-        margin:      [0, 0, 0, 0],
-        filename:    pData.filename || 'GTM_Report.pdf',
-        html2canvas: {
-          scale:            3,
-          useCORS:          true,
-          letterRendering:  true,
-          allowTaint:       false,
-          backgroundColor:  '#ffffff',
-          logging:          false,
-        },
-        jsPDF: {
-          unit:        'mm',
-          format:      'a4',
-          orientation: 'portrait',
-          compress:    true,
-        },
-        pagebreak: { mode: ['css', 'legacy'], before: '.pb', avoid: '.eb,.field,.sh' },
-      }).from(container).save();
-      document.body.removeChild(container);
+      await renderHtmlToPdf(pData.html, pData.filename || 'GTM_Report.pdf');
     }
 
+    closePdfModal();
     showToast('PDF downloaded ✓', 'success');
   } catch(e) {
     showToast('Export failed: ' + e.message, 'error');
+    btn.disabled = false;
+    btn.textContent = '⬇ Generate PDF';
+    prog.style.display = 'none';
+  }
+}
+
+// ── FIX: Corrected html2pdf rendering — was generating blank PDFs because:
+//   1. backgroundColor:'#ffffff' made white text on dark cover invisible
+//   2. zIndex:'-9999' can interfere with canvas compositing in some browsers
+//   3. scale:3 on a 6-page A4 doc creates a ~100MB canvas that silently fails
+async function renderHtmlToPdf(html, filename) {
+  const container = document.createElement('div');
+  // Off-screen but accessible: absolute (not fixed) + visibility:hidden lets
+  // html2canvas read it without it affecting page layout or canvas compositing
+  container.style.cssText = [
+    'position:absolute',
+    'left:-9999px',
+    'top:0',
+    'width:794px',        // A4 at 96dpi — required for correct page breaks
+    'visibility:hidden',  // Hidden from user but readable by html2canvas
+    'z-index:0',          // Not negative — avoids compositing issues
+  ].join(';');
+  container.innerHTML = html;
+  document.body.appendChild(container);
+
+  // Small delay: let fonts and CSS render before canvas capture
+  await new Promise(r => setTimeout(r, 600));
+
+  try {
+    await html2pdf().set({
+      margin:      [0, 0, 0, 0],
+      filename,
+      html2canvas: {
+        scale:           2,           // FIX: was 3 — caused ~100MB canvas, silent blank on some browsers
+        useCORS:         true,
+        letterRendering: true,
+        allowTaint:      true,
+        // FIX: was '#ffffff' — killed dark cover (white text on white bg = blank)
+        // null lets CSS handle backgrounds including the dark gradient cover page
+        backgroundColor: null,
+        logging:         false,
+        width:           794,
+        windowWidth:     794,
+      },
+      jsPDF: {
+        unit:        'mm',
+        format:      'a4',
+        orientation: 'portrait',
+        compress:    true,
+      },
+      pagebreak: { mode: ['css', 'legacy'], before: '.pb', avoid: '.eb,.field,.sh' },
+    }).from(container).save();
+  } finally {
+    document.body.removeChild(container);
   }
 }
 
