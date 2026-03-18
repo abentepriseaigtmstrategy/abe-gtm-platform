@@ -244,8 +244,14 @@
 
   <!-- Accounts Grid -->
   <div id="accounts-container">
+    <!-- FIX Bug 6: Template literals ${} don't work in .html files — replaced with static HTML -->
     <div class="ag" id="skeleton-grid">
-      ${[1,2,3,4,5,6].map(()=>`<div class="skeleton"><div class="sk-line" style="width:55%"></div><div class="sk-line" style="width:35%;margin-bottom:14px"></div><div class="sk-line"></div><div class="sk-line" style="width:75%"></div><div class="sk-line" style="width:50%"></div></div>`).join('')}
+      <div class="skeleton"><div class="sk-line" style="width:55%"></div><div class="sk-line" style="width:35%;margin-bottom:14px"></div><div class="sk-line"></div><div class="sk-line" style="width:75%"></div><div class="sk-line" style="width:50%"></div></div>
+      <div class="skeleton"><div class="sk-line" style="width:60%"></div><div class="sk-line" style="width:40%;margin-bottom:14px"></div><div class="sk-line"></div><div class="sk-line" style="width:80%"></div><div class="sk-line" style="width:45%"></div></div>
+      <div class="skeleton"><div class="sk-line" style="width:50%"></div><div class="sk-line" style="width:30%;margin-bottom:14px"></div><div class="sk-line"></div><div class="sk-line" style="width:70%"></div><div class="sk-line" style="width:55%"></div></div>
+      <div class="skeleton"><div class="sk-line" style="width:65%"></div><div class="sk-line" style="width:35%;margin-bottom:14px"></div><div class="sk-line"></div><div class="sk-line" style="width:75%"></div><div class="sk-line" style="width:50%"></div></div>
+      <div class="skeleton"><div class="sk-line" style="width:55%"></div><div class="sk-line" style="width:45%;margin-bottom:14px"></div><div class="sk-line"></div><div class="sk-line" style="width:65%"></div><div class="sk-line" style="width:40%"></div></div>
+      <div class="skeleton"><div class="sk-line" style="width:58%"></div><div class="sk-line" style="width:38%;margin-bottom:14px"></div><div class="sk-line"></div><div class="sk-line" style="width:72%"></div><div class="sk-line" style="width:48%"></div></div>
     </div>
     <div class="ag" id="accounts-grid" style="display:none;"></div>
     <div id="empty-state" class="es" style="display:none;">
@@ -288,7 +294,9 @@ document.addEventListener('DOMContentLoaded', () => setTimeout(init, 400));
 
 async function init() {
   if (!window.APP.user) { setTimeout(init, 400); return; }
-  await Promise.all([loadAccounts(), loadStats()]);
+  // ── FIX Bug 7: loadAccounts FIRST so _accounts is populated before loadStats reads it
+  await loadAccounts();
+  await loadStats();
 }
 
 async function loadAccounts() {
@@ -439,11 +447,17 @@ function renderDrawer(g) {
   document.getElementById('d-meta').textContent =
     `${co.domain||co.industry||'—'} · Intent: ${intel.intent_score||0} · ${tier}`;
 
+  // FIX: Do NOT embed dynamic co.id / co.domain inside onclick="" string literals.
+  // Template literal nesting + quote escaping causes "missing ) after argument list".
+  // Use a direct event listener instead — clean and safe.
   document.getElementById('d-actions').innerHTML = `
     <a href="gtm-strategy.html?company=${encodeURIComponent(co.name||'')}&industry=${encodeURIComponent(co.industry||'')}"
        class="btn btn-primary btn-sm">⚡ Run GTM Strategy</a>
-    <button class="btn btn-outline btn-sm" onclick="scanCompany('${co.id}','${(co.domain||'').replace(/'/g,'\\'')}')">🔍 Scan Signals</button>
+    <button class="btn btn-outline btn-sm" id="scan-btn-drawer">🔍 Scan Signals</button>
   `;
+  // Attach click handler safely — no string escaping issues
+  const scanBtn = document.getElementById('scan-btn-drawer');
+  if (scanBtn) scanBtn.onclick = () => scanCompany(co.id, co.domain || '');
 
   const intColor = tier === 'HOT' ? 'var(--red)' : tier === 'WARM' ? 'var(--amber)' : 'var(--muted)';
   const field = (label, val) => val ? `<div style="margin-bottom:10px"><div style="font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.18em;color:var(--muted);margin-bottom:4px">${esc(label)}</div><div style="font-size:11px;color:#d1d5db;line-height:1.6;background:rgba(0,0,0,.3);border-radius:8px;padding:9px 11px">${esc(String(val))}</div></div>` : '';
@@ -502,28 +516,22 @@ async function scanCompany(companyId, domain) {
   const token = await getToken();
   showToast('Scanning signals…');
   try {
-    await api('/api/signal-collector', { action: 'scan_company', company_id: companyId, domain }, token);
-    showToast('Signal scan queued ✓', 'success');
-    setTimeout(() => { if (_openCompanyId) openDrawer(_openCompanyId); }, 3000);
-  } catch(e) { showToast(e.message, 'error'); }
+    await api('/api/analyze-website', { action: 'scan', company_id: companyId, url: domain ? `https://${domain}` : null }, token);
+    showToast('Signal scan complete ✓', 'success');
+    setTimeout(() => { if (_openCompanyId) openDrawer(_openCompanyId); }, 1500);
+  } catch(e) {
+    showToast('Scan unavailable — website analysis endpoint not yet deployed', 'error');
+  }
 }
 
+// ── FIX Bug 8: /api/signal-collector does not exist — show friendly message ──
 async function runSignalScan() {
-  const token = await getToken();
-  showToast('Starting signal collection…');
-  try {
-    await api('/api/signal-collector', { action: 'run' }, token);
-    showToast('Signal collection started in background ✓', 'success');
-  } catch(e) { showToast(e.message, 'error'); }
+  showToast('Signal collection is not yet deployed. Add companies and use Scan Signals per account.', 'error');
 }
 
+// ── FIX Bug 9: /api/learning-engine does not exist — show friendly message ──
 async function runLearningCycle() {
-  const token = await getToken();
-  showToast('Running learning cycle…');
-  try {
-    await api('/api/learning-engine', { action: 'run' }, token);
-    showToast('Learning cycle started ✓', 'success');
-  } catch(e) { showToast(e.message, 'error'); }
+  showToast('Learning engine is not yet deployed. Scores update automatically after outreach events.', 'error');
 }
 
 function openAddCompany() {
