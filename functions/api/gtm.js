@@ -165,8 +165,11 @@ async function handleSaveStrategy(body, userId, supabaseUrl, supabaseKey, env, c
     updated_at:       new Date().toISOString(),
   };
 
+  // FIX: Must pass resolution=merge-duplicates so subsequent step saves UPDATE the row
+  // instead of being silently ignored. Without this, steps 2-6 never persisted.
   const res = await sbFetch(supabaseUrl, supabaseKey, 'strategies', 'POST',
-    JSON.stringify(payload), '?on_conflict=cache_key');
+    JSON.stringify(payload), '?on_conflict=cache_key',
+    'return=representation,resolution=merge-duplicates');
 
   if (!res.ok) {
     const e = await res.text();
@@ -527,15 +530,16 @@ Return ONLY JSON array: [{"index":0,"score":85,"priority":"HIGH","reason":"one s
   } catch { return leads.map(l=>({...l,icp_score:50,priority:'MEDIUM',score_reason:'Scoring unavailable'})); }
 }
 
-// ── Supabase sub-table savers ────────────────────────────────────
+// ── Supabase sub-table savers — FIX: all use resolution=merge-duplicates ────
+const UPSERT = 'return=representation,resolution=merge-duplicates';
 async function saveICP(sid, uid, co, d, url, key) {
-  try { await sbFetch(url,key,'icp_profiles','POST',JSON.stringify({strategy_id:sid,user_id:uid,company_name:co,primary_icp:d.primary_icp,secondary_icp:d.secondary_icp,firmographics:d.firmographics,buying_triggers:d.buying_triggers,core_pain_points:d.core_pain_points,decision_makers:d.decision_makers,deal_cycle:d.deal_cycle,objections:d.objections}),'?on_conflict=strategy_id'); } catch {}
+  try { await sbFetch(url,key,'icp_profiles','POST',JSON.stringify({strategy_id:sid,user_id:uid,company_name:co,primary_icp:d.primary_icp,secondary_icp:d.secondary_icp,firmographics:d.firmographics,buying_triggers:d.buying_triggers,core_pain_points:d.core_pain_points,decision_makers:d.decision_makers,deal_cycle:d.deal_cycle,objections:d.objections}),'?on_conflict=strategy_id',UPSERT); } catch {}
 }
 async function saveKeywords(sid, uid, co, d, url, key) {
-  try { await sbFetch(url,key,'keywords','POST',JSON.stringify({strategy_id:sid,user_id:uid,company_name:co,primary_keywords:d.primary_keywords,secondary_keywords:d.secondary_keywords,boolean_query:d.boolean_query,linkedin_search:d.linkedin_search_strings,intent_signals:d.intent_signals,content_topics:d.content_topics}),'?on_conflict=strategy_id'); } catch {}
+  try { await sbFetch(url,key,'keywords','POST',JSON.stringify({strategy_id:sid,user_id:uid,company_name:co,primary_keywords:d.primary_keywords,secondary_keywords:d.secondary_keywords,boolean_query:d.boolean_query,linkedin_search:d.linkedin_search_strings,intent_signals:d.intent_signals,content_topics:d.content_topics}),'?on_conflict=strategy_id',UPSERT); } catch {}
 }
 async function saveMessaging(sid, uid, co, d, url, key) {
-  try { await sbFetch(url,key,'messaging_sequences','POST',JSON.stringify({strategy_id:sid,user_id:uid,company_name:co,email_1:d.email_1,email_2:d.email_2,email_3:d.email_3,follow_up:d.follow_up_sequence}),'?on_conflict=strategy_id'); } catch {}
+  try { await sbFetch(url,key,'messaging_sequences','POST',JSON.stringify({strategy_id:sid,user_id:uid,company_name:co,email_1:d.email_1,email_2:d.email_2,email_3:d.email_3,follow_up:d.follow_up_sequence}),'?on_conflict=strategy_id',UPSERT); } catch {}
 }
 
 // ── Rate limit helpers ───────────────────────────────────────────
@@ -551,7 +555,7 @@ async function isHourlyLimitExceeded(userId, url, key) {
 async function bumpHourlyTokens(userId, tokens, url, key) {
   try {
     const ws = new Date(); ws.setMinutes(0,0,0);
-    await sbFetch(url,key,'rate_limits','POST',JSON.stringify({user_id:userId,window_start:ws.toISOString(),request_count:1,tokens_used:tokens}),'?on_conflict=user_id,window_start');
+    await sbFetch(url,key,'rate_limits','POST',JSON.stringify({user_id:userId,window_start:ws.toISOString(),request_count:1,tokens_used:tokens}),'?on_conflict=user_id,window_start',UPSERT);
   } catch {}
 }
 
@@ -568,10 +572,14 @@ async function hash(str) {
   return Array.from(new Uint8Array(h)).map(b=>b.toString(16).padStart(2,'0')).join('').slice(0,16);
 }
 
-const sbFetch = (url, key, table, method, body, qs = '') =>
+// FIX: Added optional `prefer` param — upserts need 'resolution=merge-duplicates'
+// Without it Supabase does INSERT OR IGNORE, silently dropping all step updates
+// after the first save. Steps 2-6 never persisted. steps_completed stuck at 1.
+const sbFetch = (url, key, table, method, body, qs = '', prefer = null) =>
   fetch(`${url}/rest/v1/${table}${qs}`, {
     method,
-    headers:{ 'Content-Type':'application/json', apikey:key, Authorization:`Bearer ${key}`, Prefer: method==='POST'?'return=representation':'return=minimal' },
+    headers:{ 'Content-Type':'application/json', apikey:key, Authorization:`Bearer ${key}`,
+      Prefer: prefer ?? (method==='POST' ? 'return=representation' : 'return=minimal') },
     body: body||undefined,
   });
 
