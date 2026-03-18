@@ -63,6 +63,10 @@
 
       window.APP.user    = user;
       window.APP.session = session;
+      // ── FIX: gtm-strategy.html polls window._currentUser for userId resolution ──
+      // This was never set, causing state.userId to stay null forever and
+      // silently blocking every vault auto-save and manual save.
+      window._currentUser = user;
       document.documentElement.style.visibility = '';
     } catch (e) {
       try { await sb.auth.signOut(); } catch (_) {}
