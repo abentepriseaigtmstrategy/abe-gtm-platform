@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>GTM Strategy Builder V2 · AB AI Revenue Infrastructure</title>
+  <title>GTM Strategy Builder V2 · ABE AI Revenue Infrastructure</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
 
   <style>
@@ -608,7 +608,7 @@
 <!-- ── TOP NAV ── -->
 <nav id="topnav">
   <a href="index.html" class="nav-brand">
-    <div class="nav-mark">AB</div>
+    <div class="nav-mark">ABE</div>
     <div class="nav-brand-text">
       <div class="nav-brand-name">AI Revenue Infrastructure</div>
       <div class="nav-brand-sub">Enterprise GTM Platform</div>
@@ -1118,7 +1118,7 @@
   <div class="footer-wrap">
     <div class="footer-g">
       <div>
-        <div class="nav-mark" style="width:40px;height:40px;">AB</div>
+        <div class="nav-mark" style="width:40px;height:40px;">ABE</div>
         <div class="fbname">AB — Enterprise AI Revenue Infrastructure</div>
         <div class="fbdesc">Secure, server-side AI systems for executive-grade lead qualification and GTM intelligence.</div>
       </div>
@@ -2386,12 +2386,15 @@ state.userId         = null;
 
 // Get user ID from Supabase session (available after auth guard)
 (function pollForUser() {
-  if (window._currentUser?.id) {
-    state.userId = window._currentUser.id;
+  // FIX: also check window.APP.user as fallback — auth-guard.js sets both now,
+  // but this double-check makes userId resolution bulletproof.
+  const u = window._currentUser || window.APP?.user;
+  if (u?.id) {
+    state.userId = u.id;
   } else {
     setTimeout(pollForUser, 500);
   }
-})();
+}());
 
 let _websiteDebounce = null;
 
@@ -2653,19 +2656,34 @@ window.callAPI = async function(step, prompt, attempt = 0) {
 };
 
 // ── Save to Vault button in summary panel ─────────────────────────
+// FIX Bug #3: The old btn.onclick only opened vault.html — it never actually
+// triggered a save. Now it calls autoSaveToVault() first, waits for completion,
+// then navigates to vault.html so the user lands on a page that shows the entry.
 const _origShowSummary = showSummary;
 window.showSummary = function() {
   _origShowSummary();
-  // Add vault save button to summary if not already there
   const panel = document.getElementById('summary-panel');
   if (panel && !panel.querySelector('#save-to-vault-btn')) {
     const btn = document.createElement('button');
-    btn.id = 'save-to-vault-btn';
+    btn.id        = 'save-to-vault-btn';
     btn.className = 'btn btn-primary btn-sm';
-    btn.innerHTML = '🗄 View in Strategy Vault';
-    btn.onclick = () => window.open('vault.html', '_blank');
-    const exportRow = panel.querySelector('.summary-export-row');
-    if (exportRow) exportRow.appendChild(btn);
+    btn.innerHTML = '🗄 Save &amp; View in Strategy Vault';
+    btn.style.cssText = 'margin-top:10px;width:100%;';
+    btn.onclick = async () => {
+      btn.disabled   = true;
+      btn.innerHTML  = '⏳ Saving…';
+      try {
+        await autoSaveToVault();
+        btn.innerHTML = '✓ Saved! Opening Vault…';
+        setTimeout(() => window.open('vault.html', '_blank'), 600);
+      } catch(err) {
+        btn.disabled  = false;
+        btn.innerHTML = '🗄 Save &amp; View in Strategy Vault';
+        addLog('ERROR', 0, 'Vault save failed: ' + err.message);
+      }
+    };
+    const exportRow = panel.querySelector('.summary-export-row') || panel;
+    exportRow.appendChild(btn);
   }
 };
 
