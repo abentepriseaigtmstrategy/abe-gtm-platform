@@ -75,17 +75,34 @@ export function buildReportHTML(strategy) {
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>');
   };
 
-  const field = (label, val, accent = '#a855f7', mono = false) =>
-    val ? `<div class="field">
-      <div class="fl">${e(label)}</div>
-      <div class="fv${mono ? ' mono' : ''}" style="border-left-color:${accent}">${e(String(val))}</div>
-    </div>` : '';
+  // FIX [object Object]: safe() handles arrays, nested objects, and primitives
+  // The AI sometimes returns filter_criteria / exclusion_criteria as objects, not strings
+  const safe = val => {
+    if (!val && val !== 0) return '';
+    if (Array.isArray(val)) return val.join(', ');
+    if (typeof val === 'object') {
+      // Flatten object into readable key: value lines
+      return Object.entries(val).map(([k, v]) => `${k}: ${Array.isArray(v) ? v.join(', ') : v}`).join('\n');
+    }
+    return String(val);
+  };
 
-  const tags = (label, arr, tagCls = '') =>
-    arr?.length ? `<div class="field">
+  // FIX: use safe() so objects/arrays render as readable text, not [object Object]
+  const field = (label, val, accent = '#a855f7', mono = false) => {
+    const rendered = safe(val);
+    return rendered ? `<div class="field">
       <div class="fl">${e(label)}</div>
-      <div class="tags">${arr.slice(0, 20).map(t => `<span class="tag ${tagCls}">${e(String(t))}</span>`).join('')}</div>
+      <div class="fv${mono ? ' mono' : ''}" style="border-left-color:${accent}">${e(rendered)}</div>
     </div>` : '';
+  };
+
+  const tags = (label, arr, tagCls = '') => {
+    const safeArr = Array.isArray(arr) ? arr : (arr ? [String(arr)] : []);
+    return safeArr.length ? `<div class="field">
+      <div class="fl">${e(label)}</div>
+      <div class="tags">${safeArr.slice(0, 20).map(t => `<span class="tag ${tagCls}">${e(String(t))}</span>`).join('')}</div>
+    </div>` : '';
+  };
 
   const section = (num, title, body) =>
     body.trim() ? `<div class="sec">
@@ -143,17 +160,18 @@ body{font-family:Helvetica,Arial,sans-serif;color:#111827;background:#fff;-webki
 .page-hdr-r{font-size:7px;color:#6b7280;font-family:monospace}
 .page-hdr-accent{height:2px;background:linear-gradient(90deg,#a855f7,transparent)}
 
-/* ── Section blocks ── */
-.sec{padding:24px 40px;page-break-inside:avoid}
+/* ── Section blocks — FIX: page-break-inside:avoid removed from .sec (entire section).
+   Large sections caused blank gaps. Now only atomic items (.sh, .field) avoid breaks. ── */
+.sec{padding:24px 40px}
 .sec+.sec{border-top:1px solid #f3f4f6}
-.sh{display:flex;align-items:center;gap:10px;margin-bottom:18px}
+.sh{display:flex;align-items:center;gap:10px;margin-bottom:18px;page-break-inside:avoid;page-break-after:avoid}
 .snum{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#a855f7,#7c3aed);color:white;font-size:10px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 2px 8px rgba(168,85,247,.4)}
 .st{font-size:15px;font-weight:900;color:#111827;letter-spacing:-.3px}
 
 /* ── Fields ── */
-.field{margin-bottom:12px}
+.field{margin-bottom:12px;page-break-inside:avoid}
 .fl{font-size:7px;font-weight:900;text-transform:uppercase;letter-spacing:.2em;color:#9ca3af;margin-bottom:5px}
-.fv{font-size:10.5px;color:#374151;line-height:1.7;background:#f9fafb;border-radius:6px;padding:10px 14px;border-left:3px solid #a855f7}
+.fv{font-size:10.5px;color:#374151;line-height:1.7;background:#f9fafb;border-radius:6px;padding:10px 14px;border-left:3px solid #a855f7;white-space:pre-wrap;word-break:break-word}
 .fv.mono{font-family:'Courier New',monospace;font-size:9.5px;background:#f3f4f6;word-break:break-all}
 .tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:5px}
 .tag{font-size:8.5px;font-weight:700;padding:3px 9px;border-radius:4px;background:#f3e8ff;color:#7c3aed;border:1px solid #e9d5ff}
@@ -218,28 +236,32 @@ body{font-family:Helvetica,Arial,sans-serif;color:#111827;background:#fff;-webki
 </div>
 
 <!-- ═══════════ CONTENT PAGES ═══════════ -->
-<div class="page-hdr">
-  <div class="page-hdr-l">ABE GTM Strategy Intelligence Report &nbsp;·&nbsp; ${e(strategy.company_name)}</div>
-  <div class="page-hdr-r">${date}</div>
+<!-- FIX blank page 2: page-hdr was rendering alone (30px) after cover's page-break-after:always.
+     Wrapping hdr + sections 01/02 together prevents the orphaned header page. -->
+<div style="page-break-inside:avoid">
+  <div class="page-hdr">
+    <div class="page-hdr-l">ABE GTM Strategy Intelligence Report &nbsp;·&nbsp; ${e(strategy.company_name)}</div>
+    <div class="page-hdr-r">${date}</div>
+  </div>
+  <div class="page-hdr-accent"></div>
+
+  ${section('01', 'Market Research & Company Overview',
+    field('Company Overview', s1.company_overview) +
+    field('Market Position', s1.market_position) +
+    field('GTM Relevance Reasoning', s1.gtm_relevance_reasoning) +
+    tags('Growth Signals', s1.growth_signals, 'g') +
+    tags('Tech Stack Hints', s1.tech_stack_hints, 'b')
+  )}
+
+  ${s2.tam_overview ? section('02', 'TAM Mapping & Market Sizing',
+    `<div class="g2">
+      <div class="mc green"><div class="mn">${e(s2.tam_size_estimate || '—')}</div><div class="ml">Total Addressable Market</div></div>
+      <div class="mc amber"><div class="mn">${e(s2.growth_rate || '—')}</div><div class="ml">CAGR / Growth Rate</div></div>
+    </div>` +
+    field('TAM Overview', s2.tam_overview, '#22c55e') +
+    field('Priority Opportunities', s2.priority_opportunities)
+  ) : ''}
 </div>
-<div class="page-hdr-accent"></div>
-
-${section('01', 'Market Research & Company Overview',
-  field('Company Overview', s1.company_overview) +
-  field('Market Position', s1.market_position) +
-  field('GTM Relevance Reasoning', s1.gtm_relevance_reasoning) +
-  tags('Growth Signals', s1.growth_signals, 'g') +
-  tags('Tech Stack Hints', s1.tech_stack_hints, 'b')
-)}
-
-${s2.tam_overview ? section('02', 'TAM Mapping & Market Sizing',
-  `<div class="g2">
-    <div class="mc green"><div class="mn">${e(s2.tam_size_estimate || '—')}</div><div class="ml">Total Addressable Market</div></div>
-    <div class="mc amber"><div class="mn">${e(s2.growth_rate || '—')}</div><div class="ml">CAGR / Growth Rate</div></div>
-  </div>` +
-  field('TAM Overview', s2.tam_overview, '#22c55e') +
-  field('Priority Opportunities', s2.priority_opportunities)
-) : ''}
 
 ${s3.primary_icp ? `<div class="pb">` + section('03', 'Ideal Customer Profile (ICP)',
   field('Primary ICP Definition', s3.primary_icp) +
