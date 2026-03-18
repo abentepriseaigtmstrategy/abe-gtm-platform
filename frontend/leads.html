@@ -288,7 +288,12 @@ let _csv     = null;
 let _searchTimer = null;
 
 /* ─── Init ──────────────────────────────────── */
-document.addEventListener('DOMContentLoaded', () => setTimeout(() => { if(window.APP.user) init(); else setTimeout(()=>init(), 600); }, 400));
+/* ── FIX Bug 1: Auth timing — poll until APP.user is ready (same pattern as vault.html) ── */
+document.addEventListener('DOMContentLoaded', () => {
+  const iv = setInterval(() => {
+    if (window.APP?.user) { clearInterval(iv); init(); }
+  }, 100);
+});
 
 async function init() { await loadLeads(); }
 
@@ -302,13 +307,18 @@ async function loadLeads() {
 
   try {
     const res = await api('/api/leads', {
-      action: 'get_leads', priority: priority||undefined, status: status||undefined,
-      search: search||undefined, limit: _limit, offset: _offset,
+      action:          'get_leads',
+      priority:        priority  || undefined,
+      status:          status    || undefined,
+      outreach_status: outreach  || undefined, // ── FIX Bug 2: was missing from API call
+      search:          search    || undefined,
+      limit:           _limit,
+      offset:          _offset,
     }, token);
     _leads = res.leads || [];
-    _total = res.total || _leads.length;
+    _total = res.total || _leads.length; // FIX Bug 4: backend now returns real DB count
     renderTable(_leads);
-    updateStats(_leads);
+    updateStats(res); // FIX Bug 3: pass full res so stats use server-side counts
     updatePagination();
   } catch(e) {
     document.getElementById('leads-body').innerHTML =
@@ -367,12 +377,15 @@ function getOutreachColor(s) {
   return s === 'replied' ? 'var(--green)' : s === 'sent' ? 'var(--blue)' : 'var(--muted)';
 }
 
-function updateStats(leads) {
-  document.getElementById('s-total').textContent    = _total;
-  document.getElementById('s-high').textContent     = leads.filter(l=>l.priority==='HIGH').length;
-  document.getElementById('s-analyzed').textContent = leads.filter(l=>l.status==='analyzed'||l.status==='mapped').length;
-  document.getElementById('s-outreach').textContent = leads.filter(l=>l.outreach_status==='sent'||l.outreach_status==='replied').length;
-  document.getElementById('s-replied').textContent  = leads.filter(l=>l.outreach_status==='replied').length;
+/* ── FIX Bug 3: Stats use server-side counts (full dataset) not just current page ── */
+function updateStats(res) {
+  // res.counts comes from backend (all rows), res.leads is just the current page
+  const counts = res.counts || {};
+  document.getElementById('s-total').textContent    = res.total    || _total;
+  document.getElementById('s-high').textContent     = counts.high     ?? _leads.filter(l=>l.priority==='HIGH').length;
+  document.getElementById('s-analyzed').textContent = counts.analyzed ?? _leads.filter(l=>l.status==='analyzed'||l.status==='mapped').length;
+  document.getElementById('s-outreach').textContent = counts.outreach  ?? _leads.filter(l=>l.outreach_status==='sent'||l.outreach_status==='replied').length;
+  document.getElementById('s-replied').textContent  = counts.replied   ?? _leads.filter(l=>l.outreach_status==='replied').length;
 }
 
 /* ─── Selection ─────────────────────────────── */
