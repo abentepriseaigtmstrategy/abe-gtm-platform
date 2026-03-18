@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AB • AI Lead Orchestration Framework</title>
+  <title>ABE • AI Lead Orchestration Framework</title>
   
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
@@ -564,9 +564,9 @@
               <span style="width:6px;height:6px;border-radius:50%;background:#a855f7;display:inline-block;box-shadow:0 0 6px #a855f7;"></span>
               GTM Strategy Builder
             </a>
-            <a href="vault.html" class="text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-purple-400 transition-colors flex items-center gap-2">
+            <a href="vault.html" class="text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-purple-400 transition-colors flex items-center gap-2" title="GTM Strategy Intelligence Vault — saved AI-generated GTM strategies">
               <span style="width:6px;height:6px;border-radius:50%;background:#7c3aed;display:inline-block;"></span>
-              Strategy Vault
+              GTM Strategy Vault
             </a>
             <a href="#architecture" class="text-[10px] font-black uppercase tracking-widest text-gray-400 hover:text-white transition-colors">Architecture</a>
         </nav>
@@ -615,7 +615,7 @@
 
         <div class="space-y-4">
             <div class="flex items-center justify-between px-2">
-                <h3 class="text-[11px] font-black uppercase tracking-[0.3em] text-cyan-400">Data Vault: Multi-Industry Repository</h3>
+                <h3 class="text-[11px] font-black uppercase tracking-[0.3em] text-cyan-400">Command Center · Data Vault</h3>
                 <div class="flex items-center space-x-3">
                     <button onclick="openMergeModal()" class="text-[9px] font-black uppercase tracking-widest text-cyan-400 border border-cyan-500/20 bg-cyan-500/5 hover:bg-cyan-500/15 px-3 py-1.5 rounded-lg transition-all">⊕ Merge Files</button>
                     <span id="vault-count" class="text-[9px] font-bold text-gray-500 uppercase">0 Files Stored</span>
@@ -890,7 +890,7 @@
             <div class="arch-card p-8 rounded-[32px] relative group hover:border-purple-500/30 transition-all">
                 <div class="text-purple-500 font-black text-4xl mb-6 opacity-20 group-hover:opacity-100 transition-opacity italic">03</div>
                 <h4 class="text-white font-bold text-xs uppercase tracking-widest mb-3">Score</h4>
-                <p class="text-gray-500 text-[11px] leading-relaxed">AI-driven qualification based on AB's proprietary ICP/GTM alignment logic.</p>
+                <p class="text-gray-500 text-[11px] leading-relaxed">AI-driven qualification based on ABE's proprietary ICP/GTM alignment logic.</p>
             </div>
             <div class="arch-card p-8 rounded-[32px] relative group hover:border-purple-500/30 transition-all">
                 <div class="text-purple-500 font-black text-4xl mb-6 opacity-20 group-hover:opacity-100 transition-opacity italic">04</div>
@@ -911,7 +911,7 @@
     <div class="max-w-[1800px] mx-auto flex flex-col md:flex-row justify-between items-center space-y-6 md:space-y-0">
         <div class="flex items-center space-x-4">
             <div class="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center font-bold text-white text-sm italic">A</div>
-            <p class="text-[10px] text-gray-500 font-black uppercase tracking-[0.2em]">© 2026 AB • Enterprise AI Revenue Infrastructure</p>
+            <p class="text-[10px] text-gray-500 font-black uppercase tracking-[0.2em]">© 2026 ABE • Enterprise AI Revenue Infrastructure</p>
         </div>
         <div class="flex space-x-8">
             <a href="#" class="text-[10px] text-gray-600 hover:text-purple-400 font-bold uppercase tracking-widest transition-colors">Documentation</a>
@@ -2323,22 +2323,315 @@ function getExportLeads() {
 
 function exportPDF() {
   const leads = getExportLeads();
+  if (!leads || leads.length === 0) { alert('No leads to export.'); return; }
+
   const { jsPDF } = window.jspdf;
-  const doc = new jsPDF();
-  let y = 14;
-  doc.setFontSize(14); doc.setFont(undefined,'bold');
-  doc.text('Strategic Repository', 10, y); y += 10;
-  doc.setFontSize(9); doc.setFont(undefined,'normal');
-  leads.forEach((l, i) => {
-    if (y > 270) { doc.addPage(); y = 14; }
-    doc.text(`${i+1}. ${l.name} | ${l.company} | ${l.score}% | ${l.status} | ${l.actionTaken || 'No action'}`, 10, y);
-    y += 7;
-    if (l.gtmAnalysis?.['Pain Area']) {
-      const lines = doc.splitTextToSize('   Pain: ' + l.gtmAnalysis['Pain Area'], 185);
-      doc.text(lines, 10, y); y += lines.length * 5 + 3;
+  const doc   = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+  const PW    = 210;   // page width mm
+  const PH    = 297;   // page height mm
+  const ML    = 16;    // margin left
+  const MR    = 16;    // margin right
+  const CW    = PW - ML - MR;  // content width
+  const today = new Date().toLocaleDateString('en-GB', { year:'numeric', month:'long', day:'numeric' });
+  const ts    = new Date().toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+
+  // ── Colour palette ─────────────────────────────────────────────
+  const clr = {
+    bg:       [11,  15,  26],   // #0B0F1A
+    accent:   [168, 85,  247],  // #a855f7
+    accent2:  [124, 58,  237],  // #7c3aed
+    white:    [255, 255, 255],
+    textDark: [17,  24,  39],   // #111827
+    textGray: [107, 114, 128],  // #6B7280
+    textMid:  [55,  65,  81],   // #374151
+    green:    [34,  197, 94],   // #22c55e
+    amber:    [245, 158, 11],   // #f59e0b
+    red:      [239, 68,  68],   // #ef4444
+    rowEven:  [249, 250, 251],  // #F9FAFB
+    rowOdd:   [255, 255, 255],
+    border:   [229, 231, 235],  // #E5E7EB
+    cyan:     [6,   182, 212],  // #06B6D4
+  };
+
+  function setRGB(c) { doc.setTextColor(c[0], c[1], c[2]); }
+  function fillRGB(c, a) {
+    if (a !== undefined) {
+      // jsPDF doesn't support alpha natively for rect fills — approximate with lighter shade
+      const blend = c.map(v => Math.round(v + (255 - v) * (1 - a)));
+      doc.setFillColor(blend[0], blend[1], blend[2]);
+    } else {
+      doc.setFillColor(c[0], c[1], c[2]);
     }
+  }
+  function drawRGB(c) { doc.setDrawColor(c[0], c[1], c[2]); }
+
+  // ── COVER PAGE ─────────────────────────────────────────────────
+  // Dark background
+  fillRGB(clr.bg);
+  doc.rect(0, 0, PW, PH, 'F');
+
+  // Purple top accent bar
+  fillRGB(clr.accent);
+  doc.rect(0, 0, PW, 6, 'F');
+
+  // Logo mark box
+  fillRGB(clr.accent2);
+  doc.roundedRect(ML, 20, 14, 14, 2, 2, 'F');
+  setRGB(clr.white);
+  doc.setFontSize(8); doc.setFont('helvetica','bold');
+  doc.text('ABE', ML + 3.5, 29);
+
+  // Brand name
+  setRGB(clr.white);
+  doc.setFontSize(9); doc.setFont('helvetica','bold');
+  doc.text('ABE', ML + 18, 26);
+  setRGB(clr.textGray);
+  doc.setFontSize(6); doc.setFont('helvetica','normal');
+  doc.text('ENTERPRISE AI REVENUE INFRASTRUCTURE', ML + 18, 31);
+
+  // Main title
+  setRGB(clr.white);
+  doc.setFontSize(34); doc.setFont('helvetica','bold');
+  doc.text('Strategic', ML, 90);
+  doc.text('Lead Repository', ML, 108);
+
+  // Accent underline
+  fillRGB(clr.accent);
+  doc.rect(ML, 113, 48, 1.5, 'F');
+
+  // Subtitle
+  setRGB(clr.textGray);
+  doc.setFontSize(10); doc.setFont('helvetica','normal');
+  doc.text('Command Center · Account Intelligence Export', ML, 122);
+
+  // Stats boxes
+  const activeLeads  = leads.filter(l => l.status !== 'Ignored').length;
+  const avgScore     = leads.length ? Math.round(leads.reduce((a,l)=>a+(parseInt(l.score)||0),0)/leads.length) : 0;
+  const highPriority = leads.filter(l => (parseInt(l.score)||0) >= 80).length;
+  const contacted    = leads.filter(l => l.status === 'Contacted' || l.status === 'Meeting Set').length;
+
+  const stats = [
+    { label: 'TOTAL LEADS',     value: String(leads.length),    color: clr.white  },
+    { label: 'AVG SCORE',       value: `${avgScore}%`,          color: clr.accent },
+    { label: 'HIGH PRIORITY',   value: String(highPriority),    color: clr.green  },
+    { label: 'CONTACTED',       value: String(contacted),       color: clr.cyan   },
+  ];
+
+  const boxW = (CW - 12) / 4;
+  stats.forEach((s, i) => {
+    const x = ML + i * (boxW + 4);
+    fillRGB([255,255,255], 0.05);
+    // Lighter dark box
+    doc.setFillColor(26, 32, 53);
+    doc.roundedRect(x, 148, boxW, 36, 3, 3, 'F');
+    drawRGB(clr.accent2);
+    doc.setDrawColor(60, 40, 100);
+    doc.roundedRect(x, 148, boxW, 36, 3, 3, 'S');
+    setRGB(s.color);
+    doc.setFontSize(16); doc.setFont('helvetica','bold');
+    doc.text(s.value, x + boxW/2, 162, { align:'center' });
+    setRGB(clr.textGray);
+    doc.setFontSize(5.5); doc.setFont('helvetica','normal');
+    doc.text(s.label, x + boxW/2, 178, { align:'center' });
   });
-  doc.save("Strategic_Repository.pdf");
+
+  // Generated line
+  setRGB(clr.textGray);
+  doc.setFontSize(7);
+  doc.text(`Generated ${today} at ${ts}  ·  Confidential  ·  ABE Enterprise AI Revenue Infrastructure`, ML, PH - 16);
+
+  // ── SUMMARY TABLE PAGE ─────────────────────────────────────────
+  function addPageHeader(pageTitle) {
+    doc.addPage();
+    // Top bar
+    fillRGB(clr.bg);
+    doc.rect(0, 0, PW, 14, 'F');
+    fillRGB(clr.accent);
+    doc.rect(0, 0, PW, 1.5, 'F');
+    setRGB(clr.textGray);
+    doc.setFontSize(6); doc.setFont('helvetica','normal');
+    doc.text('ABE · COMMAND CENTER  ·  STRATEGIC LEAD REPOSITORY', ML, 9);
+    doc.text(today, PW - MR, 9, { align:'right' });
+    // Section title
+    setRGB(clr.textDark);
+    doc.setFontSize(13); doc.setFont('helvetica','bold');
+    doc.text(pageTitle, ML, 26);
+    fillRGB(clr.accent);
+    doc.rect(ML, 28, 28, 1, 'F');
+    return 36; // return y start position
+  }
+
+  // ── TABLE HEADER ROW helper ────────────────────────────────────
+  function drawTableHeader(y, cols) {
+    fillRGB(clr.bg);
+    doc.rect(ML, y, CW, 7, 'F');
+    setRGB(clr.textGray);
+    doc.setFontSize(5.5); doc.setFont('helvetica','bold');
+    cols.forEach(c => {
+      doc.text(c.label, c.x, y + 5);
+    });
+    return y + 7;
+  }
+
+  // ── PAGE 2: Full lead table ────────────────────────────────────
+  let y = addPageHeader('Lead Summary — All Accounts');
+
+  const tableCols = [
+    { label: '#',          x: ML,        w: 6   },
+    { label: 'NAME',       x: ML+7,      w: 32  },
+    { label: 'COMPANY',    x: ML+40,     w: 38  },
+    { label: 'SCORE',      x: ML+79,     w: 14  },
+    { label: 'STATUS',     x: ML+94,     w: 26  },
+    { label: 'SOURCE',     x: ML+121,    w: 30  },
+    { label: 'ACTION',     x: ML+152,    w: 42  },
+  ];
+
+  y = drawTableHeader(y, tableCols);
+
+  leads.forEach((l, i) => {
+    if (y > PH - 18) {
+      // Footer on this page
+      setRGB(clr.textGray);
+      doc.setFontSize(6);
+      doc.text(`Page ${doc.internal.getNumberOfPages()}  ·  Confidential  ·  ABE Enterprise AI Revenue Infrastructure`, PW/2, PH-8, {align:'center'});
+      y = addPageHeader('Lead Summary (continued)');
+      y = drawTableHeader(y, tableCols);
+    }
+
+    const rowBg = i % 2 === 0 ? clr.rowEven : clr.rowOdd;
+    fillRGB(rowBg);
+    doc.rect(ML, y, CW, 7.5, 'F');
+
+    // Score colour
+    const sc    = parseInt(l.score) || 0;
+    const scClr = sc >= 80 ? clr.green : sc >= 60 ? clr.amber : clr.red;
+
+    setRGB(clr.textDark);
+    doc.setFontSize(7); doc.setFont('helvetica','normal');
+    doc.text(String(i + 1), tableCols[0].x, y + 5.2);
+
+    const nameStr = String(l.name || '').slice(0, 20);
+    doc.text(nameStr, tableCols[1].x, y + 5.2);
+
+    const coStr = String(l.company || '').slice(0, 22);
+    doc.text(coStr, tableCols[2].x, y + 5.2);
+
+    // Score pill
+    fillRGB(scClr, 0.15);
+    doc.setFillColor(
+      Math.round(scClr[0] + (255-scClr[0]) * 0.85),
+      Math.round(scClr[1] + (255-scClr[1]) * 0.85),
+      Math.round(scClr[2] + (255-scClr[2]) * 0.85)
+    );
+    doc.roundedRect(tableCols[3].x - 1, y + 1, 13, 5.5, 1, 1, 'F');
+    setRGB(scClr);
+    doc.setFontSize(6.5); doc.setFont('helvetica','bold');
+    doc.text(`${sc}%`, tableCols[3].x + 2.5, y + 5.2);
+
+    setRGB(clr.textMid);
+    doc.setFontSize(7); doc.setFont('helvetica','normal');
+    doc.text(String(l.status || '').slice(0, 16),   tableCols[4].x, y + 5.2);
+    doc.text(String(l.source_file || l.source || '').slice(0, 18), tableCols[5].x, y + 5.2);
+
+    const action = String(l.actionTaken || l.notes || '—').slice(0, 28);
+    doc.text(action, tableCols[6].x, y + 5.2);
+
+    // Row bottom border
+    drawRGB(clr.border);
+    doc.setDrawColor(229, 231, 235);
+    doc.setLineWidth(0.2);
+    doc.line(ML, y + 7.5, ML + CW, y + 7.5);
+
+    y += 7.5;
+  });
+
+  // ── PAGE 3: Detail cards for top 20 leads ─────────────────────
+  const topLeads = [...leads]
+    .sort((a,b) => (parseInt(b.score)||0) - (parseInt(a.score)||0))
+    .slice(0, 20);
+
+  y = addPageHeader('Top Account Intelligence Cards');
+
+  topLeads.forEach((l, i) => {
+    const sc    = parseInt(l.score) || 0;
+    const scClr = sc >= 80 ? clr.green : sc >= 60 ? clr.amber : clr.red;
+    const CARD_H = 36;
+
+    if (y + CARD_H > PH - 18) {
+      setRGB(clr.textGray);
+      doc.setFontSize(6);
+      doc.text(`Page ${doc.internal.getNumberOfPages()}  ·  Confidential  ·  ABE Enterprise AI Revenue Infrastructure`, PW/2, PH-8, {align:'center'});
+      y = addPageHeader('Top Account Intelligence Cards (continued)');
+    }
+
+    // Card background
+    doc.setFillColor(249, 250, 251);
+    doc.setDrawColor(229, 231, 235);
+    doc.setLineWidth(0.3);
+    doc.roundedRect(ML, y, CW, CARD_H, 2, 2, 'FD');
+
+    // Left accent strip
+    fillRGB(scClr);
+    doc.rect(ML, y, 2.5, CARD_H, 'F');
+
+    // Score badge
+    doc.setFillColor(
+      Math.round(scClr[0] + (255-scClr[0]) * 0.85),
+      Math.round(scClr[1] + (255-scClr[1]) * 0.85),
+      Math.round(scClr[2] + (255-scClr[2]) * 0.85)
+    );
+    doc.roundedRect(PW - MR - 20, y + 4, 18, 10, 2, 2, 'F');
+    setRGB(scClr);
+    doc.setFontSize(9); doc.setFont('helvetica','bold');
+    doc.text(`${sc}%`, PW - MR - 11, y + 10.5, { align:'center' });
+    setRGB(scClr);
+    doc.setFontSize(5); doc.setFont('helvetica','normal');
+    doc.text('GTM SCORE', PW - MR - 11, y + 16.5, { align:'center' });
+
+    // Name and company
+    setRGB(clr.textDark);
+    doc.setFontSize(8.5); doc.setFont('helvetica','bold');
+    doc.text(String(l.name || '').slice(0,36), ML + 6, y + 9);
+    setRGB(clr.textGray);
+    doc.setFontSize(7); doc.setFont('helvetica','normal');
+    doc.text(String(l.company || '').slice(0,36), ML + 6, y + 15.5);
+
+    // Status pill
+    const stClr = l.status === 'Contacted' || l.status === 'Meeting Set' ? clr.green : clr.textGray;
+    setRGB(stClr);
+    doc.setFontSize(6); doc.setFont('helvetica','bold');
+    doc.text(String(l.status || 'New').toUpperCase(), ML + 6, y + 21.5);
+
+    // GTM analysis fields
+    if (l.gtmAnalysis) {
+      const pain    = l.gtmAnalysis['Pain Area']         || '';
+      const insight = l.gtmAnalysis['Key Insight']       || '';
+      const sol     = l.gtmAnalysis['Proposed Solution'] || '';
+      const fields  = [pain, insight, sol].filter(Boolean).join('  ·  ').slice(0, 130);
+      if (fields) {
+        setRGB(clr.textMid);
+        doc.setFontSize(6.5); doc.setFont('helvetica','normal');
+        const wrapped = doc.splitTextToSize(fields, CW - 30);
+        doc.text(wrapped.slice(0, 2), ML + 6, y + 27);
+      }
+    } else if (l.notes) {
+      setRGB(clr.textMid);
+      doc.setFontSize(6.5);
+      const wrapped = doc.splitTextToSize(String(l.notes).slice(0, 130), CW - 30);
+      doc.text(wrapped.slice(0, 2), ML + 6, y + 27);
+    }
+
+    y += CARD_H + 4;
+  });
+
+  // ── Footer on last page ────────────────────────────────────────
+  setRGB(clr.textGray);
+  doc.setFontSize(6);
+  doc.text(`Page ${doc.internal.getNumberOfPages()}  ·  Confidential  ·  ABE Enterprise AI Revenue Infrastructure`, PW/2, PH-8, {align:'center'});
+
+  // ── Save ───────────────────────────────────────────────────────
+  const fname = `AB_Strategic_Repository_${new Date().toISOString().slice(0,10)}.pdf`;
+  doc.save(fname);
 }
 
 function exportWord() {
