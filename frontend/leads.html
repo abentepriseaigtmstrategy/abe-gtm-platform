@@ -6,6 +6,8 @@
   <title>Lead Manager · ABE AI Revenue Infrastructure</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- SheetJS: parse .xlsx files on the client before sending to backend -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
   <style>
     :root {
       --bg:#0B0F1A; --card:#121827; --border:#1F2937;
@@ -495,15 +497,47 @@ function handleDrop(e) {
 function handleFileSelect(input) { if (input.files[0]) readFile(input.files[0]); }
 
 function readFile(file) {
-  const reader = new FileReader();
-  reader.onload = evt => {
-    _csv = evt.target.result;
-    const lines = _csv.split('\n').filter(l => l.trim()).length;
-    document.getElementById('import-preview').style.display = 'block';
-    document.getElementById('import-preview-count').textContent = `✓ ${file.name} — ~${lines - 1} leads detected`;
-    document.getElementById('import-confirm').disabled = false;
-  };
-  reader.readAsText(file);
+  const isXlsx = file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls')
+    || file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+  if (isXlsx) {
+    // ── XLSX path: use SheetJS to convert to CSV text ─────────────
+    const reader = new FileReader();
+    reader.onload = evt => {
+      try {
+        const data     = new Uint8Array(evt.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        // Use the first sheet
+        const sheetName = workbook.SheetNames[0];
+        const sheet     = workbook.Sheets[sheetName];
+        // Convert to CSV — the existing backend CSV parser handles it
+        _csv = XLSX.utils.sheet_to_csv(sheet);
+        const lines = _csv.split('\n').filter(l => l.trim()).length;
+        document.getElementById('import-preview').style.display = 'block';
+        document.getElementById('import-preview-count').textContent =
+          `✓ ${file.name} — ~${lines - 1} leads detected`;
+        document.getElementById('import-confirm').disabled = false;
+      } catch(err) {
+        document.getElementById('import-preview').style.display = 'block';
+        document.getElementById('import-preview-count').textContent =
+          `✗ Failed to read Excel file: ${err.message}`;
+        document.getElementById('import-preview-count').style.color = 'var(--red)';
+      }
+    };
+    reader.readAsArrayBuffer(file); // Must use ArrayBuffer for binary xlsx
+  } else {
+    // ── CSV path: read as plain text (existing logic) ─────────────
+    const reader = new FileReader();
+    reader.onload = evt => {
+      _csv = evt.target.result;
+      const lines = _csv.split('\n').filter(l => l.trim()).length;
+      document.getElementById('import-preview').style.display = 'block';
+      document.getElementById('import-preview-count').textContent =
+        `✓ ${file.name} — ~${lines - 1} leads detected`;
+      document.getElementById('import-confirm').disabled = false;
+    };
+    reader.readAsText(file);
+  }
 }
 
 async function confirmImport() {
