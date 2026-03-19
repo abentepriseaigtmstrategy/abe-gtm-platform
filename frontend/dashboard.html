@@ -17,7 +17,6 @@
     };
   </script>
   <script src="https://cdn.tailwindcss.com"></script>
-  <script>tailwind.config = { corePlugins: { preflight: false } }</script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   
@@ -83,6 +82,8 @@
     .table-scroll-area::-webkit-scrollbar { width: 6px; }
     .table-scroll-area::-webkit-scrollbar-thumb { background: #312e81; border-radius: 10px; }
 
+    /* Explicit button reset — ensures Tailwind nav buttons never get browser default styling */
+    button { background: none; border: none; padding: 0; margin: 0; font: inherit; cursor: pointer; }
     .score-high { color: #22c55e !important; font-weight: 800; } 
     .score-med { color: #f59e0b !important; font-weight: 800; }
     .score-low { color: #ef4444 !important; font-weight: 800; }  
