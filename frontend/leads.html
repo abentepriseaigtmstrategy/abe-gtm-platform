@@ -888,10 +888,11 @@ function renderDrawerDetails() {
     ${dField('Source File',   l.source_file)}
     ${scoreReason ? dField('Score Breakdown', scoreReason, 'var(--accent)') : ''}
     ${l.notes ? dField('Notes', l.notes) : ''}
-    ${l.gtm_analysis ? `<div style="margin-bottom:14px">
-      <div style="font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.18em;color:#6b7280;margin-bottom:4px">AI Analysis</div>
-      <div style="font-size:10px;color:var(--muted);background:rgba(168,85,247,.05);border-radius:6px;padding:10px 12px;border:1px solid rgba(168,85,247,.15)">
-        ${esc(typeof l.gtm_analysis === 'string' ? l.gtm_analysis : JSON.stringify(l.gtm_analysis, null, 2))}
+    ${(l.score_reason || l.gtm_analysis?.personalisation_notes) ? `<div style="margin-bottom:14px">
+      <div style="font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.18em;color:#6b7280;margin-bottom:4px">AI Insights</div>
+      <div style="font-size:10px;color:var(--muted);background:rgba(168,85,247,.05);border-radius:6px;padding:10px 12px;border:1px solid rgba(168,85,247,.15);line-height:1.7">
+        ${l.gtm_analysis?.personalisation_notes ? esc(l.gtm_analysis.personalisation_notes) : ''}
+        ${l.score_reason ? '<br><br><span style="color:#6b7280;font-size:9px;text-transform:uppercase;letter-spacing:.1em">Score Breakdown</span><br>' + esc(l.score_reason) : ''}
       </div>
     </div>` : ''}
     <div style="margin-top:8px;padding-top:14px;border-top:1px solid var(--border)">
@@ -937,7 +938,10 @@ function renderDrawerOutreach() {
       <div style="font-size:11px;color:var(--text);background:rgba(255,255,255,.03);border-radius:8px;padding:12px;border:1px solid var(--border);line-height:1.7">${esc(linkedin)}</div>
       <button onclick="copyToClipboard('${String(linkedin).replace(/'/g,"\\'")}','LinkedIn note copied!')" style="margin-top:8px;font-size:9px;padding:5px 12px;border-radius:5px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--muted);cursor:pointer">📋 Copy LinkedIn</button>
     </div>` : ''}
-    <button class="btn btn-outline" style="width:100%;font-size:9px;margin-top:4px" onclick="drawerOutreach()">↺ Regenerate</button>`;
+    <div style="display:flex;gap:8px;margin-top:8px">
+      <button onclick="saveOutreach()" style="flex:1;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:var(--green);border-radius:6px;padding:7px 12px;font-size:9px;font-weight:700;cursor:pointer;text-transform:uppercase;letter-spacing:.08em" id="btn-save-outreach">💾 Save to Lead</button>
+      <button class="btn btn-outline" style="flex:1;font-size:9px" onclick="drawerOutreach()">↺ Regenerate</button>
+    </div>`;
 }
 
 function renderDrawerAI() {
@@ -984,25 +988,8 @@ async function sendAIMessage() {
   try {
     const token  = await getToken();
     const l      = _drawerLead;
-    const system = `You are an AI sales intelligence assistant. You have full context on this lead:
-Name: ${l.name} | Title: ${l.title} | Company: ${l.company} | Email: ${l.email}
-Location: ${l.location} | Industry: ${l.industry} | ICP Score: ${l.icp_score ?? 'not scored'}
-Priority: ${l.priority} | Outreach Status: ${l.outreach_status}
-Score Reason: ${l.score_reason || 'not scored yet'}
-Be concise, specific, and actionable. Never hallucinate details not provided.`;
 
-    const res = await fetch('https://api.anthropic.com/v1/messages', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        model: 'claude-sonnet-4-6',
-        max_tokens: 600,
-        system,
-        messages: _aiHistory,
-      }),
-    });
-
-    // Claude API requires auth — route through our own API instead
+    // Route through our own API — direct Anthropic call would fail with CORS
     const aiRes = await api('/api/leads', {
       action:    'ai_chat',
       lead_id:   l.id,
@@ -1072,6 +1059,32 @@ async function drawerOutreach() {
     showToast('Outreach saved to lead ✓', 'success');
   } catch(e) { showToast(e.message, 'error'); }
   finally { if (btn) { btn.disabled = false; btn.textContent = '✉ Generate Outreach'; } }
+}
+
+async function saveOutreach() {
+  if (!_drawerLead) return;
+  const btn = document.getElementById('btn-save-outreach');
+  if (btn) { btn.textContent = '⏳ Saving…'; btn.disabled = true; }
+  const token = await getToken();
+  try {
+    await api('/api/leads', {
+      action:  'update_lead',
+      lead_id: _drawerLead.id,
+      updates: {
+        outreach_email:    _drawerLead.outreach_email    || '',
+        outreach_linkedin: _drawerLead.outreach_linkedin || '',
+        outreach_status:   'not_sent',
+      },
+    }, token);
+    if (btn) { btn.textContent = '✓ Saved'; btn.style.background = 'rgba(34,197,94,.2)'; }
+    showToast('Outreach saved to lead ✓', 'success');
+    setTimeout(() => {
+      if (btn) { btn.textContent = '💾 Save to Lead'; btn.disabled = false; btn.style.background = ''; }
+    }, 2500);
+  } catch(e) {
+    showToast(e.message, 'error');
+    if (btn) { btn.textContent = '💾 Save to Lead'; btn.disabled = false; }
+  }
 }
 
 async function updateLeadStatus(leadId, status) {
