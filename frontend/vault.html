@@ -202,12 +202,20 @@
     </div>
   </div>
 
-  <!-- Stats -->
+  <!-- Stats — click to filter -->
   <div class="stats-row">
-    <div class="stat-card"><div class="stat-value" id="stat-total">—</div><div class="stat-label">Total Strategies</div></div>
-    <div class="stat-card"><div class="stat-value" id="stat-complete">—</div><div class="stat-label">Complete</div></div>
-    <div class="stat-card"><div class="stat-value" id="stat-avg-score">—</div><div class="stat-label">Avg GTM Score</div></div>
-    <div class="stat-card"><div class="stat-value" id="stat-tokens">—</div><div class="stat-label">Total Tokens Used</div></div>
+    <div class="stat-card" onclick="filterVault('')" style="cursor:pointer" title="Show all strategies">
+      <div class="stat-value" id="stat-total">—</div><div class="stat-label">Total Strategies</div>
+    </div>
+    <div class="stat-card" onclick="filterVault('complete')" style="cursor:pointer" title="Show complete only">
+      <div class="stat-value" id="stat-complete">—</div><div class="stat-label">Complete</div>
+    </div>
+    <div class="stat-card" style="cursor:default">
+      <div class="stat-value" id="stat-avg-score">—</div><div class="stat-label">Avg GTM Score</div>
+    </div>
+    <div class="stat-card" style="cursor:default">
+      <div class="stat-value" id="stat-tokens">—</div><div class="stat-label">Total Tokens Used</div>
+    </div>
   </div>
 
   <!-- Toolbar -->
@@ -435,6 +443,11 @@ function updateStats(strategies) {
 function debounceSearch() {
   clearTimeout(_searchTimer);
   _searchTimer = setTimeout(applyFilters, 300);
+}
+
+function filterVault(status) {
+  document.getElementById('filter-status').value = status;
+  applyFilters();
 }
 
 function applyFilters() {
