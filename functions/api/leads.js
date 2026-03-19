@@ -41,7 +41,7 @@ export async function onRequestPost(context) {
   if (!action) return errRes('Missing required field: action', 400, cors);
 
   switch (action) {
-    case 'import':            return handleImport(body, user.id, supabaseUrl, supabaseKey, cors);
+    case 'import':            return handleImport(body, user.id, openaiKey, supabaseUrl, supabaseKey, cors);
     case 'detect_schema':     return handleDetectSchema(body, user.id, openaiKey, cors);
     case 'score_batch':       return handleScoreBatch(body, user.id, openaiKey, supabaseUrl, supabaseKey, cors);
     case 'generate_outreach': return handleGenerateOutreach(body, user.id, openaiKey, supabaseUrl, supabaseKey, cors);
@@ -135,7 +135,7 @@ Example format:
 // ══════════════════════════════════════════════════════════════════
 // IMPORT — accepts confirmed field mapping from frontend schema step
 // ══════════════════════════════════════════════════════════════════
-async function handleImport(body, userId, url, key, cors) {
+async function handleImport(body, userId, openaiKey, url, key, cors) {
   const { csv_text, leads: rawLeads, source_type = 'csv', source_file, field_mapping } = body;
 
   let leads = rawLeads || [];
@@ -144,72 +144,111 @@ async function handleImport(body, userId, url, key, cors) {
   }
   if (!leads.length) return errRes('No leads to import', 400, cors);
 
+  // ── Resolve field mapping ─────────────────────────────────────────
+  // Priority 1: confirmed mapping from frontend (if provided)
+  // Priority 2: AI auto-detect from headers + sample rows (silent, no user interaction)
+  // Priority 3: intelligent fuzzy fallback (never blocks import)
+  let resolvedMapping = field_mapping || null;
+
+  if (!resolvedMapping && openaiKey && leads.length > 0) {
+    try {
+      const headers = Object.keys(leads[0]);
+      const samples = leads.slice(0, 3);
+      const aiRes   = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini', temperature: 0, max_tokens: 300,
+          response_format: { type: 'json_object' },
+          messages: [{
+            role: 'user',
+            content: `Map these file headers to standard contact fields. Headers: ${JSON.stringify(headers)}. Sample row: ${JSON.stringify(samples[0])}. Return JSON with keys: name, first_name, last_name, title, company, email, linkedin_url, website, location, industry, phone. Set each value to the EXACT matching header string, or null if no match.`,
+          }],
+        }),
+      });
+      const d = await aiRes.json();
+      resolvedMapping = JSON.parse(d.choices?.[0]?.message?.content || '{}');
+    } catch (_) {
+      resolvedMapping = null; // Fall through to fuzzy
+    }
+  }
+
   const ts = new Date().toISOString();
 
   const payload = leads.slice(0, 5000).map(l => {
-    // If a confirmed AI field_mapping was provided, use it directly.
-    // Otherwise fall back to fuzzy findField matching (legacy safety net).
-    const get = (targetField) => {
-      if (field_mapping?.[targetField]) {
-        // Use the exact confirmed column name — case-insensitive lookup
-        const colName = field_mapping[targetField];
-        const key = Object.keys(l).find(k => k.toLowerCase() === colName.toLowerCase());
-        return key ? (l[key] || '').toString().trim() : '';
+    // Get a field value using resolved mapping or fuzzy fallback
+    const get = (targetField, fuzzyAliases = []) => {
+      // Try AI mapping first
+      if (resolvedMapping?.[targetField]) {
+        const col = resolvedMapping[targetField];
+        const key = Object.keys(l).find(k => k.toLowerCase() === col.toLowerCase());
+        const val = key ? (l[key] || '').toString().trim() : '';
+        if (val && val !== 'None' && val !== 'null') return val;
+      }
+      // Fuzzy fallback — try all aliases
+      for (const alias of fuzzyAliases) {
+        const key = Object.keys(l).find(k => k.toLowerCase() === alias.toLowerCase());
+        const val = key ? (l[key] || '').toString().trim() : '';
+        if (val && val !== 'None' && val !== 'null') return val;
       }
       return '';
     };
 
-    // Build name: prefer mapped full name, fall back to first+last
-    const fullName = get('name') ||
-      [get('first_name'), get('last_name')].filter(Boolean).join(' ');
+    const fullName = get('name', ['name','full name','full_name','contact name']) ||
+      [get('first_name', ['first_name','first name','firstname']),
+       get('last_name',  ['last_name','last name','lastname'])].filter(Boolean).join(' ');
+
+    const company = get('company', [
+      'company','company name','company_name','organization','organization name',
+      'organization.name','account','account name','employer',
+      'employment_history.0.organization_name',
+    ]);
+
+    const website = get('website', [
+      'website','company website','organization.website_url','organization.primary_domain',
+      'domain','web','url','company url','company_url',
+    ]);
 
     return {
       user_id:      userId,
       name:         sanitise(fullName, 120),
-      title:        sanitise(get('title'), 120),
-      company:      sanitise(get('company'), 120),
-      email:        sanitise(get('email'), 200),
-      linkedin_url: sanitise(get('linkedin_url'), 300),
-      website:      sanitise(get('website'), 300),
-      location:     sanitise(get('location'), 200),
-      industry:     sanitise(get('industry'), 120),
+      title:        sanitise(get('title', ['title','job title','role','position','headline']), 120),
+      company:      sanitise(company, 120),
+      email:        sanitise(get('email', ['email','email address','work email','email_address']), 200),
+      linkedin_url: sanitise(get('linkedin_url', ['linkedin_url','linkedin','linkedin url','profile url']), 300),
+      website:      sanitise(website, 300),
+      location:     sanitise(get('location', ['location','city','country','formatted_address','state']), 200),
+      industry:     sanitise(get('industry', ['industry','organization.industry','departments.0','department']), 120),
       source_file:  source_file || null,
       source_type,
       status:       'unprocessed',
       tags:         JSON.stringify(['Imported']),
       activity_log: JSON.stringify([{
-        action:    'imported',
-        timestamp: ts,
-        note:      `Imported via ${source_type}${source_file ? ' — ' + source_file : ''}`,
+        action: 'imported', timestamp: ts,
+        note: `Imported via ${source_type}${source_file ? ' — ' + source_file : ''}`,
       }]),
     };
   }).filter(l => l.name && l.name !== '');
 
   if (!payload.length) return errRes('No valid leads after parsing (name field required)', 400, cors);
 
-  // Chunk insert to avoid Supabase row limits
+  // Insert in chunks. No on_conflict blocking — dedup is handled by the user
+  // via the File Manager (delete file then re-import). The previous on_conflict
+  // on user_id+name+company was blocking ALL leads when company was blank,
+  // since blank company made every "David G" look identical.
   const CHUNK = 200;
   let inserted = 0;
-  let duplicates = 0;
 
   for (let i = 0; i < payload.length; i += CHUNK) {
     const chunk = payload.slice(i, i + CHUNK);
-    const res = await sb(url, key, 'leads', 'POST',
-      JSON.stringify(chunk),
-      '?on_conflict=user_id,name,company'   // skip exact duplicates
-    );
+    const res = await sb(url, key, 'leads', 'POST', JSON.stringify(chunk), '');
     if (res.ok) {
       const saved = await res.json();
       inserted += Array.isArray(saved) ? saved.length : chunk.length;
-    } else {
-      // Try without on_conflict for servers that don't support it
-      const res2 = await sb(url, key, 'leads', 'POST', JSON.stringify(chunk));
-      if (res2.ok) inserted += chunk.length;
     }
   }
 
-  duplicates = payload.length - inserted;
-  return okRes({ imported: inserted, skipped_duplicates: duplicates, total: payload.length }, cors);
+  return okRes({ imported: inserted, total: payload.length }, cors);
 }
 
 // ══════════════════════════════════════════════════════════════════
