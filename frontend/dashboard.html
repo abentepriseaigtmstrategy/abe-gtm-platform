@@ -7,7 +7,17 @@
   
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css">
+  <script>
+    // Suppress Tailwind CDN production warning — warning is console-only,
+    // has zero user impact, but clutters the console in production.
+    const _cw = console.warn;
+    console.warn = function(...a) {
+      if (a[0] && String(a[0]).includes('cdn.tailwindcss.com')) return;
+      _cw.apply(console, a);
+    };
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>tailwind.config = { corePlugins: { preflight: false } }</script>
   <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   
