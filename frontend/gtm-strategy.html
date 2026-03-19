@@ -603,6 +603,7 @@
 
 <!-- ── AUTH GUARD ── -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="auth-guard.js"></script>
 
 <!-- ── TOP NAV ── -->
@@ -735,6 +736,9 @@
           <span id="start-btn-icon">⚡</span> Launch Pipeline
         </button>
         <button class="btn btn-outline btn-sm btn-icon" onclick="resetAll()" title="Reset">↺</button>
+        <button class="btn btn-outline" onclick="openBulkModal()" title="Bulk GTM — upload a CSV of companies and auto-generate reports for up to 10 at once" style="white-space:nowrap;gap:6px">
+          ⚡ Bulk GTM
+        </button>
       </div>
       <!-- Website extraction status -->
       <div id="website-status" style="display:none;margin-top:10px;padding:8px 14px;background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.2);border-radius:8px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#86efac;display:flex;align-items:center;gap:8px;">
@@ -2711,7 +2715,434 @@ function escHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/\n/g, '<br>');
 }
+
+/* ═══════════════════════════════════════════════════════════════
+   BULK GTM GENERATOR — lives inside GTM Strategy Builder
+   Logic:
+   - Upload CSV/Excel → detect company + website columns
+   - Select up to 10 → run all 6 steps sequentially per company
+   - Auto-save to Strategy Vault after each completes
+   - Remove from queue after successful save
+   - Dedup warning if company already exists in vault
+   - Token count display, no cost/dollar amounts
+═══════════════════════════════════════════════════════════════ */
+
+let _bulkQueue   = [];
+let _bulkStopped = false;
+let _bulkTokens  = 0;
+
+function openBulkModal()  { document.getElementById('bulk-modal').style.display = 'block'; }
+function closeBulkModal() { document.getElementById('bulk-modal').style.display = 'none'; }
+
+function resetBulkUpload() {
+  document.getElementById('bulk-upload-zone').style.display  = 'block';
+  document.getElementById('bulk-queue-section').style.display = 'none';
+  document.getElementById('bulk-file-input').value = '';
+  _bulkQueue = [];
+}
+
+// ── File handling ─────────────────────────────────────────────
+function handleBulkDrop(e) {
+  e.preventDefault();
+  const z = document.getElementById('bulk-upload-zone');
+  z.style.borderColor = 'rgba(168,85,247,.35)';
+  z.style.background  = '';
+  if (e.dataTransfer.files[0]) readBulkFile(e.dataTransfer.files[0]);
+}
+
+function handleBulkFile(input) {
+  if (input.files[0]) readBulkFile(input.files[0]);
+}
+
+function readBulkFile(file) {
+  const isXlsx = /\.(xlsx|xls)$/i.test(file.name);
+  const onCSV = (csvText) => {
+    const rows    = csvText.split('\n').filter(l => l.trim());
+    if (rows.length < 2) { alert('File appears empty — needs a header row and at least one data row.'); return; }
+    const headers = splitBulkCSVRow(rows[0]).map(h => h.replace(/"/g,'').trim().toLowerCase());
+
+    const companyCol = headers.findIndex(h => /company|organisation|organization|account|employer|firm|^name$/.test(h));
+    const websiteCol = headers.findIndex(h => /website|domain|url|web|site/.test(h));
+
+    if (companyCol === -1) {
+      alert('Could not find a company name column.\nMake sure your file has a column named "company", "organization", "account", or similar.');
+      return;
+    }
+
+    _bulkQueue = rows.slice(1).map((row, i) => {
+      const cells   = splitBulkCSVRow(row);
+      const company = (cells[companyCol] || '').replace(/"/g,'').trim();
+      const website = websiteCol >= 0 ? (cells[websiteCol] || '').replace(/"/g,'').trim() : '';
+      return { id: 'bq_' + i, company, website, status: 'pending', step: 0, tokens: 0, selected: false, error: '' };
+    }).filter(r => r.company);
+
+    if (!_bulkQueue.length) { alert('No valid companies found in the file.'); return; }
+
+    document.getElementById('bulk-queue-count').textContent = _bulkQueue.length;
+    document.getElementById('bulk-upload-zone').style.display   = 'none';
+    document.getElementById('bulk-queue-section').style.display = 'block';
+    renderBulkQueue();
+  };
+
+  if (isXlsx) {
+    const reader = new FileReader();
+    reader.onload = evt => {
+      try {
+        const wb    = XLSX.read(new Uint8Array(evt.target.result), { type: 'array' });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        onCSV(XLSX.utils.sheet_to_csv(sheet));
+      } catch(e) { alert('Error reading Excel: ' + e.message); }
+    };
+    reader.readAsArrayBuffer(file);
+  } else {
+    const reader = new FileReader();
+    reader.onload = evt => onCSV(evt.target.result);
+    reader.readAsText(file);
+  }
+}
+
+function splitBulkCSVRow(row) {
+  const result = []; let cur = '', inQ = false;
+  for (const ch of row) {
+    if (ch === '"') { inQ = !inQ; }
+    else if (ch === ',' && !inQ) { result.push(cur); cur = ''; }
+    else cur += ch;
+  }
+  result.push(cur);
+  return result;
+}
+
+function escB(str) {
+  return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Queue rendering ────────────────────────────────────────────
+function renderBulkQueue() {
+  const selected = _bulkQueue.filter(r => r.selected).length;
+  const tbody    = document.getElementById('bulk-queue-body');
+
+  tbody.innerHTML = _bulkQueue.map(row => {
+    const colors = { pending:'#6b7280', processing:'#a855f7', complete:'#22c55e', failed:'#ef4444', duplicate:'#f59e0b' };
+    const labels = {
+      pending:   '— Pending',
+      processing:'⏳ Processing…',
+      complete:  '✓ Saved to Vault',
+      failed:    '✗ ' + (row.error || 'Failed'),
+      duplicate: '⚠ Duplicate — skipped',
+    };
+    const color = colors[row.status] || '#6b7280';
+    const label = labels[row.status] || row.status;
+
+    const dots = [1,2,3,4,5,6].map(s =>
+      `<div style="width:9px;height:9px;border-radius:50%;background:${s<=row.step?'#a855f7':'rgba(255,255,255,.1)'}"></div>`
+    ).join('');
+    const progress = row.step > 0
+      ? `<div style="display:flex;gap:3px;align-items:center">${dots}<span style="font-size:8px;color:#6b7280;margin-left:4px">${row.step}/6</span></div>`
+      : '<span style="font-size:9px;color:#374151">—</span>';
+
+    const canCheck  = row.status === 'pending' || row.status === 'failed';
+    const checked   = row.selected ? 'checked' : '';
+    const disabled  = !canCheck ? 'disabled' : '';
+
+    return `<tr id="bqrow-${row.id}" style="border-top:1px solid rgba(255,255,255,.04)">
+      <td style="padding:10px 14px">
+        <input type="checkbox" ${checked} ${disabled} onchange="toggleBulkRow('${row.id}',this.checked)"
+          style="accent-color:#a855f7;width:14px;height:14px;cursor:pointer">
+      </td>
+      <td style="padding:10px 14px;font-size:11px;font-weight:700;color:white">${escB(row.company)}</td>
+      <td style="padding:10px 14px;font-size:10px;color:#6b7280">${escB(row.website||'—')}</td>
+      <td style="padding:10px 14px;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;color:${color}">${label}</td>
+      <td style="padding:10px 14px" id="bqdots-${row.id}">${progress}</td>
+    </tr>`;
+  }).join('');
+
+  const btn = document.getElementById('bulk-run-btn');
+  if (btn) btn.textContent = `⚡ Run GTM on Selected (${selected})`;
+}
+
+function toggleBulkRow(id, checked) {
+  const selected = _bulkQueue.filter(r => r.selected).length;
+  const row      = _bulkQueue.find(r => r.id === id);
+  if (!row) return;
+  if (checked && selected >= 10) {
+    const cb = document.querySelector(`#bqrow-${id} input`);
+    if (cb) cb.checked = false;
+    document.getElementById('bulk-run-status').textContent = 'Max 10 companies per batch.';
+    return;
+  }
+  row.selected = checked;
+  document.getElementById('bulk-run-status').textContent = '';
+  renderBulkQueue();
+}
+
+function bulkSelectAll() {
+  let count = 0;
+  _bulkQueue.forEach(r => {
+    r.selected = (r.status === 'pending' || r.status === 'failed') && count < 10;
+    if (r.selected) count++;
+  });
+  renderBulkQueue();
+}
+
+function bulkClearAll() {
+  _bulkQueue.forEach(r => { r.selected = false; });
+  renderBulkQueue();
+}
+
+// ── Run engine ─────────────────────────────────────────────────
+function stopBulkGTM() {
+  _bulkStopped = true;
+  document.getElementById('bulk-run-status').textContent = 'Stopping after current company…';
+}
+
+async function runBulkGTM() {
+  const selected = _bulkQueue.filter(r => r.selected && (r.status === 'pending' || r.status === 'failed'));
+  if (!selected.length) {
+    document.getElementById('bulk-run-status').textContent = 'Select at least one company first.';
+    return;
+  }
+
+  _bulkStopped = false;
+  document.getElementById('bulk-run-btn').style.display  = 'none';
+  document.getElementById('bulk-stop-btn').style.display = 'block';
+  let savedCount = 0, dupCount = 0;
+
+  for (let i = 0; i < selected.length; i++) {
+    if (_bulkStopped) break;
+    const row = selected[i];
+    document.getElementById('bulk-run-status').textContent =
+      `Processing ${i+1} of ${selected.length}: ${row.company}…`;
+
+    const result = await processBulkCompany(row);
+
+    if (result === 'complete')   { savedCount++; removeFromQueue(row.id); }
+    else if (result === 'duplicate') { dupCount++; }
+
+    renderBulkQueue();
+    document.getElementById('bulk-queue-count').textContent = _bulkQueue.length;
+
+    if (i < selected.length - 1 && !_bulkStopped) {
+      await new Promise(r => setTimeout(r, 600));
+    }
+  }
+
+  document.getElementById('bulk-run-btn').style.display  = 'block';
+  document.getElementById('bulk-stop-btn').style.display = 'none';
+
+  let statusMsg = _bulkStopped ? 'Stopped. ' : '';
+  statusMsg += `${savedCount} report${savedCount!==1?'s':''} saved to Strategy Vault.`;
+  if (dupCount > 0) {
+    statusMsg += ` ${dupCount} skipped (already in vault).`;
+    showDedupWarning(dupCount, selected.length);
+  }
+  document.getElementById('bulk-run-status').textContent = statusMsg;
+}
+
+function removeFromQueue(id) {
+  _bulkQueue = _bulkQueue.filter(r => r.id !== id);
+}
+
+function showDedupWarning(dupCount, total) {
+  const modal = document.getElementById('bulk-dedup-modal');
+  document.getElementById('bulk-dedup-msg').textContent =
+    `${dupCount} of ${total} companies already exist in your Strategy Vault and were skipped. ` +
+    `Only new companies are added — existing strategies are preserved.`;
+  modal.style.display = 'flex';
+}
+
+async function processBulkCompany(row) {
+  row.status = 'processing';
+  row.step   = 0;
+  row.error  = '';
+
+  const steps       = {};
+  let   totalTokens = 0;
+  const token       = await getAuthToken();
+
+  for (let step = 1; step <= 6; step++) {
+    if (_bulkStopped) { row.status = 'failed'; row.error = 'Stopped'; return 'stopped'; }
+    try {
+      const res = await fetch('/api/gtm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          action:          'run_step',
+          step,
+          company:         row.company,
+          industry:        '',
+          prior_steps:     steps,
+          company_profile: row.website ? { company_url: row.website } : null,
+        }),
+      });
+
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        throw new Error(e.error || `Step ${step} failed (${res.status})`);
+      }
+
+      const data = await res.json();
+      if (!data.data) throw new Error('No data returned for step ' + step);
+
+      steps[step]   = data.data;
+      totalTokens  += data.tokens || 0;
+      row.step      = step;
+      row.tokens    = totalTokens;
+
+      // Update global token counter
+      _bulkTokens += data.tokens || 0;
+      const disp = document.getElementById('bulk-token-display');
+      if (disp) disp.textContent = _bulkTokens.toLocaleString() + ' tokens used';
+
+      // Update progress dots live
+      const dotsCell = document.getElementById('bqdots-' + row.id);
+      if (dotsCell) {
+        const dots = [1,2,3,4,5,6].map(s =>
+          `<div style="width:9px;height:9px;border-radius:50%;background:${s<=step?'#a855f7':'rgba(255,255,255,.1)'}"></div>`
+        ).join('');
+        dotsCell.innerHTML = `<div style="display:flex;gap:3px;align-items:center">${dots}<span style="font-size:8px;color:#6b7280;margin-left:4px">${step}/6</span></div>`;
+      }
+
+      await new Promise(r => setTimeout(r, 250));
+
+    } catch(e) {
+      row.status = 'failed';
+      row.error  = e.message || 'Unknown error';
+      return 'failed';
+    }
+  }
+
+  // Save to Strategy Vault
+  try {
+    const saveRes = await fetch('/api/gtm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({
+        action:       'save_strategy',
+        company_name: row.company,
+        industry:     steps[1]?.industry || '',
+        company_url:  row.website || null,
+        steps,
+        total_tokens: totalTokens,
+        status:       'complete',
+      }),
+    });
+
+    const saveData = await saveRes.json();
+
+    // Detect duplicate — Supabase returns existing row on conflict
+    if (saveData.error && /duplicate|conflict|already exists/i.test(saveData.error)) {
+      row.status = 'duplicate';
+      return 'duplicate';
+    }
+    if (!saveRes.ok) {
+      row.status = 'failed';
+      row.error  = saveData.error || 'Save failed';
+      return 'failed';
+    }
+
+    row.status = 'complete';
+    return 'complete';
+
+  } catch(e) {
+    row.status = 'failed';
+    row.error  = 'Save error: ' + e.message;
+    return 'failed';
+  }
+}
 </script>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     BULK GTM MODAL
+═══════════════════════════════════════════════════════════════ -->
+<div id="bulk-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(8px);z-index:500;overflow-y:auto;padding:40px 20px">
+  <div style="max-width:760px;margin:0 auto;background:#0D1120;border:1px solid rgba(168,85,247,.3);border-radius:24px;padding:32px">
+
+    <!-- Header -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:24px">
+      <div>
+        <div style="font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.25em;color:#a855f7;margin-bottom:6px">GTM Strategy Builder</div>
+        <div style="font-size:20px;font-weight:900;color:white">⚡ Bulk GTM Generator</div>
+        <div style="font-size:10px;color:#6b7280;margin-top:4px">Upload companies → AI runs all 6 steps → Auto-saves to Strategy Vault</div>
+      </div>
+      <div style="display:flex;align-items:center;gap:12px">
+        <div id="bulk-token-display" style="font-size:9px;font-weight:900;color:#6b7280;text-transform:uppercase;letter-spacing:.12em;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:8px;padding:6px 12px">0 tokens used</div>
+        <button onclick="closeBulkModal()" style="background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:#9ca3af;border-radius:8px;padding:6px 14px;font-size:12px;cursor:pointer">✕</button>
+      </div>
+    </div>
+
+    <!-- Upload zone (shown when no file loaded) -->
+    <div id="bulk-upload-zone"
+      style="border:2px dashed rgba(168,85,247,.35);border-radius:16px;padding:36px;text-align:center;cursor:pointer;transition:all .2s;margin-bottom:20px"
+      onclick="document.getElementById('bulk-file-input').click()"
+      ondragover="event.preventDefault();this.style.borderColor='#a855f7';this.style.background='rgba(168,85,247,.08)'"
+      ondragleave="this.style.borderColor='rgba(168,85,247,.35)';this.style.background=''"
+      ondrop="handleBulkDrop(event)">
+      <div style="font-size:28px;margin-bottom:10px">📂</div>
+      <div style="font-size:13px;font-weight:800;color:white;margin-bottom:6px">Drop CSV or Excel file here</div>
+      <div style="font-size:10px;color:#6b7280">Needs a company name column. Website column optional but improves accuracy.</div>
+      <input type="file" id="bulk-file-input" accept=".csv,.xlsx,.xls" style="display:none" onchange="handleBulkFile(this)">
+    </div>
+
+    <!-- Queue section (shown after file loaded) -->
+    <div id="bulk-queue-section" style="display:none">
+
+      <!-- Queue controls -->
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">
+        <div style="font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.18em;color:#6b7280">
+          <span id="bulk-queue-count">0</span> companies loaded — select up to 10
+        </div>
+        <div style="display:flex;gap:8px">
+          <button onclick="bulkSelectAll()" style="font-size:9px;padding:5px 12px;border-radius:7px;border:1px solid rgba(168,85,247,.4);background:rgba(168,85,247,.1);color:#a855f7;cursor:pointer;font-weight:700">Select 10</button>
+          <button onclick="bulkClearAll()" style="font-size:9px;padding:5px 12px;border-radius:7px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:#6b7280;cursor:pointer;font-weight:700">Clear</button>
+          <button onclick="resetBulkUpload()" style="font-size:9px;padding:5px 12px;border-radius:7px;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.04);color:#6b7280;cursor:pointer;font-weight:700">↑ New File</button>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div style="background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.06);border-radius:14px;overflow:hidden;margin-bottom:16px">
+        <table style="width:100%;border-collapse:collapse">
+          <thead>
+            <tr style="background:rgba(0,0,0,.5)">
+              <th style="width:5%;padding:10px 14px;text-align:left;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.15em;color:#6b7280"></th>
+              <th style="width:35%;padding:10px 14px;text-align:left;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.15em;color:#6b7280">Company</th>
+              <th style="width:28%;padding:10px 14px;text-align:left;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.15em;color:#6b7280">Website</th>
+              <th style="width:14%;padding:10px 14px;text-align:left;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.15em;color:#6b7280">Status</th>
+              <th style="width:18%;padding:10px 14px;text-align:left;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.15em;color:#6b7280">Progress</th>
+            </tr>
+          </thead>
+          <tbody id="bulk-queue-body"></tbody>
+        </table>
+      </div>
+
+      <!-- Run controls -->
+      <div style="display:flex;gap:10px;align-items:center">
+        <button id="bulk-run-btn" onclick="runBulkGTM()"
+          style="background:linear-gradient(135deg,#a855f7,#7c3aed);color:white;border:none;border-radius:10px;padding:11px 24px;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.12em;cursor:pointer">
+          ⚡ Run GTM on Selected (0)
+        </button>
+        <button id="bulk-stop-btn" onclick="stopBulkGTM()"
+          style="display:none;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#ef4444;border-radius:10px;padding:11px 24px;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.12em;cursor:pointer">
+          ⏹ Stop
+        </button>
+        <div id="bulk-run-status" style="font-size:10px;color:#6b7280;font-weight:700;flex:1"></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Dedup warning modal -->
+<div id="bulk-dedup-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:600;display:none;align-items:center;justify-content:center">
+  <div style="background:#0D1120;border:1px solid rgba(245,158,11,.4);border-radius:20px;padding:28px 32px;max-width:440px;text-align:center">
+    <div style="font-size:24px;margin-bottom:12px">⚠️</div>
+    <div style="font-size:13px;font-weight:900;color:white;margin-bottom:8px">Duplicate Detected</div>
+    <div id="bulk-dedup-msg" style="font-size:11px;color:#9ca3af;line-height:1.6;margin-bottom:20px"></div>
+    <button onclick="document.getElementById('bulk-dedup-modal').style.display='none'"
+      style="background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.4);color:#f59e0b;border-radius:8px;padding:8px 20px;font-size:10px;font-weight:900;cursor:pointer;text-transform:uppercase;letter-spacing:.1em">
+      OK, Got It
+    </button>
+  </div>
+</div>
 
 </body>
 </html>
