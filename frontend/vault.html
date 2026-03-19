@@ -26,16 +26,16 @@
     }
 
     /* NAV */
-    #topnav { position: sticky; top: 0; z-index: 100; background: rgba(11,15,26,0.95); backdrop-filter: blur(24px); border-bottom: 1px solid rgba(31,41,55,0.6); padding: 0 20px; display: flex; align-items: center; justify-content: space-between; height: 58px; gap: 12px; min-width: 0; }
-    .nav-brand { display: flex; align-items: center; gap: 8px; text-decoration: none; flex-shrink: 0; }
+    #topnav { position: sticky; top: 0; z-index: 100; background: rgba(11,15,26,0.95); backdrop-filter: blur(24px); border-bottom: 1px solid rgba(31,41,55,0.6); padding: 0 16px; display: flex; align-items: center; justify-content: space-between; height: 54px; gap: 8px; min-width: 0; overflow: hidden; }
+    .nav-brand { display: flex; align-items: center; gap: 6px; text-decoration: none; flex-shrink: 0; min-width: 0; }
     .nav-mark { width: 32px; height: 32px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-family: 'Space Mono', monospace; font-size: 11px; font-weight: 700; color: white; }
     .nav-brand-name { font-size: 11px; font-weight: 800; color: white; }
-    .nav-brand-sub { font-size: 8px; color: var(--muted); letter-spacing: 0.14em; text-transform: uppercase; }
-    .nav-tabs { display: flex; align-items: center; gap: 2px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 10px; padding: 4px; flex-shrink: 1; min-width: 0; }
-    .nav-tab { font-size: 9px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); padding: 5px 10px; border-radius: 7px; cursor: pointer; text-decoration: none; transition: all 0.15s; border: none; background: none; white-space: nowrap; }
+    .nav-brand-sub { font-size: 7px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; display: none; }
+    .nav-tabs { display: flex; align-items: center; gap: 0; flex-shrink: 1; min-width: 0; overflow: visible; background: none; border: none; }
+    .nav-tab { font-size: 9px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); padding: 6px 10px; cursor: pointer; text-decoration: none; transition: all 0.15s; border: none; background: none; white-space: nowrap; border-bottom: 2px solid transparent; }
     .nav-tab:hover { color: white; background: rgba(255,255,255,0.04); }
-    .nav-tab.active { color: white; background: rgba(168,85,247,0.12); border: 1px solid rgba(168,85,247,0.25); }
-    .nav-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    .nav-tab.active { color: white; background: none; border-bottom: 2px solid var(--accent); }
+    .nav-right { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
     .btn { display: inline-flex; align-items: center; gap: 7px; padding: 8px 18px; font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; border-radius: 8px; cursor: pointer; border: none; transition: all 0.15s; text-decoration: none; }
     .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: white; }
     .btn-primary:hover { opacity: .9; transform: translateY(-1px); }
@@ -483,6 +483,34 @@ async function openDrawer(strategyId) {
   }
 }
 
+async function deleteStrategy(strategyId, companyName) {
+  if (!confirm(`Delete the GTM strategy for "${companyName}"?\nThis cannot be undone.`)) return;
+  try {
+    const res = await apiCall('/api/gtm', { action: 'delete_strategy', strategy_id: strategyId });
+    if (res.error) throw new Error(res.error);
+    closeDrawer();
+    showVaultToast(`"${companyName}" deleted from vault`);
+    setTimeout(() => loadVault(), 500);
+  } catch(e) {
+    showVaultToast('Delete failed: ' + e.message, true);
+  }
+}
+
+function showVaultToast(msg, isError) {
+  let t = document.getElementById('vault-toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'vault-toast';
+    t.style.cssText = 'position:fixed;bottom:24px;right:24px;background:rgba(18,24,39,.97);border:1px solid rgba(168,85,247,.4);border-radius:10px;padding:12px 18px;font-size:11px;color:white;font-weight:700;z-index:999;transition:opacity .3s;max-width:320px;line-height:1.5';
+    document.body.appendChild(t);
+  }
+  t.innerHTML = msg;
+  t.style.borderColor = isError ? 'rgba(239,68,68,.4)' : 'rgba(168,85,247,.4)';
+  t.style.opacity = '1';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => { t.style.opacity = '0'; }, 4000);
+}
+
 function escDQ(str) {
   return String(str || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
 }
@@ -507,9 +535,9 @@ function saveVaultAction(strategyId, action) {
 }
 
 async function sendToLeadManager(strategyId, companyName, industry, primaryIcp, website) {
-  const btn = event.target;
-  btn.disabled    = true;
-  btn.textContent = '⏳ Sending…';
+  // Use the button that triggered this — find it reliably via strategyId
+  const btn = document.querySelector(`[data-send-id="${strategyId}"]`) || event?.currentTarget || event?.target;
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Sending…'; }
 
   try {
     const token = await window.APP.token();
@@ -520,43 +548,47 @@ async function sendToLeadManager(strategyId, companyName, industry, primaryIcp, 
         action:      'import',
         source_type: 'vault',
         source_file: 'Strategy Vault — ' + companyName,
+        // Pass field_mapping explicitly so AI detection is skipped — we know the field names
+        field_mapping: { name: 'name', company: 'company', website: 'website', industry: 'industry', title: 'title' },
         leads: [{
           name:     companyName,
           company:  companyName,
-          website:  website  || '',
-          industry: industry || '',
+          website:  website   || '',
+          industry: industry  || '',
           title:    'Account (from GTM Strategy)',
-          tags:     ['Strategy Vault', 'GTM Analyzed'],
           notes:    primaryIcp ? 'ICP: ' + primaryIcp : '',
         }],
       }),
     });
 
     const data = await res.json();
-    if (!res.ok) throw new Error(data.error || 'Import failed');
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
 
-    btn.textContent      = '✓ Sent';
-    btn.style.color      = '#22c55e';
-    btn.style.background = 'rgba(34,197,94,.1)';
+    if (btn) {
+      btn.textContent      = '✓ Saved to Lead Manager';
+      btn.style.color      = '#22c55e';
+      btn.style.background = 'rgba(34,197,94,.1)';
+      btn.style.borderColor = 'rgba(34,197,94,.4)';
+    }
 
-    // Offer navigation to Lead Manager
-    setTimeout(() => {
-      if (confirm(`"${companyName}" added to Lead Manager.\n\nGo to Lead Manager now?`)) {
-        window.location.href = 'leads.html';
-      } else {
-        btn.disabled    = false;
-        btn.textContent = '→ Lead Manager';
-        btn.style.color = '';
-        btn.style.background = '';
-      }
-    }, 600);
+    // Show non-blocking toast with link — no confirm() dialog
+    showVaultToast(
+      `"${companyName}" added to Lead Manager — <a href="leads.html" style="color:#a855f7;font-weight:900">View now →</a>`
+    );
 
   } catch(e) {
-    btn.disabled    = false;
-    btn.textContent = '→ Lead Manager';
-    alert('Failed to send to Lead Manager: ' + e.message);
+    console.error('sendToLeadManager error:', e);
+    if (btn) {
+      btn.disabled    = false;
+      btn.textContent = '→ Lead Manager';
+      btn.style.color = '';
+      btn.style.background = '';
+    }
+    showVaultToast('Failed: ' + e.message, true);
   }
 }
+
+
 
 function closeDrawer() {
   document.getElementById('strategy-drawer').classList.remove('open');
@@ -574,7 +606,8 @@ function renderDrawer(s) {
     <button class="btn btn-outline btn-sm" onclick="exportStrategy('${s.id}')">⬇ PDF</button>
     <button class="btn btn-outline btn-sm" onclick="copyStrategyText('${s.id}')">📋 Copy</button>
     <a href="gtm-strategy.html?resume=${s.id}" class="btn btn-outline btn-sm">↻ Re-run</a>
-    <button class="btn btn-outline btn-sm" onclick="sendToLeadManager('${s.id}','${escDQ(s.company_name)}','${escDQ(s.industry||'')}','${escDQ(s.step_3_icp?.primary_icp||'')}','${escDQ(s.company_url||'')}')" style="color:#22c55e;border-color:rgba(34,197,94,.4)">→ Lead Manager</button>
+    <button class="btn btn-outline btn-sm" data-send-id="${s.id}" onclick="sendToLeadManager('${s.id}','${escDQ(s.company_name)}','${escDQ(s.industry||'')}','${escDQ(s.primary_icp||'')}','${escDQ(s.company_url||'')}')" style="color:#22c55e;border-color:rgba(34,197,94,.4)">→ Lead Manager</button>
+    <button class="btn btn-ghost btn-sm" onclick="deleteStrategy('${s.id}','${escDQ(s.company_name)}')" style="color:var(--red)" title="Delete strategy">🗑</button>
   `;
 
   // Action tracking section
