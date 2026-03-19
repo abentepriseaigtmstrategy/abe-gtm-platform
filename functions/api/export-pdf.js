@@ -130,14 +130,18 @@ body{font-family:Helvetica,Arial,sans-serif;color:#111827;background:#fff;-webki
   color:white;
   padding:0;
   page-break-after:always;
-  min-height:297mm;
+  /* 1100px = A4 at 96dpi (1122px) minus 22px safety margin.
+     Ensures page-break-after:always never catches cfoot at the exact slice edge. */
+  height:1100px;
   display:flex;
   flex-direction:column;
   position:relative;
   overflow:hidden;
 }
 .cover-accent-bar{height:6px;background:linear-gradient(90deg,#a855f7,#7c3aed,#4f46e5);flex-shrink:0}
-.cover-body{padding:40px 48px;flex:1;display:flex;flex-direction:column;justify-content:space-between}
+/* cover-body: flex column only. cfoot is position:absolute so it never relies on
+   flex space-between which was causing the footer to land exactly at the page-slice boundary. */
+.cover-body{padding:40px 48px 0;flex:1;display:flex;flex-direction:column;}
 .cover-grid{position:absolute;inset:0;background-image:linear-gradient(rgba(168,85,247,.04) 1px,transparent 1px),linear-gradient(90deg,rgba(168,85,247,.04) 1px,transparent 1px);background-size:40px 40px;pointer-events:none}
 .clogo-row{display:flex;align-items:center;gap:10px;margin-bottom:56px}
 .clogo-mark{width:34px;height:34px;background:linear-gradient(135deg,#a855f7,#7c3aed);border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:12px;color:white;flex-shrink:0}
@@ -147,15 +151,17 @@ body{font-family:Helvetica,Arial,sans-serif;color:#111827;background:#fff;-webki
 .ctitle span{color:#a855f7}
 .cco{font-size:20px;color:#a855f7;font-weight:700;margin-bottom:6px}
 .cind{font-size:11px;color:#6b7280;font-weight:600;text-transform:uppercase;letter-spacing:.15em;margin-bottom:44px}
-.cstats{display:flex;gap:16px;margin-bottom:44px;flex-wrap:wrap}
+.cstats{display:flex;gap:16px;margin-bottom:0;flex-wrap:wrap}
 .cstat{flex:1;min-width:80px;text-align:center;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.1);border-radius:12px;padding:16px 12px}
 .csn{font-size:24px;font-weight:900;font-family:monospace;color:white;line-height:1}
 .csl{font-size:7px;text-transform:uppercase;letter-spacing:.18em;color:#6b7280;margin-top:6px}
-.cfoot{font-size:8px;color:#374151;border-top:1px solid rgba(255,255,255,.08);padding-top:14px}
+/* cfoot: position:absolute at bottom of cover (cover has position:relative).
+   This is reliable regardless of content height — never hits the page-slice boundary. */
+.cfoot{position:absolute;bottom:28px;left:48px;right:48px;font-size:8px;color:#6b7280;border-top:1px solid rgba(255,255,255,.08);padding-top:14px}
 .cconf{display:inline-block;padding:3px 8px;background:rgba(168,85,247,.15);border:1px solid rgba(168,85,247,.3);border-radius:4px;color:#a855f7;font-size:7px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;margin-bottom:6px}
 
 /* ── Page header (repeated on content pages) ── */
-.page-hdr{background:#0B0F1A;padding:8px 40px;display:flex;justify-content:space-between;align-items:center;page-break-inside:avoid}
+.page-hdr{background:#0B0F1A;padding:8px 40px;display:flex;justify-content:space-between;align-items:center;page-break-inside:avoid;page-break-after:avoid}
 .page-hdr-l{font-size:7px;font-weight:700;text-transform:uppercase;letter-spacing:.2em;color:#6b7280}
 .page-hdr-r{font-size:7px;color:#6b7280;font-family:monospace}
 .page-hdr-accent{height:2px;background:linear-gradient(90deg,#a855f7,transparent)}
@@ -199,7 +205,7 @@ body{font-family:Helvetica,Arial,sans-serif;color:#111827;background:#fff;-webki
 .ec{font-size:10px;font-weight:700;color:#7c3aed;margin-top:10px;padding-top:10px;border-top:1px solid #e5e7eb}
 
 /* ── Footer bar ── */
-.fbar{background:#0B0F1A;color:#374151;font-size:7.5px;text-align:center;padding:10px 40px;page-break-inside:avoid;display:flex;justify-content:space-between;align-items:center}
+.fbar{background:#0B0F1A;color:#374151;font-size:7.5px;text-align:center;padding:10px 40px;page-break-before:avoid;display:flex;justify-content:space-between;align-items:center}
 .fbar span{color:#a855f7}
 </style>
 </head>
@@ -228,40 +234,39 @@ body{font-family:Helvetica,Arial,sans-serif;color:#111827;background:#fff;-webki
         <div class="cstat"><div class="csn">${strategy.steps_completed || 6}/6</div><div class="csl">Steps Done</div></div>
       </div>
     </div>
-    <div class="cfoot">
-      <div class="cconf">Confidential</div>
-      <div>Generated ${date} &nbsp;·&nbsp; ABE Enterprise AI Revenue Infrastructure &nbsp;·&nbsp; GTM Strategy Platform</div>
-    </div>
+  </div>
+  <!-- cfoot: direct child of .cover, positioned absolute at bottom of the 1100px cover div.
+       Sibling of cover-body (not inside it) so the flex layout never pushes it
+       to the exact page-slice boundary. -->
+  <div class="cfoot">
+    <div class="cconf">Confidential</div>
+    <div>Generated ${date} &nbsp;·&nbsp; ABE Enterprise AI Revenue Infrastructure &nbsp;·&nbsp; GTM Strategy Platform</div>
   </div>
 </div>
 
 <!-- ═══════════ CONTENT PAGES ═══════════ -->
-<!-- FIX blank page 2: page-hdr was rendering alone (30px) after cover's page-break-after:always.
-     Wrapping hdr + sections 01/02 together prevents the orphaned header page. -->
-<div style="page-break-inside:avoid">
-  <div class="page-hdr">
-    <div class="page-hdr-l">ABE GTM Strategy Intelligence Report &nbsp;·&nbsp; ${e(strategy.company_name)}</div>
-    <div class="page-hdr-r">${date}</div>
-  </div>
-  <div class="page-hdr-accent"></div>
-
-  ${section('01', 'Market Research & Company Overview',
-    field('Company Overview', s1.company_overview) +
-    field('Market Position', s1.market_position) +
-    field('GTM Relevance Reasoning', s1.gtm_relevance_reasoning) +
-    tags('Growth Signals', s1.growth_signals, 'g') +
-    tags('Tech Stack Hints', s1.tech_stack_hints, 'b')
-  )}
-
-  ${s2.tam_overview ? section('02', 'TAM Mapping & Market Sizing',
-    `<div class="g2">
-      <div class="mc green"><div class="mn">${e(s2.tam_size_estimate || '—')}</div><div class="ml">Total Addressable Market</div></div>
-      <div class="mc amber"><div class="mn">${e(s2.growth_rate || '—')}</div><div class="ml">CAGR / Growth Rate</div></div>
-    </div>` +
-    field('TAM Overview', s2.tam_overview, '#22c55e') +
-    field('Priority Opportunities', s2.priority_opportunities)
-  ) : ''}
+<div class="page-hdr">
+  <div class="page-hdr-l">ABE GTM Strategy Intelligence Report &nbsp;·&nbsp; ${e(strategy.company_name)}</div>
+  <div class="page-hdr-r">${date}</div>
 </div>
+<div class="page-hdr-accent"></div>
+
+${section('01', 'Market Research & Company Overview',
+  field('Company Overview', s1.company_overview) +
+  field('Market Position', s1.market_position) +
+  field('GTM Relevance Reasoning', s1.gtm_relevance_reasoning) +
+  tags('Growth Signals', s1.growth_signals, 'g') +
+  tags('Tech Stack Hints', s1.tech_stack_hints, 'b')
+)}
+
+${s2.tam_overview ? section('02', 'TAM Mapping & Market Sizing',
+  `<div class="g2">
+    <div class="mc green"><div class="mn">${e(s2.tam_size_estimate || '—')}</div><div class="ml">Total Addressable Market</div></div>
+    <div class="mc amber"><div class="mn">${e(s2.growth_rate || '—')}</div><div class="ml">CAGR / Growth Rate</div></div>
+  </div>` +
+  field('TAM Overview', s2.tam_overview, '#22c55e') +
+  field('Priority Opportunities', s2.priority_opportunities)
+) : ''}
 
 ${s3.primary_icp ? `<div class="pb">` + section('03', 'Ideal Customer Profile (ICP)',
   field('Primary ICP Definition', s3.primary_icp) +
@@ -279,12 +284,12 @@ ${s4.sourcing_playbook ? section('04', 'Account Sourcing Strategy',
   field('Exclusion Criteria', s4.exclusion_criteria, '#ef4444')
 ) : ''}
 
-${s5.primary_keywords ? `<div class="pb">` + section('05', 'Intent Keywords & Boolean Search',
+${s5.primary_keywords ? section('05', 'Intent Keywords & Boolean Search',
   tags('Primary Keywords', s5.primary_keywords, 'g') +
   tags('Secondary Keywords', s5.secondary_keywords, 'b') +
   field('Boolean Query String', s5.boolean_query, '#7c3aed', true) +
   field('LinkedIn Search String', s5.linkedin_search_strings, '#0077b5')
-) + `</div>` : ''}
+) : ''}
 
 ${s6.email_1 ? `<div class="pb">` + section('06', 'Outreach Messaging & Email Sequences',
   ['email_1','email_2','email_3'].map(k => {
@@ -298,14 +303,14 @@ ${s6.email_1 ? `<div class="pb">` + section('06', 'Outreach Messaging & Email Se
     </div>`;
   }).join('') +
   field('Follow-up Sequence', s6.follow_up_sequence) +
-  field('LinkedIn Message', s6.linkedin_message, '#0077b5')
+  field('LinkedIn Message', s6.linkedin_message, '#0077b5') +
+  // End-of-report marker: inline inside section 06 so it ALWAYS flows on the same page
+  // as the last section content. A standalone fbar block always orphans to a new page
+  // when section 06 fills the page — html2pdf has no support for running footer elements.
+  `<div style="text-align:center;padding:20px 0 6px;margin-top:8px;border-top:1px solid #f3f4f6;color:#9ca3af;font-size:8px;letter-spacing:.08em">
+    ${e(strategy.company_name)} &nbsp;·&nbsp; GTM Strategy Intelligence Report &nbsp;·&nbsp; ${date} &nbsp;·&nbsp; Confidential &nbsp;·&nbsp; ABE Enterprise AI Revenue Infrastructure
+  </div>`
 ) + `</div>` : ''}
-
-<div class="fbar">
-  <span>${e(strategy.company_name)}</span>
-  <span>GTM Strategy Intelligence Report &nbsp;·&nbsp; ${date} &nbsp;·&nbsp; Confidential</span>
-  <span>ABE Enterprise AI Revenue Infrastructure</span>
-</div>
 
 </body>
 </html>`;
