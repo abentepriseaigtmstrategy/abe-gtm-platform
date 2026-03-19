@@ -2737,6 +2737,7 @@ function closeBulkModal() { document.getElementById('bulk-modal').style.display 
 function resetBulkUpload() {
   document.getElementById('bulk-upload-zone').style.display  = 'block';
   document.getElementById('bulk-queue-section').style.display = 'none';
+  document.getElementById('bulk-footer').style.display        = 'none';
   document.getElementById('bulk-file-input').value = '';
   _bulkQueue = [];
 }
@@ -2781,6 +2782,7 @@ function readBulkFile(file) {
     document.getElementById('bulk-queue-count').textContent = _bulkQueue.length;
     document.getElementById('bulk-upload-zone').style.display   = 'none';
     document.getElementById('bulk-queue-section').style.display = 'block';
+    document.getElementById('bulk-footer').style.display        = 'block';
     renderBulkQueue();
   };
 
@@ -2922,6 +2924,8 @@ async function runBulkGTM() {
   _bulkStopped = false;
   document.getElementById('bulk-run-btn').style.display  = 'none';
   document.getElementById('bulk-stop-btn').style.display = 'block';
+  // Lock all checkboxes during processing
+  document.querySelectorAll('#bulk-queue-body input[type=checkbox]').forEach(cb => cb.disabled = true);
   let savedCount = 0, dupCount = 0;
   const total = selected.length;
 
@@ -2952,6 +2956,11 @@ async function runBulkGTM() {
 
   document.getElementById('bulk-run-btn').style.display  = 'block';
   document.getElementById('bulk-stop-btn').style.display = 'none';
+  // Re-enable checkboxes for pending/failed rows
+  document.querySelectorAll('#bulk-queue-body input[type=checkbox]').forEach(cb => {
+    const row = _bulkQueue.find(r => document.getElementById('bqrow-' + r.id)?.contains(cb));
+    cb.disabled = !(row && (row.status === 'pending' || row.status === 'failed'));
+  });
 
   let statusMsg = _bulkStopped
     ? `Stopped — ${savedCount} of ${total} saved to Strategy Vault.`
@@ -3080,7 +3089,7 @@ async function processBulkCompany(row) {
      BULK GTM MODAL
 ═══════════════════════════════════════════════════════════════ -->
 <div id="bulk-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);backdrop-filter:blur(8px);z-index:500;display:none;align-items:center;justify-content:center;padding:20px">
-  <div style="max-width:760px;width:100%;max-height:90vh;background:#0D1120;border:1px solid rgba(168,85,247,.3);border-radius:24px;display:flex;flex-direction:column;overflow:hidden">
+  <div style="max-width:960px;width:100%;max-height:92vh;background:#0D1120;border:1px solid rgba(168,85,247,.3);border-radius:24px;display:flex;flex-direction:column;overflow:hidden">
 
     <div style="padding:28px 28px 0;flex-shrink:0">
     <!-- Header -->
@@ -3142,7 +3151,11 @@ async function processBulkCompany(row) {
         </table>
       </div>
 
-      <!-- Run controls -->
+    </div><!-- /queue section -->
+    </div><!-- /bulk-modal-body -->
+
+    <!-- Sticky footer — always visible, never scrolls out of view -->
+    <div id="bulk-footer" style="display:none;flex-shrink:0;padding:16px 28px;border-top:1px solid rgba(255,255,255,.08);background:#0D1120;border-radius:0 0 24px 24px">
       <div style="display:flex;gap:10px;align-items:center">
         <button id="bulk-run-btn" onclick="runBulkGTM()"
           style="background:linear-gradient(135deg,#a855f7,#7c3aed);color:white;border:none;border-radius:10px;padding:11px 24px;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.12em;cursor:pointer">
@@ -3155,8 +3168,6 @@ async function processBulkCompany(row) {
         <div id="bulk-run-status" style="font-size:10px;color:#6b7280;font-weight:700;flex:1"></div>
       </div>
     </div>
-
-    </div><!-- /bulk-modal-body -->
   </div>
 </div>
 
