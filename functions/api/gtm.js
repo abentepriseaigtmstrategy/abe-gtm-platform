@@ -416,7 +416,14 @@ function buildStepPrompt(step, company, industry, priorSteps, companyProfile) {
     1:`${base}${profileBlock}
 Perform deep market research on "${company}"${ind}.${hasProfile ? ' Use the verified profile as your primary source.' : ''}
 
-Return:{"company_overview":"2-3 sentences","market_position":"competitive position","products_services":"main offerings","gtm_relevance_score":85,"gtm_relevance_reasoning":"why good/bad target","growth_signals":["s1","s2","s3"],"revenue_stage":"e.g. Series B","employee_count":"range","tech_stack_hints":["hint1"]}`,
+Score this company as an ABE GTM target (0-100) using this rubric:
+90-100: Large IT services/consulting firm, clear need for AI revenue platforms, strong growth signals
+70-89: Mid-size IT/SaaS/consulting company, likely needs GTM intelligence tools
+50-69: Partial fit — some IT/tech element but not core GTM buyer
+30-49: Weak fit — wrong industry or too small/large
+0-29: No fit — B2C, retail, hospitality, government, or irrelevant sector
+Be precise — different companies must get different scores. Do NOT default to 85.
+Return:{"company_overview":"2-3 sentences","market_position":"competitive position","products_services":"main offerings","gtm_relevance_score":<integer 0-100 based on rubric above>,"gtm_relevance_reasoning":"specific reasoning for this exact score","growth_signals":["s1","s2","s3"],"revenue_stage":"e.g. Series B","employee_count":"range","tech_stack_hints":["hint1"]}`,
 
     2:`${base}${profileBlock}
 TAM mapping for companies selling TO/partnering with "${company}"${ind}.
@@ -513,7 +520,7 @@ async function scoreBatch(leads, icpCtx, openaiKey) {
 ${icpCtx?`ICP:\n${icpCtx}\n`:''}
 Leads:
 ${leads.map((l,i)=>`${i}. ${l.name||'?'} | ${l.title||'?'} | ${l.company||'?'}`).join('\n')}
-Return ONLY JSON array: [{"index":0,"score":85,"priority":"HIGH","reason":"one sentence"},...] Priority: HIGH(≥75) MEDIUM(50-74) LOW(<50)`;
+Return ONLY JSON array: [{"index":0,"score":<integer 0-100>,"priority":"HIGH|MEDIUM|LOW","reason":"one sentence"},...] Priority: HIGH(≥75) MEDIUM(50-74) LOW(<50). Score each lead individually based on their actual title and company — do NOT use the same score for all leads.`;
 
   try {
     const res = await fetch('https://api.openai.com/v1/chat/completions', {
