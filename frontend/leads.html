@@ -305,6 +305,51 @@
   </div>
 </div>
 
+<!-- LEAD DETAIL DRAWER -->
+<div id="lead-drawer" style="position:fixed;top:0;right:-520px;width:500px;height:100vh;
+  background:#0D1120;border-left:1px solid var(--border);z-index:400;
+  display:flex;flex-direction:column;transition:right .3s cubic-bezier(.4,0,.2,1);
+  box-shadow:-8px 0 32px rgba(0,0,0,.5);overflow:hidden">
+  <!-- Header -->
+  <div style="padding:20px 24px 16px;border-bottom:1px solid var(--border);flex-shrink:0">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
+      <div style="font-size:9px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--accent)">Lead Intelligence</div>
+      <button onclick="closeDrawer()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;padding:2px 6px">&times;</button>
+    </div>
+    <div id="drawer-name" style="font-size:18px;font-weight:900;color:white;margin-bottom:2px">—</div>
+    <div id="drawer-meta" style="font-size:11px;color:var(--muted)">—</div>
+  </div>
+  <!-- Score strip -->
+  <div id="drawer-scores" style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);flex-shrink:0">
+    <div style="background:#0D1120;padding:12px 16px;text-align:center">
+      <div id="ds-icp" style="font-size:20px;font-weight:900;font-family:'Space Mono',monospace;color:var(--accent)">—</div>
+      <div style="font-size:8px;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-top:2px">ICP Score</div>
+    </div>
+    <div style="background:#0D1120;padding:12px 16px;text-align:center">
+      <div id="ds-priority" style="font-size:20px;font-weight:900;font-family:'Space Mono',monospace;color:var(--green)">—</div>
+      <div style="font-size:8px;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-top:2px">Priority</div>
+    </div>
+    <div style="background:#0D1120;padding:12px 16px;text-align:center">
+      <div id="ds-outreach" style="font-size:20px;font-weight:900;font-family:'Space Mono',monospace;color:var(--blue)">—</div>
+      <div style="font-size:8px;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-top:2px">Outreach</div>
+    </div>
+  </div>
+  <!-- Tabs -->
+  <div style="display:flex;border-bottom:1px solid var(--border);flex-shrink:0">
+    <button class="dtab active" onclick="switchTab('details')" id="tab-details" style="flex:1;padding:10px;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;border:none;background:none;cursor:pointer;color:var(--accent);border-bottom:2px solid var(--accent)">Details</button>
+    <button class="dtab" onclick="switchTab('outreach')" id="tab-outreach" style="flex:1;padding:10px;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;border:none;background:none;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent">Outreach</button>
+    <button class="dtab" onclick="switchTab('ai')" id="tab-ai" style="flex:1;padding:10px;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;border:none;background:none;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent">⚡ AI Chat</button>
+  </div>
+  <!-- Body -->
+  <div id="drawer-body" style="flex:1;overflow-y:auto;padding:20px 24px"></div>
+  <!-- Footer actions -->
+  <div id="drawer-footer" style="padding:14px 24px;border-top:1px solid var(--border);display:flex;gap:8px;flex-shrink:0">
+    <button class="btn btn-outline" style="flex:1;font-size:9px" onclick="drawerScore()">⚡ Score</button>
+    <button class="btn btn-primary" style="flex:1;font-size:9px" onclick="drawerOutreach()">✉ Generate Outreach</button>
+  </div>
+</div>
+<div id="drawer-overlay" onclick="closeDrawer()" style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:399;display:none"></div>
+
 <div id="toast">✓ <span id="toast-msg"></span></div>
 
 <script>
@@ -389,12 +434,12 @@ function renderTable(leads) {
     const outreach    = l.outreach_status || 'not_sent';
     // Show "—" when lead has no title — score of 32 on empty data is misleading
     const hasData    = !!(l.title || l.company);
-    const icpDisplay = (icp !== null && hasData) ? `${icp}%` : '—';
-    const icpClass   = (icp !== null && hasData) ? `priority-${icp>=75?'HIGH':icp>=50?'MEDIUM':'LOW'}` : '';
+    const icpDisplay = (icp !== null && hasData) ? `${icp}%` : (icp !== null ? `${icp}%` : '—');
+    const icpClass   = (icp !== null) ? `priority-${icp>=75?'HIGH':icp>=50?'MEDIUM':'LOW'}` : '';
     return `
     <tr id="row-${l.id}">
       <td><input type="checkbox" class="ck row-ck" value="${l.id}" onchange="toggleRow(this)"></td>
-      <td class="font-bold" style="color:white;font-weight:700">${esc(l.name||'—')}</td>
+      <td class="font-bold" style="color:white;font-weight:700;cursor:pointer" onclick="openDrawer('${l.id}')" title="View details">${esc(l.name||'—')}</td>
       <td style="color:#c4b5fd">${esc(l.company||'—')}</td>
       <td>${esc(l.title||'—')}</td>
       <td class="${icpClass}" style="color:${icp===null?'var(--muted)':'inherit'}">${icpDisplay}</td>
@@ -483,13 +528,19 @@ async function generateOutreach() {
 }
 async function genOutreach(leadId) {
   const token = await getToken();
-  showToast('Generating personalised outreach…');
+  showToast('Generating outreach…');
   try {
     const res = await api('/api/leads', { action: 'generate_outreach', lead_id: leadId }, token);
-    const o = res.outreach;
-    alert(`✉ Outreach for ${res.lead_name}\n\nSUBJECT: ${o.email?.subject}\n\n${o.email?.body}\n\nCTA: ${o.email?.cta}\n\n─\n\nLinkedIn: ${o.linkedin?.connection_note}`);
+    const idx = _leads.findIndex(l => l.id === leadId);
+    if (idx >= 0) {
+      _leads[idx].outreach_email    = res.outreach?.email?.body || _leads[idx].outreach_email;
+      _leads[idx].outreach_linkedin = res.outreach?.linkedin?.connection_note || _leads[idx].outreach_linkedin;
+      _leads[idx].gtm_analysis      = res.outreach;
+    }
+    renderTable(_leads);
+    openDrawer(leadId);
+    setTimeout(() => switchTab('outreach'), 150);
     showToast('Outreach generated ✓', 'success');
-    loadLeads();
   } catch(e) { showToast(e.message, 'error'); }
 }
 
@@ -707,6 +758,290 @@ async function confirmImport() {
     btn.disabled = false;
     btn.textContent = 'Import Leads';
   }
+}
+
+/* ─── Lead Detail Drawer ─────────────────────── */
+let _drawerLead = null;
+let _drawerTab  = 'details';
+let _aiHistory  = [];
+
+function openDrawer(leadId) {
+  // Try current page first, fall back to API fetch
+  const lead = _leads.find(l => l.id === leadId);
+  if (lead) {
+    _populateDrawer(lead);
+  } else {
+    // Lead not in current page — fetch it
+    getToken().then(token =>
+      api('/api/leads', { action: 'get_leads', search: leadId, limit: 1 }, token)
+        .then(res => { if (res.leads?.[0]) _populateDrawer(res.leads[0]); })
+        .catch(() => showToast('Could not load lead details', 'error'))
+    );
+  }
+}
+
+function _populateDrawer(lead) {
+  _drawerLead = lead;
+  _aiHistory  = [];
+
+  document.getElementById('drawer-name').textContent = lead.name || '—';
+  document.getElementById('drawer-meta').textContent =
+    [lead.title, lead.company, lead.location].filter(Boolean).join(' · ') || '—';
+
+  const icp = lead.icp_score;
+  document.getElementById('ds-icp').textContent      = icp != null ? icp + '%' : '—';
+  document.getElementById('ds-icp').style.color      = icp >= 75 ? 'var(--green)' : icp >= 50 ? 'var(--amber)' : icp != null ? 'var(--red)' : 'var(--muted)';
+  document.getElementById('ds-priority').textContent = lead.priority || '—';
+  document.getElementById('ds-priority').style.color = lead.priority === 'HIGH' ? 'var(--green)' : lead.priority === 'MEDIUM' ? 'var(--amber)' : 'var(--muted)';
+  document.getElementById('ds-outreach').textContent = (lead.outreach_status || 'not sent').replace('_',' ');
+
+  switchTab('details');
+
+  document.getElementById('lead-drawer').style.right = '0';
+  document.getElementById('drawer-overlay').style.display = 'block';
+  document.body.style.overflow = 'hidden';
+}
+
+function closeDrawer() {
+  document.getElementById('lead-drawer').style.right = '-520px';
+  document.getElementById('drawer-overlay').style.display = 'none';
+  document.body.style.overflow = '';
+  _drawerLead = null;
+}
+
+function switchTab(tab) {
+  _drawerTab = tab;
+  ['details','outreach','ai'].forEach(t => {
+    const btn = document.getElementById('tab-' + t);
+    if (btn) {
+      btn.style.color = t === tab ? 'var(--accent)' : 'var(--muted)';
+      btn.style.borderBottom = t === tab ? '2px solid var(--accent)' : '2px solid transparent';
+    }
+  });
+  if (tab === 'details')  renderDrawerDetails();
+  if (tab === 'outreach') renderDrawerOutreach();
+  if (tab === 'ai')       renderDrawerAI();
+}
+
+function dField(label, value, accent) {
+  if (!value || value === 'None' || value === 'null') return '';
+  return `<div style="margin-bottom:14px">
+    <div style="font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.18em;color:#6b7280;margin-bottom:4px">${label}</div>
+    <div style="font-size:11px;color:${accent||'var(--text)'};background:rgba(255,255,255,.03);border-radius:6px;padding:8px 12px;border-left:2px solid var(--accent);word-break:break-word">${esc(String(value))}</div>
+  </div>`;
+}
+
+function renderDrawerDetails() {
+  const l = _drawerLead;
+  if (!l) return;
+  const scoreReason = l.score_reason || '';
+  document.getElementById('drawer-body').innerHTML = `
+    ${dField('Full Name',     l.name)}
+    ${dField('Job Title',     l.title)}
+    ${dField('Company',       l.company)}
+    ${dField('Email',         l.email)}
+    ${dField('LinkedIn',      l.linkedin_url)}
+    ${dField('Website',       l.website)}
+    ${dField('Location',      l.location)}
+    ${dField('Industry',      l.industry)}
+    ${dField('Source File',   l.source_file)}
+    ${scoreReason ? dField('Score Breakdown', scoreReason, 'var(--accent)') : ''}
+    ${l.notes ? dField('Notes', l.notes) : ''}
+    ${l.gtm_analysis ? `<div style="margin-bottom:14px">
+      <div style="font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.18em;color:#6b7280;margin-bottom:4px">AI Analysis</div>
+      <div style="font-size:10px;color:var(--muted);background:rgba(168,85,247,.05);border-radius:6px;padding:10px 12px;border:1px solid rgba(168,85,247,.15)">
+        ${esc(typeof l.gtm_analysis === 'string' ? l.gtm_analysis : JSON.stringify(l.gtm_analysis, null, 2))}
+      </div>
+    </div>` : ''}
+    <div style="margin-top:8px;padding-top:14px;border-top:1px solid var(--border)">
+      <div style="font-size:8px;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.15em">Update Status</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap">
+        ${['unprocessed','analyzed','mapped'].map(s =>
+          `<button onclick="updateLeadStatus('${l.id}','${s}')" style="font-size:9px;padding:4px 10px;border-radius:5px;border:1px solid var(--border);background:${l.status===s?'var(--accent)':'rgba(255,255,255,.04)'};color:${l.status===s?'white':'var(--muted)'};cursor:pointer">${s}</button>`
+        ).join('')}
+      </div>
+    </div>`;
+}
+
+function renderDrawerOutreach() {
+  const l = _drawerLead;
+  if (!l) return;
+  const hasOutreach = l.outreach_email || l.gtm_analysis?.email;
+  const email = l.outreach_email
+    ? { body: l.outreach_email }
+    : l.gtm_analysis?.email;
+  const linkedin = l.outreach_linkedin || l.gtm_analysis?.linkedin?.connection_note;
+
+  if (!hasOutreach) {
+    document.getElementById('drawer-body').innerHTML = `
+      <div style="text-align:center;padding:48px 24px">
+        <div style="font-size:32px;margin-bottom:12px">✉</div>
+        <div style="font-size:13px;font-weight:700;color:white;margin-bottom:8px">No outreach generated yet</div>
+        <div style="font-size:11px;color:var(--muted);margin-bottom:20px">Generate AI-powered personalised outreach for this lead</div>
+        <button class="btn btn-primary" onclick="drawerOutreach()">Generate Outreach</button>
+      </div>`;
+    return;
+  }
+
+  document.getElementById('drawer-body').innerHTML = `
+    ${email ? `<div style="margin-bottom:16px">
+      <div style="font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.18em;color:#6b7280;margin-bottom:8px">Email</div>
+      ${email.subject ? `<div style="font-size:11px;font-weight:700;color:white;margin-bottom:8px">Subject: ${esc(email.subject)}</div>` : ''}
+      <div style="font-size:11px;color:var(--text);background:rgba(255,255,255,.03);border-radius:8px;padding:12px;border:1px solid var(--border);white-space:pre-wrap;line-height:1.7">${esc(email.body || '')}</div>
+      ${email.cta ? `<div style="margin-top:8px;font-size:10px;font-weight:700;color:var(--accent)">CTA → ${esc(email.cta)}</div>` : ''}
+      <button onclick="copyToClipboard('${(email.body||'').replace(/'/g,"\\'")}','Email copied!')" style="margin-top:8px;font-size:9px;padding:5px 12px;border-radius:5px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--muted);cursor:pointer">📋 Copy Email</button>
+    </div>` : ''}
+    ${linkedin ? `<div style="margin-bottom:16px">
+      <div style="font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.18em;color:#6b7280;margin-bottom:8px">LinkedIn Note</div>
+      <div style="font-size:11px;color:var(--text);background:rgba(255,255,255,.03);border-radius:8px;padding:12px;border:1px solid var(--border);line-height:1.7">${esc(linkedin)}</div>
+      <button onclick="copyToClipboard('${String(linkedin).replace(/'/g,"\\'")}','LinkedIn note copied!')" style="margin-top:8px;font-size:9px;padding:5px 12px;border-radius:5px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--muted);cursor:pointer">📋 Copy LinkedIn</button>
+    </div>` : ''}
+    <button class="btn btn-outline" style="width:100%;font-size:9px;margin-top:4px" onclick="drawerOutreach()">↺ Regenerate</button>`;
+}
+
+function renderDrawerAI() {
+  const l = _drawerLead;
+  if (!l) return;
+  document.getElementById('drawer-body').innerHTML = `
+    <div id="ai-messages" style="min-height:200px;margin-bottom:12px">
+      <div style="text-align:center;padding:32px;color:var(--muted);font-size:11px">
+        Ask anything about this lead — scoring, outreach angle, research, objections…
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:flex-end">
+      <textarea id="ai-input" placeholder="E.g. What's the best outreach angle for this person?" rows="2"
+        style="flex:1;background:rgba(0,0,0,.4);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:8px 12px;font-size:11px;resize:none;font-family:inherit"
+        onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendAIMessage();}"></textarea>
+      <button class="btn btn-primary" onclick="sendAIMessage()" style="padding:8px 14px;font-size:11px">Send</button>
+    </div>
+    <div style="font-size:9px;color:var(--muted);margin-top:6px">Enter to send · Shift+Enter for new line</div>`;
+}
+
+async function sendAIMessage() {
+  const input = document.getElementById('ai-input');
+  const msg   = input?.value.trim();
+  if (!msg || !_drawerLead) return;
+  input.value = '';
+
+  const messagesEl = document.getElementById('ai-messages');
+  if (!messagesEl) return;
+
+  // Add user message
+  messagesEl.innerHTML += `<div style="margin-bottom:10px;text-align:right">
+    <div style="display:inline-block;background:var(--accent);color:white;border-radius:10px 10px 2px 10px;padding:8px 12px;font-size:11px;max-width:85%;text-align:left">${esc(msg)}</div>
+  </div>`;
+
+  // Thinking indicator
+  const thinkId = 'think-' + Date.now();
+  messagesEl.innerHTML += `<div id="${thinkId}" style="margin-bottom:10px">
+    <div style="display:inline-block;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:10px 10px 10px 2px;padding:8px 12px;font-size:11px;color:var(--muted)">Thinking…</div>
+  </div>`;
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+
+  _aiHistory.push({ role: 'user', content: msg });
+
+  try {
+    const token  = await getToken();
+    const l      = _drawerLead;
+    const system = `You are an AI sales intelligence assistant. You have full context on this lead:
+Name: ${l.name} | Title: ${l.title} | Company: ${l.company} | Email: ${l.email}
+Location: ${l.location} | Industry: ${l.industry} | ICP Score: ${l.icp_score ?? 'not scored'}
+Priority: ${l.priority} | Outreach Status: ${l.outreach_status}
+Score Reason: ${l.score_reason || 'not scored yet'}
+Be concise, specific, and actionable. Never hallucinate details not provided.`;
+
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        model: 'claude-sonnet-4-6',
+        max_tokens: 600,
+        system,
+        messages: _aiHistory,
+      }),
+    });
+
+    // Claude API requires auth — route through our own API instead
+    const aiRes = await api('/api/leads', {
+      action:    'ai_chat',
+      lead_id:   l.id,
+      message:   msg,
+      history:   _aiHistory.slice(-6),
+      lead_context: { name: l.name, title: l.title, company: l.company, icp_score: l.icp_score, priority: l.priority, score_reason: l.score_reason, industry: l.industry },
+    }, token);
+
+    const reply = aiRes.reply || 'No response';
+    _aiHistory.push({ role: 'assistant', content: reply });
+
+    const thinkEl = document.getElementById(thinkId);
+    if (thinkEl) thinkEl.outerHTML = `<div style="margin-bottom:10px">
+      <div style="display:inline-block;background:rgba(255,255,255,.05);border:1px solid var(--border);border-radius:10px 10px 10px 2px;padding:8px 12px;font-size:11px;color:var(--text);max-width:90%;white-space:pre-wrap;line-height:1.6">${esc(reply)}</div>
+    </div>`;
+  } catch(e) {
+    const thinkEl = document.getElementById(thinkId);
+    if (thinkEl) thinkEl.outerHTML = `<div style="margin-bottom:10px">
+      <div style="display:inline-block;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:10px;padding:8px 12px;font-size:11px;color:var(--red)">${esc(e.message)}</div>
+    </div>`;
+  }
+  messagesEl.scrollTop = messagesEl.scrollHeight;
+}
+
+async function drawerScore() {
+  if (!_drawerLead) return;
+  const token = await getToken();
+  showToast('Scoring…');
+  try {
+    const res = await api('/api/leads', { action: 'score_batch', lead_ids: [_drawerLead.id] }, token);
+    const updated = res.leads?.[0];
+    if (updated) {
+      _drawerLead = { ..._drawerLead, ...updated };
+      // Update in main list too
+      const idx = _leads.findIndex(l => l.id === _drawerLead.id);
+      if (idx >= 0) _leads[idx] = { ..._leads[idx], ...updated };
+      renderTable(_leads);
+      // Refresh scores in drawer header
+      document.getElementById('ds-icp').textContent  = updated.icp_score != null ? updated.icp_score + '%' : '—';
+      document.getElementById('ds-priority').textContent = updated.priority || '—';
+      if (_drawerTab === 'details') renderDrawerDetails();
+    }
+    showToast('Scored ✓', 'success');
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function drawerOutreach() {
+  if (!_drawerLead) return;
+  const token = await getToken();
+  showToast('Generating outreach…');
+  try {
+    const res = await api('/api/leads', { action: 'generate_outreach', lead_id: _drawerLead.id }, token);
+    // Merge saved outreach back into lead
+    _drawerLead.outreach_email   = res.outreach?.email?.body  || _drawerLead.outreach_email;
+    _drawerLead.outreach_linkedin = res.outreach?.linkedin?.connection_note || _drawerLead.outreach_linkedin;
+    _drawerLead.gtm_analysis     = res.outreach;
+    // Update in main list
+    const idx = _leads.findIndex(l => l.id === _drawerLead.id);
+    if (idx >= 0) _leads[idx] = { ..._leads[idx], outreach_email: _drawerLead.outreach_email, gtm_analysis: _drawerLead.gtm_analysis };
+    document.getElementById('ds-outreach').textContent = 'generated';
+    switchTab('outreach');
+    showToast('Outreach generated ✓', 'success');
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+async function updateLeadStatus(leadId, status) {
+  const token = await getToken();
+  try {
+    await api('/api/leads', { action: 'update_lead', lead_id: leadId, updates: { status } }, token);
+    _drawerLead.status = status;
+    const idx = _leads.findIndex(l => l.id === leadId);
+    if (idx >= 0) _leads[idx].status = status;
+    renderTable(_leads);
+    renderDrawerDetails();
+    showToast('Status updated ✓', 'success');
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+function copyToClipboard(text, successMsg) {
+  navigator.clipboard.writeText(text).then(() => showToast(successMsg || 'Copied ✓', 'success'));
 }
 
 /* ─── Utils ──────────────────────────────────── */
