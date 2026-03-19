@@ -27,16 +27,15 @@
 
     /* NAV */
     #topnav { position: sticky; top: 0; z-index: 100; background: rgba(11,15,26,0.95); backdrop-filter: blur(24px); border-bottom: 1px solid rgba(31,41,55,0.6); padding: 0 20px; display: flex; align-items: center; justify-content: space-between; height: 58px; gap: 12px; min-width: 0; }
-    .nav-brand { display: flex; align-items: center; gap: 12px; text-decoration: none; }
+    .nav-brand { display: flex; align-items: center; gap: 8px; text-decoration: none; flex-shrink: 0; }
     .nav-mark { width: 32px; height: 32px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-family: 'Space Mono', monospace; font-size: 11px; font-weight: 700; color: white; }
     .nav-brand-name { font-size: 11px; font-weight: 800; color: white; }
     .nav-brand-sub { font-size: 8px; color: var(--muted); letter-spacing: 0.14em; text-transform: uppercase; }
-    .nav-tabs { display: flex; align-items: center; gap: 2px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 10px; padding: 4px; flex-shrink: 1; overflow: hidden; }
-    .nav-tab { font-size: 9px !important; white-space: nowrap; }
-    .nav-tab { font-size: 10px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); padding: 6px 14px; border-radius: 7px; cursor: pointer; text-decoration: none; transition: all 0.15s; border: none; background: none; }
+    .nav-tabs { display: flex; align-items: center; gap: 2px; background: rgba(255,255,255,0.03); border: 1px solid var(--border); border-radius: 10px; padding: 4px; flex-shrink: 1; min-width: 0; }
+    .nav-tab { font-size: 9px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); padding: 5px 10px; border-radius: 7px; cursor: pointer; text-decoration: none; transition: all 0.15s; border: none; background: none; white-space: nowrap; }
     .nav-tab:hover { color: white; background: rgba(255,255,255,0.04); }
     .nav-tab.active { color: white; background: rgba(168,85,247,0.12); border: 1px solid rgba(168,85,247,0.25); }
-    .nav-right { display: flex; align-items: center; gap: 10px; }
+    .nav-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
     .btn { display: inline-flex; align-items: center; gap: 7px; padding: 8px 18px; font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; border-radius: 8px; cursor: pointer; border: none; transition: all 0.15s; text-decoration: none; }
     .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: white; }
     .btn-primary:hover { opacity: .9; transform: translateY(-1px); }
