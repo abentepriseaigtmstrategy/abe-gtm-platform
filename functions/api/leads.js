@@ -51,7 +51,6 @@ export async function onRequestPost(context) {
     case 'track_outreach':    return handleTrackOutreach(body, user.id, supabaseUrl, supabaseKey, cors);
     case 'delete_leads':      return handleDeleteLeads(body, user.id, supabaseUrl, supabaseKey, cors);
     case 'delete_by_file':    return handleDeleteByFile(body, user.id, supabaseUrl, supabaseKey, cors);
-    case 'ai_chat':           return handleAIChat(body, user.id, openaiKey, cors);
     default:                  return errRes(`Unknown action: ${action}`, 400, cors);
   }
 }
@@ -829,50 +828,6 @@ async function handleDeleteByFile(body, userId, url, key, cors) {
     `?user_id=eq.${userId}&source_file=eq.${encodeURIComponent(sanitise(source_file, 200))}`);
   if (!res.ok) return errRes('Failed to delete file leads', 500, cors);
   return okRes({ deleted: true, source_file }, cors);
-}
-
-// ══════════════════════════════════════════════════════════════════
-// AI CHAT — per-lead intelligence chat (powers the drawer AI tab)
-// ══════════════════════════════════════════════════════════════════
-async function handleAIChat(body, userId, openaiKey, cors) {
-  if (!openaiKey) return errRes('AI not configured', 503, cors);
-  const { message, history = [], lead_context = {} } = body;
-  if (!message) return errRes('message required', 400, cors);
-
-  const { name, title, company, icp_score, priority, score_reason, industry } = lead_context;
-
-  const system = `You are an expert B2B sales intelligence assistant at ABE (AB Enterprise), embedded in ABE's GTM platform.
-
-ABOUT ABE (always advise from ABE's perspective):
-ABE builds proprietary AI revenue infrastructure — GTM Strategy Intelligence, Lead Orchestration, and Account Intelligence platforms for B2B companies scaling revenue with AI.
-
-LEAD CONTEXT:
-Name: ${name || '—'} | Title: ${title || '—'} | Company: ${company || '—'} | Industry: ${industry || '—'}
-ICP Score: ${icp_score != null ? icp_score + '/100' : 'not scored'} | Priority: ${priority || '—'}
-Score Breakdown: ${score_reason || 'not available'}
-
-Your role: help ABE's sales team understand this lead, suggest outreach angles for ABE's platforms, identify pain points ABE solves, and recommend next actions. Be concise, specific, actionable. Never invent facts or reference competitors.`;  const messages = [
-    ...history.slice(-6).map(h => ({ role: h.role, content: h.content })),
-    { role: 'user', content: sanitise(message, 1000) },
-  ];
-
-  try {
-    const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        temperature: 0.4,
-        max_tokens: 500,
-        messages: [{ role: 'system', content: system }, ...messages],
-      }),
-    });
-    const d     = await aiRes.json();
-    const reply = d.choices?.[0]?.message?.content || 'No response from AI.';
-    return okRes({ reply }, cors);
-  } catch(e) {
-    return errRes('AI chat failed: ' + e.message, 500, cors);
-  }
 }
 
 // ── Pure CSV parser (no external deps — Worker compatible) ─────────
