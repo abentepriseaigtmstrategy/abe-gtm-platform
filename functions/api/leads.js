@@ -539,7 +539,7 @@ Return ONLY this exact JSON:
     "body": "2 short paragraphs. Different angle — specific ABE capability relevant to them."
   },
   "personalisation_notes": "What specific details made this personal"
-}\`
+}`;
 
   let outreach;
   try {
