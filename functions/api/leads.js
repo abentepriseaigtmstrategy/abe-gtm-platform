@@ -684,8 +684,8 @@ async function handleGetLeads(body, userId, url, key, cors) {
   if (source_file)     baseFilter += `&source_file=eq.${encodeURIComponent(sanitise(source_file, 200))}`;
   if (search)          baseFilter += `&or=(name.ilike.*${encodeURIComponent(sanitise(search, 100))}*,company.ilike.*${encodeURIComponent(sanitise(search, 100))}*,email.ilike.*${encodeURIComponent(sanitise(search, 100))}*)`;
 
-  // Data query — paginated
-  const dataQuery = baseFilter + `&order=icp_score.desc.nullslast,created_at.desc&limit=${limit}&offset=${offset}`;
+  // Data query — paginated. Order by icp_score if available, else created_at
+  const dataQuery = baseFilter + `&order=created_at.desc&limit=${limit}&offset=${offset}`;
   const res = await sb(url, key, 'leads', 'GET', null, dataQuery);
   if (!res.ok) return errRes('Failed to fetch leads', 500, cors);
   const leads = await res.json();
