@@ -222,6 +222,7 @@ async function handleImport(body, userId, openaiKey, url, key, cors) {
       source_file:  source_file || null,
       source_type,
       status:       'unprocessed',
+      notes:        sanitise(get('notes', ['notes','note','comments','comment']), 500) || null,
       tags:         JSON.stringify(['Imported']),
       activity_log: JSON.stringify([{
         action: 'imported', timestamp: ts,
@@ -238,6 +239,7 @@ async function handleImport(body, userId, openaiKey, url, key, cors) {
   // since blank company made every "David G" look identical.
   const CHUNK = 200;
   let inserted = 0;
+  let lastError = '';
 
   for (let i = 0; i < payload.length; i += CHUNK) {
     const chunk = payload.slice(i, i + CHUNK);
@@ -245,7 +247,15 @@ async function handleImport(body, userId, openaiKey, url, key, cors) {
     if (res.ok) {
       const saved = await res.json();
       inserted += Array.isArray(saved) ? saved.length : chunk.length;
+    } else {
+      // Surface the Supabase error — never swallow silently
+      try { const e = await res.json(); lastError = e?.message || e?.error || `HTTP ${res.status}`; }
+      catch { lastError = `HTTP ${res.status}`; }
     }
+  }
+
+  if (inserted === 0 && lastError) {
+    return errRes('Database insert failed: ' + lastError, 500, cors);
   }
 
   return okRes({ imported: inserted, total: payload.length }, cors);
