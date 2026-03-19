@@ -138,8 +138,51 @@ async function handleScoreBatch(body, userId, openaiKey, url, key, cors) {
   const leads = await res.json();
   if (!leads.length) return okRes({ scored: 0 }, cors);
 
-  // Score each lead deterministically
-  const icp = icp_criteria || {};
+  // ── ICP resolution (priority order) ──────────────────────────────
+  // 1. Explicit icp_criteria passed from frontend (future manual config)
+  // 2. Auto-fetch user's latest icp_profiles row saved from GTM Step 3
+  // 3. Empty object → neutral scoring (all sub-scores at midpoint)
+  let icp = icp_criteria || {};
+  if (!Object.keys(icp).length) {
+    try {
+      const icpRes = await sb(url, key, 'icp_profiles', 'GET', null,
+        `?user_id=eq.${userId}&order=created_at.desc&limit=1`);
+      if (icpRes.ok) {
+        const profiles = await icpRes.json();
+        if (profiles.length) {
+          const p = profiles[0];
+          // Map icp_profiles fields → deterministicScore format
+          // decision_makers: ["VP Sales","CMO"] → target_titles
+          const dm = Array.isArray(p.decision_makers)
+            ? p.decision_makers
+            : (typeof p.decision_makers === 'string'
+                ? JSON.parse(p.decision_makers || '[]')
+                : []);
+          // firmographics: "ARR: $1M-$10M, size: 100-500, industry: SaaS, B2B"
+          // Parse industry and employee size range out of the text
+          const firm  = (p.firmographics || '').toLowerCase();
+          const industries = [];
+          const indMatch   = firm.match(/industry[:\s]+([^,\n]+)/i);
+          if (indMatch) indMatch[1].split(/[,/]/).map(s => s.trim()).filter(Boolean).forEach(i => industries.push(i));
+          // Parse employee size: look for patterns like 100-500 or 50-200
+          let minSize = 0, maxSize = Infinity;
+          const sizeMatch = firm.match(/(\d+)\s*[-–]\s*(\d+)\s*(employees?|emp|staff|people)?/i);
+          if (sizeMatch) { minSize = parseInt(sizeMatch[1]); maxSize = parseInt(sizeMatch[2]); }
+          icp = {
+            target_titles:    dm,
+            target_industries: industries,
+            min_company_size:  minSize || undefined,
+            max_company_size:  maxSize === Infinity ? undefined : maxSize,
+            primary_icp:       p.primary_icp || '',
+          };
+        }
+      }
+    } catch (_) {
+      // ICP fetch failed — fall through to neutral scoring, never block
+    }
+  }
+
+  // Score each lead deterministically against resolved ICP
   const scored = leads.map(l => ({
     ...l,
     ...deterministicScore(l, icp),
