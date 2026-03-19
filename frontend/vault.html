@@ -636,42 +636,61 @@ async function confirmPdfExport() {
   }
 }
 
-// ── FIX: Corrected html2pdf rendering — was generating blank PDFs because:
-//   1. backgroundColor:'#ffffff' made white text on dark cover invisible
-//   2. zIndex:'-9999' can interfere with canvas compositing in some browsers
-//   3. scale:3 on a 6-page A4 doc creates a ~100MB canvas that silently fails
+// ── ROOT CAUSE FIX (blank PDF):
+//   The API returns a COMPLETE HTML document (<!DOCTYPE html><html><head><style>…</style>…</html>).
+//   The previous approach did: container.innerHTML = html  (container = a <div>)
+//   When a browser parses a full HTML document into a div's innerHTML, it strips
+//   <html>/<head>/<body> tags and relocates the <style> block — but CSS selectors
+//   like body{} and class rules may not apply correctly in the broken context.
+//   html2canvas reads computed styles, finds nothing styled, and renders a blank canvas.
+//
+//   FIX: Use iframe.srcdoc — the browser renders the complete HTML document inside
+//   the iframe's own document context (same-origin guaranteed via srcdoc), so all
+//   <head> CSS is correctly parsed and applied before html2canvas captures it.
 async function renderHtmlToPdf(html, filename) {
-  const container = document.createElement('div');
-  // Off-screen rendering: pushed far left so user never sees it.
-  // visibility:hidden is intentionally ABSENT — html2canvas reads computed
-  // styles and treats visibility:hidden as a zero-height invisible element,
-  // producing a blank canvas. left:-9999px is sufficient to hide from view.
-  container.style.cssText = [
-    'position:absolute',
-    'left:-9999px',
-    'top:0',
-    'width:794px',        // A4 at 96dpi — required for correct page breaks
-    'opacity:1',          // Explicit: must be fully opaque for canvas capture
-    'z-index:0',          // Not negative — avoids compositing issues
-  ].join(';');
-  container.innerHTML = html;
-  document.body.appendChild(container);
+  const iframe = document.createElement('iframe');
 
-  // Small delay: let fonts and CSS render before canvas capture
-  await new Promise(r => setTimeout(r, 600));
+  // Off-screen, fixed size matching A4 at 96dpi — opacity:0 hides it without
+  // affecting rendering (visibility:hidden would suppress computed styles)
+  iframe.style.cssText = [
+    'position:fixed',
+    'top:0',
+    'left:-9999px',
+    'width:794px',
+    'height:1123px',
+    'border:none',
+    'opacity:0',
+    'pointer-events:none',
+  ].join(';');
+
+  // srcdoc renders a complete HTML document in its own document context —
+  // all <head> styles are parsed and applied exactly as in a real page load
+  iframe.srcdoc = html;
+  document.body.appendChild(iframe);
+
+  // Wait for the iframe document to fully load (fonts, CSS cascade, layout)
+  await new Promise((resolve, reject) => {
+    iframe.onload = resolve;
+    iframe.onerror = reject;
+    // Safety timeout — resolve anyway after 8s so we never hang
+    setTimeout(resolve, 8000);
+  });
+
+  // Additional settle time: lets the browser finish CSS painting inside the iframe
+  await new Promise(r => setTimeout(r, 800));
 
   try {
+    const iDoc = iframe.contentDocument || iframe.contentWindow.document;
+
     await html2pdf().set({
       margin:      [0, 0, 0, 0],
       filename,
       html2canvas: {
-        scale:           2,           // FIX: was 3 — caused ~100MB canvas, silent blank on some browsers
+        scale:           2,
         useCORS:         true,
         letterRendering: true,
         allowTaint:      true,
-        // FIX: was '#ffffff' — killed dark cover (white text on white bg = blank)
-        // null lets CSS handle backgrounds including the dark gradient cover page
-        backgroundColor: null,
+        backgroundColor: '#ffffff',  // White base — dark cover renders over this via CSS
         logging:         false,
         width:           794,
         windowWidth:     794,
@@ -683,9 +702,10 @@ async function renderHtmlToPdf(html, filename) {
         compress:    true,
       },
       pagebreak: { mode: ['css', 'legacy'], before: '.pb', avoid: '.eb,.field,.sh' },
-    }).from(container).save();
+    }).from(iDoc.body).save();
+
   } finally {
-    document.body.removeChild(container);
+    document.body.removeChild(iframe);
   }
 }
 
