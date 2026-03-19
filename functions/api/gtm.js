@@ -416,13 +416,33 @@ function buildStepPrompt(step, company, industry, priorSteps, companyProfile) {
     1:`${base}${profileBlock}
 Perform deep market research on "${company}"${ind}.${hasProfile ? ' Use the verified profile as your primary source.' : ''}
 
-Score this company as an ABE GTM target (0-100) using this rubric:
-90-100: Large IT services/consulting firm, clear need for AI revenue platforms, strong growth signals
-70-89: Mid-size IT/SaaS/consulting company, likely needs GTM intelligence tools
-50-69: Partial fit — some IT/tech element but not core GTM buyer
-30-49: Weak fit — wrong industry or too small/large
-0-29: No fit — B2C, retail, hospitality, government, or irrelevant sector
-Be precise — different companies must get different scores. Do NOT default to 85.
+Score this company as an ABE GTM target (0-100).
+ABE sells AI-powered GTM intelligence and lead orchestration platforms to B2B companies.
+ABE's ideal buyer: IT services firms, SaaS companies, consulting firms, B2B enterprises with sales teams.
+
+Scoring rules — read carefully:
+- Score based on ACTUAL fit, not general quality. A great company in the wrong sector scores low.
+- Every company must get a UNIQUE score reflecting their specific situation.
+- Never round to 75, 80, 85, 90. Use specific numbers like 67, 73, 82, 91, 44, 28.
+- B2C companies (retail, food, fashion, hospitality, consumer apps): score 5-25
+- Government, NGO, non-profit, education: score 10-30
+- Healthcare/pharma with no IT sales focus: score 20-40
+- Financial services (banks, insurance) with no tech arm: score 30-50
+- IT services, SaaS, tech consulting (small <50 people): score 52-68
+- IT services, SaaS, tech consulting (mid 50-500 people): score 69-84
+- IT services, SaaS, tech consulting (large >500 people): score 85-96
+- Mixed/unclear industry: score 35-55
+
+Examples of correct scoring:
+- Accenture (large IT consulting): 94
+- A 30-person SaaS startup: 71
+- McDonald's (B2C food): 8
+- H&M (retail fashion): 4
+- A law firm: 38
+- Marriott Hotels: 22
+- Mid-size fintech SaaS: 76
+
+Never give the same score to different companies. Be specific and honest.
 Return:{"company_overview":"2-3 sentences","market_position":"competitive position","products_services":"main offerings","gtm_relevance_score":<integer 0-100 based on rubric above>,"gtm_relevance_reasoning":"specific reasoning for this exact score","growth_signals":["s1","s2","s3"],"revenue_stage":"e.g. Series B","employee_count":"range","tech_stack_hints":["hint1"]}`,
 
     2:`${base}${profileBlock}
