@@ -642,14 +642,16 @@ async function confirmPdfExport() {
 //   3. scale:3 on a 6-page A4 doc creates a ~100MB canvas that silently fails
 async function renderHtmlToPdf(html, filename) {
   const container = document.createElement('div');
-  // Off-screen but accessible: absolute (not fixed) + visibility:hidden lets
-  // html2canvas read it without it affecting page layout or canvas compositing
+  // Off-screen rendering: pushed far left so user never sees it.
+  // visibility:hidden is intentionally ABSENT — html2canvas reads computed
+  // styles and treats visibility:hidden as a zero-height invisible element,
+  // producing a blank canvas. left:-9999px is sufficient to hide from view.
   container.style.cssText = [
     'position:absolute',
     'left:-9999px',
     'top:0',
     'width:794px',        // A4 at 96dpi — required for correct page breaks
-    'visibility:hidden',  // Hidden from user but readable by html2canvas
+    'opacity:1',          // Explicit: must be fully opaque for canvas capture
     'z-index:0',          // Not negative — avoids compositing issues
   ].join(';');
   container.innerHTML = html;
