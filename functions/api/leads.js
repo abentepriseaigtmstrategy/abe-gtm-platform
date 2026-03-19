@@ -494,38 +494,52 @@ async function handleGenerateOutreach(body, userId, openaiKey, url, key, cors) {
     emailTemplate = personaliseTemplate(sequence_template.email_1, lead);
   }
 
-  const prompt = `You are a B2B outreach expert. Write hyper-personalised cold outreach for this prospect.
+  const prompt = `You are a senior B2B sales executive at ABE (AB Enterprise), writing hyper-personalised cold outreach on behalf of ABE.
 
-PROSPECT:
+ABOUT ABE — the sender (always write FROM ABE, never mention competitors like Stripe, HubSpot, Salesforce):
+ABE is an enterprise AI revenue infrastructure company with proprietary platforms for:
+- GTM Strategy Intelligence: account-based mapping, ICP scoring, TAM analysis, outreach sequences
+- Lead Orchestration: AI-powered lead scoring, intent detection, personalised outreach at scale
+- Account Intelligence: buying signal detection, engagement tracking, learning cycle optimisation
+ABE's clients are B2B companies — IT services, SaaS, consulting firms, and enterprises scaling revenue with AI.
+
+PROSPECT (the person receiving this outreach):
 Name: ${lead.name}
 First Name: ${(lead.name || '').split(' ')[0]}
 Title: ${lead.title || 'Unknown'}
 Company: ${lead.company || 'Unknown'}
 Location: ${lead.location || 'Unknown'}
+Industry: ${lead.industry || 'Unknown'}
 ICP Score: ${lead.icp_score || 'N/A'}/100
 Score Reason: ${lead.score_reason || 'N/A'}
 
-${gtm_context ? `COMPANY GTM CONTEXT (use this for personalisation):\n${gtm_context}\n` : ''}
+${gtm_context ? `GTM CONTEXT FOR THIS ACCOUNT:\n${gtm_context}\n` : ''}
 ${emailTemplate ? `BASE TEMPLATE TO PERSONALISE:\nSubject: ${emailTemplate.subject}\nBody: ${emailTemplate.body}\n` : ''}
 
-Write a complete outreach sequence. Return ONLY this exact JSON:
+RULES:
+- Always write from ABE — never reference any other company name in the outreach
+- Connect ABE's AI capabilities to THIS prospect's specific role/company challenge
+- Be concise, conversational, no buzzwords, no generic phrases
+- First line must reference something specific about the prospect or their company
+
+Return ONLY this exact JSON:
 {
   "email": {
     "subject": "Subject line under 50 chars — mention their company or role",
-    "body": "3 short paragraphs. Hyper-relevant to ${lead.company || 'their company'}. Conversational, no buzzwords. First line must reference something specific about them.",
-    "cta": "Specific, low-friction CTA — e.g. '15-min call Thursday?' not 'Would you be open to a meeting?'"
+    "body": "3 short paragraphs. First line specific to ${lead.company || 'their company'}. Second explains how ABE solves their challenge. Third is soft ask.",
+    "cta": "Specific low-friction CTA — e.g. '15-min call Thursday?'"
   },
   "linkedin": {
-    "connection_note": "Under 300 chars. Reference their work. No pitch.",
+    "connection_note": "Under 300 chars. Reference their work. No pitch. Written by ABE.",
     "follow_up_day3": "Under 200 chars. Value-first, no ask.",
-    "follow_up_day7": "Under 200 chars. Soft ask."
+    "follow_up_day7": "Under 200 chars. Soft ask referencing ABE."
   },
   "follow_up_email": {
     "subject": "Brief reply-thread subject",
-    "body": "2 short paragraphs. Different angle from email 1."
+    "body": "2 short paragraphs. Different angle — specific ABE capability relevant to them."
   },
   "personalisation_notes": "What specific details made this personal"
-}`;
+}\`
 
   let outreach;
   try {
@@ -827,22 +841,17 @@ async function handleAIChat(body, userId, openaiKey, cors) {
 
   const { name, title, company, icp_score, priority, score_reason, industry } = lead_context;
 
-  const system = `You are an expert B2B sales intelligence assistant embedded in an enterprise GTM platform.
-You have full context on this specific lead:
+  const system = `You are an expert B2B sales intelligence assistant at ABE (AB Enterprise), embedded in ABE's GTM platform.
 
-Name: ${name || '—'}
-Title: ${title || '—'}
-Company: ${company || '—'}
-Industry: ${industry || '—'}
-ICP Score: ${icp_score != null ? icp_score + '/100' : 'not scored'}
-Priority: ${priority || '—'}
+ABOUT ABE (always advise from ABE's perspective):
+ABE builds proprietary AI revenue infrastructure — GTM Strategy Intelligence, Lead Orchestration, and Account Intelligence platforms for B2B companies scaling revenue with AI.
+
+LEAD CONTEXT:
+Name: ${name || '—'} | Title: ${title || '—'} | Company: ${company || '—'} | Industry: ${industry || '—'}
+ICP Score: ${icp_score != null ? icp_score + '/100' : 'not scored'} | Priority: ${priority || '—'}
 Score Breakdown: ${score_reason || 'not available'}
 
-Your role: help the user understand this lead, suggest outreach angles, identify pain points, recommend next actions, and answer any sales intelligence questions.
-Be concise (max 3 short paragraphs), specific to this person, and always actionable.
-Never invent facts not provided. If you don't know something, say so.`;
-
-  const messages = [
+Your role: help ABE's sales team understand this lead, suggest outreach angles for ABE's platforms, identify pain points ABE solves, and recommend next actions. Be concise, specific, actionable. Never invent facts or reference competitors.`;  const messages = [
     ...history.slice(-6).map(h => ({ role: h.role, content: h.content })),
     { role: 'user', content: sanitise(message, 1000) },
   ];
