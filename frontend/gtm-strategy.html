@@ -704,7 +704,7 @@
           <div class="token-dot"></div>
           <span>0 tokens used</span>
         </div>
-        <div style="font-size:9px; color:var(--muted);">~$0.00 estimated cost</div>
+
       </div>
     </div>
   </aside>
@@ -1105,8 +1105,8 @@
           <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.15em;margin-top:4px;">Prompts Executed</div>
         </div>
         <div style="background:rgba(0,0,0,0.3);border:1px solid var(--border);border-radius:14px;padding:20px;text-align:center;">
-          <div style="font-size:28px;font-weight:900;color:var(--accent);font-family:'Space Mono',monospace;" id="summary-cost">$0.00</div>
-          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.15em;margin-top:4px;">Est. Cost (gpt-4o-mini)</div>
+          <div style="font-size:28px;font-weight:900;color:var(--accent);font-family:'Space Mono',monospace;" id="summary-cost">—</div>
+          <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:0.15em;margin-top:4px;">AI Steps Complete</div>
         </div>
       </div>
     </div>
@@ -1578,7 +1578,7 @@ function setTokens(n, count) {
   const el = document.getElementById(`tokens-${n}`);
   if (el) { el.style.display = 'inline-flex'; el.querySelector('span').textContent = `${count.toLocaleString()} tokens`; }
   document.getElementById('token-counter').querySelector('span').textContent = `${state.totalTokens.toLocaleString()} tokens used`;
-  document.querySelector('.sidebar-footer div:last-child div:last-child').textContent = `~$${(state.totalTokens * 0.000003).toFixed(3)} estimated cost`;
+  
 }
 
 function updateProgress() {
@@ -2275,7 +2275,7 @@ function showSummary() {
   panel.classList.add('show');
   document.getElementById('summary-company-name').textContent = `${state.company} — Complete GTM Strategy`;
   document.getElementById('summary-tokens').textContent = state.totalTokens.toLocaleString();
-  document.getElementById('summary-cost').textContent = `$${(state.totalTokens * 0.0000002).toFixed(4)}`;
+  document.getElementById('summary-cost').textContent = '6/6';
   panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   showToast('🎉 Complete GTM Strategy Generated!', 'success');
 }
