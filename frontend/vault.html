@@ -647,41 +647,65 @@ async function confirmPdfExport() {
 //   FIX: Use iframe.srcdoc — the browser renders the complete HTML document inside
 //   the iframe's own document context (same-origin guaranteed via srcdoc), so all
 //   <head> CSS is correctly parsed and applied before html2canvas captures it.
+// ── ROOT CAUSE ANALYSIS (both issues diagnosed before fix):
+//
+// ISSUE 1 — Cover page invisible (appeared "missing"):
+//   The cover uses color:white on ALL text over a dark CSS linear-gradient background.
+//   html2canvas has a known limitation rendering CSS gradient backgrounds — when it
+//   fails to capture the gradient, the cover canvas = white. White text on white = invisible.
+//   Content sections (dark text on light bg) were visible, cover was not.
+//   FIX: backgroundColor:null — lets html2canvas composite the CSS background correctly
+//   instead of filling the canvas white first. print-color-adjust:exact already in CSS.
+//
+// ISSUE 2 — Content cropped after page 1:
+//   iframe was fixed at height:1123px (exactly 1 A4 page). html2canvas reads windowHeight
+//   from the iframe's viewport = 1123px. Capture stops there, rest of document clipped.
+//   FIX: Set no initial height on iframe → after load, read full scrollHeight → expand
+//   iframe to exact content height → pass height+windowHeight to html2canvas explicitly.
 async function renderHtmlToPdf(html, filename) {
   const iframe = document.createElement('iframe');
 
-  // Off-screen, fixed size matching A4 at 96dpi — opacity:0 hides it without
-  // affecting rendering (visibility:hidden would suppress computed styles)
+  // Width = A4 at 96dpi. No height set yet — we expand after load to full content height.
+  // opacity:0 hides without suppressing computed styles (visibility:hidden would).
   iframe.style.cssText = [
     'position:fixed',
     'top:0',
     'left:-9999px',
     'width:794px',
-    'height:1123px',
     'border:none',
     'opacity:0',
     'pointer-events:none',
   ].join(';');
 
-  // srcdoc renders a complete HTML document in its own document context —
-  // all <head> styles are parsed and applied exactly as in a real page load
+  // srcdoc = full HTML document rendered in its own document context.
+  // <head><style> is parsed and applied correctly — all CSS applies.
   iframe.srcdoc = html;
   document.body.appendChild(iframe);
 
-  // Wait for the iframe document to fully load (fonts, CSS cascade, layout)
-  await new Promise((resolve, reject) => {
+  // Wait for iframe document to fully load (fonts, CSS cascade, layout complete)
+  await new Promise(resolve => {
     iframe.onload = resolve;
-    iframe.onerror = reject;
-    // Safety timeout — resolve anyway after 8s so we never hang
-    setTimeout(resolve, 8000);
+    setTimeout(resolve, 8000); // Safety fallback — never hang
   });
 
-  // Additional settle time: lets the browser finish CSS painting inside the iframe
+  const iDoc = iframe.contentDocument || iframe.contentWindow.document;
+
+  // FIX 2: Read the full document height BEFORE capping the iframe.
+  // scrollHeight gives the true layout height of all content — cover + all sections.
+  const fullHeight = Math.max(
+    iDoc.body.scrollHeight,
+    iDoc.documentElement.scrollHeight,
+    2000 // Minimum: at least 2 A4 pages, never zero
+  );
+
+  // Expand iframe to full content height so the browser lays out all pages completely.
+  // Without this, elements below the fold may have collapsed or unresolved dimensions.
+  iframe.style.height = fullHeight + 'px';
+
+  // Settle: let browser reflow at the expanded height before canvas capture
   await new Promise(r => setTimeout(r, 800));
 
   try {
-    const iDoc = iframe.contentDocument || iframe.contentWindow.document;
-
     await html2pdf().set({
       margin:      [0, 0, 0, 0],
       filename,
@@ -690,10 +714,18 @@ async function renderHtmlToPdf(html, filename) {
         useCORS:         true,
         letterRendering: true,
         allowTaint:      true,
-        backgroundColor: '#ffffff',  // White base — dark cover renders over this via CSS
+        // FIX 1: null = transparent canvas base. The cover's dark CSS gradient composites
+        // correctly on top. '#ffffff' was filling canvas white BEFORE gradient paint,
+        // making white-text cover invisible when gradient failed to capture.
+        backgroundColor: null,
         logging:         false,
         width:           794,
         windowWidth:     794,
+        // FIX 2: Explicitly tell html2canvas the full document height.
+        // Without these, html2canvas defaults to iframe's viewport height (1123px)
+        // and clips everything beyond the first A4 page.
+        height:          fullHeight,
+        windowHeight:    fullHeight,
       },
       jsPDF: {
         unit:        'mm',
