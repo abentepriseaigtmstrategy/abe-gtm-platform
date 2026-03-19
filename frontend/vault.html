@@ -702,39 +702,56 @@ async function renderHtmlToPdf(html, filename) {
   // Without this, elements below the fold may have collapsed or unresolved dimensions.
   iframe.style.height = fullHeight + 'px';
 
-  // Settle: let browser reflow at the expanded height before canvas capture
-  await new Promise(r => setTimeout(r, 800));
+  // Settle: let browser finish reflow and CSS painting at full height
+  await new Promise(r => setTimeout(r, 1000));
 
   try {
-    await html2pdf().set({
-      margin:      [0, 0, 0, 0],
-      filename,
-      html2canvas: {
-        scale:           2,
-        useCORS:         true,
-        letterRendering: true,
-        allowTaint:      true,
-        // FIX 1: null = transparent canvas base. The cover's dark CSS gradient composites
-        // correctly on top. '#ffffff' was filling canvas white BEFORE gradient paint,
-        // making white-text cover invisible when gradient failed to capture.
-        backgroundColor: null,
-        logging:         false,
-        width:           794,
-        windowWidth:     794,
-        // FIX 2: Explicitly tell html2canvas the full document height.
-        // Without these, html2canvas defaults to iframe's viewport height (1123px)
-        // and clips everything beyond the first A4 page.
-        height:          fullHeight,
-        windowHeight:    fullHeight,
-      },
-      jsPDF: {
-        unit:        'mm',
-        format:      'a4',
-        orientation: 'portrait',
-        compress:    true,
-      },
-      pagebreak: { mode: ['css', 'legacy'], before: '.pb', avoid: '.eb,.field,.sh' },
-    }).from(iDoc.body).save();
+    // ── DIRECT html2canvas + jsPDF — bypasses html2pdf .from() entirely ──
+    // html2pdf().from(element) physically moves the element OUT of the iframe
+    // into the main document. The iframe's <head><style> is left behind in a
+    // different document — ALL CSS is lost. Content collapses, dark cover bleeds,
+    // text crops left. Root cause of every broken PDF so far.
+    //
+    // Fix: call html2canvas directly on iDoc.documentElement — renders IN PLACE
+    // inside the iframe, CSS fully intact — then slice into A4 pages with jsPDF.
+    const canvas = await html2canvas(iDoc.documentElement, {
+      scale:           2,
+      useCORS:         true,
+      allowTaint:      true,
+      backgroundColor: '#ffffff',
+      logging:         false,
+      width:           794,
+      windowWidth:     794,
+      height:          fullHeight,
+      windowHeight:    fullHeight,
+    });
+
+    // A4 in jsPDF points (72dpi): 595.28 × 841.89
+    const A4_W = 595.28;
+    const A4_H = 841.89;
+    const cw   = canvas.width;   // 794 × scale
+    const ch   = canvas.height;  // fullHeight × scale
+
+    // Canvas pixels per A4 page height, proportional to A4 aspect ratio
+    const pageH    = Math.round((A4_H / A4_W) * cw);
+    const numPages = Math.ceil(ch / pageH);
+
+    // eslint-disable-next-line new-cap
+    const pdf = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait', compress: true });
+
+    for (let i = 0; i < numPages; i++) {
+      if (i > 0) pdf.addPage();
+      const srcY   = i * pageH;
+      const srcH   = Math.min(pageH, ch - srcY);
+      const pg     = document.createElement('canvas');
+      pg.width     = cw;
+      pg.height    = srcH;
+      pg.getContext('2d').drawImage(canvas, 0, srcY, cw, srcH, 0, 0, cw, srcH);
+      const imgH   = (srcH / cw) * A4_W;
+      pdf.addImage(pg.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, A4_W, imgH);
+    }
+
+    pdf.save(filename);
 
   } finally {
     document.body.removeChild(iframe);
