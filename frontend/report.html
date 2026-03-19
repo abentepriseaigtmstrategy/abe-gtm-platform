@@ -6,7 +6,8 @@
   <title>Strategy Report · ABE AI Revenue Infrastructure</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="auth-guard.js"></script>
   <style>
     :root{--bg:#0B0F1A;--card:#121827;--border:#1F2937;--accent:#a855f7;--accent2:#7c3aed;
@@ -303,29 +304,62 @@ async function exportPDF() {
   if (btn) { btn.disabled = true; btn.textContent = 'Generating…'; }
 
   try {
-    // Try server-side pdf-lib first
     const data = await window.APP.api('/api/export-pdf', { strategy: window._strategy });
-
-    if (data.pdf_base64) {
-      const link = document.createElement('a');
-      link.href     = 'data:application/pdf;base64,' + data.pdf_base64;
-      link.download = data.filename || 'GTM_Report.pdf';
-      link.click();
-    } else if (data.html && data.mode === 'html2pdf') {
-      // Fallback
-      const opt = {
-        margin:       [10, 10, 10, 10],
-        filename:     data.filename || 'GTM_Report.pdf',
-        image:        { type: 'jpeg', quality: 0.95 },
-        html2canvas:  { scale: 2, useCORS: true },
-        jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      };
-      await html2pdf().set(opt).from(data.html).save();
-    }
+    if (!data.html) throw new Error(data.error || 'Export failed');
+    await renderHtmlToPdf(data.html, data.filename || 'GTM_Report.pdf');
   } catch (e) {
     alert('PDF export failed: ' + e.message);
   } finally {
     if (btn) { btn.disabled = false; btn.textContent = 'Export PDF'; }
+  }
+}
+
+// Same iframe+html2canvas+jsPDF approach as vault.html.
+// html2pdf().from(element) transplants the element out of the iframe,
+// losing all <head> CSS. Direct html2canvas on iDoc.documentElement
+// renders in place with styles fully intact.
+async function renderHtmlToPdf(html, filename) {
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = [
+    'position:fixed', 'top:0', 'left:-9999px',
+    'width:794px', 'border:none', 'opacity:0', 'pointer-events:none',
+  ].join(';');
+  iframe.srcdoc = html;
+  document.body.appendChild(iframe);
+
+  await new Promise(resolve => { iframe.onload = resolve; setTimeout(resolve, 8000); });
+
+  const iDoc = iframe.contentDocument || iframe.contentWindow.document;
+  const fullHeight = Math.max(iDoc.body.scrollHeight, iDoc.documentElement.scrollHeight, 2000);
+  iframe.style.height = fullHeight + 'px';
+
+  await new Promise(r => setTimeout(r, 1000));
+
+  try {
+    const canvas = await html2canvas(iDoc.documentElement, {
+      scale: 2, useCORS: true, allowTaint: true,
+      backgroundColor: '#ffffff', logging: false,
+      width: 794, windowWidth: 794,
+      height: fullHeight, windowHeight: fullHeight,
+    });
+
+    const A4_W = 595.28, A4_H = 841.89;
+    const cw = canvas.width, ch = canvas.height;
+    const pageH = Math.round((A4_H / A4_W) * cw);
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait', compress: true });
+
+    for (let i = 0; i < Math.ceil(ch / pageH); i++) {
+      if (i > 0) pdf.addPage();
+      const srcY = i * pageH, srcH = Math.min(pageH, ch - srcY);
+      const pg = document.createElement('canvas');
+      pg.width = cw; pg.height = srcH;
+      pg.getContext('2d').drawImage(canvas, 0, srcY, cw, srcH, 0, 0, cw, srcH);
+      pdf.addImage(pg.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, A4_W, (srcH / cw) * A4_W);
+    }
+    pdf.save(filename);
+  } finally {
+    document.body.removeChild(iframe);
   }
 }
 
