@@ -130,9 +130,9 @@ body{font-family:Helvetica,Arial,sans-serif;color:#111827;background:#fff;-webki
   color:white;
   padding:0;
   page-break-after:always;
-  /* 1100px = A4 at 96dpi (1122px) minus 22px safety margin.
-     Ensures page-break-after:always never catches cfoot at the exact slice edge. */
-  height:1100px;
+  /* 1122px = A4 at 96dpi exactly (794px × 841.89/595.28 = 1122.9px).
+     Cover must fill exactly one canvas slice so page-hdr lands at top of page 2. */
+  height:1122px;
   display:flex;
   flex-direction:column;
   position:relative;
@@ -235,7 +235,7 @@ body{font-family:Helvetica,Arial,sans-serif;color:#111827;background:#fff;-webki
       </div>
     </div>
   </div>
-  <!-- cfoot: direct child of .cover, positioned absolute at bottom of the 1100px cover div.
+  <!-- cfoot: direct child of .cover, positioned absolute at bottom of the 1122px cover div.
        Sibling of cover-body (not inside it) so the flex layout never pushes it
        to the exact page-slice boundary. -->
   <div class="cfoot">
