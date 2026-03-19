@@ -42,6 +42,7 @@ export async function onRequestPost(context) {
 
   switch (action) {
     case 'import':            return handleImport(body, user.id, supabaseUrl, supabaseKey, cors);
+    case 'detect_schema':     return handleDetectSchema(body, user.id, openaiKey, cors);
     case 'score_batch':       return handleScoreBatch(body, user.id, openaiKey, supabaseUrl, supabaseKey, cors);
     case 'generate_outreach': return handleGenerateOutreach(body, user.id, openaiKey, supabaseUrl, supabaseKey, cors);
     case 'export_csv':        return handleExportCSV(body, user.id, supabaseUrl, supabaseKey, cors);
@@ -49,50 +50,140 @@ export async function onRequestPost(context) {
     case 'update_lead':       return handleUpdateLead(body, user.id, supabaseUrl, supabaseKey, cors);
     case 'track_outreach':    return handleTrackOutreach(body, user.id, supabaseUrl, supabaseKey, cors);
     case 'delete_leads':      return handleDeleteLeads(body, user.id, supabaseUrl, supabaseKey, cors);
+    case 'delete_by_file':    return handleDeleteByFile(body, user.id, supabaseUrl, supabaseKey, cors);
     default:                  return errRes(`Unknown action: ${action}`, 400, cors);
   }
 }
 
 // ══════════════════════════════════════════════════════════════════
-// IMPORT — parse CSV text (no external deps) and save to Supabase
+// DETECT SCHEMA — AI infers field mapping from headers + sample rows
+// Called once per upload before import. Returns mapping object.
+// ══════════════════════════════════════════════════════════════════
+async function handleDetectSchema(body, userId, openaiKey, cors) {
+  const { headers, sample_rows } = body;
+  if (!headers?.length) return errRes('headers required', 400, cors);
+
+  // Target fields we need to map to
+  const TARGET_FIELDS = {
+    name:        'Full name of the contact person',
+    first_name:  'First name only (used if no full name column)',
+    last_name:   'Last name only (used if no full name column)',
+    title:       'Job title / role / position of the person',
+    company:     'Company or organization name the person works at',
+    email:       'Email address of the contact',
+    linkedin_url:'LinkedIn profile URL of the contact',
+    website:     'Company website URL or domain',
+    location:    'Location — city, country, or region',
+    industry:    'Industry or department the person works in',
+    phone:       'Phone number',
+  };
+
+  const prompt = `You are a data mapping expert. A user has uploaded a leads file with these column headers.
+Map each target field to the most appropriate column header from their file.
+
+TARGET FIELDS (map these):
+${Object.entries(TARGET_FIELDS).map(([k,v]) => `- ${k}: ${v}`).join('\n')}
+
+FILE HEADERS:
+${headers.join(', ')}
+
+SAMPLE DATA (first 3 rows):
+${(sample_rows || []).slice(0,3).map((r,i) => `Row ${i+1}: ${JSON.stringify(r)}`).join('\n')}
+
+Return ONLY valid JSON. For each target field, set the value to the EXACT header string from the file that best matches it, or null if no good match exists.
+If two fields map to the same column (e.g. both "name" and "first_name" could match "Full Name"), prefer the more specific mapping.
+Example format:
+{
+  "name": "Full Name",
+  "first_name": null,
+  "last_name": null,
+  "title": "Job Title",
+  "company": "Account",
+  "email": "Email Address",
+  "linkedin_url": null,
+  "website": "Company URL",
+  "location": "City",
+  "industry": "Industry",
+  "phone": null
+}`;
+
+  try {
+    const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        temperature: 0,
+        max_tokens: 400,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: 'Return only valid JSON field mapping.' },
+          { role: 'user', content: prompt },
+        ],
+      }),
+    });
+    const d       = await aiRes.json();
+    const raw     = d.choices?.[0]?.message?.content || '{}';
+    const mapping = JSON.parse(raw);
+    return okRes({ mapping, headers }, cors);
+  } catch (e) {
+    // Fallback: return empty mapping — frontend will show manual mapping UI
+    return okRes({ mapping: {}, headers, error: e.message }, cors);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// IMPORT — accepts confirmed field mapping from frontend schema step
 // ══════════════════════════════════════════════════════════════════
 async function handleImport(body, userId, url, key, cors) {
-  const errors = validate({
-    source_type: 'string',
-  }, body);
-  if (errors.length) return errRes(errors[0], 400, cors);
-
-  const { csv_text, leads: rawLeads, source_type = 'csv', source_file } = body;
+  const { csv_text, leads: rawLeads, source_type = 'csv', source_file, field_mapping } = body;
 
   let leads = rawLeads || [];
-
-  // Parse CSV text if provided
   if (csv_text && typeof csv_text === 'string') {
     leads = parseCSV(csv_text);
   }
-
   if (!leads.length) return errRes('No leads to import', 400, cors);
 
   const ts = new Date().toISOString();
-  const payload = leads.slice(0, 5000).map(l => ({
-    user_id:      userId,
-    name:         sanitise(findField(l, ['name','full name','contact name','first name']), 120),
-    title:        sanitise(findField(l, ['title','job title','role','position']), 120),
-    company:      sanitise(findField(l, ['company','company name','organization','account']), 120),
-    email:        sanitise(findField(l, ['email','email address','work email']), 200),
-    linkedin_url: sanitise(findField(l, ['linkedin','linkedin url','profile url']), 300),
-    website:      sanitise(findField(l, ['website','company website','domain']), 300),
-    location:     sanitise(findField(l, ['location','city','country']), 200),
-    source_file:  source_file || null,
-    source_type,
-    status:       'unprocessed',
-    tags:         JSON.stringify(['Imported']),
-    activity_log: JSON.stringify([{
-      action:    'imported',
-      timestamp: ts,
-      note:      `Imported via ${source_type}${source_file ? ' — ' + source_file : ''}`,
-    }]),
-  })).filter(l => l.name && l.name !== '');
+
+  const payload = leads.slice(0, 5000).map(l => {
+    // If a confirmed AI field_mapping was provided, use it directly.
+    // Otherwise fall back to fuzzy findField matching (legacy safety net).
+    const get = (targetField) => {
+      if (field_mapping?.[targetField]) {
+        // Use the exact confirmed column name — case-insensitive lookup
+        const colName = field_mapping[targetField];
+        const key = Object.keys(l).find(k => k.toLowerCase() === colName.toLowerCase());
+        return key ? (l[key] || '').toString().trim() : '';
+      }
+      return '';
+    };
+
+    // Build name: prefer mapped full name, fall back to first+last
+    const fullName = get('name') ||
+      [get('first_name'), get('last_name')].filter(Boolean).join(' ');
+
+    return {
+      user_id:      userId,
+      name:         sanitise(fullName, 120),
+      title:        sanitise(get('title'), 120),
+      company:      sanitise(get('company'), 120),
+      email:        sanitise(get('email'), 200),
+      linkedin_url: sanitise(get('linkedin_url'), 300),
+      website:      sanitise(get('website'), 300),
+      location:     sanitise(get('location'), 200),
+      industry:     sanitise(get('industry'), 120),
+      source_file:  source_file || null,
+      source_type,
+      status:       'unprocessed',
+      tags:         JSON.stringify(['Imported']),
+      activity_log: JSON.stringify([{
+        action:    'imported',
+        timestamp: ts,
+        note:      `Imported via ${source_type}${source_file ? ' — ' + source_file : ''}`,
+      }]),
+    };
+  }).filter(l => l.name && l.name !== '');
 
   if (!payload.length) return errRes('No valid leads after parsing (name field required)', 400, cors);
 
@@ -401,14 +492,26 @@ Write a complete outreach sequence. Return ONLY this exact JSON:
     const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
-      body: JSON.stringify({ model: 'gpt-4o-mini', temperature: 0.8, max_tokens: 1200,
-        messages: [{ role: 'system', content: 'Return ONLY valid JSON.' }, { role: 'user', content: prompt }] }),
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        temperature: 0.3,
+        max_tokens: 1200,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: 'You are a B2B outreach expert. Return ONLY valid JSON, no extra text.' },
+          { role: 'user', content: prompt },
+        ],
+      }),
     });
-    const d     = await aiRes.json();
-    const raw   = d.choices?.[0]?.message?.content || '{}';
-    const clean = raw.replace(/```json|```/g, '').trim();
-    const m     = clean.match(/\{[\s\S]*\}/);
-    outreach    = JSON.parse(m ? m[0] : clean);
+    const d   = await aiRes.json();
+    const raw = d.choices?.[0]?.message?.content || '{}';
+    try {
+      outreach = JSON.parse(raw);
+    } catch {
+      const clean = raw.replace(/```json|```/g, '').trim();
+      const m     = clean.match(/\{[\s\S]*\}/);
+      outreach    = JSON.parse(m ? m[0] : clean);
+    }
   } catch (e) {
     return errRes('Outreach generation failed: ' + e.message, 500, cors);
   }
@@ -662,6 +765,16 @@ async function handleDeleteLeads(body, userId, url, key, cors) {
     `?id=in.(${ids})&user_id=eq.${userId}`);
   if (!res.ok) return errRes('Failed to delete leads', 500, cors);
   return okRes({ deleted: body.lead_ids.length }, cors);
+}
+
+// Delete all leads belonging to a specific source_file upload
+async function handleDeleteByFile(body, userId, url, key, cors) {
+  const { source_file } = body;
+  if (!source_file) return errRes('source_file required', 400, cors);
+  const res = await sb(url, key, 'leads', 'DELETE', null,
+    `?user_id=eq.${userId}&source_file=eq.${encodeURIComponent(sanitise(source_file, 200))}`);
+  if (!res.ok) return errRes('Failed to delete file leads', 500, cors);
+  return okRes({ deleted: true, source_file }, cors);
 }
 
 // ── Pure CSV parser (no external deps — Worker compatible) ─────────
