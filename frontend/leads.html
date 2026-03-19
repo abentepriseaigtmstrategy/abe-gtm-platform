@@ -215,6 +215,10 @@
       <option value="sent">Sent</option>
       <option value="replied">Replied</option>
     </select>
+    <select class="fs" id="filter-file" onchange="loadLeads()" style="max-width:160px">
+      <option value="">All Files</option>
+    </select>
+    <button class="btn btn-outline btn-sm" title="Manage uploaded files" onclick="openFileManager()" style="white-space:nowrap">📁 Files</button>
     <button class="btn btn-outline btn-sm" onclick="loadLeads()">↺</button>
   </div>
 
@@ -264,24 +268,64 @@
 
 <!-- IMPORT MODAL -->
 <div id="import-modal" class="modal-overlay" style="display:none">
-  <div class="modal-box">
-    <div class="modal-title">Import Leads</div>
-    <div class="modal-sub">CSV · Apollo Export · Manual List</div>
-    <div class="drop-zone" id="drop-zone" onclick="document.getElementById('csv-file').click()"
-      ondragover="event.preventDefault();this.classList.add('over')"
-      ondragleave="this.classList.remove('over')"
-      ondrop="handleDrop(event)">
-      <div class="drop-icon">📂</div>
-      <div class="drop-label">Drop CSV file here or click to browse</div>
-      <div class="drop-hint">Supports: CSV, Excel (Apollo / generic format)</div>
-      <input type="file" id="csv-file" accept=".csv,.xlsx" style="display:none" onchange="handleFileSelect(this)">
+  <div class="modal-box" style="max-width:640px">
+
+    <!-- STEP 1: File drop -->
+    <div id="import-step-1">
+      <div class="modal-title">Import Leads</div>
+      <div class="modal-sub">CSV · Excel · Apollo · ZoomInfo · LinkedIn · Any Format</div>
+      <div class="drop-zone" id="drop-zone" onclick="document.getElementById('csv-file').click()"
+        ondragover="event.preventDefault();this.classList.add('over')"
+        ondragleave="this.classList.remove('over')"
+        ondrop="handleDrop(event)">
+        <div class="drop-icon">📂</div>
+        <div class="drop-label">Drop file here or click to browse</div>
+        <div class="drop-hint">Supports CSV and Excel (.xlsx) from any source — Apollo, ZoomInfo, LinkedIn Sales Nav, or custom exports</div>
+        <input type="file" id="csv-file" accept=".csv,.xlsx" style="display:none" onchange="handleFileSelect(this)">
+      </div>
+      <div id="import-preview" style="display:none;margin-bottom:16px">
+        <div style="font-size:10px;font-weight:700;color:var(--green);margin-bottom:8px" id="import-preview-count"></div>
+      </div>
+      <div id="import-step1-detecting" style="display:none;text-align:center;padding:16px;color:var(--muted);font-size:11px">
+        <div style="width:20px;height:20px;border:2px solid rgba(168,85,247,.3);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 8px"></div>
+        AI is reading your file and detecting column mapping…
+      </div>
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
+        <button class="btn btn-outline" onclick="closeImport()">Cancel</button>
+      </div>
     </div>
-    <div id="import-preview" style="display:none;margin-bottom:16px">
-      <div style="font-size:10px;font-weight:700;color:var(--green);margin-bottom:8px" id="import-preview-count"></div>
+
+    <!-- STEP 2: Mapping confirmation -->
+    <div id="import-step-2" style="display:none">
+      <div class="modal-title">Confirm Field Mapping</div>
+      <div class="modal-sub">AI detected these mappings — review and adjust if needed</div>
+      <div id="mapping-table" style="max-height:340px;overflow-y:auto;margin-bottom:16px"></div>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button class="btn btn-outline" onclick="backToStep1()">← Back</button>
+        <button class="btn btn-primary" id="import-confirm" onclick="confirmImport()">Import Leads</button>
+      </div>
     </div>
-    <div style="display:flex;gap:10px;justify-content:flex-end">
-      <button class="btn btn-outline" onclick="closeImport()">Cancel</button>
-      <button class="btn btn-primary" id="import-confirm" onclick="confirmImport()" disabled>Import Leads</button>
+
+    <!-- STEP 3: Importing progress -->
+    <div id="import-step-3" style="display:none;text-align:center;padding:32px">
+      <div style="width:36px;height:36px;border:3px solid rgba(168,85,247,.3);border-top-color:var(--accent);border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 16px"></div>
+      <div style="font-size:13px;font-weight:700;color:white;margin-bottom:6px">Importing leads…</div>
+      <div style="font-size:10px;color:var(--muted)">This may take a moment for large files</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- FILE MANAGER MODAL -->
+<div id="file-modal" class="modal-overlay" style="display:none">
+  <div class="modal-box" style="max-width:620px">
+    <div class="modal-title">Uploaded Files</div>
+    <div class="modal-sub">Manage imported lead batches</div>
+    <div id="file-list" style="max-height:400px;overflow-y:auto">
+      <div style="text-align:center;padding:40px;color:var(--muted)">Loading…</div>
+    </div>
+    <div style="display:flex;justify-content:flex-end;margin-top:16px">
+      <button class="btn btn-outline" onclick="closeFileManager()">Close</button>
     </div>
   </div>
 </div>
@@ -295,7 +339,10 @@ let _selected = new Set();
 let _offset  = 0;
 let _limit   = 100;
 let _total   = 0;
-let _csv     = null;
+let _csv          = null;   // raw CSV text
+let _fileName     = '';     // original file name
+let _fieldMapping = {};     // confirmed AI field mapping
+let _csvHeaders   = [];     // detected column headers
 let _searchTimer = null;
 
 /* ─── Init ──────────────────────────────────── */
@@ -315,22 +362,25 @@ async function loadLeads() {
   const status   = document.getElementById('filter-status').value;
   const outreach = document.getElementById('filter-outreach').value;
   const search   = document.getElementById('search').value.trim();
+  const fileFilter = document.getElementById('filter-file')?.value || '';
 
   try {
     const res = await api('/api/leads', {
       action:          'get_leads',
-      priority:        priority  || undefined,
-      status:          status    || undefined,
-      outreach_status: outreach  || undefined, // ── FIX Bug 2: was missing from API call
-      search:          search    || undefined,
+      priority:        priority   || undefined,
+      status:          status     || undefined,
+      outreach_status: outreach   || undefined,
+      source_file:     fileFilter || undefined,
+      search:          search     || undefined,
       limit:           _limit,
       offset:          _offset,
     }, token);
     _leads = res.leads || [];
-    _total = res.total || _leads.length; // FIX Bug 4: backend now returns real DB count
+    _total = res.total || _leads.length;
     renderTable(_leads);
-    updateStats(res); // FIX Bug 3: pass full res so stats use server-side counts
+    updateStats(res);
     updatePagination();
+    populateFileFilter(_leads);
   } catch(e) {
     document.getElementById('leads-body').innerHTML =
       `<tr><td colspan="11" style="text-align:center;padding:40px;color:var(--red)">${e.message}</td></tr>`;
@@ -362,8 +412,10 @@ function renderTable(leads) {
     const date    = l.updated_at ? new Date(l.updated_at).toLocaleDateString('en-GB',{day:'2-digit',month:'short'}) : '—';
     const statusCls   = `sb-${l.status||'unprocessed'}`;
     const outreach    = l.outreach_status || 'not_sent';
-    const icpDisplay  = icp !== null ? `${icp}%` : '—';
-    const icpClass    = icp !== null ? `priority-${icp>=75?'HIGH':icp>=50?'MEDIUM':'LOW'}` : '';
+    // Show "—" when lead has no title — score of 32 on empty data is misleading
+    const hasData    = !!(l.title || l.company);
+    const icpDisplay = (icp !== null && hasData) ? `${icp}%` : '—';
+    const icpClass   = (icp !== null && hasData) ? `priority-${icp>=75?'HIGH':icp>=50?'MEDIUM':'LOW'}` : '';
     return `
     <tr id="row-${l.id}">
       <td><input type="checkbox" class="ck row-ck" value="${l.id}" onchange="toggleRow(this)"></td>
@@ -380,6 +432,7 @@ function renderTable(leads) {
         <div style="display:flex;gap:4px">
           <button class="btn btn-sm btn-outline" title="Score this lead" onclick="scoreOne('${l.id}')">⚡</button>
           <button class="btn btn-sm btn-outline" title="Generate outreach" onclick="genOutreach('${l.id}')">✉</button>
+          <button class="btn btn-sm" style="color:var(--red);border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.05);border-radius:6px;padding:4px 7px;cursor:pointer;font-size:10px" title="Delete lead" onclick="deleteSingle('${l.id}')">✕</button>
         </div>
       </td>
     </tr>`;
@@ -496,77 +549,317 @@ async function deleteSelected() {
   } catch(e) { showToast(e.message, 'error'); }
 }
 
-/* ─── Import ─────────────────────────────────── */
-function openImport()  { document.getElementById('import-modal').style.display = 'flex'; }
-function closeImport() { document.getElementById('import-modal').style.display = 'none'; _csv = null; }
+async function deleteSingle(leadId) {
+  if (!confirm('Delete this lead? This cannot be undone.')) return;
+  const token = await getToken();
+  try {
+    await api('/api/leads', { action: 'delete_leads', lead_ids: [leadId] }, token);
+    showToast('Lead deleted ✓', 'success');
+    loadLeads();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+/* ─── File Manager ───────────────────────────── */
+// Track known source files from loaded leads
+const _knownFiles = new Set();
+
+function populateFileFilter(leads) {
+  leads.forEach(l => { if (l.source_file) _knownFiles.add(l.source_file); });
+  const sel = document.getElementById('filter-file');
+  if (!sel) return;
+  const current = sel.value;
+  // Rebuild options preserving current selection
+  sel.innerHTML = '<option value="">All Files</option>' +
+    [..._knownFiles].sort().map(f =>
+      `<option value="${esc(f)}" ${f === current ? 'selected' : ''}>${esc(f)}</option>`
+    ).join('');
+}
+
+async function openFileManager() {
+  document.getElementById('file-modal').style.display = 'flex';
+  const token = await getToken();
+  const el = document.getElementById('file-list');
+
+  try {
+    // Fetch all leads just for source_file metadata (limit high, select minimal fields)
+    const res = await api('/api/leads', {
+      action: 'get_leads', limit: 5000, offset: 0,
+    }, token);
+
+    // Group by source_file
+    const files = {};
+    (res.leads || []).forEach(l => {
+      const f = l.source_file || '(No file name)';
+      if (!files[f]) files[f] = { count: 0, date: l.created_at };
+      files[f].count++;
+      if (l.created_at > files[f].date) files[f].date = l.created_at;
+    });
+
+    if (!Object.keys(files).length) {
+      el.innerHTML = '<div style="text-align:center;padding:40px;color:var(--muted)">No imported files found.</div>';
+      return;
+    }
+
+    el.innerHTML = Object.entries(files).map(([name, info]) => `
+      <div style="display:flex;align-items:center;justify-content:space-between;
+        padding:14px 16px;border:1px solid var(--border);border-radius:10px;margin-bottom:8px;
+        background:rgba(18,24,39,.5)">
+        <div>
+          <div style="font-size:12px;font-weight:700;color:white;margin-bottom:2px">${esc(name)}</div>
+          <div style="font-size:10px;color:var(--muted)">
+            ${info.count} lead${info.count !== 1 ? 's' : ''} &nbsp;·&nbsp;
+            ${info.date ? new Date(info.date).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'}) : '—'}
+          </div>
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-sm btn-outline" onclick="filterByFile('${esc(name)}')">View</button>
+          <button class="btn btn-sm" style="color:var(--red);border:1px solid rgba(239,68,68,.3);
+            background:rgba(239,68,68,.05);border-radius:6px;padding:4px 10px;cursor:pointer;font-size:10px"
+            onclick="deleteFile('${esc(name)}')">Delete All</button>
+        </div>
+      </div>`).join('');
+  } catch(e) {
+    el.innerHTML = `<div style="color:var(--red);padding:20px">${e.message}</div>`;
+  }
+}
+
+function closeFileManager() {
+  document.getElementById('file-modal').style.display = 'none';
+}
+
+function filterByFile(filename) {
+  const sel = document.getElementById('filter-file');
+  if (sel) {
+    // Ensure option exists then select it
+    if (![...sel.options].some(o => o.value === filename)) {
+      sel.appendChild(Object.assign(document.createElement('option'), { value: filename, textContent: filename }));
+    }
+    sel.value = filename;
+  }
+  closeFileManager();
+  _offset = 0;
+  loadLeads();
+}
+
+async function deleteFile(filename) {
+  if (!confirm(`Delete ALL leads from "${filename}"? This cannot be undone.`)) return;
+  const token = await getToken();
+  try {
+    await api('/api/leads', { action: 'delete_by_file', source_file: filename }, token);
+    _knownFiles.delete(filename);
+    showToast(`Deleted all leads from ${filename} ✓`, 'success');
+    closeFileManager();
+    // Reset file filter if we just deleted the active filter
+    const sel = document.getElementById('filter-file');
+    if (sel && sel.value === filename) sel.value = '';
+    _offset = 0;
+    loadLeads();
+  } catch(e) { showToast(e.message, 'error'); }
+}
+
+
+/* ─── Import — 3-step AI schema detection flow ── */
+function openImport() {
+  _csv = null; _fileName = ''; _fieldMapping = {}; _csvHeaders = [];
+  document.getElementById('import-modal').style.display = 'flex';
+  showImportStep(1);
+}
+function closeImport() {
+  document.getElementById('import-modal').style.display = 'none';
+  _csv = null; _fileName = ''; _fieldMapping = {}; _csvHeaders = [];
+}
+function backToStep1() { showImportStep(1); }
+function showImportStep(n) {
+  [1,2,3].forEach(i => {
+    const el = document.getElementById('import-step-' + i);
+    if (el) el.style.display = i === n ? 'block' : 'none';
+  });
+}
 
 function handleDrop(e) {
   e.preventDefault();
   document.getElementById('drop-zone').classList.remove('over');
-  const file = e.dataTransfer.files[0];
-  if (file) readFile(file);
+  if (e.dataTransfer.files[0]) readFile(e.dataTransfer.files[0]);
 }
 function handleFileSelect(input) { if (input.files[0]) readFile(input.files[0]); }
 
 function readFile(file) {
-  const isXlsx = file.name.toLowerCase().endsWith('.xlsx') || file.name.toLowerCase().endsWith('.xls')
-    || file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+  _fileName = file.name;
+  const isXlsx = /\.(xlsx|xls)$/i.test(file.name) ||
+    file.type === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+
+  document.getElementById('import-preview').style.display = 'none';
+  document.getElementById('import-step1-detecting').style.display = 'block';
+
+  const onCsvReady = async (csvText) => {
+    _csv = csvText;
+    const rows = csvText.split('\n').filter(l => l.trim()).length - 1;
+    document.getElementById('import-preview').style.display = 'block';
+    document.getElementById('import-preview-count').textContent =
+      '\u2713 ' + file.name + ' \u2014 ' + rows + ' rows detected';
+
+    const parsed = parseCSVForSchema(csvText);
+    _csvHeaders  = parsed.headers;
+
+    try {
+      const token = await getToken();
+      const res   = await api('/api/leads', {
+        action: 'detect_schema', headers: _csvHeaders, sample_rows: parsed.samples,
+      }, token);
+      _fieldMapping = res.mapping || {};
+    } catch(e) {
+      _fieldMapping = {};
+    }
+
+    document.getElementById('import-step1-detecting').style.display = 'none';
+    renderMappingTable(_csvHeaders, _fieldMapping);
+    showImportStep(2);
+  };
 
   if (isXlsx) {
-    // ── XLSX path: use SheetJS to convert to CSV text ─────────────
     const reader = new FileReader();
     reader.onload = evt => {
       try {
-        const data     = new Uint8Array(evt.target.result);
-        const workbook = XLSX.read(data, { type: 'array' });
-        // Use the first sheet
-        const sheetName = workbook.SheetNames[0];
-        const sheet     = workbook.Sheets[sheetName];
-        // Convert to CSV — the existing backend CSV parser handles it
-        _csv = XLSX.utils.sheet_to_csv(sheet);
-        const lines = _csv.split('\n').filter(l => l.trim()).length;
-        document.getElementById('import-preview').style.display = 'block';
-        document.getElementById('import-preview-count').textContent =
-          `✓ ${file.name} — ~${lines - 1} leads detected`;
-        document.getElementById('import-confirm').disabled = false;
+        const wb    = XLSX.read(new Uint8Array(evt.target.result), { type: 'array' });
+        const sheet = wb.Sheets[wb.SheetNames[0]];
+        onCsvReady(XLSX.utils.sheet_to_csv(sheet));
       } catch(err) {
+        document.getElementById('import-step1-detecting').style.display = 'none';
         document.getElementById('import-preview').style.display = 'block';
-        document.getElementById('import-preview-count').textContent =
-          `✗ Failed to read Excel file: ${err.message}`;
+        document.getElementById('import-preview-count').textContent = '\u2717 Failed to read file: ' + err.message;
         document.getElementById('import-preview-count').style.color = 'var(--red)';
       }
     };
-    reader.readAsArrayBuffer(file); // Must use ArrayBuffer for binary xlsx
+    reader.readAsArrayBuffer(file);
   } else {
-    // ── CSV path: read as plain text (existing logic) ─────────────
     const reader = new FileReader();
-    reader.onload = evt => {
-      _csv = evt.target.result;
-      const lines = _csv.split('\n').filter(l => l.trim()).length;
-      document.getElementById('import-preview').style.display = 'block';
-      document.getElementById('import-preview-count').textContent =
-        `✓ ${file.name} — ~${lines - 1} leads detected`;
-      document.getElementById('import-confirm').disabled = false;
-    };
+    reader.onload = evt => onCsvReady(evt.target.result);
     reader.readAsText(file);
+  }
+}
+
+function parseCSVForSchema(csvText) {
+  const lines = csvText.split('\n').filter(l => l.trim());
+  if (lines.length < 2) return { headers: [], samples: [] };
+  const headers = splitCSVLineFE(lines[0]).map(h => h.trim());
+  const samples = lines.slice(1, 4).map(line => {
+    const vals = splitCSVLineFE(line);
+    const row  = {};
+    headers.forEach((h, i) => { row[h] = (vals[i] || '').trim(); });
+    return row;
+  });
+  return { headers, samples };
+}
+
+function splitCSVLineFE(line) {
+  const result = []; let cur = ''; let inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { inQ = !inQ; }
+    else if (c === ',' && !inQ) { result.push(cur); cur = ''; }
+    else { cur += c; }
+  }
+  result.push(cur);
+  return result.map(v => v.replace(/^"|"$/g, '').trim());
+}
+
+const MAPPING_TARGETS = [
+  { key: 'name',         label: 'Full Name',    required: true  },
+  { key: 'first_name',   label: 'First Name',   required: false },
+  { key: 'last_name',    label: 'Last Name',    required: false },
+  { key: 'title',        label: 'Job Title',    required: false },
+  { key: 'company',      label: 'Company',      required: false },
+  { key: 'email',        label: 'Email',        required: false },
+  { key: 'linkedin_url', label: 'LinkedIn URL', required: false },
+  { key: 'website',      label: 'Website',      required: false },
+  { key: 'location',     label: 'Location',     required: false },
+  { key: 'industry',     label: 'Industry',     required: false },
+  { key: 'phone',        label: 'Phone',        required: false },
+];
+
+function renderMappingTable(headers, mapping) {
+  const nullOpt = '<option value="">(not mapped)</option>';
+  const opts    = headers.map(h => '<option value="' + esc(h) + '">' + esc(h) + '</option>').join('');
+  document.getElementById('mapping-table').innerHTML =
+    '<table style="width:100%;border-collapse:collapse;font-size:11px">' +
+    '<thead><tr>' +
+    '<th style="text-align:left;padding:8px 10px;color:var(--muted);font-size:9px;letter-spacing:.1em;border-bottom:1px solid var(--border)">TARGET FIELD</th>' +
+    '<th style="text-align:left;padding:8px 10px;color:var(--muted);font-size:9px;letter-spacing:.1em;border-bottom:1px solid var(--border)">YOUR COLUMN</th>' +
+    '<th style="text-align:left;padding:8px 10px;color:var(--muted);font-size:9px;letter-spacing:.1em;border-bottom:1px solid var(--border)">SAMPLE</th>' +
+    '</tr></thead><tbody>' +
+    MAPPING_TARGETS.map(function(t) {
+      const mapped = mapping[t.key] || '';
+      return '<tr>' +
+        '<td style="padding:8px 10px;border-bottom:1px solid rgba(31,41,55,.4)">' +
+          '<span style="font-weight:700;color:' + (t.required ? 'var(--accent)' : 'white') + '">' + t.label + '</span>' +
+          (t.required ? '<span style="color:var(--red);margin-left:2px">*</span>' : '') +
+        '</td>' +
+        '<td style="padding:8px 10px;border-bottom:1px solid rgba(31,41,55,.4)">' +
+          '<select id="map-' + t.key + '" style="width:100%;background:rgba(0,0,0,.4);border:1px solid ' + (mapped ? 'var(--accent)' : 'var(--border)') + ';color:var(--text);border-radius:6px;padding:5px 8px;font-size:10px">' +
+            nullOpt + opts +
+          '</select>' +
+        '</td>' +
+        '<td style="padding:8px 10px;border-bottom:1px solid rgba(31,41,55,.4);color:var(--muted);font-size:9px;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" id="map-preview-' + t.key + '">—</td>' +
+      '</tr>';
+    }).join('') +
+    '</tbody></table>';
+
+  MAPPING_TARGETS.forEach(function(t) {
+    const sel = document.getElementById('map-' + t.key);
+    if (!sel) return;
+    if (mapping[t.key] && Array.from(sel.options).some(function(o) { return o.value === mapping[t.key]; })) {
+      sel.value = mapping[t.key];
+    }
+    updateMappingPreview(t.key);
+    sel.addEventListener('change', function() { updateMappingPreview(t.key); });
+  });
+}
+
+function updateMappingPreview(fieldKey) {
+  const sel    = document.getElementById('map-' + fieldKey);
+  const prevEl = document.getElementById('map-preview-' + fieldKey);
+  if (!sel || !prevEl || !_csv) return;
+  const colName = sel.value;
+  if (!colName) { prevEl.textContent = '—'; return; }
+  const lines = _csv.split('\n').filter(function(l) { return l.trim(); });
+  if (lines.length > 1) {
+    const hdrs = splitCSVLineFE(lines[0]).map(function(h) { return h.trim(); });
+    const vals = splitCSVLineFE(lines[1]);
+    const idx  = hdrs.findIndex(function(h) { return h === colName; });
+    prevEl.textContent = idx >= 0 ? (vals[idx] || '—').slice(0, 30) : '—';
   }
 }
 
 async function confirmImport() {
   if (!_csv) return;
+  const confirmedMapping = {};
+  MAPPING_TARGETS.forEach(function(t) {
+    const sel = document.getElementById('map-' + t.key);
+    if (sel && sel.value) confirmedMapping[t.key] = sel.value;
+  });
+  if (!confirmedMapping.name && !confirmedMapping.first_name && !confirmedMapping.last_name) {
+    showToast('Map at least Full Name or First + Last Name to continue', 'error');
+    return;
+  }
+  showImportStep(3);
   const token = await getToken();
-  document.getElementById('import-confirm').disabled = true;
-  showToast('Importing leads…');
   try {
-    const res = await api('/api/leads', { action: 'import', csv_text: _csv, source_type: 'csv' }, token);
-    showToast(`Imported ${res.imported} leads ✓`, 'success');
-    closeImport();
-    loadLeads();
+    const res = await api('/api/leads', {
+      action:        'import',
+      csv_text:      _csv,
+      source_type:   'csv',
+      source_file:   _fileName,
+      field_mapping: confirmedMapping,
+    }, token);
+    const dupes = res.skipped_duplicates ? ' \u00b7 ' + res.skipped_duplicates + ' duplicates skipped' : '';
+    showToast('Imported ' + res.imported + ' leads' + dupes + ' \u2713', 'success');
+    closeImport(); _offset = 0; loadLeads();
   } catch(e) {
     showToast(e.message, 'error');
-    document.getElementById('import-confirm').disabled = false;
+    showImportStep(2);
   }
 }
+
 
 /* ─── Utils ──────────────────────────────────── */
 async function api(endpoint, body, token) {
