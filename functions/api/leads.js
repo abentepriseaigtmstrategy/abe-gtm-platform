@@ -145,31 +145,39 @@ async function handleScoreBatch(body, userId, openaiKey, url, key, cors) {
   let icp = icp_criteria || {};
   if (!Object.keys(icp).length) {
     try {
-      const icpRes = await sb(url, key, 'icp_profiles', 'GET', null,
-        `?user_id=eq.${userId}&order=created_at.desc&limit=1`);
+      const icpRes = await fetch(
+        `${url}/rest/v1/icp_profiles?user_id=eq.${userId}&order=created_at.desc&limit=1`,
+        {
+          headers: {
+            'Content-Type':  'application/json',
+            'apikey':        key,
+            'Authorization': `Bearer ${key}`,
+            'Prefer':        'return=representation',
+          },
+        }
+      );
       if (icpRes.ok) {
         const profiles = await icpRes.json();
-        if (profiles.length) {
+        if (Array.isArray(profiles) && profiles.length) {
           const p = profiles[0];
-          // Map icp_profiles fields → deterministicScore format
-          // decision_makers: ["VP Sales","CMO"] → target_titles
+          // decision_makers: ["VP Sales","CMO"] → target_titles for scoring
           const dm = Array.isArray(p.decision_makers)
             ? p.decision_makers
             : (typeof p.decision_makers === 'string'
                 ? JSON.parse(p.decision_makers || '[]')
                 : []);
-          // firmographics: "ARR: $1M-$10M, size: 100-500, industry: SaaS, B2B"
-          // Parse industry and employee size range out of the text
-          const firm  = (p.firmographics || '').toLowerCase();
+          // firmographics text: "ARR: $1M-$10M, size: 100-500, industry: SaaS, B2B"
+          const firm = (p.firmographics || '').toLowerCase();
           const industries = [];
-          const indMatch   = firm.match(/industry[:\s]+([^,\n]+)/i);
-          if (indMatch) indMatch[1].split(/[,/]/).map(s => s.trim()).filter(Boolean).forEach(i => industries.push(i));
-          // Parse employee size: look for patterns like 100-500 or 50-200
+          const indMatch = firm.match(/industry[:\s]+([^,\n]+)/i);
+          if (indMatch) {
+            indMatch[1].split(/[,/]/).map(s => s.trim()).filter(Boolean).forEach(i => industries.push(i));
+          }
           let minSize = 0, maxSize = Infinity;
           const sizeMatch = firm.match(/(\d+)\s*[-–]\s*(\d+)\s*(employees?|emp|staff|people)?/i);
           if (sizeMatch) { minSize = parseInt(sizeMatch[1]); maxSize = parseInt(sizeMatch[2]); }
           icp = {
-            target_titles:    dm,
+            target_titles:     dm,
             target_industries: industries,
             min_company_size:  minSize || undefined,
             max_company_size:  maxSize === Infinity ? undefined : maxSize,
