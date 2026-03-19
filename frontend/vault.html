@@ -6,7 +6,8 @@
   <title>Strategy Vault · ABE AI Revenue Infrastructure</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="auth-guard.js"></script>
 
   <style>
@@ -736,7 +737,7 @@ async function renderHtmlToPdf(html, filename) {
     const pageH    = Math.round((A4_H / A4_W) * cw);
     const numPages = Math.ceil(ch / pageH);
 
-    // eslint-disable-next-line new-cap
+    const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait', compress: true });
 
     for (let i = 0; i < numPages; i++) {
