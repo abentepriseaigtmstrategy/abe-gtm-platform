@@ -737,14 +737,18 @@ function csvCell(val) {
 // FIX Bug 5: Returns real DB total count via separate count query, not just page length
 // ══════════════════════════════════════════════════════════════════
 async function handleGetLeads(body, userId, url, key, cors) {
-  const { status, priority, outreach_status, search, source_file, limit = 100, offset = 0 } = body;
+  const { status, priority, outreach_status, intent_level, search, source_file, limit = 100, offset = 0 } = body;
 
   // Base filter (same for both data + count queries)
   let baseFilter = `?user_id=eq.${userId}`;
   if (status)          baseFilter += `&status=eq.${sanitise(status, 20)}`;
   if (priority)        baseFilter += `&priority=eq.${sanitise(priority, 10)}`;
-  if (outreach_status) baseFilter += `&outreach_status=eq.${sanitise(outreach_status, 20)}`; // ← FIX Bug 4
+  if (outreach_status) baseFilter += `&outreach_status=eq.${sanitise(outreach_status, 20)}`;
   if (source_file)     baseFilter += `&source_file=eq.${encodeURIComponent(sanitise(source_file, 200))}`;
+  // Intent filter: translate HIGH/MEDIUM/LOW to score ranges
+  if (intent_level === 'HIGH')   baseFilter += `&intent_score=gte.60`;
+  if (intent_level === 'MEDIUM') baseFilter += `&intent_score=gte.30&intent_score=lt.60`;
+  if (intent_level === 'LOW')    baseFilter += `&intent_score=lt.30`;
   if (search)          baseFilter += `&or=(name.ilike.*${encodeURIComponent(sanitise(search, 100))}*,company.ilike.*${encodeURIComponent(sanitise(search, 100))}*,email.ilike.*${encodeURIComponent(sanitise(search, 100))}*)`;
 
   // Data query — paginated. Order by icp_score if available, else created_at
