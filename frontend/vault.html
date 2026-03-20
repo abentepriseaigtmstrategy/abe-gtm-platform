@@ -75,7 +75,14 @@
 
     .vault-card { background: rgba(18,24,39,0.7); border: 1px solid var(--border); border-radius: 16px; padding: 22px 24px; cursor: pointer; transition: all 0.2s; position: relative; }
     .vault-card:hover { border-color: rgba(168,85,247,0.4); background: rgba(168,85,247,0.04); transform: translateY(-2px); }
-    .vault-card-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; }
+    .vault-card.selected { border-color: rgba(168,85,247,0.7); background: rgba(168,85,247,0.08); transform: none; }
+    .vault-card-checkbox { position:absolute;top:14px;left:14px;width:16px;height:16px;accent-color:var(--accent);cursor:pointer;z-index:5; }
+    .vault-card-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; padding-left: 24px; }
+    .vault-in-lm { display:inline-flex;align-items:center;gap:4px;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;color:#22c55e;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2);border-radius:4px;padding:2px 7px;margin-top:4px; }
+    /* Vault bulk bar */
+    #vault-bulk-bar { display:none;background:linear-gradient(135deg,rgba(168,85,247,.12),rgba(99,102,241,.08));border:1px solid rgba(168,85,247,.25);border-radius:14px;padding:10px 18px;align-items:center;gap:10px;margin-bottom:16px;animation:slideDown .2s ease }
+    #vault-bulk-bar.active { display:flex }
+    @keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
     .vault-company { font-size: 15px; font-weight: 800; color: white; letter-spacing: -0.3px; }
     .vault-industry { font-size: 9px; text-transform: uppercase; letter-spacing: 0.15em; color: var(--muted); font-weight: 700; margin-top: 3px; }
     .vault-score { font-size: 22px; font-weight: 900; font-family: 'Space Mono', monospace; }
@@ -218,6 +225,15 @@
     </div>
   </div>
 
+  <!-- Bulk action bar -->
+  <div id="vault-bulk-bar">
+    <span id="vault-bulk-count" style="font-size:10px;font-weight:900;color:#c4b5fd;text-transform:uppercase;letter-spacing:.1em"></span>
+    <div style="flex:1"></div>
+    <button class="btn btn-sm" style="background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.3);border-radius:8px;padding:6px 14px;font-size:10px;font-weight:900;cursor:pointer" onclick="bulkSendToLeadManager()">→ Lead Manager</button>
+    <button class="btn btn-sm" style="background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:6px 14px;font-size:10px;font-weight:900;cursor:pointer" onclick="bulkDeleteStrategies()">🗑 Delete</button>
+    <button class="btn btn-sm" style="background:rgba(107,114,128,.1);color:var(--muted);border:1px solid var(--border);border-radius:8px;padding:6px 14px;font-size:10px;font-weight:900;cursor:pointer" onclick="clearVaultSelection()">✕ Clear</button>
+  </div>
+
   <!-- Toolbar -->
   <div class="toolbar">
     <div class="search-wrap">
@@ -230,6 +246,7 @@
       <option value="in_progress">In Progress</option>
       <option value="archived">Archived</option>
     </select>
+    <button id="vault-select-all-btn" class="btn btn-outline btn-sm" onclick="toggleSelectAll()" style="font-size:10px;white-space:nowrap">☐ Select All</button>
   </div>
 
   <!-- Loading -->
@@ -315,8 +332,9 @@
 /* ─────────────────────────────────────────────────────────────────
    VAULT STATE
 ───────────────────────────────────────────────────────────────── */
-let allStrategies = [];
-let _searchTimer  = null;
+let allStrategies  = [];
+let _searchTimer   = null;
+let _vaultSelected = new Set();
 
 /* ─────────────────────────────────────────────────────────────────
    HELPER: authenticated API call (always includes Bearer token)
@@ -386,13 +404,20 @@ function renderVault(strategies) {
     const steps      = s.steps_completed || 0;
     const date       = new Date(s.updated_at).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
     const statusKey  = (s.status || 'in_progress').replace(' ', '_');
+    const inLM       = localStorage.getItem('vault_in_lm_' + s.id) === '1';
+    const isSelected = _vaultSelected.has(s.id);
 
     return `
-    <div class="vault-card" onclick="openDrawer('${s.id}')">
+    <div class="vault-card${isSelected ? ' selected' : ''}" id="vcard-${s.id}" onclick="openDrawer('${s.id}')">
+      <input type="checkbox" class="vault-card-checkbox" id="vck-${s.id}"
+        ${isSelected ? 'checked' : ''}
+        onchange="toggleVaultCard('${s.id}',this.checked)"
+        onclick="event.stopPropagation()" />
       <div class="vault-card-header">
         <div>
           <div class="vault-company">${esc(s.company_name)}</div>
           <div class="vault-industry">${esc(s.industry || 'General Market')}</div>
+          ${inLM ? `<div class="vault-in-lm">✓ In Lead Manager</div>` : ''}
         </div>
         <div style="text-align:right;">
           ${score
@@ -418,9 +443,9 @@ function renderVault(strategies) {
       </div>
       <div class="vault-actions" onclick="event.stopPropagation()">
         <button class="btn btn-primary btn-sm" onclick="openDrawer('${s.id}')">Open</button>
-        <a href="report.html?id=${s.id}" class="btn btn-outline btn-sm" onclick="event.stopPropagation()">Full Report</a>
-        <button class="btn btn-outline btn-sm" onclick="exportStrategy('${s.id}');event.stopPropagation()">PDF</button>
-        <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="archiveStrategy('${s.id}');event.stopPropagation()">Archive</button>
+        <a href="report.html?id=${s.id}" class="btn btn-outline btn-sm" onclick="event.stopPropagation()">Report</a>
+        <button class="btn btn-outline btn-sm" data-send-id="${s.id}" onclick="sendToLeadManager('${s.id}','${escDQ(s.company_name)}','${escDQ(s.industry||'')}','${escDQ(s.primary_icp||'')}','${escDQ(s.company_url||'')}',${s.gtm_score||0});event.stopPropagation()" style="color:#22c55e;border-color:rgba(34,197,94,.3)">→ LM</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteStrategy('${s.id}','${escDQ(s.company_name)}');event.stopPropagation()" title="Delete">🗑</button>
       </div>
     </div>`;
   }).join('');
@@ -494,6 +519,141 @@ async function deleteStrategy(strategyId, companyName) {
   } catch(e) {
     showVaultToast('Delete failed: ' + e.message, true);
   }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   VAULT BULK SELECTION
+───────────────────────────────────────────────────────────────── */
+function toggleVaultCard(id, checked) {
+  if (checked) {
+    _vaultSelected.add(id);
+  } else {
+    _vaultSelected.delete(id);
+  }
+  const card = document.getElementById('vcard-' + id);
+  if (card) card.classList.toggle('selected', checked);
+  updateVaultBulkBar();
+}
+
+function updateVaultBulkBar() {
+  const bar   = document.getElementById('vault-bulk-bar');
+  const count = document.getElementById('vault-bulk-count');
+  const n     = _vaultSelected.size;
+  if (n > 0) {
+    bar.classList.add('active');
+    count.textContent = `${n} selected`;
+  } else {
+    bar.classList.remove('active');
+  }
+}
+
+function clearVaultSelection() {
+  _vaultSelected.clear();
+  document.querySelectorAll('.vault-card-checkbox').forEach(cb => { cb.checked = false; });
+  document.querySelectorAll('.vault-card').forEach(c => c.classList.remove('selected'));
+  const btn = document.getElementById('vault-select-all-btn');
+  if (btn) btn.textContent = '☐ Select All';
+  updateVaultBulkBar();
+}
+
+function toggleSelectAll() {
+  const all  = Array.from(document.querySelectorAll('.vault-card-checkbox'));
+  const btn  = document.getElementById('vault-select-all-btn');
+  const allChecked = all.every(cb => cb.checked);
+  all.forEach(cb => {
+    cb.checked = !allChecked;
+    const id = cb.id.replace('vck-', '');
+    toggleVaultCard(id, !allChecked);
+  });
+  if (btn) btn.textContent = allChecked ? '☐ Select All' : '☑ Deselect All';
+}
+
+async function bulkSendToLeadManager() {
+  if (!_vaultSelected.size) return;
+  const ids = Array.from(_vaultSelected);
+  const strategies = allStrategies.filter(s => ids.includes(s.id));
+  const btn = document.querySelector('#vault-bulk-bar button');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Sending…'; }
+
+  let sent = 0, dupes = 0, failed = 0;
+  for (const s of strategies) {
+    try {
+      const token = await window.APP.token();
+      const res = await fetch('/api/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          action: 'import', source_type: 'csv',
+          source_file: 'Strategy Vault — ' + s.company_name,
+          vault_import: true,
+          field_mapping: { name:'name', company:'company', website:'website', industry:'industry', title:'title' },
+          leads: [{
+            name: s.company_name, company: s.company_name,
+            website: s.company_url || '', industry: s.industry || '',
+            title: 'Account (from GTM Strategy)',
+            notes: s.primary_icp ? 'ICP: ' + s.primary_icp : '',
+            icp_score: s.gtm_score || null,
+            priority: (s.gtm_score >= 75) ? 'HIGH' : (s.gtm_score >= 50) ? 'MEDIUM' : 'LOW',
+            status: 'analyzed',
+          }],
+        }),
+      });
+      const data = await res.json();
+      if (data.duplicate) { dupes++; }
+      else if (res.ok) {
+        sent++;
+        // Mark card with "In Lead Manager" badge
+        localStorage.setItem('vault_in_lm_' + s.id, '1');
+        const card = document.getElementById('vcard-' + s.id);
+        if (card && !card.querySelector('.vault-in-lm')) {
+          const nameEl = card.querySelector('.vault-company');
+          if (nameEl) {
+            const badge = document.createElement('div');
+            badge.className = 'vault-in-lm';
+            badge.textContent = '✓ In Lead Manager';
+            nameEl.parentNode.insertBefore(badge, nameEl.nextSibling.nextSibling);
+          }
+        }
+        // Update card's send button
+        const sendBtn = card?.querySelector('[data-send-id]');
+        if (sendBtn) {
+          sendBtn.textContent = '✓ Sent';
+          sendBtn.style.color = '#22c55e';
+          sendBtn.disabled = true;
+        }
+      } else { failed++; }
+    } catch(_) { failed++; }
+  }
+
+  clearVaultSelection();
+  if (btn) { btn.disabled = false; btn.textContent = '→ Lead Manager'; }
+
+  const parts = [];
+  if (sent)  parts.push(`${sent} added`);
+  if (dupes) parts.push(`${dupes} already exist`);
+  if (failed) parts.push(`${failed} failed`);
+  showVaultToast(
+    parts.join(', ') + ` — <a href="leads.html" style="color:#a855f7;font-weight:900">View Lead Manager →</a>`
+  );
+}
+
+async function bulkDeleteStrategies() {
+  const ids = Array.from(_vaultSelected);
+  if (!ids.length) return;
+  if (!confirm(`Delete ${ids.length} selected strategies? This cannot be undone.`)) return;
+
+  let deleted = 0;
+  for (const id of ids) {
+    try {
+      await apiCall('/api/gtm', { action: 'delete_strategy', strategy_id: id });
+      deleted++;
+      allStrategies = allStrategies.filter(s => s.id !== id);
+    } catch(_) {}
+  }
+  clearVaultSelection();
+  showVaultToast(`${deleted} strategies deleted`);
+  renderVault(allStrategies);
+  updateStats(allStrategies);
 }
 
 function showVaultToast(msg, isError) {
@@ -589,6 +749,19 @@ async function sendToLeadManager(strategyId, companyName, industry, primaryIcp, 
       btn.style.color      = '#22c55e';
       btn.style.background = 'rgba(34,197,94,.1)';
       btn.style.borderColor = 'rgba(34,197,94,.4)';
+    }
+
+    // Mark card with "In Lead Manager" badge and persist in localStorage
+    localStorage.setItem('vault_in_lm_' + strategyId, '1');
+    const card = document.getElementById('vcard-' + strategyId);
+    if (card && !card.querySelector('.vault-in-lm')) {
+      const nameEl = card.querySelector('.vault-company');
+      if (nameEl) {
+        const badge = document.createElement('div');
+        badge.className = 'vault-in-lm';
+        badge.textContent = '✓ In Lead Manager';
+        nameEl.parentNode.insertBefore(badge, nameEl.nextSibling?.nextSibling || null);
+      }
     }
 
     // Show non-blocking toast with link — no confirm() dialog
