@@ -216,6 +216,12 @@
       <option value="MEDIUM">🟡 Medium</option>
       <option value="LOW">🔴 Low</option>
     </select>
+    <select class="fs" id="filter-intent" onchange="loadLeads()">
+      <option value="">All Intent</option>
+      <option value="HIGH">🔴 High Intent</option>
+      <option value="MEDIUM">🟡 Med Intent</option>
+      <option value="LOW">⚫ Low Intent</option>
+    </select>
     <select class="fs" id="filter-status" onchange="loadLeads()">
       <option value="">All Statuses</option>
       <option value="unprocessed">Unprocessed</option>
@@ -252,16 +258,16 @@
         <thead>
           <tr>
             <th style="width:3%"><input type="checkbox" class="ck" id="select-all" onchange="toggleAll(this.checked)"></th>
-            <th style="width:15%">Name</th>
-            <th style="width:16%">Company</th>
-            <th style="width:12%">Title</th>
+            <th style="width:14%">Name</th>
+            <th style="width:15%">Company</th>
+            <th style="width:11%">Title</th>
             <th style="width:6%">ICP</th>
-            <th style="width:6%">Intent</th>
+            <th style="width:8%">Intent</th>
             <th style="width:7%">Priority</th>
             <th style="width:9%">Status</th>
-            <th style="width:11%">Outreach</th>
-            <th style="width:8%">Updated</th>
-            <th style="width:7%">Actions</th>
+            <th style="width:10%">Outreach</th>
+            <th style="width:7%">Updated</th>
+            <th style="width:10%">Actions</th>
           </tr>
         </thead>
         <tbody id="leads-body">
@@ -393,6 +399,7 @@ async function loadLeads() {
   const priority = document.getElementById('filter-priority').value;
   const status   = document.getElementById('filter-status').value;
   const outreach = document.getElementById('filter-outreach').value;
+  const intent   = document.getElementById('filter-intent')?.value || '';
   const search   = document.getElementById('search').value.trim();
   const fileFilter = document.getElementById('filter-file')?.value || '';
 
@@ -402,6 +409,7 @@ async function loadLeads() {
       priority:        priority   || undefined,
       status:          status     || undefined,
       outreach_status: outreach   || undefined,
+      intent_level:    intent     || undefined,
       source_file:     fileFilter || undefined,
       search:          search     || undefined,
       limit:           _limit,
@@ -444,10 +452,15 @@ function renderTable(leads) {
     const date    = l.updated_at ? new Date(l.updated_at).toLocaleDateString('en-GB',{day:'2-digit',month:'short'}) : '—';
     const statusCls   = `sb-${l.status||'unprocessed'}`;
     const outreach    = l.outreach_status || 'not_sent';
-    // Show "—" when lead has no title — score of 32 on empty data is misleading
-    const hasData    = !!(l.title || l.company);
-    const icpDisplay = (icp !== null && hasData) ? `${icp}%` : (icp !== null ? `${icp}%` : '—');
-    const icpClass   = (icp !== null) ? `priority-${icp>=75?'HIGH':icp>=50?'MEDIUM':'LOW'}` : '';
+    const hasData     = !!(l.title || l.company);
+    const icpDisplay  = (icp !== null && hasData) ? `${icp}%` : (icp !== null ? `${icp}%` : '—');
+    const icpClass    = (icp !== null) ? `priority-${icp>=75?'HIGH':icp>=50?'MEDIUM':'LOW'}` : '';
+    // Intent: convert numeric score to label — 0 or null both show LOW
+    const intentLevel = intent === null ? null : (intent >= 60 ? 'HIGH' : intent >= 30 ? 'MEDIUM' : 'LOW');
+    const intentColor = intentLevel === 'HIGH' ? 'var(--red)' : intentLevel === 'MEDIUM' ? 'var(--amber)' : 'var(--muted)';
+    const intentDisplay = intentLevel
+      ? `<span style="font-size:9px;font-weight:800;color:${intentColor}">${intentLevel}</span>`
+      : '—';
     // Vault leads carry their GTM Score — hide the rescore button to protect the value
     const isVault = l.source_file && l.source_file.startsWith('Strategy Vault');
     return `
@@ -456,8 +469,8 @@ function renderTable(leads) {
       <td class="font-bold" style="color:white;font-weight:700;cursor:pointer" onclick="openDrawer('${l.id}')" title="View details">${esc(l.name||'—')}</td>
       <td style="color:#c4b5fd">${esc(l.company||'—')}</td>
       <td>${esc(l.title||'—')}</td>
-      <td class="${icpClass}" style="color:${icp===null?'var(--muted)':'inherit'}">${icpDisplay}</td>
-      <td style="color:${getIntentColor(intent)};font-weight:800">${intent !== null ? intent : '—'}</td>
+      <td style="color:${icpClass?'inherit':'var(--muted)'}" class="${icpClass}">${icpDisplay}</td>
+      <td>${intentDisplay}</td>
       <td class="priority-${prio}">${prio}</td>
       <td><span class="status-badge ${statusCls}">${l.status||'unprocessed'}</span></td>
       <td><span class="ob ob-${outreach}">${outreach.replace('_',' ')}</span></td>
@@ -791,14 +804,22 @@ function quickFilter(type, value) {
     document.getElementById('filter-priority').value = value;
     document.getElementById('filter-status').value   = '';
     document.getElementById('filter-outreach').value = '';
+    document.getElementById('filter-intent').value   = '';
   } else if (type === 'status') {
     document.getElementById('filter-status').value   = value;
     document.getElementById('filter-priority').value = '';
     document.getElementById('filter-outreach').value = '';
+    document.getElementById('filter-intent').value   = '';
   } else if (type === 'outreach') {
     document.getElementById('filter-outreach').value = value;
     document.getElementById('filter-priority').value = '';
     document.getElementById('filter-status').value   = '';
+    document.getElementById('filter-intent').value   = '';
+  } else if (type === 'intent') {
+    document.getElementById('filter-intent').value   = value;
+    document.getElementById('filter-priority').value = '';
+    document.getElementById('filter-status').value   = '';
+    document.getElementById('filter-outreach').value = '';
   }
   _offset = 0;
   loadLeads();
@@ -808,6 +829,7 @@ function clearFilters() {
   document.getElementById('filter-priority').value = '';
   document.getElementById('filter-status').value   = '';
   document.getElementById('filter-outreach').value = '';
+  document.getElementById('filter-intent').value   = '';
   document.getElementById('filter-file').value     = '';
   document.getElementById('search').value          = '';
   _offset = 0;
