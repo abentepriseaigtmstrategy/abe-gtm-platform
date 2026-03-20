@@ -455,10 +455,13 @@ function renderTable(leads) {
     const hasData     = !!(l.title || l.company);
     const icpDisplay  = (icp !== null && hasData) ? `${icp}%` : (icp !== null ? `${icp}%` : '—');
     const icpClass    = (icp !== null) ? `priority-${icp>=75?'HIGH':icp>=50?'MEDIUM':'LOW'}` : '';
-    // Intent: vault leads have no intent_score — derive from icp_score instead.
-    // CSV leads use intent_score as normal.
+    // Intent derivation:
+    // Vault leads: intent_score is stored as 0 (Supabase default) when no real intent data exists.
+    //   Treat 0 the same as null — fall back to icp_score which carries the real GTM signal.
+    // CSV leads: intent_score of 0 means genuinely no signals — show LOW as-is.
     const isVault     = l.source_file && l.source_file.startsWith('Strategy Vault');
-    const intentRaw   = intent !== null ? intent : (isVault && icp !== null ? icp : null);
+    const hasRealIntent = intent !== null && (!isVault || intent > 0);
+    const intentRaw   = hasRealIntent ? intent : (icp !== null ? icp : null);
     const intentLevel = intentRaw === null ? null : (intentRaw >= 60 ? 'HIGH' : intentRaw >= 30 ? 'MEDIUM' : 'LOW');
     const intentColor = intentLevel === 'HIGH' ? 'var(--green)' : intentLevel === 'MEDIUM' ? 'var(--amber)' : 'var(--muted)';
     const intentDisplay = intentLevel
