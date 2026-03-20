@@ -258,16 +258,16 @@
         <thead>
           <tr>
             <th style="width:3%"><input type="checkbox" class="ck" id="select-all" onchange="toggleAll(this.checked)"></th>
-            <th style="width:14%">Name</th>
-            <th style="width:15%">Company</th>
-            <th style="width:11%">Title</th>
+            <th style="width:13%">Name</th>
+            <th style="width:14%">Company</th>
+            <th style="width:10%">Title</th>
             <th style="width:6%">ICP</th>
             <th style="width:8%">Intent</th>
             <th style="width:7%">Priority</th>
             <th style="width:9%">Status</th>
-            <th style="width:10%">Outreach</th>
+            <th style="width:9%">Outreach</th>
             <th style="width:7%">Updated</th>
-            <th style="width:10%">Actions</th>
+            <th style="width:14%">Actions</th>
           </tr>
         </thead>
         <tbody id="leads-body">
@@ -455,14 +455,15 @@ function renderTable(leads) {
     const hasData     = !!(l.title || l.company);
     const icpDisplay  = (icp !== null && hasData) ? `${icp}%` : (icp !== null ? `${icp}%` : '—');
     const icpClass    = (icp !== null) ? `priority-${icp>=75?'HIGH':icp>=50?'MEDIUM':'LOW'}` : '';
-    // Intent: convert numeric score to label — 0 or null both show LOW
-    const intentLevel = intent === null ? null : (intent >= 60 ? 'HIGH' : intent >= 30 ? 'MEDIUM' : 'LOW');
-    const intentColor = intentLevel === 'HIGH' ? 'var(--red)' : intentLevel === 'MEDIUM' ? 'var(--amber)' : 'var(--muted)';
+    // Intent: vault leads have no intent_score — derive from icp_score instead.
+    // CSV leads use intent_score as normal.
+    const isVault     = l.source_file && l.source_file.startsWith('Strategy Vault');
+    const intentRaw   = intent !== null ? intent : (isVault && icp !== null ? icp : null);
+    const intentLevel = intentRaw === null ? null : (intentRaw >= 60 ? 'HIGH' : intentRaw >= 30 ? 'MEDIUM' : 'LOW');
+    const intentColor = intentLevel === 'HIGH' ? 'var(--green)' : intentLevel === 'MEDIUM' ? 'var(--amber)' : 'var(--muted)';
     const intentDisplay = intentLevel
       ? `<span style="font-size:9px;font-weight:800;color:${intentColor}">${intentLevel}</span>`
       : '—';
-    // Vault leads carry their GTM Score — hide the rescore button to protect the value
-    const isVault = l.source_file && l.source_file.startsWith('Strategy Vault');
     return `
     <tr id="row-${l.id}">
       <td><input type="checkbox" class="ck row-ck" value="${l.id}" onchange="toggleRow(this)"></td>
