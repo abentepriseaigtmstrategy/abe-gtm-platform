@@ -749,16 +749,16 @@ async function handleGetLeads(body, userId, url, key, cors) {
   if (outreach_status) baseFilter += `&outreach_status=eq.${sanitise(outreach_status, 20)}`;
   if (source_file)     baseFilter += `&source_file=eq.${encodeURIComponent(sanitise(source_file, 200))}`;
   // Intent filter: translate HIGH/MEDIUM/LOW to score ranges.
-  // Uses or() to also catch vault leads where intent_score is null but icp_score exists
-  // (covers records imported before the intent_score fix was deployed).
+  // Vault leads store intent_score=0 (Supabase integer default, not null).
+  // For both null and 0, fall back to icp_score which carries the real GTM signal.
   if (intent_level === 'HIGH') {
-    baseFilter += `&or=(intent_score.gte.60,and(intent_score.is.null,icp_score.gte.60))`;
+    baseFilter += `&or=(intent_score.gte.60,and(intent_score.is.null,icp_score.gte.60),and(intent_score.eq.0,icp_score.gte.60))`;
   }
   if (intent_level === 'MEDIUM') {
-    baseFilter += `&or=(and(intent_score.gte.30,intent_score.lt.60),and(intent_score.is.null,icp_score.gte.30,icp_score.lt.60))`;
+    baseFilter += `&or=(and(intent_score.gte.30,intent_score.lt.60),and(intent_score.is.null,icp_score.gte.30,icp_score.lt.60),and(intent_score.eq.0,icp_score.gte.30,icp_score.lt.60))`;
   }
   if (intent_level === 'LOW') {
-    baseFilter += `&or=(intent_score.lt.30,and(intent_score.is.null,icp_score.lt.30))`;
+    baseFilter += `&or=(and(intent_score.gt.0,intent_score.lt.30),and(intent_score.is.null,icp_score.lt.30),and(intent_score.eq.0,icp_score.lt.30))`;
   }
   if (search)          baseFilter += `&or=(name.ilike.*${encodeURIComponent(sanitise(search, 100))}*,company.ilike.*${encodeURIComponent(sanitise(search, 100))}*,email.ilike.*${encodeURIComponent(sanitise(search, 100))}*)`;
 
