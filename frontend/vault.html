@@ -534,7 +534,7 @@ function saveVaultAction(strategyId, action) {
   }
 }
 
-async function sendToLeadManager(strategyId, companyName, industry, primaryIcp, website) {
+async function sendToLeadManager(strategyId, companyName, industry, primaryIcp, website, gtmScore) {
   // Use the button that triggered this — find it reliably via strategyId
   const btn = document.querySelector(`[data-send-id="${strategyId}"]`) || event?.currentTarget || event?.target;
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Sending…'; }
@@ -548,21 +548,41 @@ async function sendToLeadManager(strategyId, companyName, industry, primaryIcp, 
         action:      'import',
         source_type: 'csv',
         source_file: 'Strategy Vault — ' + companyName,
+        // Flag so backend skips deterministicScore and uses gtm_score directly
+        vault_import: true,
         // Pass field_mapping explicitly so AI detection is skipped — we know the field names
         field_mapping: { name: 'name', company: 'company', website: 'website', industry: 'industry', title: 'title' },
         leads: [{
-          name:     companyName,
-          company:  companyName,
-          website:  website   || '',
-          industry: industry  || '',
-          title:    'Account (from GTM Strategy)',
-          notes:    primaryIcp ? 'ICP: ' + primaryIcp : '',
+          name:      companyName,
+          company:   companyName,
+          website:   website   || '',
+          industry:  industry  || '',
+          title:     'Account (from GTM Strategy)',
+          notes:     primaryIcp ? 'ICP: ' + primaryIcp : '',
+          // Wire the vault's GTM Score directly as the ICP score so Lead Manager shows real data
+          icp_score: gtmScore || null,
+          priority:  gtmScore >= 75 ? 'HIGH' : gtmScore >= 50 ? 'MEDIUM' : 'LOW',
+          status:    'analyzed',
         }],
       }),
     });
 
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+    if (data.duplicate) {
+      // Already in Lead Manager — update button but don't show error
+      if (btn) {
+        btn.textContent      = '✓ Already in Lead Manager';
+        btn.style.color      = '#f59e0b';
+        btn.style.background = 'rgba(245,158,11,.1)';
+        btn.style.borderColor = 'rgba(245,158,11,.4)';
+      }
+      showVaultToast(
+        `"${companyName}" is already in Lead Manager — <a href="leads.html" style="color:#a855f7;font-weight:900">View →</a>`
+      );
+      return;
+    }
 
     if (btn) {
       btn.textContent      = '✓ Saved to Lead Manager';
@@ -606,7 +626,7 @@ function renderDrawer(s) {
     <button class="btn btn-outline btn-sm" onclick="exportStrategy('${s.id}')">⬇ PDF</button>
     <button class="btn btn-outline btn-sm" onclick="copyStrategyText('${s.id}')">📋 Copy</button>
     <a href="gtm-strategy.html?resume=${s.id}" class="btn btn-outline btn-sm">↻ Re-run</a>
-    <button class="btn btn-outline btn-sm" data-send-id="${s.id}" onclick="sendToLeadManager('${s.id}','${escDQ(s.company_name)}','${escDQ(s.industry||'')}','${escDQ(s.primary_icp||'')}','${escDQ(s.company_url||'')}')" style="color:#22c55e;border-color:rgba(34,197,94,.4)">→ Lead Manager</button>
+    <button class="btn btn-outline btn-sm" data-send-id="${s.id}" onclick="sendToLeadManager('${s.id}','${escDQ(s.company_name)}','${escDQ(s.industry||'')}','${escDQ(s.primary_icp||'')}','${escDQ(s.company_url||'')}',${s.gtm_score||0})" style="color:#22c55e;border-color:rgba(34,197,94,.4)">→ Lead Manager</button>
     <button class="btn btn-ghost btn-sm" onclick="deleteStrategy('${s.id}','${escDQ(s.company_name)}')" style="color:var(--red)" title="Delete strategy">🗑</button>
   `;
 
