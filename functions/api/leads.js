@@ -362,11 +362,18 @@ async function handleScoreBatch(body, userId, openaiKey, url, key, cors) {
     }
   }
 
-  // Score each lead deterministically against resolved ICP
-  const scored = leads.map(l => ({
-    ...l,
-    ...deterministicScore(l, icp),
-  }));
+  // ── Vault leads are pre-scored from GTM — never overwrite with deterministic score ──
+  // Any lead sourced from Strategy Vault carries the real GTM score; rescoring it
+  // with the title-based heuristic would replace a meaningful score with a flat ~36.
+  const vaultLeads  = leads.filter(l => l.source_file && l.source_file.startsWith('Strategy Vault'));
+  const scorableLeads = leads.filter(l => !l.source_file || !l.source_file.startsWith('Strategy Vault'));
+
+  const scored = [
+    // Vault leads: pass through unchanged — score already set on import
+    ...vaultLeads,
+    // Regular leads: apply deterministic ICP scoring
+    ...scorableLeads.map(l => ({ ...l, ...deterministicScore(l, icp) })),
+  ];
 
   // Optionally enrich explanation via AI (batched, non-blocking)
   if (openaiKey && scored.length <= 20) {
