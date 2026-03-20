@@ -448,6 +448,8 @@ function renderTable(leads) {
     const hasData    = !!(l.title || l.company);
     const icpDisplay = (icp !== null && hasData) ? `${icp}%` : (icp !== null ? `${icp}%` : '—');
     const icpClass   = (icp !== null) ? `priority-${icp>=75?'HIGH':icp>=50?'MEDIUM':'LOW'}` : '';
+    // Vault leads carry their GTM Score — hide the rescore button to protect the value
+    const isVault = l.source_file && l.source_file.startsWith('Strategy Vault');
     return `
     <tr id="row-${l.id}">
       <td><input type="checkbox" class="ck row-ck" value="${l.id}" onchange="toggleRow(this)"></td>
@@ -462,7 +464,10 @@ function renderTable(leads) {
       <td style="color:var(--muted);font-family:'Space Mono',monospace;font-size:9px">${date}</td>
       <td>
         <div style="display:flex;gap:4px">
-          <button class="btn btn-sm btn-outline" title="Score this lead" onclick="scoreOne('${l.id}')">⚡</button>
+          ${isVault
+            ? `<span title="GTM Score locked — sourced from Strategy Vault" style="font-size:9px;color:var(--muted);padding:4px 6px;border:1px solid var(--border);border-radius:6px;white-space:nowrap">🔒 GTM</span>`
+            : `<button class="btn btn-sm btn-outline" title="Score this lead" onclick="scoreOne('${l.id}')">⚡</button>`
+          }
           <button class="btn btn-sm btn-outline" title="Generate outreach" onclick="genOutreach('${l.id}')">✉</button>
           <button class="btn btn-sm" style="color:var(--red);border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.05);border-radius:6px;padding:4px 7px;cursor:pointer;font-size:10px" title="Delete lead" onclick="deleteSingle('${l.id}')">✕</button>
         </div>
@@ -513,9 +518,18 @@ function updateBulkBar() {
 async function scoreBatch() {
   if (!_selected.size) return;
   const token = await getToken();
-  showToast(`Scoring ${_selected.size} leads…`);
+  // Filter out vault leads — their GTM Score must not be overwritten
+  const scorableIds = [..._selected].filter(id => {
+    const lead = _leads.find(l => l.id === id);
+    return !lead || !lead.source_file || !lead.source_file.startsWith('Strategy Vault');
+  });
+  if (!scorableIds.length) {
+    showToast('Selected leads are from Strategy Vault — scores are locked 🔒', 'info');
+    return;
+  }
+  showToast(`Scoring ${scorableIds.length} leads…`);
   try {
-    await api('/api/leads', { action: 'score_batch', lead_ids: [..._selected] }, token);
+    await api('/api/leads', { action: 'score_batch', lead_ids: scorableIds }, token);
     showToast('Leads scored ✓', 'success');
     loadLeads();
     clearSelection();
@@ -837,6 +851,28 @@ function _populateDrawer(lead) {
   document.getElementById('lead-drawer').style.right = '0';
   document.getElementById('drawer-overlay').style.display = 'block';
   document.body.style.overflow = 'hidden';
+
+  // Vault leads carry their GTM Score — hide rescore button, show lock badge
+  const isVault = lead.source_file && lead.source_file.startsWith('Strategy Vault');
+  const drawerScoreBtn = document.getElementById('btn-drawer-score');
+  if (drawerScoreBtn) {
+    if (isVault) {
+      drawerScoreBtn.style.display = 'none';
+      // Show lock badge if not already there
+      if (!document.getElementById('vault-score-lock')) {
+        const lock = document.createElement('span');
+        lock.id = 'vault-score-lock';
+        lock.title = 'GTM Score locked — sourced from Strategy Vault';
+        lock.style.cssText = 'flex:1;font-size:9px;color:var(--muted);padding:5px 8px;border:1px solid var(--border);border-radius:6px;text-align:center;white-space:nowrap';
+        lock.textContent = '🔒 GTM Score Locked';
+        drawerScoreBtn.parentNode.insertBefore(lock, drawerScoreBtn);
+      }
+    } else {
+      drawerScoreBtn.style.display = '';
+      const lock = document.getElementById('vault-score-lock');
+      if (lock) lock.remove();
+    }
+  }
 }
 
 function closeDrawer() {
