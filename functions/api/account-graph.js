@@ -159,9 +159,23 @@ async function addCompany(body, userId, url, key, env, cors) {
     scan_status: domain ? 'pending' : 'skipped',
   };
 
-  const res = await sb(url, key, 'companies', 'POST',
-    JSON.stringify(payload), '?on_conflict=user_id,name');
-  if (!res.ok) return errRes('Failed to save company', 500, cors);
+  // FIX: upsert needs 'resolution=merge-duplicates' — sb() helper missing this
+  const res = await fetch(`${url}/rest/v1/companies?on_conflict=user_id,name`, {
+    method: 'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'apikey':        key,
+      'Authorization': `Bearer ${key}`,
+      'Prefer':        'resolution=merge-duplicates,return=representation',
+    },
+    body: JSON.stringify(payload),
+  });
+
+  if (!res.ok) {
+    const errText = await res.text().catch(() => 'unknown');
+    console.error('addCompany failed:', res.status, errText);
+    return errRes('Failed to save company', 500, cors);
+  }
 
   const saved = await res.json();
   const companyId = Array.isArray(saved) ? saved[0]?.id : saved?.id;
@@ -349,13 +363,17 @@ function thirtyDaysAgo() {
   return new Date(Date.now() - 30 * 86400 * 1000).toISOString();
 }
 
-const sb = (url, key, table, method, body, qs = '') =>
+const sb = (url, key, table, method, body, qs = '', prefer = null) =>
   fetch(`${url}/rest/v1/${table}${qs}`, {
     method,
     headers: {
       'Content-Type': 'application/json',
       apikey: key, Authorization: `Bearer ${key}`,
-      Prefer: method === 'POST' ? 'return=representation' : 'return=minimal',
+      Prefer: prefer
+        ? prefer
+        : method === 'POST'
+          ? 'return=representation'
+          : 'return=minimal',
     },
     body: body || undefined,
   });
