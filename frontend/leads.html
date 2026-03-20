@@ -477,12 +477,15 @@ function renderTable(leads) {
       <td><span class="ob ob-${outreach}">${outreach.replace('_',' ')}</span></td>
       <td style="color:var(--muted);font-family:'Space Mono',monospace;font-size:9px">${date}</td>
       <td>
-        <div style="display:flex;gap:4px">
+        <div style="display:flex;gap:4px;align-items:center">
           ${isVault
-            ? `<span title="GTM Score locked — sourced from Strategy Vault" style="font-size:9px;color:var(--muted);padding:4px 6px;border:1px solid var(--border);border-radius:6px;white-space:nowrap">🔒 GTM</span>`
+            ? `<span title="${l.outreach_email ? 'GTM Score locked · Outreach generated' : 'GTM Score locked — sourced from Strategy Vault'}" style="font-size:9px;color:var(--muted);padding:4px 6px;border:1px solid var(--border);border-radius:6px;white-space:nowrap">🔒 GTM</span>`
             : `<button class="btn btn-sm btn-outline" title="Score this lead" onclick="scoreOne('${l.id}')">⚡</button>`
           }
-          <button class="btn btn-sm btn-outline" title="Generate outreach" onclick="genOutreach('${l.id}')">✉</button>
+          ${l.outreach_email
+            ? `<span title="Outreach already generated — click lead to view" style="font-size:9px;color:#22c55e;padding:4px 6px;border:1px solid rgba(34,197,94,.3);background:rgba(34,197,94,.06);border-radius:6px;cursor:default">📧</span>`
+            : `<button class="btn btn-sm btn-outline" title="Generate outreach" onclick="genOutreach('${l.id}')">✉</button>`
+          }
           <button class="btn btn-sm" style="color:var(--red);border:1px solid rgba(239,68,68,.3);background:rgba(239,68,68,.05);border-radius:6px;padding:4px 7px;cursor:pointer;font-size:10px" title="Delete lead" onclick="deleteSingle('${l.id}')">✕</button>
         </div>
       </td>
@@ -869,6 +872,16 @@ function _populateDrawer(lead) {
   document.getElementById('ds-priority').style.color = lead.priority === 'HIGH' ? 'var(--green)' : lead.priority === 'MEDIUM' ? 'var(--amber)' : 'var(--muted)';
   document.getElementById('ds-outreach').textContent = (lead.outreach_status || 'not sent').replace('_',' ');
 
+  // Update outreach button label to reflect whether outreach exists already
+  const outreachBtn = document.getElementById('btn-drawer-outreach');
+  if (outreachBtn) {
+    const hasOutreach = !!(lead.outreach_email || lead.gtm_analysis?.email);
+    outreachBtn.textContent = hasOutreach ? '📧 View / Regenerate' : '✉ Generate Outreach';
+    outreachBtn.style.background = hasOutreach ? 'rgba(34,197,94,.1)' : '';
+    outreachBtn.style.color      = hasOutreach ? '#22c55e' : '';
+    outreachBtn.style.borderColor = hasOutreach ? 'rgba(34,197,94,.3)' : '';
+  }
+
   switchTab('details');
 
   document.getElementById('lead-drawer').style.right = '0';
@@ -1060,11 +1073,20 @@ async function saveOutreach() {
         outreach_status:   'not_sent',
       },
     }, token);
-    if (btn) { btn.textContent = '✓ Saved'; btn.style.background = 'rgba(34,197,94,.2)'; }
-    showToast('Outreach saved to lead ✓', 'success');
-    setTimeout(() => {
-      if (btn) { btn.textContent = '💾 Save to Lead'; btn.disabled = false; btn.style.background = ''; }
-    }, 2500);
+
+    // Update in-memory lead so table re-render reflects the change
+    const idx = _leads.findIndex(l => l.id === _drawerLead.id);
+    if (idx >= 0) {
+      _leads[idx].outreach_email    = _drawerLead.outreach_email    || '';
+      _leads[idx].outreach_linkedin = _drawerLead.outreach_linkedin || '';
+      _leads[idx].outreach_status   = 'not_sent';
+    }
+    renderTable(_leads);   // refresh table so mail icon locks immediately
+
+    showToast('Outreach saved ✓ — closing', 'success');
+    // Close drawer automatically after short delay so user sees the success toast
+    setTimeout(() => closeDrawer(), 1200);
+
   } catch(e) {
     showToast(e.message, 'error');
     if (btn) { btn.textContent = '💾 Save to Lead'; btn.disabled = false; }
