@@ -546,7 +546,7 @@ async function sendToLeadManager(strategyId, companyName, industry, primaryIcp, 
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
       body: JSON.stringify({
         action:      'import',
-        source_type: 'vault',
+        source_type: 'csv',
         source_file: 'Strategy Vault — ' + companyName,
         // Pass field_mapping explicitly so AI detection is skipped — we know the field names
         field_mapping: { name: 'name', company: 'company', website: 'website', industry: 'industry', title: 'title' },
