@@ -160,7 +160,7 @@ async function addCompany(body, userId, url, key, env, cors) {
   };
 
   // FIX: upsert needs 'resolution=merge-duplicates' — sb() helper missing this
-  const res = await fetch(`${url}/rest/v1/companies?on_conflict=user_id,name`, {
+  const res = await fetch(`${url}/rest/v1/companies?on_conflict=companies_user_name_unique`, {
     method: 'POST',
     headers: {
       'Content-Type':  'application/json',
