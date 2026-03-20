@@ -174,6 +174,21 @@ async function handleImport(body, userId, openaiKey, url, key, cors) {
   }
 
   const ts = new Date().toISOString();
+  const isVaultImport = body.vault_import === true;
+
+  // ── Vault import dedup: skip companies already sent from vault ──────────────
+  // Prevents duplicate rows when user clicks "→ Lead Manager" more than once.
+  let existingVaultCompanies = new Set();
+  if (isVaultImport) {
+    try {
+      const dupRes = await sb(url, key, 'leads', 'GET', null,
+        `?user_id=eq.${userId}&source_type=eq.csv&source_file=like.Strategy Vault*&select=company`);
+      if (dupRes.ok) {
+        const existing = await dupRes.json();
+        existing.forEach(r => { if (r.company) existingVaultCompanies.add(r.company.toLowerCase()); });
+      }
+    } catch (_) { /* non-blocking — if check fails, allow insert */ }
+  }
 
   const payload = leads.slice(0, 5000).map(l => {
     // Get a field value using resolved mapping or fuzzy fallback
@@ -209,6 +224,13 @@ async function handleImport(body, userId, openaiKey, url, key, cors) {
       'domain','web','url','company url','company_url',
     ]);
 
+    // ── Vault imports: honour pre-computed GTM score — skip rescoring ──────────
+    // icp_score, priority, status come directly from vault.html when vault_import=true.
+    // For regular CSV imports these are absent → fall back to defaults below.
+    const preScore  = isVaultImport && l.icp_score != null ? Number(l.icp_score) : null;
+    const prePrio   = isVaultImport && l.priority  ? l.priority  : null;
+    const preStatus = isVaultImport               ? (l.status || 'analyzed') : 'unprocessed';
+
     return {
       user_id:      userId,
       name:         sanitise(fullName, 120),
@@ -221,22 +243,32 @@ async function handleImport(body, userId, openaiKey, url, key, cors) {
       industry:     sanitise(get('industry', ['industry','organization.industry','departments.0','department']), 120),
       source_file:  source_file || null,
       source_type,
-      status:       'unprocessed',
+      status:       preStatus,
+      icp_score:    preScore,
+      priority:     prePrio,
       notes:        sanitise(get('notes', ['notes','note','comments','comment']), 500) || null,
-      tags:         JSON.stringify(['Imported']),
+      tags:         JSON.stringify(isVaultImport ? ['Vault', 'Account'] : ['Imported']),
       activity_log: JSON.stringify([{
         action: 'imported', timestamp: ts,
         note: `Imported via ${source_type}${source_file ? ' — ' + source_file : ''}`,
       }]),
     };
-  }).filter(l => l.name && l.name !== '');
+  }).filter(l => {
+    if (!l.name || l.name === '') return false;
+    // Dedup vault imports by company name (case-insensitive)
+    if (isVaultImport && existingVaultCompanies.has((l.company || '').toLowerCase())) return false;
+    return true;
+  });
 
-  if (!payload.length) return errRes('No valid leads after parsing (name field required)', 400, cors);
+  if (!payload.length) {
+    // Vault duplicate — return friendly response instead of hard error
+    if (isVaultImport) return okRes({ imported: 0, total: leads.length, duplicate: true }, cors);
+    return errRes('No valid leads after parsing (name field required)', 400, cors);
+  }
 
-  // Insert in chunks. No on_conflict blocking — dedup is handled by the user
-  // via the File Manager (delete file then re-import). The previous on_conflict
-  // on user_id+name+company was blocking ALL leads when company was blank,
-  // since blank company made every "David G" look identical.
+  // Insert in chunks. Vault imports honour pre-computed scores so no re-scoring needed.
+  // Regular CSV imports have no conflict guard — dedup is handled by the user
+  // via the File Manager (delete file then re-import).
   const CHUNK = 200;
   let inserted = 0;
   let lastError = '';
