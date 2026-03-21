@@ -479,14 +479,49 @@ function renderDrawer(g) {
   // FIX: Do NOT embed dynamic co.id / co.domain inside onclick="" string literals.
   // Template literal nesting + quote escaping causes "missing ) after argument list".
   // Use a direct event listener instead — clean and safe.
-  document.getElementById('d-actions').innerHTML = `
-    <a href="gtm-strategy.html?company=${encodeURIComponent(co.name||'')}&industry=${encodeURIComponent(co.industry||'')}"
-       class="btn btn-primary btn-sm">⚡ Run GTM Strategy</a>
-    <button class="btn btn-outline btn-sm" id="scan-btn-drawer">🔍 Scan Signals</button>
-  `;
-  // Attach click handler safely — no string escaping issues
+  document.getElementById('d-actions').innerHTML =
+    '<button class="btn btn-primary btn-sm" id="gtm-btn-drawer">&#9889; Open GTM Strategy</button>' +
+    '<button class="btn btn-outline btn-sm" id="scan-btn-drawer">&#128269; Scan Signals</button>' +
+    '<button class="btn btn-outline btn-sm" id="edit-btn-drawer">&#9998; Edit</button>';
+
+  // GTM Strategy — find existing strategy in vault, resume it
+  const gtmBtn = document.getElementById('gtm-btn-drawer');
+  if (gtmBtn) gtmBtn.onclick = async function() {
+    gtmBtn.disabled = true; gtmBtn.textContent = 'Finding strategy…';
+    try {
+      const token = await getToken();
+      const res = await fetch('/api/gtm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ action: 'get_vault', search: co.name, limit: 5 }),
+      });
+      const data = await res.json();
+      const strategies = data.strategies || [];
+      // Find best match
+      const match = strategies.find(s =>
+        s.company_name.toLowerCase().trim() === (co.name||'').toLowerCase().trim()
+      ) || strategies[0];
+
+      if (match) {
+        // Resume existing strategy
+        window.location.href = 'gtm-strategy.html?resume=' + match.id;
+      } else {
+        // No strategy yet — start new one
+        window.location.href = 'gtm-strategy.html?company=' + encodeURIComponent(co.name||'') +
+          '&industry=' + encodeURIComponent(co.industry||'');
+      }
+    } catch(e) {
+      window.location.href = 'gtm-strategy.html?company=' + encodeURIComponent(co.name||'');
+    }
+  };
+
+  // Scan Signals
   const scanBtn = document.getElementById('scan-btn-drawer');
-  if (scanBtn) scanBtn.onclick = () => scanCompany(co.id, co.domain || '');
+  if (scanBtn) scanBtn.onclick = function() { scanCompany(co.id, co.domain || ''); };
+
+  // Edit company
+  const editBtn = document.getElementById('edit-btn-drawer');
+  if (editBtn) editBtn.onclick = function() { openEditCompany(co.id, co.name||'', co.domain||'', co.industry||''); };
 
   const intColor = tier === 'HOT' ? 'var(--red)' : tier === 'WARM' ? 'var(--amber)' : 'var(--muted)';
   const field = (label, val) => val ? `<div style="margin-bottom:10px"><div style="font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.18em;color:var(--muted);margin-bottom:4px">${esc(label)}</div><div style="font-size:11px;color:#d1d5db;line-height:1.6;background:rgba(0,0,0,.3);border-radius:8px;padding:9px 11px">${esc(String(val))}</div></div>` : '';
@@ -694,6 +729,107 @@ function showToast(msg, type = '') {
 function esc(s) {
   if (typeof s !== 'string') return String(s||'');
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+/* ═══════════════════════════════════
+   EDIT COMPANY
+═══════════════════════════════════ */
+function openEditCompany(companyId, name, domain, industry) {
+  var existing = document.getElementById('edit-co-modal');
+  if (existing) existing.remove();
+
+  var overlay = document.createElement('div');
+  overlay.id = 'edit-co-modal';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:600;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(6px)';
+
+  var box = document.createElement('div');
+  box.style.cssText = 'width:100%;max-width:400px;background:#0F1420;border:1px solid #1C2235;border-radius:14px;overflow:hidden;font-family:inherit';
+
+  var hdr = document.createElement('div');
+  hdr.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:rgba(0,0,0,.3);border-bottom:1px solid #1C2235';
+  var htitle = document.createElement('div');
+  htitle.style.cssText = 'font-size:13px;font-weight:800;color:white';
+  htitle.textContent = '✎ Edit Company';
+  var xBtn = document.createElement('button');
+  xBtn.textContent = '✕';
+  xBtn.style.cssText = 'background:none;border:none;color:#6B7280;cursor:pointer;font-size:16px;font-family:inherit';
+  xBtn.onclick = function(){ overlay.remove(); };
+  hdr.appendChild(htitle);
+  hdr.appendChild(xBtn);
+
+  var body = document.createElement('div');
+  body.style.cssText = 'padding:20px 18px';
+
+  function mkField(label, id, val, ph) {
+    var w = document.createElement('div');
+    w.style.marginBottom = '12px';
+    var l = document.createElement('div');
+    l.style.cssText = 'font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.14em;color:#6B7280;margin-bottom:5px';
+    l.textContent = label;
+    var inp = document.createElement('input');
+    inp.id = id; inp.type = 'text'; inp.value = val || ''; inp.placeholder = ph || '';
+    inp.style.cssText = 'width:100%;background:rgba(0,0,0,.3);border:1px solid #1C2235;color:#E2E8F0;font-size:12px;padding:9px 12px;border-radius:7px;font-family:inherit;outline:none;box-sizing:border-box';
+    w.appendChild(l); w.appendChild(inp);
+    return w;
+  }
+
+  body.appendChild(mkField('Company Name',             'eco-name',     name,    ''));
+  body.appendChild(mkField('Domain (e.g. stripe.com)', 'eco-domain',   domain,  'company.com'));
+  body.appendChild(mkField('Industry',                 'eco-industry', industry, 'e.g. Fintech'));
+
+  var footer = document.createElement('div');
+  footer.style.cssText = 'display:flex;gap:8px;justify-content:flex-end;margin-top:6px';
+
+  var cancelBtn = document.createElement('button');
+  cancelBtn.textContent = 'Cancel';
+  cancelBtn.style.cssText = 'padding:8px 16px;border-radius:7px;font-size:10px;font-weight:800;background:rgba(31,41,55,.5);border:1px solid #1C2235;color:#6B7280;cursor:pointer;font-family:inherit';
+  cancelBtn.onclick = function(){ overlay.remove(); };
+
+  var saveBtn = document.createElement('button');
+  saveBtn.textContent = 'Save Changes';
+  saveBtn.style.cssText = 'padding:8px 16px;border-radius:7px;font-size:10px;font-weight:800;background:linear-gradient(135deg,#a855f7,#7c3aed);color:white;border:none;cursor:pointer;font-family:inherit';
+  saveBtn.onclick = function(){ saveEditCompany(companyId); };
+
+  footer.appendChild(cancelBtn);
+  footer.appendChild(saveBtn);
+  body.appendChild(footer);
+  box.appendChild(hdr);
+  box.appendChild(body);
+  overlay.appendChild(box);
+  document.body.appendChild(overlay);
+  setTimeout(function(){ var n = document.getElementById('eco-name'); if(n) n.focus(); }, 100);
+}
+
+async function saveEditCompany(companyId) {
+  var name     = (document.getElementById('eco-name').value     || '').trim();
+  var domain   = (document.getElementById('eco-domain').value   || '').trim();
+  var industry = (document.getElementById('eco-industry').value || '').trim();
+  if (!name) { showToast('Company name is required', 'error'); return; }
+
+  // Normalise domain
+  domain = domain.replace(/^https?:\/\//i,'').replace(/^www\./i,'').split('/')[0].toLowerCase();
+
+  try {
+    const token = await getToken();
+    const res = await fetch('/api/account-graph', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({
+        action:     'update_company',
+        company_id: companyId,
+        name:       name,
+        domain:     domain,
+        industry:   industry,
+      }),
+    });
+    const data = await res.json();
+    if (!res.ok) { showToast('Save failed: ' + (data.error||'unknown'), 'error'); return; }
+    document.getElementById('edit-co-modal').remove();
+    showToast(name + ' updated ✓', 'success');
+    setTimeout(loadAccounts, 500);
+  } catch(e) {
+    showToast('Error: ' + e.message, 'error');
+  }
 }
 
 async function handleSignOut() {
