@@ -209,12 +209,13 @@ var CSS = `
   position: fixed; z-index: 9001;
   border-radius: 10px;
   box-shadow: 0 0 0 9999px rgba(0,0,0,.65), 0 0 0 3px #a855f7, 0 0 24px rgba(168,85,247,.5);
-  pointer-events: none;
+  pointer-events: none !important;
   transition: all .35s cubic-bezier(.4,0,.2,1);
 }
 
 .abe-tour-box {
-  position: fixed; z-index: 9002;
+  position: fixed; z-index: 9010;
+  pointer-events: all;
   background: #0F1420;
   border: 1px solid rgba(168,85,247,.4);
   border-radius: 14px;
@@ -265,6 +266,7 @@ var CSS = `
   font-weight: 800; cursor: pointer; border: none;
   font-family: 'Inter', sans-serif; text-transform: uppercase;
   letter-spacing: .08em; transition: all .15s;
+  position: relative; z-index: 9020; pointer-events: all;
 }
 .abe-tbtn.next {
   background: linear-gradient(135deg, #a855f7, #7c3aed); color: white;
