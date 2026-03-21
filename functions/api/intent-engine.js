@@ -153,34 +153,84 @@ export function calculateIntentScore(signals, weights = {}) {
 // ══════════════════════════════════════════════════════════════════
 async function scoreAllCompanies(userId, url, key, env, cors) {
   const companiesRes = await sb(url, key, 'companies', 'GET', null,
-    `?user_id=eq.${userId}&select=id,name`);
+    `?user_id=eq.${userId}&select=id,name,intent_score,intent_tier`);
   if (!companiesRes.ok) return errRes('Failed to load companies', 500, cors);
   const companies = await companiesRes.json();
+
+  if (!companies.length) {
+    return okRes({ companies_scored: 0, results: [], message: 'No companies to score' }, cors);
+  }
 
   const weights = await loadWeights(userId, url, key, env);
   const results = [];
   let updated = 0;
+  let tiers_changed = 0;
 
   for (const company of companies) {
     const signalsRes = await sb(url, key, 'intent_signals', 'GET', null,
-      `?company_id=eq.${company.id}&user_id=eq.${userId}&created_at=gte.${thirtyDaysAgo()}`);
+      `?company_id=eq.${company.id}&user_id=eq.${userId}&detected_at=gte.${thirtyDaysAgo()}&order=detected_at.desc`);
     if (!signalsRes.ok) continue;
     const signals = await signalsRes.json();
 
-    const { intent_score, intent_tier } = calculateIntentScore(signals, weights);
-    results.push({ company_id: company.id, company_name: company.name, intent_score, intent_tier });
+    const { intent_score, intent_tier, breakdown } = calculateIntentScore(signals, weights);
 
-    // Update leads for this company
+    const prev_tier  = company.intent_tier  || 'COLD';
+    const prev_score = company.intent_score || 0;
+    const tier_changed = prev_tier !== intent_tier;
+    if (tier_changed) tiers_changed++;
+
+    // ── CRITICAL FIX: Write score directly to companies table ─────
+    // The trigger only fires on intent_signals changes.
+    // score_all must also write directly so scores update on demand.
+    await sb(url, key, 'companies', 'PATCH',
+      JSON.stringify({
+        intent_score,
+        intent_tier,
+        updated_at: new Date().toISOString(),
+      }),
+      `?id=eq.${company.id}&user_id=eq.${userId}`);
+
+    // Also update any leads linked to this company
     await sb(url, key, 'leads', 'PATCH',
       JSON.stringify({ intent_score, last_scored_at: new Date().toISOString() }),
-      `?user_id=eq.${userId}&lower(company)=eq.${encodeURIComponent(company.name.toLowerCase())}`);
+      `?company_id=eq.${company.id}&user_id=eq.${userId}`);
+
+    results.push({
+      company_id:   company.id,
+      company_name: company.name,
+      prev_score,
+      prev_tier,
+      intent_score,
+      intent_tier,
+      signal_count: signals.length,
+      tier_changed,
+      breakdown,
+    });
     updated++;
   }
 
-  // Bust hot_accounts cache
-  await cacheDel(env, `hot:${userId}`);
+  // Bust all cache variants
+  await Promise.allSettled([
+    cacheDel(env, `hot:${userId}`),
+    cacheDel(env, `hot:${userId}:all`),
+    cacheDel(env, `hot:${userId}:HOT`),
+    cacheDel(env, `hot:${userId}:WARM`),
+    cacheDel(env, `hot:${userId}:COLD`),
+  ]);
 
-  return okRes({ companies_scored: updated, results: results.slice(0, 50) }, cors);
+  return okRes({
+    companies_scored: updated,
+    tiers_changed,
+    results,
+    summary: results.map(r => ({
+      name:        r.company_name,
+      score:       r.intent_score,
+      tier:        r.intent_tier,
+      signals:     r.signal_count,
+      changed:     r.tier_changed,
+      prev:        r.prev_tier !== r.intent_tier ? `${r.prev_tier} → ${r.intent_tier}` : null,
+    })),
+  }, cors);
 }
 
 // ══════════════════════════════════════════════════════════════════
