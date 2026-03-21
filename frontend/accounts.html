@@ -601,18 +601,34 @@ async function runLearningCycle() {
   }
   const btn = document.querySelector('[onclick="runLearningCycle()"]');
   if (btn) { btn.disabled = true; btn.textContent = '⏳ Scoring…'; }
-  showToast(`🧠 Recalculating intent scores for ${_accounts.length} companies…`);
+  showToast('🧠 Recalculating intent scores…');
 
-  try {
-    const token = await getToken();
-    await api('/api/intent-engine', { action: 'score_all' }, token);
-    showToast('✓ Intent scores updated', 'success');
-    setTimeout(() => loadAccounts(), 1500);
-  } catch(e) {
-    showToast('Score update failed: ' + e.message, 'error');
-  } finally {
-    if (btn) { btn.disabled = false; btn.textContent = '🧠 Run Learning Cycle'; }
-  }
+  // Use setTimeout to prevent UI blocking
+  setTimeout(async function() {
+    try {
+      const token = await getToken();
+      // Fire and don't await — non-blocking
+      fetch('/api/intent-engine', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ action: 'score_all' })
+      }).then(function(r) {
+        if (r.ok) {
+          showToast('✓ Intent scores updated — refreshing…', 'success');
+          setTimeout(loadAccounts, 1000);
+        } else {
+          showToast('Score update failed', 'error');
+        }
+      }).catch(function(e) {
+        showToast('Score update failed: ' + e.message, 'error');
+      }).finally(function() {
+        if (btn) { btn.disabled = false; btn.textContent = '🧠 Run Learning Cycle'; }
+      });
+    } catch(e) {
+      showToast('Error: ' + e.message, 'error');
+      if (btn) { btn.disabled = false; btn.textContent = '🧠 Run Learning Cycle'; }
+    }
+  }, 0);
 }
 
 function openAddCompany() {
