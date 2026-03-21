@@ -126,10 +126,8 @@ async function getGraph(body, userId, url, key, env, cors) {
 // ══════════════════════════════════════════════════════════════════
 async function getHotAccounts(body, userId, url, key, env, cors) {
   const { limit = 20, tier, min_score = 0 } = body;
-  const cacheKey = `hot:${userId}:${tier || 'all'}`;
-
-  const cached = await cacheGet(env, cacheKey);
-  if (cached) return okRes({ accounts: cached.slice(0, limit), cached: true, total: cached.length }, cors);
+  // Cache disabled — always fetch fresh so newly added companies appear immediately
+  // const cacheKey = `hot:${userId}:${tier || 'all'}`;
 
   let query = `?user_id=eq.${userId}&total_intent_score=gte.${min_score}&order=total_intent_score.desc&limit=50`;
   if (tier) query += `&intent_tier=eq.${sanitise(tier, 10)}`;
@@ -138,7 +136,7 @@ async function getHotAccounts(body, userId, url, key, env, cors) {
   if (!res.ok) return errRes('Failed to load hot accounts', 500, cors);
   const accounts = await res.json();
 
-  await cachePut(env, cacheKey, accounts, TTL.HOT_ACCOUNTS);
+  // await cachePut(env, cacheKey, accounts, TTL.HOT_ACCOUNTS); // disabled
   return okRes({ accounts: accounts.slice(0, limit), cached: false, total: accounts.length }, cors);
 }
 
@@ -180,9 +178,14 @@ async function addCompany(body, userId, url, key, env, cors) {
   const saved = await res.json();
   const companyId = Array.isArray(saved) ? saved[0]?.id : saved?.id;
 
-  // Bust caches
-  await cacheDel(env, `hot:${userId}`);
-  await cacheDel(env, `hot:${userId}:HOT`);
+  // Bust ALL hot account cache variants
+  await Promise.allSettled([
+    cacheDel(env, `hot:${userId}`),
+    cacheDel(env, `hot:${userId}:all`),
+    cacheDel(env, `hot:${userId}:HOT`),
+    cacheDel(env, `hot:${userId}:WARM`),
+    cacheDel(env, `hot:${userId}:COLD`),
+  ]);
 
   return okRes({ company_id: companyId, created: true }, cors);
 }
