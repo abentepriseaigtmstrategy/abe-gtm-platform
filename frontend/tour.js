@@ -565,6 +565,10 @@ function addHelpButton() {
 }
 
 // ── EXPOSE GLOBALLY ─────────────────────────────────────────────
+// Must be on window so onclick="" handlers in HTML strings can call them
+window.tourNext  = function() { tourNext(); };
+window.skipTour  = function() { skipTour(); };
+
 window.ABE_TOUR = {
   start:  startTour,
   skip:   skipTour,
