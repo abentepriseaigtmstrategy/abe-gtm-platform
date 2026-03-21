@@ -160,7 +160,7 @@ async function addCompany(body, userId, url, key, env, cors) {
   };
 
   // ── FIX: PostgREST upsert requires named constraint + resolution header ──
-  const res = await fetch(`${url}/rest/v1/companies?on_conflict=companies_user_name_unique`, {
+  const res = await fetch(`${url}/rest/v1/companies?on_conflict=user_id,name`, {
     method: 'POST',
     headers: {
       'Content-Type':  'application/json',
