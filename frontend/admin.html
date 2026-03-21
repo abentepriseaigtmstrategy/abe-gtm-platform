@@ -252,9 +252,18 @@ tr.blocked td{background:rgba(239,68,68,.03)}
       <div class="nav-name">Admin Dashboard</div>
     </div>
     <div class="admin-pill">Super Admin</div>
+    <!-- Breadcrumb trail -->
+    <div style="display:flex;align-items:center;gap:6px;margin-left:10px">
+      <span style="font-size:10px;color:#374151">&#9612;</span>
+      <a href="dashboard.html" style="font-size:10px;color:#6B7280;text-decoration:none;
+        transition:color .15s;font-weight:600" onmouseover="this.style.color='#E2E8F0'"
+        onmouseout="this.style.color='#6B7280'">Platform</a>
+      <span style="font-size:10px;color:#374151">&#8250;</span>
+      <span style="font-size:10px;color:#f59e0b;font-weight:700">Admin</span>
+    </div>
   </div>
   <div class="nav-r">
-    <button class="nav-btn back" onclick="window.location.href='dashboard.html'">← Platform</button>
+    <button class="nav-btn back" onclick="goBack()">&#8592; Back to Platform</button>
     <button class="nav-btn out" onclick="signOut()">Sign Out</button>
   </div>
 </nav>
@@ -264,7 +273,7 @@ tr.blocked td{background:rgba(239,68,68,.03)}
   <div class="ad-icon">🔒</div>
   <div class="ad-title">Access Denied</div>
   <div class="ad-sub">This page is restricted to super admins only. If you believe this is an error, contact the platform administrator.</div>
-  <button class="nav-btn back" onclick="window.location.href='dashboard.html'" style="margin-top:8px">← Back to Platform</button>
+  <button class="nav-btn back" onclick="goBack()" style="margin-top:8px">← Back to Platform</button>
 </div>
 
 <!-- MAIN CONTENT (hidden until admin verified) -->
@@ -378,6 +387,11 @@ var _toastTimer = null;
   }
 
   document.getElementById("mainContent").style.display = "block";
+  // Store where user came from so back button works correctly
+  if (document.referrer && !document.referrer.includes('admin')) {
+    const ref = document.referrer.split('/').pop() || 'dashboard.html';
+    sessionStorage.setItem('abe_admin_referrer', ref);
+  }
   await loadUsers();
 })();
 
@@ -651,6 +665,12 @@ function showToast(msg, type) {
   t.className = "toast show " + (type || "");
   clearTimeout(_toastTimer);
   _toastTimer = setTimeout(() => t.classList.remove("show"), 3500);
+}
+
+function goBack() {
+  // Go back to where user came from, or default to dashboard
+  const ref = sessionStorage.getItem('abe_admin_referrer') || 'dashboard.html';
+  window.location.href = ref;
 }
 
 async function signOut() {
