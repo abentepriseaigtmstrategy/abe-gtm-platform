@@ -1,0 +1,662 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ABE · Admin Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Mono:wght@400;700&family=Syne:wght@700;800&display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{
+  --bg:#080C15;--card:#0F1420;--border:#1C2235;
+  --a:#a855f7;--a2:#7c3aed;--cy:#06b6d4;
+  --gr:#22c55e;--am:#f59e0b;--re:#ef4444;
+  --tx:#E2E8F0;--mu:#64748B;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{min-height:100%;background:var(--bg);color:var(--tx);font-family:'Inter',sans-serif}
+body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+  background-image:linear-gradient(rgba(168,85,247,.022) 1px,transparent 1px),
+  linear-gradient(90deg,rgba(168,85,247,.022) 1px,transparent 1px);
+  background-size:56px 56px}
+
+/* NAV */
+nav{position:sticky;top:0;z-index:100;display:flex;align-items:center;justify-content:space-between;
+  padding:0 24px;height:54px;background:rgba(8,12,21,.97);backdrop-filter:blur(20px);
+  border-bottom:1px solid rgba(28,34,53,.8)}
+.nav-l{display:flex;align-items:center;gap:10px}
+.nav-mark{width:28px;height:28px;background:linear-gradient(135deg,var(--a),var(--a2));
+  border-radius:6px;display:flex;align-items:center;justify-content:center;
+  font-size:9px;font-weight:700;color:white}
+.nav-name{font-family:'Syne',sans-serif;font-size:13px;font-weight:800;color:white}
+.admin-pill{padding:3px 8px;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);
+  border-radius:20px;font-size:8px;font-weight:800;text-transform:uppercase;
+  letter-spacing:.12em;color:var(--re)}
+.nav-r{display:flex;align-items:center;gap:8px}
+.nav-btn{padding:6px 14px;border-radius:7px;font-size:10px;font-weight:700;cursor:pointer;
+  border:none;font-family:inherit;transition:all .15s}
+.nav-btn.out{background:rgba(31,41,55,.5);border:1px solid var(--border);color:var(--mu)}
+.nav-btn.out:hover{color:var(--tx);border-color:rgba(168,85,247,.3)}
+.nav-btn.back{background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.25);color:var(--a)}
+
+/* MAIN */
+.main{position:relative;z-index:1;max-width:1200px;margin:0 auto;padding:28px 20px}
+
+/* KPI CARDS */
+.kpi-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px;margin-bottom:24px}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:14px 16px}
+.kpi-val{font-family:'Space Mono',monospace;font-size:22px;font-weight:700;margin-bottom:3px}
+.kpi-lbl{font-size:9px;color:var(--mu);text-transform:uppercase;letter-spacing:.1em}
+
+/* SECTION */
+.section{background:var(--card);border:1px solid var(--border);border-radius:12px;
+  margin-bottom:20px;overflow:hidden}
+.sec-hdr{display:flex;align-items:center;justify-content:space-between;
+  padding:14px 18px;border-bottom:1px solid var(--border);background:rgba(0,0,0,.2)}
+.sec-title{font-size:12px;font-weight:800;color:white;display:flex;align-items:center;gap:8px}
+.sec-actions{display:flex;align-items:center;gap:8px}
+
+/* SEARCH + FILTER */
+.filter-bar{display:flex;align-items:center;gap:8px;padding:12px 18px;
+  border-bottom:1px solid var(--border);background:rgba(0,0,0,.1)}
+.search-inp{background:rgba(0,0,0,.3);border:1px solid var(--border);color:var(--tx);
+  font-size:11px;padding:7px 12px;border-radius:7px;font-family:inherit;outline:none;
+  transition:border-color .15s;width:220px}
+.search-inp:focus{border-color:var(--a)}
+.search-inp::placeholder{color:#374151}
+.filter-sel{background:rgba(0,0,0,.3);border:1px solid var(--border);color:var(--mu);
+  font-size:10px;padding:7px 10px;border-radius:7px;font-family:inherit;
+  outline:none;cursor:pointer}
+.filter-sel:focus{border-color:var(--a)}
+.filter-count{font-size:10px;color:var(--mu);margin-left:auto;font-weight:700}
+
+/* TABLE */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+th{background:rgba(0,0,0,.3);font-size:9px;font-weight:800;text-transform:uppercase;
+  letter-spacing:.1em;color:var(--mu);padding:10px 14px;text-align:left;
+  border-bottom:1px solid var(--border);white-space:nowrap}
+td{padding:10px 14px;font-size:11px;border-bottom:1px solid rgba(28,34,53,.4);
+  vertical-align:middle}
+tr:hover td{background:rgba(168,85,247,.03)}
+tr.blocked td{background:rgba(239,68,68,.03)}
+
+/* BADGES */
+.badge{display:inline-flex;align-items:center;gap:3px;padding:2px 7px;border-radius:4px;
+  font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.08em}
+.badge.free{background:rgba(107,114,128,.15);color:var(--mu)}
+.badge.standard{background:rgba(168,85,247,.12);color:var(--a)}
+.badge.professional{background:rgba(6,182,212,.12);color:var(--cy)}
+.badge.enterprise{background:rgba(34,197,94,.12);color:var(--gr)}
+.badge.blocked{background:rgba(239,68,68,.15);color:var(--re)}
+.badge.active{background:rgba(34,197,94,.12);color:var(--gr)}
+.badge.admin{background:rgba(245,158,11,.12);color:var(--am)}
+.badge.unconfirmed{background:rgba(107,114,128,.12);color:var(--mu)}
+
+/* PROGRESS BAR */
+.usage-bar{height:5px;background:rgba(31,41,55,.6);border-radius:3px;overflow:hidden;width:80px}
+.usage-fill{height:100%;border-radius:3px;transition:width .3s}
+
+/* ACTION BUTTONS */
+.act-btn{padding:4px 10px;border-radius:5px;font-size:9px;font-weight:800;cursor:pointer;
+  border:none;font-family:inherit;transition:all .14s;text-transform:uppercase;letter-spacing:.07em}
+.act-btn.block{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.25);color:var(--re)}
+.act-btn.block:hover{background:rgba(239,68,68,.2)}
+.act-btn.unblock{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.25);color:var(--gr)}
+.act-btn.unblock:hover{background:rgba(34,197,94,.2)}
+.act-btn.upgrade{background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.25);color:var(--a)}
+.act-btn.upgrade:hover{background:rgba(168,85,247,.2)}
+.act-btn.view{background:rgba(31,41,55,.5);border:1px solid var(--border);color:var(--mu)}
+.act-btn.view:hover{color:var(--tx)}
+
+/* EMAIL */
+.email-cell{font-family:'Space Mono',monospace;font-size:10px;color:var(--tx);max-width:200px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* IP */
+.ip-cell{font-family:'Space Mono',monospace;font-size:10px;color:var(--mu)}
+
+/* USAGE TEXT */
+.usage-wrap{display:flex;align-items:center;gap:6px}
+.usage-txt{font-size:10px;color:var(--mu);white-space:nowrap}
+
+/* MODAL */
+.modal-bg{position:fixed;inset:0;z-index:500;background:rgba(0,0,0,.75);
+  display:flex;align-items:center;justify-content:center;padding:20px;
+  opacity:0;pointer-events:none;transition:opacity .2s}
+.modal-bg.open{opacity:1;pointer-events:all}
+.modal{width:100%;max-width:440px;background:var(--card);border:1px solid var(--border);
+  border-radius:14px;overflow:hidden}
+.modal-hdr{display:flex;align-items:center;justify-content:space-between;
+  padding:14px 18px;background:rgba(0,0,0,.3);border-bottom:1px solid var(--border)}
+.modal-title{font-size:13px;font-weight:800;color:white}
+.modal-close{background:none;border:none;color:var(--mu);cursor:pointer;
+  font-size:16px;font-family:inherit}
+.modal-close:hover{color:var(--tx)}
+.modal-body{padding:20px 18px}
+.modal-field{margin-bottom:14px}
+.modal-lbl{display:block;font-size:9px;font-weight:800;text-transform:uppercase;
+  letter-spacing:.14em;color:var(--mu);margin-bottom:5px}
+.modal-inp{width:100%;background:rgba(0,0,0,.3);border:1px solid var(--border);
+  color:var(--tx);font-size:12px;padding:9px 12px;border-radius:7px;
+  font-family:inherit;outline:none;transition:border-color .14s}
+.modal-inp:focus{border-color:var(--a)}
+.modal-sel{width:100%;background:rgba(0,0,0,.3);border:1px solid var(--border);
+  color:var(--tx);font-size:12px;padding:9px 12px;border-radius:7px;
+  font-family:inherit;outline:none;cursor:pointer}
+.modal-sel:focus{border-color:var(--a)}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;padding:14px 18px;
+  border-top:1px solid var(--border);background:rgba(0,0,0,.2)}
+.modal-btn{padding:8px 18px;border-radius:7px;font-size:10px;font-weight:800;
+  text-transform:uppercase;letter-spacing:.1em;cursor:pointer;
+  border:none;font-family:inherit;transition:all .15s}
+.modal-btn.confirm{background:linear-gradient(135deg,var(--a),var(--a2));color:white}
+.modal-btn.confirm.danger{background:linear-gradient(135deg,var(--re),#b91c1c)}
+.modal-btn.cancel{background:rgba(31,41,55,.5);border:1px solid var(--border);color:var(--mu)}
+
+/* TOAST */
+.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(80px);
+  background:rgba(15,20,32,.97);border:1px solid var(--border);border-radius:8px;
+  padding:10px 20px;font-size:11px;font-weight:700;color:var(--tx);
+  z-index:999;transition:transform .25s;white-space:nowrap;backdrop-filter:blur(16px)}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.toast.ok{border-color:rgba(34,197,94,.4);color:var(--gr)}
+.toast.err{border-color:rgba(239,68,68,.4);color:var(--re)}
+
+/* EMPTY */
+.empty-row td{text-align:center;padding:40px;color:var(--mu);font-style:italic}
+
+/* REFRESH BTN */
+.refresh-btn{padding:6px 12px;background:rgba(31,41,55,.5);border:1px solid var(--border);
+  border-radius:7px;font-size:10px;font-weight:700;color:var(--mu);cursor:pointer;
+  font-family:inherit;transition:all .15s}
+.refresh-btn:hover{color:var(--tx);border-color:rgba(168,85,247,.3)}
+
+/* ACCESS DENIED */
+.access-denied{display:none;flex-direction:column;align-items:center;justify-content:center;
+  min-height:80vh;gap:16px;text-align:center}
+.access-denied.show{display:flex}
+.ad-icon{font-size:48px}
+.ad-title{font-family:'Syne',sans-serif;font-size:24px;font-weight:800;color:var(--re)}
+.ad-sub{font-size:13px;color:var(--mu);max-width:360px;line-height:1.6}
+
+@media(max-width:700px){.kpi-grid{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+
+<!-- BLOCK USER MODAL -->
+<div class="modal-bg" id="blockModal">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-title" id="blockModalTitle">Block User</div>
+      <button class="modal-close" onclick="closeBlockModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--mu);margin-bottom:14px" id="blockModalSub"></div>
+      <div class="modal-field">
+        <label class="modal-lbl">Reason (shown in admin log)</label>
+        <input class="modal-inp" id="blockReason" placeholder="e.g. Trial abuse, spam activity…"/>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="modal-btn cancel" onclick="closeBlockModal()">Cancel</button>
+      <button class="modal-btn confirm danger" onclick="confirmBlock()">Block User</button>
+    </div>
+  </div>
+</div>
+
+<!-- UPGRADE PLAN MODAL -->
+<div class="modal-bg" id="planModal">
+  <div class="modal">
+    <div class="modal-hdr">
+      <div class="modal-title">Change Plan</div>
+      <button class="modal-close" onclick="closePlanModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="font-size:12px;color:var(--mu);margin-bottom:14px" id="planModalSub"></div>
+      <div class="modal-field">
+        <label class="modal-lbl">Plan Tier</label>
+        <select class="modal-sel" id="planSelect">
+          <option value="free_trial">Free Trial</option>
+          <option value="standard">Standard ($29/mo)</option>
+          <option value="professional">Professional ($79/mo)</option>
+          <option value="enterprise">Enterprise (Unlimited)</option>
+        </select>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:10px">
+        <div class="modal-field" style="margin-bottom:0">
+          <label class="modal-lbl">ABE Limit (strategies)</label>
+          <input class="modal-inp" id="abeLimitInp" type="number" placeholder="e.g. 50"/>
+        </div>
+        <div class="modal-field" style="margin-bottom:0">
+          <label class="modal-lbl">ALO Limit (leads)</label>
+          <input class="modal-inp" id="aloLimitInp" type="number" placeholder="e.g. 500"/>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="modal-btn cancel" onclick="closePlanModal()">Cancel</button>
+      <button class="modal-btn confirm" onclick="confirmPlan()">Update Plan</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-l">
+    <div class="nav-mark">ABE</div>
+    <div>
+      <div class="nav-name">Admin Dashboard</div>
+    </div>
+    <div class="admin-pill">Super Admin</div>
+  </div>
+  <div class="nav-r">
+    <button class="nav-btn back" onclick="window.location.href='dashboard.html'">← Platform</button>
+    <button class="nav-btn out" onclick="signOut()">Sign Out</button>
+  </div>
+</nav>
+
+<!-- ACCESS DENIED (shown if not admin) -->
+<div class="access-denied" id="accessDenied">
+  <div class="ad-icon">🔒</div>
+  <div class="ad-title">Access Denied</div>
+  <div class="ad-sub">This page is restricted to super admins only. If you believe this is an error, contact the platform administrator.</div>
+  <button class="nav-btn back" onclick="window.location.href='dashboard.html'" style="margin-top:8px">← Back to Platform</button>
+</div>
+
+<!-- MAIN CONTENT (hidden until admin verified) -->
+<div class="main" id="mainContent" style="display:none">
+
+  <!-- KPI STRIP -->
+  <div class="kpi-grid">
+    <div class="kpi">
+      <div class="kpi-val" id="kTotal" style="color:var(--a)">—</div>
+      <div class="kpi-lbl">Total Users</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-val" id="kActive" style="color:var(--gr)">—</div>
+      <div class="kpi-lbl">Active (7 Days)</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-val" id="kBlocked" style="color:var(--re)">—</div>
+      <div class="kpi-lbl">Blocked</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-val" id="kUnconfirmed" style="color:var(--am)">—</div>
+      <div class="kpi-lbl">Unconfirmed Email</div>
+    </div>
+    <div class="kpi">
+      <div class="kpi-val" id="kTrialExhausted" style="color:var(--cy)">—</div>
+      <div class="kpi-lbl">Trial Exhausted</div>
+    </div>
+  </div>
+
+  <!-- USER TABLE -->
+  <div class="section">
+    <div class="sec-hdr">
+      <div class="sec-title">👥 All Users</div>
+      <div class="sec-actions">
+        <button class="refresh-btn" onclick="loadUsers()">↻ Refresh</button>
+      </div>
+    </div>
+
+    <div class="filter-bar">
+      <input class="search-inp" id="searchInp" placeholder="Search email or IP…"
+        oninput="filterUsers()"/>
+      <select class="filter-sel" id="planFilter" onchange="filterUsers()">
+        <option value="">All Plans</option>
+        <option value="free_trial">Free Trial</option>
+        <option value="standard">Standard</option>
+        <option value="professional">Professional</option>
+        <option value="enterprise">Enterprise</option>
+      </select>
+      <select class="filter-sel" id="statusFilter" onchange="filterUsers()">
+        <option value="">All Status</option>
+        <option value="active">Active</option>
+        <option value="blocked">Blocked</option>
+        <option value="unconfirmed">Unconfirmed</option>
+      </select>
+      <div class="filter-count" id="filterCount"></div>
+    </div>
+
+    <div class="tbl-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Email</th>
+            <th>Plan</th>
+            <th>Status</th>
+            <th>ABE Usage</th>
+            <th>ALO Usage</th>
+            <th>Signup IP</th>
+            <th>Last Active</th>
+            <th>Joined</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="userTbody">
+          <tr class="empty-row"><td colspan="9">Loading users…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+var SUPABASE_URL = "https://cwcvneluhlimhlzowabv.supabase.co";
+var SUPABASE_ANON = "sb_publishable_EeDAvGbX7TpO_hgBoUZMhQ_B_nJtAbb";
+var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+
+// ── STATE ──
+var allUsers = [];
+var currentUser = null;
+var _blockTarget = null;
+var _planTarget = null;
+var _toastTimer = null;
+
+// ── INIT ──
+(async function init() {
+  // Check auth
+  const { data: { session } } = await sb.auth.getSession();
+  if (!session) { window.location.replace("login.html"); return; }
+  currentUser = session.user;
+
+  // Verify admin via user_profiles
+  const { data: profile } = await sb
+    .from("user_profiles")
+    .select("is_admin, plan_tier")
+    .eq("id", currentUser.id)
+    .single();
+
+  if (!profile?.is_admin) {
+    document.getElementById("accessDenied").classList.add("show");
+    return;
+  }
+
+  document.getElementById("mainContent").style.display = "block";
+  await loadUsers();
+})();
+
+// ── LOAD USERS ──
+async function loadUsers() {
+  document.getElementById("userTbody").innerHTML =
+    '<tr class="empty-row"><td colspan="9">Loading…</td></tr>';
+
+  try {
+    const { data, error } = await sb
+      .from("user_profiles")
+      .select(`
+        id, email, plan_tier, is_admin, is_blocked, blocked_reason,
+        abe_runs_used, abe_runs_limit, alo_runs_used, alo_runs_limit,
+        email_confirmed, signup_ip, trial_ip, last_active_at, created_at
+      `)
+      .order("created_at", { ascending: false });
+
+    if (error) throw error;
+
+    // Also get last_sign_in_at from auth (via admin API isn't available client-side,
+    // so we use last_active_at from profiles which is updated by workers)
+    allUsers = data || [];
+    updateKPIs();
+    renderUsers(allUsers);
+    filterUsers();
+  } catch (e) {
+    showToast("Failed to load users: " + e.message, "err");
+    document.getElementById("userTbody").innerHTML =
+      `<tr class="empty-row"><td colspan="9">Error: ${e.message}</td></tr>`;
+  }
+}
+
+// ── KPIs ──
+function updateKPIs() {
+  const sevenDaysAgo = new Date(Date.now() - 7 * 86400 * 1000);
+  document.getElementById("kTotal").textContent = allUsers.length;
+  document.getElementById("kActive").textContent = allUsers.filter(u =>
+    u.last_active_at && new Date(u.last_active_at) > sevenDaysAgo
+  ).length;
+  document.getElementById("kBlocked").textContent = allUsers.filter(u => u.is_blocked).length;
+  document.getElementById("kUnconfirmed").textContent = allUsers.filter(u => !u.email_confirmed).length;
+  document.getElementById("kTrialExhausted").textContent = allUsers.filter(u =>
+    u.plan_tier === "free_trial" &&
+    u.abe_runs_used >= u.abe_runs_limit &&
+    u.alo_runs_used >= u.alo_runs_limit
+  ).length;
+}
+
+// ── FILTER ──
+function filterUsers() {
+  const q = document.getElementById("searchInp").value.toLowerCase().trim();
+  const plan = document.getElementById("planFilter").value;
+  const status = document.getElementById("statusFilter").value;
+
+  const filtered = allUsers.filter(u => {
+    const matchQ = !q ||
+      (u.email || "").toLowerCase().includes(q) ||
+      (u.signup_ip || "").includes(q) ||
+      (u.trial_ip || "").includes(q);
+    const matchP = !plan || u.plan_tier === plan;
+    let matchS = true;
+    if (status === "active")      matchS = !u.is_blocked && u.email_confirmed;
+    if (status === "blocked")     matchS = u.is_blocked;
+    if (status === "unconfirmed") matchS = !u.email_confirmed;
+    return matchQ && matchP && matchS;
+  });
+
+  document.getElementById("filterCount").textContent =
+    `${filtered.length} of ${allUsers.length} users`;
+  renderUsers(filtered);
+}
+
+// ── RENDER TABLE ──
+function renderUsers(users) {
+  if (!users.length) {
+    document.getElementById("userTbody").innerHTML =
+      '<tr class="empty-row"><td colspan="9">No users match the current filters</td></tr>';
+    return;
+  }
+
+  document.getElementById("userTbody").innerHTML = users.map(u => {
+    const planClass = {
+      free_trial: "free", standard: "standard",
+      professional: "professional", enterprise: "enterprise"
+    }[u.plan_tier] || "free";
+
+    const planLabel = {
+      free_trial: "Free Trial", standard: "Standard",
+      professional: "Professional", enterprise: "Enterprise"
+    }[u.plan_tier] || u.plan_tier;
+
+    const status = u.is_blocked ? "blocked" : (u.email_confirmed ? "active" : "unconfirmed");
+    const statusLabel = u.is_blocked ? "Blocked" : (u.email_confirmed ? "Active" : "Unconfirmed");
+
+    const abePct = u.abe_runs_limit > 0
+      ? Math.min(100, Math.round((u.abe_runs_used / u.abe_runs_limit) * 100)) : 0;
+    const aloPct = u.alo_runs_limit > 0
+      ? Math.min(100, Math.round((u.alo_runs_used / u.alo_runs_limit) * 100)) : 0;
+
+    const abeColor = abePct >= 90 ? "var(--re)" : abePct >= 70 ? "var(--am)" : "var(--gr)";
+    const aloColor = aloPct >= 90 ? "var(--re)" : aloPct >= 70 ? "var(--am)" : "var(--gr)";
+
+    const lastActive = u.last_active_at
+      ? timeAgo(u.last_active_at) : "Never";
+    const joined = u.created_at
+      ? new Date(u.created_at).toLocaleDateString("en-GB", {day:"2-digit",month:"short",year:"2-digit"})
+      : "—";
+
+    const blockBtn = u.is_blocked
+      ? `<button class="act-btn unblock" onclick="openUnblock('${u.id}','${esc(u.email)}')">Unblock</button>`
+      : `<button class="act-btn block" onclick="openBlock('${u.id}','${esc(u.email)}')">Block</button>`;
+
+    return `<tr class="${u.is_blocked ? "blocked" : ""}">
+      <td>
+        <div class="email-cell" title="${esc(u.email || "")}">${esc(u.email || "—")}</div>
+        ${u.is_admin ? '<span class="badge admin">Admin</span>' : ""}
+      </td>
+      <td><span class="badge ${planClass}">${planLabel}</span></td>
+      <td><span class="badge ${status}">${statusLabel}${u.is_blocked && u.blocked_reason ? ` · ${esc(u.blocked_reason.slice(0,30))}` : ""}</span></td>
+      <td>
+        <div class="usage-wrap">
+          <div class="usage-bar"><div class="usage-fill" style="width:${abePct}%;background:${abeColor}"></div></div>
+          <span class="usage-txt">${u.abe_runs_used}/${u.abe_runs_limit}</span>
+        </div>
+      </td>
+      <td>
+        <div class="usage-wrap">
+          <div class="usage-bar"><div class="usage-fill" style="width:${aloPct}%;background:${aloColor}"></div></div>
+          <span class="usage-txt">${u.alo_runs_used}/${u.alo_runs_limit}</span>
+        </div>
+      </td>
+      <td><span class="ip-cell">${esc(u.signup_ip || u.trial_ip || "—")}</span></td>
+      <td style="color:var(--mu);font-size:10px">${lastActive}</td>
+      <td style="color:var(--mu);font-size:10px">${joined}</td>
+      <td>
+        <div style="display:flex;gap:5px;flex-wrap:wrap">
+          ${blockBtn}
+          <button class="act-btn upgrade" onclick="openPlan('${u.id}','${esc(u.email)}','${u.plan_tier}',${u.abe_runs_limit},${u.alo_runs_limit})">Plan</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join("");
+}
+
+// ── BLOCK / UNBLOCK ──
+function openBlock(userId, email) {
+  _blockTarget = { id: userId, email, action: "block" };
+  document.getElementById("blockModalTitle").textContent = "Block User";
+  document.getElementById("blockModalSub").textContent =
+    `Block access for: ${email}. They will receive a 401 Unauthorized on all API calls.`;
+  document.getElementById("blockReason").value = "";
+  document.getElementById("blockModal").classList.add("open");
+}
+
+function openUnblock(userId, email) {
+  _blockTarget = { id: userId, email, action: "unblock" };
+  document.getElementById("blockModalTitle").textContent = "Unblock User";
+  document.getElementById("blockModalSub").textContent =
+    `Restore access for: ${email}`;
+  document.getElementById("blockReason").value = "";
+  document.querySelector("#blockModal .confirm").textContent = "Unblock User";
+  document.querySelector("#blockModal .confirm").classList.remove("danger");
+  document.getElementById("blockModal").classList.add("open");
+}
+
+function closeBlockModal() {
+  document.getElementById("blockModal").classList.remove("open");
+  document.querySelector("#blockModal .confirm").textContent = "Block User";
+  document.querySelector("#blockModal .confirm").classList.add("danger");
+  _blockTarget = null;
+}
+
+async function confirmBlock() {
+  if (!_blockTarget) return;
+  const reason = document.getElementById("blockReason").value.trim() || "Blocked by admin";
+  const btn = document.querySelector("#blockModal .confirm");
+  btn.disabled = true; btn.textContent = "Processing…";
+
+  try {
+    const isBlock = _blockTarget.action === "block";
+    const updates = isBlock
+      ? { is_blocked: true, blocked_reason: reason, blocked_at: new Date().toISOString() }
+      : { is_blocked: false, blocked_reason: null, blocked_at: null };
+
+    const { error } = await sb
+      .from("user_profiles")
+      .update(updates)
+      .eq("id", _blockTarget.id);
+
+    if (error) throw error;
+
+    showToast(
+      isBlock ? `${_blockTarget.email} blocked` : `${_blockTarget.email} unblocked`,
+      "ok"
+    );
+    closeBlockModal();
+    await loadUsers();
+  } catch (e) {
+    showToast("Failed: " + e.message, "err");
+    btn.disabled = false;
+    btn.textContent = _blockTarget.action === "block" ? "Block User" : "Unblock User";
+  }
+}
+
+// ── PLAN MANAGEMENT ──
+function openPlan(userId, email, currentPlan, abeLimit, aloLimit) {
+  _planTarget = { id: userId, email };
+  document.getElementById("planModalSub").textContent = `Updating plan for: ${email}`;
+  document.getElementById("planSelect").value = currentPlan;
+  document.getElementById("abeLimitInp").value = abeLimit;
+  document.getElementById("aloLimitInp").value = aloLimit;
+  document.getElementById("planModal").classList.add("open");
+}
+
+function closePlanModal() {
+  document.getElementById("planModal").classList.remove("open");
+  _planTarget = null;
+}
+
+async function confirmPlan() {
+  if (!_planTarget) return;
+  const plan = document.getElementById("planSelect").value;
+  const abeLimit = parseInt(document.getElementById("abeLimitInp").value) || null;
+  const aloLimit = parseInt(document.getElementById("aloLimitInp").value) || null;
+  const btn = document.querySelector("#planModal .confirm");
+  btn.disabled = true; btn.textContent = "Updating…";
+
+  try {
+    const updates = { plan_tier: plan, updated_at: new Date().toISOString() };
+    if (abeLimit !== null) updates.abe_runs_limit = abeLimit;
+    if (aloLimit !== null) updates.alo_runs_limit = aloLimit;
+
+    const { error } = await sb
+      .from("user_profiles")
+      .update(updates)
+      .eq("id", _planTarget.id);
+
+    if (error) throw error;
+
+    showToast(`${_planTarget.email} → ${plan}`, "ok");
+    closePlanModal();
+    await loadUsers();
+  } catch (e) {
+    showToast("Failed: " + e.message, "err");
+    btn.disabled = false; btn.textContent = "Update Plan";
+  }
+}
+
+// ── UTILS ──
+function timeAgo(dateStr) {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 60) return mins < 2 ? "Just now" : `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  const days = Math.floor(hrs / 24);
+  if (days < 30) return `${days}d ago`;
+  return new Date(dateStr).toLocaleDateString("en-GB", { day:"2-digit", month:"short" });
+}
+
+function esc(str) {
+  if (!str) return "";
+  return String(str).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;")
+    .replace(/"/g,"&quot;").replace(/'/g,"&#39;");
+}
+
+function showToast(msg, type) {
+  const t = document.getElementById("toast");
+  t.textContent = msg;
+  t.className = "toast show " + (type || "");
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.classList.remove("show"), 3500);
+}
+
+async function signOut() {
+  await sb.auth.signOut({ scope: "local" });
+  window.location.replace("login.html");
+}
+</script>
+</body>
+</html>
