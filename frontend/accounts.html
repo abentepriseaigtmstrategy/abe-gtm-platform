@@ -479,54 +479,10 @@ function renderDrawer(g) {
   // FIX: Do NOT embed dynamic co.id / co.domain inside onclick="" string literals.
   // Template literal nesting + quote escaping causes "missing ) after argument list".
   // Use a direct event listener instead — clean and safe.
-  // Check if strategy exists first to set correct button label
-  var gtmLabel = '&#9889; View GTM Strategy';
-  var lmLabel  = '&#8594; Send to Lead Manager';
   document.getElementById('d-actions').innerHTML =
-    '<button class="btn btn-primary btn-sm" id="gtm-btn-drawer">' + gtmLabel + '</button>' +
-    '<button class="btn btn-outline btn-sm" id="lm-btn-drawer" style="color:#22c55e;border-color:rgba(34,197,94,.3)">' + lmLabel + '</button>' +
+    '<button class="btn btn-primary btn-sm" id="gtm-btn-drawer">&#9889; Open GTM Strategy</button>' +
     '<button class="btn btn-outline btn-sm" id="scan-btn-drawer">&#128269; Scan Signals</button>' +
     '<button class="btn btn-outline btn-sm" id="edit-btn-drawer">&#9998; Edit</button>';
-
-  // Lead Manager — send company directly to lead manager
-  const lmBtn = document.getElementById('lm-btn-drawer');
-  if (lmBtn) lmBtn.onclick = async function() {
-    lmBtn.disabled = true; lmBtn.textContent = 'Sending…';
-    try {
-      const token = await getToken();
-      // First find strategy to carry over GTM score
-      const vRes = await fetch('/api/gtm', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-        body: JSON.stringify({ action: 'get_vault', search: co.name, limit: 3 }),
-      });
-      const vData = await vRes.json();
-      const match = (vData.strategies||[]).find(s =>
-        s.company_name.toLowerCase().trim() === (co.name||'').toLowerCase().trim()
-      );
-      const gtmScore = match ? (match.gtm_score || 0) : 0;
-      const industry = match ? (match.industry || co.industry || '') : (co.industry || '');
-      // Import as lead
-      await fetch('/api/leads', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-        body: JSON.stringify({
-          action: 'import', source_type: 'csv', vault_import: true,
-          source_file: 'Account Intelligence — ' + co.name,
-          field_mapping: { name:'name', company:'company', website:'website', industry:'industry', title:'title' },
-          leads: [{ name: co.name, company: co.name, website: co.domain ? 'https://'+co.domain : '',
-            industry: industry, title: 'Account (from Intelligence)',
-            icp_score: gtmScore, priority: gtmScore >= 75 ? 'HIGH' : gtmScore >= 50 ? 'MEDIUM' : 'LOW',
-            status: 'analyzed' }]
-        })
-      });
-      showToast(co.name + ' sent to Lead Manager ✓', 'success');
-      setTimeout(function(){ window.location.href = 'leads.html'; }, 1200);
-    } catch(e) {
-      showToast('Failed: ' + e.message, 'error');
-      lmBtn.disabled = false; lmBtn.innerHTML = '&#8594; Send to Lead Manager';
-    }
-  };
 
   // GTM Strategy — find existing strategy in vault, resume it
   const gtmBtn = document.getElementById('gtm-btn-drawer');
@@ -622,54 +578,133 @@ function renderDrawer(g) {
 ═══════════════════════════════════ */
 async function scanCompany(companyId, domain) {
   if (!domain) {
-    showToast('No domain set for this company — edit company to add domain first.', 'error');
+    showToast('No domain set — click ✎ Edit to add this company\'s domain first.', 'error');
     return;
   }
-  const token = await getToken();
-  showToast('🔍 Scanning signals for this company…');
+  const btn = document.getElementById('scan-btn-drawer');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Scanning…'; }
+  showToast('🔍 Scanning ' + domain + ' for buying signals…');
+
   try {
+    const token = await getToken();
     const a = _accounts.find(a => a.company_id === companyId);
-    await api('/api/analyze-website', {
-      action:       'scan',
-      company_id:   companyId,
-      website_url:  `https://${domain}`,
-      company_name: a?.company_name || '',
-    }, token);
-    showToast('✓ Signal scan complete', 'success');
-    setTimeout(() => { if (_openCompanyId) openDrawer(_openCompanyId); }, 1500);
+    const res = await fetch('/api/analyze-website', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({
+        company_id:   companyId,
+        website_url:  'https://' + domain,
+        company_name: a ? a.company_name : '',
+      }),
+    });
+    const data = await res.json();
+
+    if (!res.ok) {
+      showToast('Scan failed: ' + (data.error || 'HTTP ' + res.status), 'error');
+      if (btn) { btn.disabled = false; btn.textContent = '🔍 Scan Signals'; }
+      return;
+    }
+
+    const sigCount = data.signals_detected || 0;
+    const sigs     = (data.signals || []).map(function(s){ return s.type.replace(/_/g,' '); });
+
+    if (sigCount === 0) {
+      showToast('Scan complete — no buying signals detected on ' + domain, '');
+    } else {
+      showToast('✓ ' + sigCount + ' signal' + (sigCount>1?'s':'') + ' detected: ' + sigs.join(', '), 'success');
+    }
+
+    // Refresh accounts list and reopen drawer with updated score
+    await loadAccounts();
+    setTimeout(function() {
+      if (_openCompanyId) openDrawer(_openCompanyId);
+    }, 600);
+
   } catch(e) {
-    showToast('Scan failed: ' + e.message, 'error');
+    showToast('Scan error: ' + e.message, 'error');
+    if (btn) { btn.disabled = false; btn.textContent = '🔍 Scan Signals'; }
   }
 }
 
 // ── SCAN SIGNALS — scans ALL monitored companies for buying signals ──
 async function runSignalScan() {
+  const withDomain = _accounts.filter(function(a){ return a.domain; });
+  const noDomain   = _accounts.filter(function(a){ return !a.domain; });
+
   if (!_accounts.length) {
-    showToast('No companies to scan. Add companies to Account Intelligence first.', 'error');
+    showToast('No companies to scan. Add companies first.', 'error');
     return;
   }
-  showToast(`⚡ Scanning ${_accounts.length} companies for signals…`);
-  const token = await getToken();
-  let scanned = 0, failed = 0;
-
-  for (const a of _accounts) {
-    if (!a.domain) { failed++; continue; }
-    try {
-      await api('/api/analyze-website', {
-        action:       'scan',
-        company_id:   a.company_id,
-        website_url:  `https://${a.domain}`,
-        company_name: a.company_name,
-      }, token);
-      scanned++;
-    } catch(_) { failed++; }
+  if (!withDomain.length) {
+    showToast('No companies have a domain set. Click ✎ Edit on each company to add their domain.', 'error');
+    return;
   }
 
-  const msg = scanned
-    ? `✓ Scanned ${scanned} companies${failed ? ` · ${failed} skipped (no domain)` : ''}`
-    : 'No companies with domains to scan.';
-  showToast(msg, scanned ? 'success' : 'error');
-  setTimeout(() => loadAccounts(), 2000);
+  const scanBtn = document.querySelector('[onclick="runSignalScan()"]');
+  if (scanBtn) { scanBtn.disabled = true; scanBtn.textContent = '⏳ Scanning…'; }
+  showToast('⚡ Scanning ' + withDomain.length + ' companies for buying signals…');
+
+  const token = await getToken();
+  let totalSignals = 0;
+  const results = [];
+
+  for (const a of withDomain) {
+    try {
+      const res = await fetch('/api/analyze-website', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({
+          company_id:   a.company_id,
+          website_url:  'https://' + a.domain,
+          company_name: a.company_name,
+        }),
+      });
+      const data = await res.json();
+      const sigs = data.signals_detected || 0;
+      totalSignals += sigs;
+      results.push({ name: a.company_name, signals: sigs, ok: res.ok });
+    } catch(e) {
+      results.push({ name: a.company_name, signals: 0, ok: false, err: e.message });
+    }
+  }
+
+  if (scanBtn) { scanBtn.disabled = false; scanBtn.textContent = '⚡ Scan Signals'; }
+
+  // Show summary
+  const detected  = results.filter(function(r){ return r.signals > 0; });
+  const noSignals = results.filter(function(r){ return r.signals === 0 && r.ok; });
+  const failed    = results.filter(function(r){ return !r.ok; });
+
+  var msg = '⚡ Scan complete — ' + totalSignals + ' signal' + (totalSignals !== 1 ? 's' : '') + ' across ' + withDomain.length + ' companies';
+  if (detected.length) msg += ' · ' + detected.length + ' with signals';
+  if (noDomain.length) msg += ' · ' + noDomain.length + ' skipped (no domain)';
+  showToast(msg, totalSignals > 0 ? 'success' : '');
+
+  // Auto-run learning cycle to update scores
+  if (totalSignals > 0) {
+    setTimeout(async function() {
+      showToast('🧠 Updating intent scores…');
+      try {
+        const r2 = await fetch('/api/intent-engine', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify({ action: 'score_all' }),
+        });
+        const d2 = await r2.json();
+        const hot    = (d2.summary || []).filter(function(s){ return s.tier === 'HOT'; }).length;
+        const warm   = (d2.summary || []).filter(function(s){ return s.tier === 'WARM'; }).length;
+        const changed = d2.tiers_changed || 0;
+        var scoreMsg = '✓ Scores updated — ' + hot + ' HOT · ' + warm + ' WARM';
+        if (changed > 0) scoreMsg += ' · ' + changed + ' tier' + (changed>1?'s':'') + ' changed';
+        showToast(scoreMsg, 'success');
+        setTimeout(loadAccounts, 500);
+      } catch(e) {
+        showToast('Score update failed: ' + e.message, 'error');
+      }
+    }, 1500);
+  } else {
+    setTimeout(loadAccounts, 800);
+  }
 }
 
 // ── RUN LEARNING CYCLE — recalculates intent scores for ALL companies ──
@@ -686,23 +721,31 @@ async function runLearningCycle() {
   setTimeout(async function() {
     try {
       const token = await getToken();
-      // Fire and don't await — non-blocking
-      fetch('/api/intent-engine', {
+      const r = await fetch('/api/intent-engine', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-        body: JSON.stringify({ action: 'score_all' })
-      }).then(function(r) {
-        if (r.ok) {
-          showToast('✓ Intent scores updated — refreshing…', 'success');
-          setTimeout(loadAccounts, 1000);
-        } else {
-          showToast('Score update failed', 'error');
-        }
-      }).catch(function(e) {
-        showToast('Score update failed: ' + e.message, 'error');
-      }).finally(function() {
-        if (btn) { btn.disabled = false; btn.textContent = '🧠 Run Learning Cycle'; }
+        body: JSON.stringify({ action: 'score_all' }),
       });
+      const d = await r.json();
+      if (!r.ok) {
+        showToast('Score update failed: ' + (d.error || 'HTTP ' + r.status), 'error');
+        if (btn) { btn.disabled = false; btn.textContent = '🧠 Run Learning Cycle'; }
+        return;
+      }
+      const scored  = d.companies_scored || 0;
+      const changed = d.tiers_changed    || 0;
+      const hot     = (d.summary || []).filter(function(s){ return s.tier === 'HOT';  }).length;
+      const warm    = (d.summary || []).filter(function(s){ return s.tier === 'WARM'; }).length;
+      const cold    = (d.summary || []).filter(function(s){ return s.tier === 'COLD'; }).length;
+
+      var msg = '🧠 ' + scored + ' companies scored';
+      if (hot || warm) msg += ' — ' + hot + ' HOT · ' + warm + ' WARM · ' + cold + ' COLD';
+      if (changed > 0) msg += ' · ' + changed + ' tier' + (changed > 1 ? 's' : '') + ' changed';
+      else if (scored > 0 && !hot && !warm) msg += ' — no signals found yet. Run Scan Signals first.';
+
+      showToast(msg, scored > 0 ? 'success' : '');
+      if (btn) { btn.disabled = false; btn.textContent = '🧠 Run Learning Cycle'; }
+      setTimeout(loadAccounts, 500);
     } catch(e) {
       showToast('Error: ' + e.message, 'error');
       if (btn) { btn.disabled = false; btn.textContent = '🧠 Run Learning Cycle'; }
@@ -779,8 +822,8 @@ function esc(s) {
    EDIT COMPANY
 ═══════════════════════════════════ */
 function openEditCompany(companyId, name, domain, industry) {
-  var existing = document.getElementById('edit-co-modal');
-  if (existing) existing.remove();
+  var ex = document.getElementById('edit-co-modal');
+  if (ex) ex.remove();
 
   var overlay = document.createElement('div');
   overlay.id = 'edit-co-modal';
@@ -793,9 +836,9 @@ function openEditCompany(companyId, name, domain, industry) {
   hdr.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:rgba(0,0,0,.3);border-bottom:1px solid #1C2235';
   var htitle = document.createElement('div');
   htitle.style.cssText = 'font-size:13px;font-weight:800;color:white';
-  htitle.textContent = '✎ Edit Company';
+  htitle.textContent = '\u270e Edit Company';
   var xBtn = document.createElement('button');
-  xBtn.textContent = '✕';
+  xBtn.textContent = '\u2715';
   xBtn.style.cssText = 'background:none;border:none;color:#6B7280;cursor:pointer;font-size:16px;font-family:inherit';
   xBtn.onclick = function(){ overlay.remove(); };
   hdr.appendChild(htitle);
@@ -817,8 +860,8 @@ function openEditCompany(companyId, name, domain, industry) {
     return w;
   }
 
-  body.appendChild(mkField('Company Name',             'eco-name',     name,    ''));
-  body.appendChild(mkField('Domain (e.g. stripe.com)', 'eco-domain',   domain,  'company.com'));
+  body.appendChild(mkField('Company Name',             'eco-name',     name,     ''));
+  body.appendChild(mkField('Domain (e.g. stripe.com)', 'eco-domain',   domain,   'company.com'));
   body.appendChild(mkField('Industry',                 'eco-industry', industry, 'e.g. Fintech'));
 
   var footer = document.createElement('div');
@@ -841,7 +884,7 @@ function openEditCompany(companyId, name, domain, industry) {
   box.appendChild(body);
   overlay.appendChild(box);
   document.body.appendChild(overlay);
-  setTimeout(function(){ var n = document.getElementById('eco-name'); if(n) n.focus(); }, 100);
+  setTimeout(function(){ var n=document.getElementById('eco-name'); if(n) n.focus(); }, 100);
 }
 
 async function saveEditCompany(companyId) {
@@ -870,11 +913,7 @@ async function saveEditCompany(companyId) {
     if (!res.ok) { showToast('Save failed: ' + (data.error||'unknown'), 'error'); return; }
     document.getElementById('edit-co-modal').remove();
     showToast(name + ' updated ✓', 'success');
-    // Refresh accounts list AND reopen drawer with updated data
-    await loadAccounts();
-    setTimeout(function() {
-      if (companyId) openDrawer(companyId);
-    }, 600);
+    setTimeout(loadAccounts, 500);
   } catch(e) {
     showToast('Error: ' + e.message, 'error');
   }
