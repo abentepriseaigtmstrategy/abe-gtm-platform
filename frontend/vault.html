@@ -1248,41 +1248,40 @@ async function bulkMonitorIntelligence() {
   const ids = Array.from(_vaultSelected);
   const strategies = allStrategies.filter(s => ids.includes(s.id));
   const btn = document.getElementById('btn-bulk-monitor');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Adding to Intelligence…'; }
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Adding…'; }
 
   let added = 0, dupes = 0, failed = 0;
+  const errors = [];
 
   for (const s of strategies) {
     try {
       const token = await window.APP.token();
+
+      const payload = {
+        action:   'add_company',
+        name:     s.company_name,
+        domain:   s.company_url ? extractDomain(s.company_url) : '',
+        industry: s.industry || '',
+        size:     null,
+      };
+
       const res = await fetch('/api/account-graph', {
-        method: 'POST',
+        method:  'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({
-          action:   'add_company',
-          name:     s.company_name,
-          domain:   extractDomain(s.company_url || ''),
-          industry: s.industry || '',
-          // Pass GTM score as initial intent context
-          size:     null,
-        }),
+        body: JSON.stringify(payload),
       });
 
-      const data = await res.json();
+      let data = {};
+      try { data = await res.json(); } catch(_) {}
 
-      if (!res.ok) {
-        // Check if it's a duplicate (company already monitored)
-        if (data.error && data.error.toLowerCase().includes('duplicate')) {
-          dupes++;
-        } else {
-          failed++;
-        }
-      } else {
+      // Log full response for debugging
+      console.log('[Monitor] ' + s.company_name, res.status, data);
+
+      if (res.ok) {
         added++;
-        // Mark card with "📡 Monitoring" badge
         localStorage.setItem('vault_in_intel_' + s.id, '1');
         const card = document.getElementById('vcard-' + s.id);
         if (card && !card.querySelector('.vault-in-intel')) {
@@ -1294,29 +1293,55 @@ async function bulkMonitorIntelligence() {
             nameEl.parentNode.insertBefore(badge, nameEl.nextSibling);
           }
         }
+      } else {
+        const errMsg = data.error || ('HTTP ' + res.status);
+        if (errMsg.toLowerCase().includes('duplicate') ||
+            errMsg.toLowerCase().includes('already') ||
+            res.status === 409) {
+          dupes++;
+          // Still mark as monitoring since it already exists
+          localStorage.setItem('vault_in_intel_' + s.id, '1');
+        } else {
+          failed++;
+          errors.push(s.company_name + ': ' + errMsg);
+          console.error('[Monitor FAIL] ' + s.company_name, res.status, data);
+        }
       }
     } catch (e) {
-      console.error('bulkMonitorIntelligence error:', e);
       failed++;
+      errors.push(s.company_name + ': ' + e.message);
+      console.error('[Monitor ERROR] ' + s.company_name, e);
     }
   }
 
   clearVaultSelection();
   if (btn) { btn.disabled = false; btn.textContent = '📡 Monitor in Account Intelligence'; }
 
+  // Build result message
   const parts = [];
-  if (added)  parts.push(`${added} added to monitoring`);
-  if (dupes)  parts.push(`${dupes} already monitored`);
-  if (failed) parts.push(`${failed} failed`);
+  if (added)  parts.push(added + ' added ✓');
+  if (dupes)  parts.push(dupes + ' already monitored');
+  if (failed) parts.push(failed + ' failed');
 
-  showVaultToast(
-    parts.join(', ') +
-    ` — <a href="accounts.html" style="color:#06b6d4;font-weight:900">View Account Intelligence →</a>`
-  );
+  const msg = parts.join(' · ');
 
-  // If any were added, kick off an immediate intent check and show alert
-  if (added > 0) {
-    setTimeout(() => checkIntelligenceAlerts(), 2000);
+  if (failed > 0 && errors.length) {
+    // Show persistent error so user can see what went wrong
+    const detail = errors.join('\n');
+    showVaultToast('⚠ ' + msg + ' — check console for details', true);
+    console.error('[Monitor] Failures:\n' + detail);
+  } else if (added > 0) {
+    showVaultToast(
+      '✓ ' + msg +
+      ' — <a href="accounts.html" style="color:#06b6d4;font-weight:900;text-decoration:underline">View Account Intelligence →</a>'
+    );
+  } else if (dupes > 0) {
+    showVaultToast(
+      msg +
+      ' — <a href="accounts.html" style="color:#06b6d4;font-weight:900;text-decoration:underline">View Account Intelligence →</a>'
+    );
+  } else {
+    showVaultToast('Nothing was added. Check the browser console (F12) for details.', true);
   }
 }
 
