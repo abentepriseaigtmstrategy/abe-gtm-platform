@@ -1418,8 +1418,16 @@ const STEP_META = {
   }
 
   if (company) {
-    document.getElementById('company-input').value  = decodeURIComponent(company);
+    const decodedCompany = decodeURIComponent(company);
+    document.getElementById('company-input').value  = decodedCompany;
     document.getElementById('industry-input').value = decodeURIComponent(industry || '');
+    // Set state and enable buttons so user doesn't get a disabled page
+    state.company  = decodedCompany;
+    state.industry = decodeURIComponent(industry || '');
+    const startBtn = document.getElementById('start-btn');
+    const runBtn1  = document.getElementById('run-btn-1');
+    if (startBtn) startBtn.disabled = false;
+    if (runBtn1)  runBtn1.disabled  = false;
     history.replaceState({}, '', location.pathname);
   }
 })();
