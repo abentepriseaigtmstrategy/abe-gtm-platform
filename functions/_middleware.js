@@ -20,6 +20,7 @@ export async function verifyAuth(request, env) {
 
   const supabaseUrl  = env?.SUPABASE_URL      || SUPABASE_URL_DEFAULT;
   const supabaseAnon = env?.SUPABASE_ANON_KEY || SUPABASE_ANON_KEY_DEFAULT;
+  const supabaseSvc  = env?.SUPABASE_SERVICE_KEY;
 
   try {
     const res = await fetch(`${supabaseUrl}/auth/v1/user`, {
@@ -32,6 +33,34 @@ export async function verifyAuth(request, env) {
     if (!res.ok) return { user: null, error: `Invalid or expired token (${res.status})` };
     const user = await res.json();
     if (!user?.id) return { user: null, error: 'Invalid token payload' };
+
+    // ── BLOCKED USER CHECK ─────────────────────────────────────────
+    // Check user_profiles for is_blocked flag (uses service key — bypasses RLS)
+    if (supabaseSvc) {
+      try {
+        const blockRes = await fetch(
+          `${supabaseUrl}/rest/v1/user_profiles?id=eq.${user.id}&select=is_blocked,blocked_reason`,
+          {
+            headers: {
+              apikey:        supabaseSvc,
+              Authorization: `Bearer ${supabaseSvc}`,
+              'Content-Type': 'application/json',
+            },
+          }
+        );
+        if (blockRes.ok) {
+          const profiles = await blockRes.json();
+          if (profiles?.[0]?.is_blocked) {
+            const reason = profiles[0].blocked_reason || 'Account suspended';
+            return { user: null, error: `Account suspended: ${reason}` };
+          }
+        }
+      } catch (_) {
+        // If block check fails, fail open (don't block legitimate users)
+      }
+    }
+    // ── END BLOCKED USER CHECK ─────────────────────────────────────
+
     return { user, error: null };
   } catch (e) {
     return { user: null, error: 'Auth verification failed: ' + e.message };
