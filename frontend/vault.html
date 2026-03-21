@@ -1259,11 +1259,12 @@ async function bulkMonitorIntelligence() {
 
       const payload = {
         action:   'add_company',
-        name:     s.company_name,
+        name:     (s.company_name || '').trim(),
         domain:   s.company_url ? extractDomain(s.company_url) : '',
         industry: s.industry || '',
         size:     null,
       };
+      console.log('[Monitor] Sending:', payload.name, '| domain:', payload.domain || '(none)');
 
       const res = await fetch('/api/account-graph', {
         method:  'POST',
