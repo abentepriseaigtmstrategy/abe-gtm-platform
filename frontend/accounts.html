@@ -259,10 +259,10 @@
     </div>
     <div class="ag" id="accounts-grid" style="display:none;"></div>
     <div id="empty-state" class="es" style="display:none;">
-      <div class="es-icon">🧠</div>
-      <div class="es-title">No accounts in intelligence graph</div>
-      <div class="es-sub">Add companies to start tracking intent signals and buying behaviour.</div>
-      <button class="btn btn-primary" onclick="openAddCompany()">+ Add First Company</button>
+      <div class="es-icon" id="es-icon">🧠</div>
+      <div class="es-title" id="es-title">No accounts in intelligence graph</div>
+      <div class="es-sub" id="es-sub">Add companies to start tracking intent signals and buying behaviour.</div>
+      <button class="btn btn-primary" id="es-btn" onclick="openAddCompany()">+ Add First Company</button>
     </div>
   </div>
 </div>
@@ -344,6 +344,30 @@ function renderAccounts(accounts) {
   if (!accounts.length) {
     grid.style.display  = 'none';
     empty.style.display = 'block';
+    // Show context-aware message based on whether filter is active
+    const tier = document.getElementById('tier-filter')?.value || '';
+    const q    = document.getElementById('search')?.value?.trim() || '';
+    if (tier || q) {
+      // Filtered empty — don't show "Add First Company"
+      const icon = document.getElementById('es-icon');
+      const title = document.getElementById('es-title');
+      const sub  = document.getElementById('es-sub');
+      const btn  = document.getElementById('es-btn');
+      if (icon)  icon.textContent  = tier === 'HOT' ? '🔥' : tier === 'WARM' ? '🌡' : '🔍';
+      if (title) title.textContent = `No ${tier || ''} accounts match your filter`.trim();
+      if (sub)   sub.textContent   = 'Try clearing the filter to see all monitored companies.';
+      if (btn)   btn.style.display = 'none';
+    } else {
+      // Truly empty — show add company
+      const icon = document.getElementById('es-icon');
+      const title = document.getElementById('es-title');
+      const sub  = document.getElementById('es-sub');
+      const btn  = document.getElementById('es-btn');
+      if (icon)  icon.textContent  = '🧠';
+      if (title) title.textContent = 'No accounts in intelligence graph';
+      if (sub)   sub.textContent   = 'Add companies to start tracking intent signals and buying behaviour.';
+      if (btn)   btn.style.display = '';
+    }
     return;
   }
   empty.style.display = 'none';
