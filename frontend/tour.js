@@ -24,41 +24,59 @@ var PAGES = {
 
 var TOURS = {
 
-  // ─── DASHBOARD ───────────────────────────────────────────────
+  // ─── DASHBOARD / COMMAND CENTRE ─────────────────────────────
   dashboard: [
     {
-      title:  'Welcome to ABE',
-      body:   'ABE is your AI Revenue Infrastructure. This Command Centre shows your live pipeline, lead scoring and outreach repository. Let\'s take a 60-second tour so you know exactly where everything is.',
+      title:  'Welcome to ABE — AI Revenue Infrastructure',
+      body:   'ABE gives you two platforms in one. The ABE GTM Platform builds complete go-to-market strategies per account. The AI Lead Orchestration platform scores and outreaches your lead database at scale. This tour covers both.',
       anchor: null,
       pos:    'center',
     },
     {
-      title:  'Step 1 — Build a GTM Strategy',
-      body:   'Start here. Go to GTM Strategy, enter any company name and website, and ABE will generate a complete 6-step go-to-market strategy in under 4 minutes.',
+      title:  'ABE GTM Platform — How It Works',
+      body:   'Step 1: GTM Strategy — enter a company, generate 6-step intelligence (Market, TAM, ICP, Sourcing, Keywords, Messaging). Step 2: Strategy Vault — all saved strategies. Step 3: Account Intelligence — monitor buying signals. Step 4: Lead Manager — pipeline tracking.',
+      anchor: null,
+      pos:    'center',
+    },
+    {
+      title:  'AI Lead Orchestration — How It Works',
+      body:   'Import any CSV or Excel file of leads. Execute Mapping scores every lead instantly — green HIGH, amber MEDIUM, red LOW. Bulk Analyze Intel generates AI intelligence for 100 leads in under 3 minutes. Each lead gets Pain Area, Key Insight, Solution and Cold Outreach.',
+      anchor: null,
+      pos:    'center',
+    },
+    {
+      title:  'GTM Strategy — Start Here',
+      body:   'Click GTM Strategy, enter any company name and website. ABE extracts their digital footprint and runs all 6 strategy steps. Each step builds on the previous. The full strategy takes 3-4 minutes.',
       anchor: 'a[href="gtm-strategy.html"]',
       pos:    'bottom',
     },
     {
-      title:  'Step 2 — Save to Strategy Vault',
-      body:   'Every completed strategy auto-saves to the Strategy Vault. From there you can send companies to Lead Manager or monitor them in Account Intelligence.',
+      title:  'Strategy Vault',
+      body:   'Every completed strategy auto-saves here. Select multiple companies and use bulk actions: → Lead Manager to start outreach, or 📡 Monitor to track buying signals in Account Intelligence.',
       anchor: 'a[href="vault.html"]',
       pos:    'bottom',
     },
     {
-      title:  'Step 3 — Monitor Buying Signals',
-      body:   'Account Intelligence tracks 8 buying signal types — hiring growth, funding, leadership changes and more. Select low/medium intent companies from the Vault and send them here to watch automatically.',
+      title:  'Account Intelligence',
+      body:   'Tracks 8 buying signal types for every company you monitor — hiring growth, funding signals, product launches, leadership changes and more. Signals older than 14 days decay automatically. Scores always reflect right now.',
       anchor: 'a[href="accounts.html"]',
       pos:    'bottom',
     },
     {
-      title:  'Step 4 — Manage Your Pipeline',
-      body:   'Lead Manager is your CRM layer. Import CSV files, score every lead with AI, generate personalised outreach, and track every prospect through the pipeline.',
+      title:  'Lead Manager',
+      body:   'Your AI-powered pipeline. Import raw CSV/Excel lead lists, score every contact, generate personalised outreach per lead, and track every prospect from first contact to closed deal.',
       anchor: 'a[href="leads.html"]',
       pos:    'bottom',
     },
     {
+      title:  'BYOK — Bring Your Own API Key',
+      body:   'ABE uses your own OpenAI API key — paste it once in settings, it stays in session memory only, wiped on logout. No key stored on servers. No data sold. Your key, your machine.',
+      anchor: null,
+      pos:    'center',
+    },
+    {
       title:  'You\'re ready 🚀',
-      body:   'Start by clicking GTM Strategy and entering your first target company. The platform works best when you complete at least one full strategy first. Click anywhere to close.',
+      body:   'Start with GTM Strategy → enter your first target company → run all 6 steps. Then send it to Lead Manager or Account Intelligence. Click the ? button anytime to restart this tour.',
       anchor: null,
       pos:    'center',
     },
