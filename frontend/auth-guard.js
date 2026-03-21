@@ -64,9 +64,72 @@
       window.APP.user    = user;
       window.APP.session = session;
       // ── FIX: gtm-strategy.html polls window._currentUser for userId resolution ──
-      // This was never set, causing state.userId to stay null forever and
-      // silently blocking every vault auto-save and manual save.
       window._currentUser = user;
+
+      // ── ADMIN DETECTION ───────────────────────────────────────────
+      // Check user_profiles for is_admin flag
+      // Cached in sessionStorage so it doesn't re-query on every page load
+      let isAdmin = false;
+      try {
+        const cached = sessionStorage.getItem('abe_is_admin');
+        if (cached !== null) {
+          isAdmin = cached === 'true';
+        } else {
+          const { data: profile } = await sb
+            .from('user_profiles')
+            .select('is_admin')
+            .eq('id', user.id)
+            .single();
+          isAdmin = !!profile?.is_admin;
+          sessionStorage.setItem('abe_is_admin', String(isAdmin));
+        }
+      } catch (_) {
+        isAdmin = false;
+      }
+      window.APP.isAdmin = isAdmin;
+
+      // ── INJECT ADMIN LINK INTO NAV ────────────────────────────────
+      // Runs after page renders — adds Admin tab only for admins
+      // Works on ALL pages that use auth-guard.js
+      if (isAdmin) {
+        const injectAdminNav = () => {
+          // Don't inject if we're already on admin.html
+          if (window.location.pathname.includes('admin')) return;
+          // Don't inject if already injected
+          if (document.getElementById('admin-nav-link')) return;
+
+          const navTabs = document.querySelector('.nav-tabs') ||
+                          document.querySelector('#topnav .nav-tabs');
+          if (!navTabs) return;
+
+          const link = document.createElement('a');
+          link.id        = 'admin-nav-link';
+          link.href      = 'admin.html';
+          link.className = 'nav-tab';
+          link.innerHTML = '&#128274; Admin';
+          link.style.cssText = [
+            'color:#f59e0b',
+            'border-bottom:2px solid rgba(245,158,11,0.4)',
+            'background:rgba(245,158,11,0.06)',
+          ].join(';');
+          link.addEventListener('mouseenter', () => {
+            link.style.background = 'rgba(245,158,11,0.12)';
+            link.style.color      = '#fbbf24';
+          });
+          link.addEventListener('mouseleave', () => {
+            link.style.background = 'rgba(245,158,11,0.06)';
+            link.style.color      = '#f59e0b';
+          });
+          navTabs.appendChild(link);
+        };
+
+        // Try immediately, then retry after DOM settles
+        injectAdminNav();
+        setTimeout(injectAdminNav, 300);
+        setTimeout(injectAdminNav, 800);
+      }
+      // ── END ADMIN NAV INJECTION ───────────────────────────────────
+
       document.documentElement.style.visibility = '';
     } catch (e) {
       try { await sb.auth.signOut(); } catch (_) {}
