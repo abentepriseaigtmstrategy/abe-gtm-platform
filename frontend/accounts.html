@@ -517,41 +517,110 @@ function renderDrawer(g) {
    ACTIONS
 ═══════════════════════════════════ */
 async function scanCompany(companyId, domain) {
+  if (!domain) {
+    showToast('No domain set for this company — edit company to add domain first.', 'error');
+    return;
+  }
   const token = await getToken();
-  showToast('Scanning signals…');
+  showToast('🔍 Scanning signals for this company…');
   try {
-    await api('/api/analyze-website', { action: 'scan', company_id: companyId, url: domain ? `https://${domain}` : null }, token);
-    showToast('Signal scan complete ✓', 'success');
+    const a = _accounts.find(a => a.company_id === companyId);
+    await api('/api/analyze-website', {
+      action:       'scan',
+      company_id:   companyId,
+      website_url:  `https://${domain}`,
+      company_name: a?.company_name || '',
+    }, token);
+    showToast('✓ Signal scan complete', 'success');
     setTimeout(() => { if (_openCompanyId) openDrawer(_openCompanyId); }, 1500);
   } catch(e) {
-    showToast('Scan unavailable — website analysis endpoint not yet deployed', 'error');
+    showToast('Scan failed: ' + e.message, 'error');
   }
 }
 
-// ── FIX Bug 8: /api/signal-collector does not exist — show friendly message ──
+// ── SCAN SIGNALS — scans ALL monitored companies for buying signals ──
 async function runSignalScan() {
-  showToast('Signal collection is not yet deployed. Add companies and use Scan Signals per account.', 'error');
+  if (!_accounts.length) {
+    showToast('No companies to scan. Add companies to Account Intelligence first.', 'error');
+    return;
+  }
+  showToast(`⚡ Scanning ${_accounts.length} companies for signals…`);
+  const token = await getToken();
+  let scanned = 0, failed = 0;
+
+  for (const a of _accounts) {
+    if (!a.domain) { failed++; continue; }
+    try {
+      await api('/api/analyze-website', {
+        action:       'scan',
+        company_id:   a.company_id,
+        website_url:  `https://${a.domain}`,
+        company_name: a.company_name,
+      }, token);
+      scanned++;
+    } catch(_) { failed++; }
+  }
+
+  const msg = scanned
+    ? `✓ Scanned ${scanned} companies${failed ? ` · ${failed} skipped (no domain)` : ''}`
+    : 'No companies with domains to scan.';
+  showToast(msg, scanned ? 'success' : 'error');
+  setTimeout(() => loadAccounts(), 2000);
 }
 
-// ── FIX Bug 9: /api/learning-engine does not exist — show friendly message ──
+// ── RUN LEARNING CYCLE — recalculates intent scores for ALL companies ──
 async function runLearningCycle() {
-  showToast('Learning engine is not yet deployed. Scores update automatically after outreach events.', 'error');
+  if (!_accounts.length) {
+    showToast('No companies to score.', 'error');
+    return;
+  }
+  const btn = document.querySelector('[onclick="runLearningCycle()"]');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Scoring…'; }
+  showToast(`🧠 Recalculating intent scores for ${_accounts.length} companies…`);
+
+  try {
+    const token = await getToken();
+    await api('/api/intent-engine', { action: 'score_all' }, token);
+    showToast('✓ Intent scores updated', 'success');
+    setTimeout(() => loadAccounts(), 1500);
+  } catch(e) {
+    showToast('Score update failed: ' + e.message, 'error');
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = '🧠 Run Learning Cycle'; }
+  }
 }
 
 function openAddCompany() {
-  const name   = prompt('Company name:');
+  const name = prompt('Company name:');
   if (!name?.trim()) return;
-  const domain = prompt('Company domain (e.g. stripe.com):') || '';
+  const domain = prompt('Company domain (e.g. stripe.com) — press OK to skip:') || '';
   addCompany(name.trim(), domain.trim());
 }
 
 async function addCompany(name, domain) {
   const token = await getToken();
   try {
-    await api('/api/account-graph', { action: 'add_company', name, domain }, token);
-    showToast(`${name} added ✓`, 'success');
-    loadAccounts();
-  } catch(e) { showToast(e.message, 'error'); }
+    const res = await fetch('/api/account-graph', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ action: 'add_company', name, domain }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      // Treat as duplicate if 409 or error mentions conflict
+      const err = data.error || '';
+      if (res.status === 409 || err.includes('duplicate') || err.includes('already')) {
+        showToast(`${name} is already being monitored ✓`, 'success');
+      } else {
+        showToast('Failed: ' + err, 'error');
+      }
+    } else {
+      showToast(`${name} added to Account Intelligence ✓`, 'success');
+    }
+    setTimeout(() => loadAccounts(), 800);
+  } catch(e) {
+    showToast(e.message, 'error');
+  }
 }
 
 /* ═══════════════════════════════════
