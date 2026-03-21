@@ -417,6 +417,9 @@ async function loadVault() {
   try {
     const data = await apiCall('/api/gtm', { action: 'get_vault', limit: 100, offset: 0 });
     allStrategies = data.strategies || [];
+    // Verify which companies are ACTUALLY in Account Intelligence
+    // by checking against the live API (background, non-blocking)
+    syncIntelBadgesFromAPI();
     renderVault(allStrategies);
     updateStats(allStrategies);
   } catch(e) {
@@ -1243,6 +1246,35 @@ function esc(str) {
    Sends selected companies to Account Intelligence (account-graph)
    Identical pattern to bulkSendToLeadManager
 ═══════════════════════════════════════════════════════════════ */
+/* ── Sync monitoring badges against live Account Intelligence data ── */
+async function syncIntelBadgesFromAPI() {
+  try {
+    const token = await window.APP.token();
+    const res = await fetch('/api/account-graph', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ action: 'get_hot_accounts', limit: 100, min_score: 0 }),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    const inIntel = new Set((data.accounts || []).map(a => (a.company_name || '').toLowerCase().trim()));
+
+    // Update localStorage to reflect reality
+    allStrategies.forEach(s => {
+      const key = 'vault_in_intel_' + s.id;
+      const nameMatch = inIntel.has((s.company_name || '').toLowerCase().trim());
+      if (nameMatch) {
+        localStorage.setItem(key, '1');
+      } else {
+        // Remove stale badge if company is NOT in Account Intelligence
+        localStorage.removeItem(key);
+      }
+    });
+  } catch(e) {
+    // Fail silently — badges stay as-is if API unreachable
+  }
+}
+
 async function bulkMonitorIntelligence() {
   if (!_vaultSelected.size) return;
   const ids = Array.from(_vaultSelected);
