@@ -48,6 +48,7 @@ export async function onRequestPost(context) {
     case 'link_lead_company': return linkLeadCompany(body, userId, supabaseUrl, supabaseKey, cors);
     case 'get_tech_overlap':  return getTechOverlap(body, userId, supabaseUrl, supabaseKey, cors);
     case 'prioritize_leads':  return prioritizeLeads(body, userId, supabaseUrl, supabaseKey, env, cors);
+    case 'update_company':    return updateCompany(body, userId, supabaseUrl, supabaseKey, env, cors);
     default:                  return errRes(`Unknown action: ${body.action}`, 400, cors);
   }
 }
@@ -311,6 +312,52 @@ async function prioritizeLeads(body, userId, url, key, env, cors) {
     leads_prioritized: updated,
     weights_used: { icp: icpW, intent: intentW },
   }, cors);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// UPDATE COMPANY — edit name, domain, industry
+// ══════════════════════════════════════════════════════════════════
+async function updateCompany(body, userId, url, key, env, cors) {
+  const errors = validate({ company_id: 'string|required' }, body);
+  if (errors.length) return errRes(errors[0], 400, cors);
+
+  const { company_id, name, domain, industry } = body;
+  const updates = {};
+  if (name     !== undefined) updates.name     = sanitise(name, 200);
+  if (domain   !== undefined) updates.domain   = domain ? normaliseDomain(domain) : null;
+  if (industry !== undefined) updates.industry = industry ? sanitise(industry, 100) : null;
+  updates.updated_at = new Date().toISOString();
+
+  const res = await fetch(
+    `${url}/rest/v1/companies?id=eq.${sanitise(company_id,36)}&user_id=eq.${userId}`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Content-Type':  'application/json',
+        'apikey':        key,
+        'Authorization': `Bearer ${key}`,
+        'Prefer':        'return=representation',
+      },
+      body: JSON.stringify(updates),
+    }
+  );
+
+  if (!res.ok) {
+    const err = await res.text().catch(() => 'unknown');
+    return errRes('Failed to update company: ' + err, 500, cors);
+  }
+
+  // Bust all hot account caches
+  await Promise.allSettled([
+    cacheDel(env, `hot:${userId}`),
+    cacheDel(env, `hot:${userId}:all`),
+    cacheDel(env, `hot:${userId}:HOT`),
+    cacheDel(env, `hot:${userId}:WARM`),
+    cacheDel(env, `hot:${userId}:COLD`),
+    cacheDel(env, `graph:${company_id}`),
+  ]);
+
+  return okRes({ updated: true }, cors);
 }
 
 // ── Helpers ───────────────────────────────────────────────────────
