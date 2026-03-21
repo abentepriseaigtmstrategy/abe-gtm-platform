@@ -479,10 +479,54 @@ function renderDrawer(g) {
   // FIX: Do NOT embed dynamic co.id / co.domain inside onclick="" string literals.
   // Template literal nesting + quote escaping causes "missing ) after argument list".
   // Use a direct event listener instead — clean and safe.
+  // Check if strategy exists first to set correct button label
+  var gtmLabel = '&#9889; View GTM Strategy';
+  var lmLabel  = '&#8594; Send to Lead Manager';
   document.getElementById('d-actions').innerHTML =
-    '<button class="btn btn-primary btn-sm" id="gtm-btn-drawer">&#9889; Open GTM Strategy</button>' +
+    '<button class="btn btn-primary btn-sm" id="gtm-btn-drawer">' + gtmLabel + '</button>' +
+    '<button class="btn btn-outline btn-sm" id="lm-btn-drawer" style="color:#22c55e;border-color:rgba(34,197,94,.3)">' + lmLabel + '</button>' +
     '<button class="btn btn-outline btn-sm" id="scan-btn-drawer">&#128269; Scan Signals</button>' +
     '<button class="btn btn-outline btn-sm" id="edit-btn-drawer">&#9998; Edit</button>';
+
+  // Lead Manager — send company directly to lead manager
+  const lmBtn = document.getElementById('lm-btn-drawer');
+  if (lmBtn) lmBtn.onclick = async function() {
+    lmBtn.disabled = true; lmBtn.textContent = 'Sending…';
+    try {
+      const token = await getToken();
+      // First find strategy to carry over GTM score
+      const vRes = await fetch('/api/gtm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ action: 'get_vault', search: co.name, limit: 3 }),
+      });
+      const vData = await vRes.json();
+      const match = (vData.strategies||[]).find(s =>
+        s.company_name.toLowerCase().trim() === (co.name||'').toLowerCase().trim()
+      );
+      const gtmScore = match ? (match.gtm_score || 0) : 0;
+      const industry = match ? (match.industry || co.industry || '') : (co.industry || '');
+      // Import as lead
+      await fetch('/api/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({
+          action: 'import', source_type: 'csv', vault_import: true,
+          source_file: 'Account Intelligence — ' + co.name,
+          field_mapping: { name:'name', company:'company', website:'website', industry:'industry', title:'title' },
+          leads: [{ name: co.name, company: co.name, website: co.domain ? 'https://'+co.domain : '',
+            industry: industry, title: 'Account (from Intelligence)',
+            icp_score: gtmScore, priority: gtmScore >= 75 ? 'HIGH' : gtmScore >= 50 ? 'MEDIUM' : 'LOW',
+            status: 'analyzed' }]
+        })
+      });
+      showToast(co.name + ' sent to Lead Manager ✓', 'success');
+      setTimeout(function(){ window.location.href = 'leads.html'; }, 1200);
+    } catch(e) {
+      showToast('Failed: ' + e.message, 'error');
+      lmBtn.disabled = false; lmBtn.innerHTML = '&#8594; Send to Lead Manager';
+    }
+  };
 
   // GTM Strategy — find existing strategy in vault, resume it
   const gtmBtn = document.getElementById('gtm-btn-drawer');
@@ -826,7 +870,11 @@ async function saveEditCompany(companyId) {
     if (!res.ok) { showToast('Save failed: ' + (data.error||'unknown'), 'error'); return; }
     document.getElementById('edit-co-modal').remove();
     showToast(name + ' updated ✓', 'success');
-    setTimeout(loadAccounts, 500);
+    // Refresh accounts list AND reopen drawer with updated data
+    await loadAccounts();
+    setTimeout(function() {
+      if (companyId) openDrawer(companyId);
+    }, 600);
   } catch(e) {
     showToast('Error: ' + e.message, 'error');
   }
