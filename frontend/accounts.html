@@ -913,7 +913,12 @@ async function saveEditCompany(companyId) {
     if (!res.ok) { showToast('Save failed: ' + (data.error||'unknown'), 'error'); return; }
     document.getElementById('edit-co-modal').remove();
     showToast(name + ' updated ✓', 'success');
-    setTimeout(loadAccounts, 500);
+    // Close drawer, reload accounts, reopen drawer — ensures fresh co.domain in closure
+    closeDrawer();
+    await loadAccounts();
+    if (companyId) {
+      setTimeout(function(){ openDrawer(companyId); }, 300);
+    }
   } catch(e) {
     showToast('Error: ' + e.message, 'error');
   }
