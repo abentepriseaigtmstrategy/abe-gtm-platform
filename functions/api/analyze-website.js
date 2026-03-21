@@ -219,7 +219,32 @@ Return ONLY this JSON with nulls for unresolvable fields:
     saveEnrichment(user.id, company_name || profile.company_name, hostname, result, supabaseUrl, supabaseKey);
   }
 
-  return okRes(result, cors);
+  // ── STEP 7: Extract intent signals and write to intent_signals ──
+  // This is the bridge between website analysis and scoring engine.
+  // Without this, scan produces no scoreable data — learning cycle finds nothing.
+  let signalsWritten = [];
+  if (supabaseUrl && supabaseKey && body.company_id) {
+    signalsWritten = await extractAndWriteSignals(
+      user.id,
+      sanitise(body.company_id, 36),
+      profile,
+      extraction.text,
+      html,
+      supabaseUrl,
+      supabaseKey
+    );
+
+    // ── STEP 8: Recalculate intent score immediately ──────────────
+    if (signalsWritten.length > 0) {
+      await recalculateCompanyScore(user.id, sanitise(body.company_id, 36), supabaseUrl, supabaseKey);
+    }
+  }
+
+  return okRes({
+    ...result,
+    signals_detected: signalsWritten.length,
+    signals:          signalsWritten,
+  }, cors);
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -354,6 +379,177 @@ function stripTags(html) {
     .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+// ══════════════════════════════════════════════════════════════════
+// EXTRACT AND WRITE SIGNALS
+// Maps AI-extracted profile + raw website text to intent_signals rows.
+// This is the ENGINE that makes Scan Signals actually do something.
+// ══════════════════════════════════════════════════════════════════
+async function extractAndWriteSignals(userId, companyId, profile, text, html, url, key) {
+  const detectedSignals = [];
+  const lower = (text + ' ' + html).toLowerCase();
+  const now = new Date().toISOString();
+
+  // ── Signal detection rules ─────────────────────────────────────
+  // Each rule: { type, score, test(text), evidence(text) }
+  const SIGNAL_RULES = [
+    {
+      type:  'hiring_growth',
+      score: 20,
+      test:  t => /(we('re| are) hiring|join our team|open roles|careers page|job openings|now hiring|apply now|positions available|we're growing|team is growing)/.test(t),
+      note:  'Active hiring language detected on website',
+    },
+    {
+      type:  'funding_signal',
+      score: 20,
+      test:  t => /(series [a-e]|seed round|raised \$|funding round|venture capital|investors|backed by|total funding|we raised|closed funding|announced.*million|investment round)/.test(t),
+      note:  'Funding or investment language detected',
+    },
+    {
+      type:  'product_launch',
+      score: 20,
+      test:  t => /(we('ve| have) launched|introducing|announcing|new feature|now available|generally available|v2|version 2|product update|release notes|changelog|what's new)/.test(t),
+      note:  'Product launch or release language detected',
+    },
+    {
+      type:  'expansion_signal',
+      score: 15,
+      test:  t => /(expanding (to|into)|new (market|office|region|country|city)|international|global expansion|now serving|available in|we operate in|new location)/.test(t),
+      note:  'Geographic or market expansion language detected',
+    },
+    {
+      type:  'tech_adoption',
+      score: 15,
+      test:  () => (profile.tech_stack_hints || []).length >= 4,
+      note:  `Tech stack detected: ${(profile.tech_stack_hints || []).slice(0,5).join(', ')}`,
+    },
+    {
+      type:  'leadership_change',
+      score: 15,
+      test:  t => /(new (ceo|cto|cmo|coo|vp|head of|chief)|joins as|appointed|we('re| are) (welcoming|pleased to)|welcome.*team|leadership team)/.test(t),
+      note:  'Leadership or team announcement detected',
+    },
+    {
+      type:  'content_activity',
+      score: 10,
+      test:  () => Object.keys(profile.social_links || {}).length >= 1 || /(blog|news|press|insights|resources|webinar|podcast|case study)/.test(lower),
+      note:  'Active content or social presence detected',
+    },
+    {
+      type:  'website_change',
+      score: 10,
+      test:  () => (profile.extraction_confidence === 'HIGH') && (text.length > 500),
+      note:  'Website content successfully extracted — site is active',
+    },
+  ];
+
+  for (const rule of SIGNAL_RULES) {
+    try {
+      if (!rule.test(lower)) continue;
+
+      // Write signal to intent_signals table
+      const res = await fetch(`${url}/rest/v1/intent_signals`, {
+        method: 'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          'apikey':        key,
+          'Authorization': `Bearer ${key}`,
+          'Prefer':        'return=representation',
+        },
+        body: JSON.stringify({
+          user_id:     userId,
+          company_id:  companyId,
+          signal_type: rule.type,
+          score:       rule.score,
+          source:      'website_scan',
+          notes:       rule.note,
+          detected_at: now,
+          signal_data: {
+            source_url:  profile._meta?.website_url || '',
+            confidence:  profile.extraction_confidence || 'MEDIUM',
+            scanned_at:  now,
+          },
+        }),
+      });
+
+      if (res.ok) {
+        detectedSignals.push({ type: rule.type, score: rule.score, note: rule.note });
+      } else {
+        const err = await res.text().catch(() => '');
+        // Ignore duplicate key errors — signal already exists
+        if (!err.includes('duplicate') && !err.includes('23505')) {
+          console.error('[Signal write failed]', rule.type, res.status, err);
+        }
+      }
+    } catch (e) {
+      console.error('[Signal detection error]', rule.type, e.message);
+    }
+  }
+
+  return detectedSignals;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// RECALCULATE COMPANY SCORE
+// Reads all signals from DB, runs scoring model, writes result back
+// to companies table so it appears immediately on Account Intelligence
+// ══════════════════════════════════════════════════════════════════
+async function recalculateCompanyScore(userId, companyId, url, key) {
+  try {
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 86400 * 1000).toISOString();
+
+    // Load all signals for this company
+    const sigRes = await fetch(
+      `${url}/rest/v1/intent_signals?company_id=eq.${companyId}&user_id=eq.${userId}&detected_at=gte.${thirtyDaysAgo}&order=detected_at.desc`,
+      { headers: { 'apikey': key, 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' } }
+    );
+    if (!sigRes.ok) return;
+    const signals = await sigRes.json();
+
+    // Score each unique signal type (best score per type, with recency decay)
+    const BASE = {
+      hiring_growth: 20, product_launch: 20, funding_signal: 20,
+      tech_adoption: 15, leadership_change: 15, expansion_signal: 15,
+      content_activity: 10, website_change: 10,
+    };
+    const byType = {};
+    for (const s of signals) {
+      if (!byType[s.signal_type] || s.score > byType[s.signal_type].score) {
+        byType[s.signal_type] = s;
+      }
+    }
+    let total = 0;
+    for (const [type, sig] of Object.entries(byType)) {
+      const base   = BASE[type] || 10;
+      const ageMs  = Date.now() - new Date(sig.detected_at).getTime();
+      const decay  = ageMs > 14 * 86400 * 1000 ? 0.5 : 1.0;
+      total += Math.round(base * decay);
+    }
+    const intent_score = Math.min(100, Math.max(0, total));
+    const intent_tier  = intent_score >= 60 ? 'HOT' : intent_score >= 30 ? 'WARM' : 'COLD';
+
+    // Write score back to companies table directly
+    await fetch(
+      `${url}/rest/v1/companies?id=eq.${companyId}&user_id=eq.${userId}`,
+      {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': key, 'Authorization': `Bearer ${key}`,
+          'Prefer': 'return=minimal',
+        },
+        body: JSON.stringify({
+          intent_score,
+          intent_tier,
+          last_scanned_at: new Date().toISOString(),
+          updated_at:      new Date().toISOString(),
+        }),
+      }
+    );
+  } catch (e) {
+    console.error('[recalculateCompanyScore]', e.message);
+  }
 }
 
 async function saveEnrichment(userId, companyName, source, payload, url, key) {
