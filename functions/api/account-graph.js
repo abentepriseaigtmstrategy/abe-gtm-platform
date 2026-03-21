@@ -159,7 +159,7 @@ async function addCompany(body, userId, url, key, env, cors) {
     scan_status: domain ? 'pending' : 'skipped',
   };
 
-  // FIX: upsert needs 'resolution=merge-duplicates' — sb() helper missing this
+  // ── FIX: PostgREST upsert requires named constraint + resolution header ──
   const res = await fetch(`${url}/rest/v1/companies?on_conflict=companies_user_name_unique`, {
     method: 'POST',
     headers: {
@@ -170,10 +170,9 @@ async function addCompany(body, userId, url, key, env, cors) {
     },
     body: JSON.stringify(payload),
   });
-
   if (!res.ok) {
     const errText = await res.text().catch(() => 'unknown');
-    console.error('addCompany failed:', res.status, errText);
+    console.error('[addCompany] HTTP', res.status, errText);
     return errRes('Failed to save company', 500, cors);
   }
 
@@ -369,11 +368,7 @@ const sb = (url, key, table, method, body, qs = '', prefer = null) =>
     headers: {
       'Content-Type': 'application/json',
       apikey: key, Authorization: `Bearer ${key}`,
-      Prefer: prefer
-        ? prefer
-        : method === 'POST'
-          ? 'return=representation'
-          : 'return=minimal',
+      Prefer: prefer ?? (method === 'POST' ? 'return=representation' : 'return=minimal'),
     },
     body: body || undefined,
   });
