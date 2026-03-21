@@ -77,6 +77,38 @@
     .vault-card:hover { border-color: rgba(168,85,247,0.4); background: rgba(168,85,247,0.04); transform: translateY(-2px); }
     .vault-card.selected { border-color: rgba(168,85,247,0.7); background: rgba(168,85,247,0.08); transform: none; }
     .vault-card-checkbox { position:absolute;top:14px;left:14px;width:16px;height:16px;accent-color:var(--accent);cursor:pointer;z-index:5; }
+
+    /* ── Account Intelligence badge on vault card ── */
+    .vault-in-intel {
+      display:inline-flex;align-items:center;gap:4px;margin-top:4px;
+      font-size:9px;font-weight:800;color:#06b6d4;text-transform:uppercase;
+      letter-spacing:.1em;
+    }
+
+    /* ── Intelligence alert banner ── */
+    #intel-alert-bar {
+      display:none;position:fixed;top:64px;left:50%;transform:translateX(-50%);
+      z-index:500;min-width:420px;max-width:680px;
+      background:rgba(6,182,212,.1);border:1px solid rgba(6,182,212,.4);
+      border-radius:12px;padding:12px 18px;
+      backdrop-filter:blur(20px);box-shadow:0 8px 32px rgba(0,0,0,.4);
+      animation:slideDown .3s ease;
+    }
+    #intel-alert-bar.show { display:flex;align-items:center;gap:12px; }
+    .intel-alert-icon { font-size:20px;flex-shrink:0; }
+    .intel-alert-body { flex:1 }
+    .intel-alert-title { font-size:12px;font-weight:800;color:#06b6d4;margin-bottom:2px; }
+    .intel-alert-sub { font-size:11px;color:#94A3B8;line-height:1.4; }
+    .intel-alert-actions { display:flex;gap:6px;margin-top:6px; }
+    .intel-alert-btn { padding:4px 12px;border-radius:6px;font-size:10px;font-weight:800;
+      text-transform:uppercase;letter-spacing:.08em;cursor:pointer;border:none;font-family:inherit;
+      transition:all .15s; }
+    .intel-alert-btn.primary { background:linear-gradient(135deg,#06b6d4,#0891b2);color:white; }
+    .intel-alert-btn.dismiss { background:rgba(31,41,55,.6);color:#6B7280;
+      border:1px solid rgba(31,41,55,.8); }
+    .intel-alert-close { font-size:14px;color:#6B7280;cursor:pointer;background:none;
+      border:none;font-family:inherit;padding:2px 4px;flex-shrink:0; }
+    .intel-alert-close:hover { color:white; }
     .vault-card-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; padding-left: 24px; }
     .vault-in-lm { display:inline-flex;align-items:center;gap:4px;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;color:#22c55e;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2);border-radius:4px;padding:2px 7px;margin-top:4px; }
     /* Vault bulk bar */
@@ -230,6 +262,7 @@
     <span id="vault-bulk-count" style="font-size:10px;font-weight:900;color:#c4b5fd;text-transform:uppercase;letter-spacing:.1em"></span>
     <div style="flex:1"></div>
     <button class="btn btn-sm" style="background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.3);border-radius:8px;padding:6px 14px;font-size:10px;font-weight:900;cursor:pointer" onclick="bulkSendToLeadManager()">→ Lead Manager</button>
+    <button id="btn-bulk-monitor" class="btn btn-sm" style="background:rgba(6,182,212,.12);color:#06b6d4;border:1px solid rgba(6,182,212,.3);border-radius:8px;padding:6px 14px;font-size:10px;font-weight:900;cursor:pointer" onclick="bulkMonitorIntelligence()">📡 Monitor in Account Intelligence</button>
     <button class="btn btn-sm" style="background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:6px 14px;font-size:10px;font-weight:900;cursor:pointer" onclick="bulkDeleteStrategies()">🗑 Delete</button>
     <button class="btn btn-sm" style="background:rgba(107,114,128,.1);color:var(--muted);border:1px solid var(--border);border-radius:8px;padding:6px 14px;font-size:10px;font-weight:900;cursor:pointer" onclick="clearVaultSelection()">✕ Clear</button>
   </div>
@@ -327,6 +360,20 @@
 
 <!-- Toast -->
 <div id="toast">✓ <span id="toast-msg">Done</span></div>
+
+<!-- ── Account Intelligence Alert Bar ── -->
+<div id="intel-alert-bar">
+  <div class="intel-alert-icon">📡</div>
+  <div class="intel-alert-body">
+    <div class="intel-alert-title" id="intel-alert-title">Intent signal detected</div>
+    <div class="intel-alert-sub" id="intel-alert-sub">A monitored company has a new buying signal.</div>
+    <div class="intel-alert-actions">
+      <button class="intel-alert-btn primary" onclick="goToIntelligence()">View Account Intelligence →</button>
+      <button class="intel-alert-btn dismiss" onclick="dismissIntelAlert()">Dismiss</button>
+    </div>
+  </div>
+  <button class="intel-alert-close" onclick="dismissIntelAlert()">✕</button>
+</div>
 
 <script>
 /* ─────────────────────────────────────────────────────────────────
@@ -1190,6 +1237,223 @@ function esc(str) {
   if (typeof str !== 'string') return String(str || '');
   return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
 }
-</script>
+
+/* ═══════════════════════════════════════════════════════════════
+   ACCOUNT INTELLIGENCE — BULK MONITOR
+   Sends selected companies to Account Intelligence (account-graph)
+   Identical pattern to bulkSendToLeadManager
+═══════════════════════════════════════════════════════════════ */
+async function bulkMonitorIntelligence() {
+  if (!_vaultSelected.size) return;
+  const ids = Array.from(_vaultSelected);
+  const strategies = allStrategies.filter(s => ids.includes(s.id));
+  const btn = document.getElementById('btn-bulk-monitor');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Adding to Intelligence…'; }
+
+  let added = 0, dupes = 0, failed = 0;
+
+  for (const s of strategies) {
+    try {
+      const token = await window.APP.token();
+      const res = await fetch('/api/account-graph', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          action:   'add_company',
+          name:     s.company_name,
+          domain:   extractDomain(s.company_url || ''),
+          industry: s.industry || '',
+          // Pass GTM score as initial intent context
+          size:     null,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        // Check if it's a duplicate (company already monitored)
+        if (data.error && data.error.toLowerCase().includes('duplicate')) {
+          dupes++;
+        } else {
+          failed++;
+        }
+      } else {
+        added++;
+        // Mark card with "📡 Monitoring" badge
+        localStorage.setItem('vault_in_intel_' + s.id, '1');
+        const card = document.getElementById('vcard-' + s.id);
+        if (card && !card.querySelector('.vault-in-intel')) {
+          const nameEl = card.querySelector('.vault-company');
+          if (nameEl) {
+            const badge = document.createElement('div');
+            badge.className = 'vault-in-intel';
+            badge.innerHTML = '📡 Monitoring';
+            nameEl.parentNode.insertBefore(badge, nameEl.nextSibling);
+          }
+        }
+      }
+    } catch (e) {
+      console.error('bulkMonitorIntelligence error:', e);
+      failed++;
+    }
+  }
+
+  clearVaultSelection();
+  if (btn) { btn.disabled = false; btn.textContent = '📡 Monitor in Account Intelligence'; }
+
+  const parts = [];
+  if (added)  parts.push(`${added} added to monitoring`);
+  if (dupes)  parts.push(`${dupes} already monitored`);
+  if (failed) parts.push(`${failed} failed`);
+
+  showVaultToast(
+    parts.join(', ') +
+    ` — <a href="accounts.html" style="color:#06b6d4;font-weight:900">View Account Intelligence →</a>`
+  );
+
+  // If any were added, kick off an immediate intent check and show alert
+  if (added > 0) {
+    setTimeout(() => checkIntelligenceAlerts(), 2000);
+  }
+}
+
+/* ── Domain extractor helper ── */
+function extractDomain(url) {
+  if (!url) return '';
+  try {
+    const u = url.startsWith('http') ? url : 'https://' + url;
+    return new URL(u).hostname.replace(/^www\./, '');
+  } catch (_) {
+    return url.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0];
+  }
+}
+
+/* ── Restore "Monitoring" badges on page load ── */
+function restoreIntelBadges() {
+  if (!allStrategies) return;
+  allStrategies.forEach(s => {
+    if (localStorage.getItem('vault_in_intel_' + s.id)) {
+      const card = document.getElementById('vcard-' + s.id);
+      if (card && !card.querySelector('.vault-in-intel')) {
+        const nameEl = card.querySelector('.vault-company');
+        if (nameEl) {
+          const badge = document.createElement('div');
+          badge.className = 'vault-in-intel';
+          badge.innerHTML = '📡 Monitoring';
+          nameEl.parentNode.insertBefore(badge, nameEl.nextSibling);
+        }
+      }
+    }
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   INTELLIGENCE ALERT SYSTEM
+   Polls for intent score changes on monitored companies
+   Shows a non-intrusive banner when something changes
+═══════════════════════════════════════════════════════════════ */
+var _intelAlertShown = false;
+var _intelPollInterval = null;
+
+async function checkIntelligenceAlerts() {
+  // Only check if user has companies being monitored
+  const monitoredKeys = Object.keys(localStorage).filter(k => k.startsWith('vault_in_intel_'));
+  if (!monitoredKeys.length) return;
+
+  try {
+    const token = await window.APP.token();
+    const res = await fetch('/api/account-graph', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ action: 'get_hot_accounts', limit: 50, min_score: 1 }),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    const accounts = data.accounts || [];
+
+    // Find any HOT accounts that were recently added from vault
+    const monitoredIds = monitoredKeys.map(k => k.replace('vault_in_intel_', ''));
+    const hotMonitored = accounts.filter(a =>
+      a.intent_tier === 'HOT' &&
+      allStrategies.some(s =>
+        monitoredIds.includes(s.id) &&
+        s.company_name.toLowerCase() === (a.company_name || '').toLowerCase()
+      )
+    );
+
+    if (hotMonitored.length > 0 && !_intelAlertShown) {
+      const co = hotMonitored[0];
+      showIntelAlert(
+        `🔥 ${co.company_name} is now HOT intent (score: ${co.total_intent_score})`,
+        `A new buying signal was detected. This is a good time to reach out.`
+      );
+    }
+
+    // Check for any signals in last 7 days
+    const withSignals = accounts.filter(a =>
+      (a.recent_signal_count || 0) > 0 &&
+      allStrategies.some(s =>
+        monitoredIds.includes(s.id) &&
+        s.company_name.toLowerCase() === (a.company_name || '').toLowerCase()
+      )
+    );
+
+    if (withSignals.length > 0 && !_intelAlertShown) {
+      const co = withSignals[0];
+      showIntelAlert(
+        `📡 ${co.company_name} has ${co.recent_signal_count} new signal${co.recent_signal_count > 1 ? 's' : ''}`,
+        `Intent signals detected in the last 7 days. Check Account Intelligence for details.`
+      );
+    }
+
+  } catch (e) {
+    console.error('Intelligence alert check failed:', e);
+  }
+}
+
+function showIntelAlert(title, subtitle) {
+  _intelAlertShown = true;
+  document.getElementById('intel-alert-title').textContent = title;
+  document.getElementById('intel-alert-sub').textContent = subtitle;
+  document.getElementById('intel-alert-bar').classList.add('show');
+  // Auto-dismiss after 12 seconds
+  setTimeout(dismissIntelAlert, 12000);
+}
+
+function dismissIntelAlert() {
+  document.getElementById('intel-alert-bar').classList.remove('show');
+}
+
+function goToIntelligence() {
+  window.location.href = 'accounts.html';
+}
+
+/* ── Start polling for intelligence alerts every 5 minutes ── */
+function startIntelPolling() {
+  // Initial check after 3s (give page time to load)
+  setTimeout(checkIntelligenceAlerts, 3000);
+  // Then every 5 minutes
+  _intelPollInterval = setInterval(checkIntelligenceAlerts, 5 * 60 * 1000);
+}
+
+/* ── Hook into existing vault load to restore badges + start polling ── */
+const _origRenderVault = typeof renderVault !== 'undefined' ? renderVault : null;
+// We patch via the existing renderVault — after render, restore badges
+document.addEventListener('DOMContentLoaded', function() {
+  // Patch renderVault to also restore intel badges
+  const origRV = window.renderVault;
+  if (origRV) {
+    window.renderVault = function(strategies) {
+      origRV(strategies);
+      setTimeout(restoreIntelBadges, 100);
+    };
+  }
+  // Start polling
+  startIntelPolling();
+});
+
 </body>
 </html>
