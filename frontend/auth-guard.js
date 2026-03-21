@@ -66,38 +66,38 @@
       // ── FIX: gtm-strategy.html polls window._currentUser for userId resolution ──
       window._currentUser = user;
 
-      // ── ADMIN DETECTION ───────────────────────────────────────────
-      // Check user_profiles for is_admin flag
-      // Cached in sessionStorage so it doesn't re-query on every page load
-      let isAdmin = false;
-      try {
-        const cached = sessionStorage.getItem('abe_is_admin');
-        if (cached !== null) {
-          isAdmin = cached === 'true';
-        } else {
-          const { data: profile } = await sb
-            .from('user_profiles')
-            .select('is_admin')
-            .eq('id', user.id)
-            .single();
-          isAdmin = !!profile?.is_admin;
-          sessionStorage.setItem('abe_is_admin', String(isAdmin));
+      // ── Reveal page immediately — admin check runs AFTER, non-blocking ──
+      document.documentElement.style.visibility = '';
+
+      // ── ADMIN DETECTION (non-blocking — never delays page load) ──────
+      // Runs after page is already visible and vault has already started loading
+      ;(async () => {
+        let isAdmin = false;
+        try {
+          const cached = sessionStorage.getItem('abe_is_admin');
+          if (cached !== null) {
+            isAdmin = cached === 'true';
+          } else {
+            // user_profiles table may not exist yet — wrapped safely
+            const { data: profile } = await sb
+              .from('user_profiles')
+              .select('is_admin')
+              .eq('id', user.id)
+              .single();
+            isAdmin = !!profile?.is_admin;
+            sessionStorage.setItem('abe_is_admin', String(isAdmin));
+          }
+        } catch (_) {
+          isAdmin = false;
         }
-      } catch (_) {
-        isAdmin = false;
-      }
-      window.APP.isAdmin = isAdmin;
+        window.APP.isAdmin = isAdmin;
 
-      // ── INJECT ADMIN LINK INTO NAV ────────────────────────────────
-      // Runs after page renders — adds Admin tab only for admins
-      // Works on ALL pages that use auth-guard.js
-      if (isAdmin) {
+        // ── INJECT ADMIN LINK INTO NAV ──────────────────────────────
+        if (!isAdmin) return;
+        if (window.location.pathname.includes('admin')) return;
+
         const injectAdminNav = () => {
-          // Don't inject if we're already on admin.html
-          if (window.location.pathname.includes('admin')) return;
-          // Don't inject if already injected
           if (document.getElementById('admin-nav-link')) return;
-
           const navTabs = document.querySelector('.nav-tabs') ||
                           document.querySelector('#topnav .nav-tabs');
           if (!navTabs) return;
@@ -123,14 +123,10 @@
           navTabs.appendChild(link);
         };
 
-        // Try immediately, then retry after DOM settles
         injectAdminNav();
-        setTimeout(injectAdminNav, 300);
-        setTimeout(injectAdminNav, 800);
-      }
-      // ── END ADMIN NAV INJECTION ───────────────────────────────────
-
-      document.documentElement.style.visibility = '';
+        setTimeout(injectAdminNav, 400);
+        setTimeout(injectAdminNav, 1000);
+      })();
     } catch (e) {
       try { await sb.auth.signOut(); } catch (_) {}
       window.location.replace('login.html');
