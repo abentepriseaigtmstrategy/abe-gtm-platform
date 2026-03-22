@@ -225,13 +225,7 @@ const TOUR_CONFIG = {
         content: 'Graceful stop — never cuts mid-batch. Sets a flag that breaks the loop after the current 5-lead batch completes. Shows exact count of completed leads on stop.',
         position: 'top'
       },
-      {
-        id: 'dash-architecture',
-        target: '#architecture',
-        title: '🏛 Automation Architecture',
-        content: '5-step vision pipeline: Capture → Enrich → Score → Route → Outreach. Shows the full capability roadmap — webhook ingestion, Apollo/Clearbit enrichment, CRM routing, Smartlead sequencing.',
-        position: 'top'
-      },
+
       {
         id: 'dash-ai-modal-pain',
         target: '#painArea',
