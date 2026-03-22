@@ -25,13 +25,12 @@ var ABE_FAQ = (function () {
   var panel     = null;
 
   function getToken() {
+    // Use window.APP.token() — the same method used by all other pages
+    // This is defined in auth-guard.js and always returns a fresh JWT
     return new Promise(function(resolve) {
       try {
-        if (window.APP && window.APP.sb) {
-          window.APP.sb.auth.getSession().then(function(r) {
-            var token = r && r.data && r.data.session && r.data.session.access_token;
-            resolve(token || '');
-          }).catch(function() { resolve(''); });
+        if (window.APP && typeof window.APP.token === 'function') {
+          window.APP.token().then(function(t) { resolve(t || ''); }).catch(function() { resolve(''); });
         } else {
           resolve('');
         }
