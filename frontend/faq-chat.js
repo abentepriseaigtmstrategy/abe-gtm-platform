@@ -19,6 +19,75 @@ var ABE_FAQ = (function () {
     'What is the Strategy Vault?'
   ];
 
+  // Follow-up suggestions based on topic keywords in the question
+  var FOLLOW_UPS = [
+    {
+      keywords: ['import', 'upload', 'csv', 'leads', 'file'],
+      questions: ['How does duplicate detection work?', 'What happens after I import?', 'How do I bulk analyze after importing?', 'What file formats are supported?']
+    },
+    {
+      keywords: ['bulk analyze', 'bulk', 'analyze', 'analysis', 'batch'],
+      questions: ['How do I stop bulk analysis?', 'What does the AI generate per lead?', 'How do I save analyzed leads?', 'What is the progress bar showing?']
+    },
+    {
+      keywords: ['gtm score', 'gtm strategy', 'strategy builder', 'gtm'],
+      questions: ['What are the 6 GTM steps?', 'How do I push a strategy to Lead Manager?', 'What is the Strategy Vault?', 'How does bulk GTM generation work?']
+    },
+    {
+      keywords: ['icp score', 'icp', 'scoring', 'score'],
+      questions: ['What is HIGH vs MEDIUM vs LOW priority?', 'Can I override a score manually?', 'Difference between ICP and GTM score?', 'How do I bulk score leads?']
+    },
+    {
+      keywords: ['outreach', 'email', 'message', 'linkedin'],
+      questions: ['How do I regenerate outreach?', 'Where does outreach get saved?', 'Can I customise the outreach prompt?', 'How do I track if outreach was sent?']
+    },
+    {
+      keywords: ['intent signal', 'intent', 'signal', 'hot', 'warm', 'cold', 'account intelligence'],
+      questions: ['What are the 8 signal types?', 'How does recency decay work?', 'How do I scan for new signals?', 'What is a HOT account?']
+    },
+    {
+      keywords: ['vault', 'strategy vault', 'saved strategies'],
+      questions: ['How do I open a saved strategy?', 'How do I push vault to Lead Manager?', 'Can I export a strategy as PDF?', 'How do I resume an incomplete strategy?']
+    },
+    {
+      keywords: ['lead manager', 'leads.html', 'lead manager'],
+      questions: ['How do I filter leads by priority?', 'How do I bulk score leads?', 'How do I export my leads?', 'How do I generate outreach for a lead?']
+    },
+    {
+      keywords: ['export', 'download', 'pdf', 'xlsx', 'csv', 'word'],
+      questions: ['What fields are included in the export?', 'How do I export only selected leads?', 'Can I export a GTM strategy as PDF?', 'What export formats are available?']
+    },
+    {
+      keywords: ['save', 'local', 'supabase', 'cloud', 'storage', 'persist'],
+      questions: ['What is the difference between LOCAL and SUPABASE save?', 'Can both saves be active at once?', 'Will my data survive a page refresh?', 'How do I load saved leads from cloud?']
+    },
+    {
+      keywords: ['recency decay', 'decay', '14 days'],
+      questions: ['What are the 8 signal types?', 'How is intent score calculated?', 'What is a HOT vs WARM account?', 'How do I add a signal manually?']
+    },
+    {
+      keywords: ['tour', 'help', 'guide', 'how to use', 'walkthrough'],
+      questions: ['How do I start the platform tour?', 'Which pages have a tour?', 'How do I navigate between modules?', 'What is the Command Centre?']
+    }
+  ];
+
+  function getFollowUps(question) {
+    var q = question.toLowerCase();
+    for (var i = 0; i < FOLLOW_UPS.length; i++) {
+      var group = FOLLOW_UPS[i];
+      for (var j = 0; j < group.keywords.length; j++) {
+        if (q.indexOf(group.keywords[j]) !== -1) {
+          // Return suggestions excluding the question just asked
+          return group.questions.filter(function(s) {
+            return s.toLowerCase() !== q;
+          }).slice(0, 3);
+        }
+      }
+    }
+    // Generic fallback follow-ups
+    return ['How do I import leads?', 'What is a GTM Score?', 'How does Bulk Analyze work?'];
+  }
+
   var isOpen    = false;
   var isLoading = false;
   var messages  = [];
@@ -149,10 +218,29 @@ var ABE_FAQ = (function () {
       var align = isUser ? 'flex-end' : 'flex-start';
       var bg = isUser ? 'linear-gradient(135deg,#a855f7,#7c3aed)' : 'rgba(255,255,255,.07)';
       var radius = isUser ? '14px 14px 4px 14px' : '14px 14px 14px 4px';
-      html += '<div style="display:flex;justify-content:' + align + ';margin-bottom:10px;padding:0 12px">'
+      html += '<div style="display:flex;justify-content:' + align + ';margin-bottom:6px;padding:0 12px">'
         + '<div style="max-width:82%;background:' + bg + ';color:#fff;border-radius:' + radius + ';padding:10px 13px;font-size:12px;line-height:1.6">'
         + esc(m.content)
         + '</div></div>';
+
+      // After each assistant reply, show contextual follow-up chips
+      // but only after the LAST assistant message and only when not loading
+      var isLastAssistant = !isUser && j === messages.length - 1 && !isLoading;
+      if (isLastAssistant) {
+        // Find the user question that triggered this answer
+        var userQ = j > 0 && messages[j-1].role === 'user' ? messages[j-1].content : '';
+        var suggestions = getFollowUps(userQ);
+        if (suggestions.length) {
+          html += '<div style="padding:4px 12px 10px;display:flex;flex-wrap:wrap;gap:5px">';
+          for (var k = 0; k < suggestions.length; k++) {
+            var sq = suggestions[k];
+            html += '<button class="abe-faq-chip" style="font-size:9px;padding:4px 9px" '
+              + "onclick=\"ABE_FAQ.ask(this.getAttribute('data-q'));\" data-q=\"" + esc(sq) + "\">"
+              + esc(sq) + '</button>';
+          }
+          html += '</div>';
+        }
+      }
     }
 
     if (isLoading) {
