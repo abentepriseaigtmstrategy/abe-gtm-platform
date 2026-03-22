@@ -854,8 +854,129 @@ const TOUR_CONFIG = {
   init: function () {
     this.injectStyles();
     this.loadState();
-    this.injectButton();
+    this.injectButton(); // no-op, FAB handles this
+    this.injectFAB();
     this.bindKeys();
+  },
+
+  injectFAB: function () {
+    if (document.getElementById('abe-fab')) return;
+
+    // ── FAB container ──
+    var fab = document.createElement('div');
+    fab.id = 'abe-fab';
+    fab.style.cssText = [
+      'position:fixed',
+      'bottom:28px',
+      'right:28px',
+      'z-index:8000',
+      'display:flex',
+      'flex-direction:column',
+      'align-items:flex-end',
+      'gap:10px',
+      'transition:opacity .3s,transform .3s',
+      'font-family:Inter,sans-serif',
+    ].join(';');
+
+    // ── Tour button ──
+    var tourBtn = document.createElement('button');
+    tourBtn.id = 'abe-fab-tour';
+    tourBtn.title = 'Start Platform Tour';
+    tourBtn.innerHTML = '<span style="font-size:15px">✨</span><span style="font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase">Tour</span>';
+    tourBtn.style.cssText = [
+      'display:flex',
+      'align-items:center',
+      'gap:6px',
+      'background:linear-gradient(135deg,#a855f7,#7c3aed)',
+      'color:#fff',
+      'border:none',
+      'border-radius:50px',
+      'padding:10px 16px',
+      'cursor:pointer',
+      'box-shadow:0 4px 20px rgba(168,85,247,.45)',
+      'transition:transform .15s,box-shadow .15s',
+      'font-family:inherit',
+      'white-space:nowrap',
+    ].join(';');
+    tourBtn.onmouseenter = function () {
+      tourBtn.style.transform = 'scale(1.06)';
+      tourBtn.style.boxShadow = '0 6px 28px rgba(168,85,247,.6)';
+    };
+    tourBtn.onmouseleave = function () {
+      tourBtn.style.transform = 'scale(1)';
+      tourBtn.style.boxShadow = '0 4px 20px rgba(168,85,247,.45)';
+    };
+    tourBtn.onclick = function (e) { e.stopPropagation(); TOUR_CONFIG.start(); };
+
+    // ── FAQ chat button ──
+    var chatBtn = document.createElement('button');
+    chatBtn.id = 'abe-fab-chat';
+    chatBtn.title = 'Platform FAQ & Help';
+    chatBtn.innerHTML = '<span style="font-size:15px">💬</span><span style="font-size:9px;font-weight:800;letter-spacing:.1em;text-transform:uppercase">Help</span>';
+    chatBtn.style.cssText = [
+      'display:flex',
+      'align-items:center',
+      'gap:6px',
+      'background:linear-gradient(135deg,#0ea5e9,#0284c7)',
+      'color:#fff',
+      'border:none',
+      'border-radius:50px',
+      'padding:10px 16px',
+      'cursor:pointer',
+      'box-shadow:0 4px 20px rgba(14,165,233,.4)',
+      'transition:transform .15s,box-shadow .15s',
+      'font-family:inherit',
+      'white-space:nowrap',
+    ].join(';');
+    chatBtn.onmouseenter = function () {
+      chatBtn.style.transform = 'scale(1.06)';
+      chatBtn.style.boxShadow = '0 6px 28px rgba(14,165,233,.55)';
+    };
+    chatBtn.onmouseleave = function () {
+      chatBtn.style.transform = 'scale(1)';
+      chatBtn.style.boxShadow = '0 4px 20px rgba(14,165,233,.4)';
+    };
+    chatBtn.onclick = function (e) { e.stopPropagation(); ABE_FAQ.toggle(); };
+
+    fab.appendChild(tourBtn);
+    fab.appendChild(chatBtn);
+    document.body.appendChild(fab);
+
+    // ── Auto-hide on scroll, reappear on idle ──
+    var hideTimer = null;
+    var visible   = true;
+
+    function hideFAB() {
+      if (!visible) return;
+      visible = false;
+      fab.style.opacity   = '0';
+      fab.style.transform = 'translateY(16px)';
+      fab.style.pointerEvents = 'none';
+    }
+    function showFAB() {
+      visible = true;
+      fab.style.opacity   = '1';
+      fab.style.transform = 'translateY(0)';
+      fab.style.pointerEvents = 'auto';
+    }
+    function onActivity() {
+      showFAB();
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(hideFAB, 3500); // hide after 3.5s of no activity
+    }
+
+    window.addEventListener('scroll', onActivity, { passive: true });
+    document.addEventListener('mousemove', onActivity, { passive: true });
+    document.addEventListener('keydown', onActivity, { passive: true });
+    document.addEventListener('touchstart', onActivity, { passive: true });
+
+    // Always show while tour is active
+    var origStart = TOUR_CONFIG.start.bind(TOUR_CONFIG);
+    TOUR_CONFIG.start = function () {
+      showFAB();
+      clearTimeout(hideTimer);
+      origStart();
+    };
   },
 
   injectStyles: function () {
@@ -866,8 +987,9 @@ const TOUR_CONFIG = {
       '@keyframes abe-fade{from{opacity:0}to{opacity:1}}',
       '@keyframes abe-pop{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:scale(1)}}',
       '@keyframes abe-slide{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}',
-      '#abe-overlay{animation:abe-fade .2s ease-out}',
-      '#abe-tooltip{animation:abe-pop .25s cubic-bezier(.34,1.56,.64,1)}',
+      /* No overlay — spotlight handles ALL dimming via box-shadow spread */
+      '#abe-spotlight{position:fixed;z-index:9998;border-radius:10px;transition:top .22s ease,left .22s ease,width .22s ease,height .22s ease;pointer-events:none;box-shadow:0 0 0 9999px rgba(0,0,0,.6);border:2px solid rgba(168,85,247,.9);animation:abe-fade .2s ease-out;}',
+      '#abe-tooltip{position:fixed;z-index:10000;animation:abe-pop .25s cubic-bezier(.34,1.56,.64,1);}',
       '.abe-toast{animation:abe-slide .3s ease-out}',
     ].join('');
     document.head.appendChild(s);
@@ -892,55 +1014,7 @@ const TOUR_CONFIG = {
   },
 
   injectButton: function () {
-    if (document.getElementById('abe-tour-btn')) return;
-
-    var btn = document.createElement('button');
-    btn.id = 'abe-tour-btn';
-    btn.textContent = '✨ Tour';
-    btn.style.cssText = [
-      'background:linear-gradient(135deg,#a855f7,#7c3aed)',
-      'color:#fff',
-      'border:none',
-      'border-radius:7px',
-      'padding:6px 14px',
-      'font-size:10px',
-      'font-weight:800',
-      'letter-spacing:.08em',
-      'text-transform:uppercase',
-      'cursor:pointer',
-      'font-family:inherit',
-      'flex-shrink:0',
-    ].join(';');
-    btn.onclick = function () { TOUR_CONFIG.start(); };
-
-    // Strategy 1: find the Sign Out button and insert Tour before it
-    // Works for dashboard.html (no #topnav) and all other pages
-    var allBtns = document.querySelectorAll('button');
-    var signOutBtn = null;
-    for (var i = 0; i < allBtns.length; i++) {
-      var txt = (allBtns[i].textContent || '').trim().toLowerCase();
-      if (txt === 'sign out' || txt.includes('sign out')) {
-        signOutBtn = allBtns[i];
-        break;
-      }
-    }
-    if (signOutBtn && signOutBtn.parentNode) {
-      signOutBtn.parentNode.insertBefore(btn, signOutBtn);
-      return;
-    }
-
-    // Strategy 2: #topnav (vault, leads, accounts, gtm-strategy, report)
-    var topnav = document.getElementById('topnav');
-    if (topnav) {
-      topnav.appendChild(btn);
-      return;
-    }
-
-    // Strategy 3: any nav element
-    var nav = document.querySelector('nav');
-    if (nav) {
-      nav.appendChild(btn);
-    }
+    // FAB is injected by injectFAB() — no nav button needed
   },
 
   bindKeys: function () {
@@ -983,14 +1057,7 @@ const TOUR_CONFIG = {
     this.cleanup();
     const step = steps[this.currentStep];
 
-    // Overlay
-    const ov = document.createElement('div');
-    ov.id = 'abe-overlay';
-    ov.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,.72);backdrop-filter:blur(3px)';
-    ov.onclick = function () { TOUR_CONFIG.end(); };
-    document.body.appendChild(ov);
-
-    // Tooltip
+    // Tooltip — no overlay div; spotlight handles dimming via box-shadow
     const tt = document.createElement('div');
     tt.id = 'abe-tooltip';
     tt.style.cssText = [
@@ -1039,37 +1106,51 @@ const TOUR_CONFIG = {
   },
 
   highlight: function (selector, position) {
-    const el = document.querySelector(selector);
-    const tt = document.getElementById('abe-tooltip');
+    var el = document.querySelector(selector);
+    var tt = document.getElementById('abe-tooltip');
     if (!tt) return;
 
     if (!el) {
-      // Element not found — skip to next step gracefully
-      const page  = this.getPage();
-      const total = (this.steps[page] || []).length;
+      var page  = this.getPage();
+      var total = (this.steps[page] || []).length;
       this.currentStep++;
       if (this.currentStep < total) { this.render(); } else { this.end(); }
       return;
     }
 
-    const r  = el.getBoundingClientRect();
-    const TW = 380, TH = 170, G = 14, M = 14;
+    var r   = el.getBoundingClientRect();
+    var PAD = 8;
+    var TW  = 380, TH = 175, G = 16, M = 14;
 
-    // Elevate target above overlay
-    el.setAttribute('data-tour-style', el.getAttribute('style') || '');
-    el.style.position = el.style.position || 'relative';
-    el.style.zIndex   = '9999';
-    el.style.outline  = '2px solid #a855f7';
-    el.style.outlineOffset = '3px';
-    el.style.borderRadius  = '6px';
+    // Spotlight — the box-shadow spread creates the dimming cutout with NO blur
+    var sp = document.getElementById('abe-spotlight');
+    if (!sp) {
+      sp = document.createElement('div');
+      sp.id = 'abe-spotlight';
+      document.body.appendChild(sp);
+    }
+    sp.style.top    = Math.round(r.top    - PAD) + 'px';
+    sp.style.left   = Math.round(r.left   - PAD) + 'px';
+    sp.style.width  = Math.round(r.width  + PAD * 2) + 'px';
+    sp.style.height = Math.round(r.height + PAD * 2) + 'px';
+
+    // Click outside spotlight = end tour
+    sp.style.pointerEvents = 'none';
+    if (!document.getElementById('abe-click-trap')) {
+      var trap = document.createElement('div');
+      trap.id = 'abe-click-trap';
+      trap.style.cssText = 'position:fixed;inset:0;z-index:9997;';
+      trap.onclick = function () { TOUR_CONFIG.end(); };
+      document.body.appendChild(trap);
+    }
 
     // Position tooltip
-    let top, left;
+    var top, left;
     switch (position) {
       case 'top':    top = r.top - TH - G;              left = r.left + r.width/2 - TW/2; break;
       case 'bottom': top = r.bottom + G;                left = r.left + r.width/2 - TW/2; break;
-      case 'left':   top = r.top + r.height/2 - TH/2;  left = r.left - TW - G; break;
-      case 'right':  top = r.top + r.height/2 - TH/2;  left = r.right + G; break;
+      case 'left':   top = r.top + r.height/2 - TH/2;  left = r.left - TW - G;           break;
+      case 'right':  top = r.top + r.height/2 - TH/2;  left = r.right + G;               break;
       default:       top = r.bottom + G;                left = r.left + r.width/2 - TW/2;
     }
     top  = Math.max(M, Math.min(top,  window.innerHeight - TH - M));
@@ -1084,15 +1165,14 @@ const TOUR_CONFIG = {
   },
 
   cleanup: function () {
-    // Restore highlighted elements
-    document.querySelectorAll('[data-tour-style]').forEach(function (el) {
-      el.setAttribute('style', el.getAttribute('data-tour-style'));
-      el.removeAttribute('data-tour-style');
-    });
-    const ov = document.getElementById('abe-overlay');
-    const tt = document.getElementById('abe-tooltip');
-    if (ov) ov.remove();
-    if (tt) tt.remove();
+    var sp   = document.getElementById('abe-spotlight');
+    var tt   = document.getElementById('abe-tooltip');
+    var trap = document.getElementById('abe-click-trap');
+    var ov   = document.getElementById('abe-overlay');
+    if (sp)   sp.remove();
+    if (tt)   tt.remove();
+    if (trap) trap.remove();
+    if (ov)   ov.remove();
   },
 
   next: function () {
