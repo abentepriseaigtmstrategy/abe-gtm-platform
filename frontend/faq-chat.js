@@ -86,14 +86,25 @@ var ABE_FAQ = (function () {
   }
 
   // ── Call OpenAI via existing /api/analyze endpoint ──────────────────────
+  // /api/analyze ignores custom system prompts — it only uses customPrompt as
+  // the user message. So we embed our full knowledge base + the question inside
+  // customPrompt and ask for a plain-text answer (not JSON).
   function callAI(userMsg) {
     isLoading = true;
     renderMessages();
 
-    // Build messages array with full history
-    var messages = [{ role: 'system', content: SYSTEM_PROMPT }];
-    history.forEach(function (m) { messages.push(m); });
-    messages.push({ role: 'user', content: userMsg });
+    // Build conversation context from history (last 4 turns max to stay within token limit)
+    var recentHistory = history.slice(-4);
+    var historyText = recentHistory.length
+      ? recentHistory.map(function(m){ return (m.role === 'user' ? 'User: ' : 'Assistant: ') + m.content; }).join('\n')
+      : '';
+
+    // Embed full platform knowledge + question into customPrompt
+    // The server treats this as the user message to GPT-4o-mini
+    var fullPrompt = SYSTEM_PROMPT
+      + (historyText ? '\n\nPREVIOUS CONVERSATION:\n' + historyText : '')
+      + '\n\nUSER QUESTION: ' + userMsg
+      + '\n\nIMPORTANT: Reply in plain conversational text only. Do NOT return JSON. Do NOT use markdown headers. Keep your answer concise and helpful. If the question is not about the ABE platform, say: "I can only help with ABE platform questions."';
 
     getToken().then(function (token) {
       var headers = { 'Content-Type': 'application/json' };
@@ -103,46 +114,60 @@ var ABE_FAQ = (function () {
         method: 'POST',
         headers: headers,
         body: JSON.stringify({
-          lead: { name: 'Platform User', title: 'User', company: 'ABE Platform' },
-          customPrompt: userMsg,
-          faqMode: true,
-          faqSystemPrompt: SYSTEM_PROMPT,
-          faqHistory: history,
-          faqQuestion: userMsg,
+          lead: { name: 'ABE FAQ User', title: 'Platform User', company: 'ABE Platform' },
+          customPrompt: fullPrompt,
         }),
         signal: AbortSignal.timeout(30000),
       })
-      .then(function (res) { return res.json(); })
+      .then(function (res) {
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        return res.json();
+      })
       .then(function (data) {
         isLoading = false;
-        // Try to extract plain text answer from various response shapes
-        var answer = '';
-        if (typeof data === 'string') {
-          answer = data;
-        } else if (data.answer) {
-          answer = data.answer;
-        } else if (data.message) {
-          answer = data.message;
-        } else if (data.coldOutreachMessage) {
-          // Fallback: /api/analyze returns 4-panel JSON — use the most relevant panel
-          answer = data.painArea || data.keyInsight || data.coldOutreachMessage || JSON.stringify(data);
-        } else if (data.content && Array.isArray(data.content)) {
-          answer = data.content.map(function(c){ return c.text || ''; }).join('');
-        } else {
-          // Direct OpenAI call fallback
-          answer = JSON.stringify(data);
-        }
+        // /api/analyze returns parsed JSON from AI. Since we asked for plain text,
+        // the AI may return a JSON object with one key, or a raw string.
+        // Extract the most meaningful text value.
+        var answer = extractAnswer(data, userMsg);
         history.push({ role: 'user',      content: userMsg });
         history.push({ role: 'assistant', content: answer  });
         renderMessages();
       })
       .catch(function (err) {
         isLoading = false;
+        var errMsg = err.message && err.message.includes('429')
+          ? '⚠️ Too many requests. Please wait a moment and try again.'
+          : '⚠️ Could not reach the AI engine. Please check your connection and try again.';
         history.push({ role: 'user',      content: userMsg });
-        history.push({ role: 'assistant', content: '⚠️ Could not reach the AI engine. Please check your connection and try again.' });
+        history.push({ role: 'assistant', content: errMsg  });
         renderMessages();
       });
     });
+  }
+
+  // Extract the most meaningful plain-text value from the API response
+  function extractAnswer(data, fallbackQ) {
+    if (!data || typeof data === 'string') return data || 'No response received.';
+    // If AI returned a plain answer key
+    if (data.answer)  return data.answer;
+    if (data.message) return data.message;
+    if (data.response) return data.response;
+    if (data.reply)   return data.reply;
+    if (data.text)    return data.text;
+    // /api/analyze 4-panel format — stitch together the most relevant panels
+    var parts = [];
+    if (data['Pain Area'])            parts.push(data['Pain Area']);
+    if (data['Key Insight'])          parts.push(data['Key Insight']);
+    if (data['Proposed Solution'])    parts.push(data['Proposed Solution']);
+    if (data['Cold Outreach Message']) parts.push(data['Cold Outreach Message']);
+    if (data.painArea)                parts.push(data.painArea);
+    if (data.keyInsight)              parts.push(data.keyInsight);
+    if (data.proposedSolution)        parts.push(data.proposedSolution);
+    if (data.coldOutreachMessage)     parts.push(data.coldOutreachMessage);
+    if (parts.length) return parts[0]; // return first/most relevant
+    // Last resort: first string value in the object
+    var vals = Object.values(data).filter(function(v){ return typeof v === 'string' && v.length > 5; });
+    return vals.length ? vals[0] : 'I received a response but could not parse it. Please try rephrasing your question.';
   }
 
   // ── Direct OpenAI call (used if /api/analyze doesn\'t support faqMode) ──
