@@ -1,935 +1,1133 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Account Intelligence · ABE AI Revenue Infrastructure</title>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+// ═══════════════════════════════════════════════════════════════════════════════
+// ABE Platform + AI Lead Orchestration Framework
+// User Tour Guide — SDR & Sales Manager Edition
+// Built from: ABE_Platform_Features.docx + ALO_Feature_Addendum.docx
+// All targets verified against actual HTML element IDs
+// ═══════════════════════════════════════════════════════════════════════════════
 
-  <style>
-    :root {
-      --bg:#0B0F1A; --bg-alt:#0D1120; --card:#121827; --border:#1F2937;
-      --accent:#a855f7; --accent2:#7c3aed; --green:#22c55e; --amber:#f59e0b;
-      --red:#ef4444; --blue:#3b82f6; --text:#E5E7EB; --muted:#6B7280; --white:#fff;
-    }
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
-    body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
-      background-image:linear-gradient(rgba(168,85,247,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(168,85,247,.02) 1px,transparent 1px);
-      background-size:48px 48px}
+const TOUR_CONFIG = {
+  version: '2.0.0',
+  platform: 'ABE AI Revenue Infrastructure',
 
-    /* NAV */
-    #topnav{position:sticky;top:0;z-index:100;background:rgba(11,15,26,.95);
-      backdrop-filter:blur(24px);border-bottom:1px solid rgba(31,41,55,.6);
-      padding:0 32px;display:flex;align-items:center;justify-content:space-between;height:58px}
-    .nav-brand{display:flex;align-items:center;gap:12px;text-decoration:none}
-    .nav-mark{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),var(--accent2));
-      border-radius:8px;display:flex;align-items:center;justify-content:center;
-      font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:white}
-    .nbname{font-size:11px;font-weight:800;color:white}
-    .nbsub{font-size:8px;color:var(--muted);letter-spacing:.14em;text-transform:uppercase}
-    .nav-tabs{display:flex;align-items:center;gap:4px;background:rgba(255,255,255,.03);
-      border:1px solid var(--border);border-radius:10px;padding:4px}
-    .nav-tab{font-size:10px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
-      color:var(--muted);padding:6px 14px;border-radius:7px;cursor:pointer;text-decoration:none;
-      transition:all .15s;border:none;background:none}
-    .nav-tab:hover{color:white;background:rgba(255,255,255,.04)}
-    .nav-tab.active{color:white;background:rgba(168,85,247,.12);border:1px solid rgba(168,85,247,.25)}
+  // ── Page → tour section mapping ───────────────────────────────────────────
+  pageMap: {
+    'dashboard.html':    'dashboard',
+    'login.html':        'login',
+    'gtm-strategy.html': 'gtm',
+    'vault.html':        'vault',
+    'leads.html':        'leads',
+    'accounts.html':     'accounts',
+    'report.html':       'report',
+  },
 
-    /* LAYOUT */
-    .wrap{position:relative;z-index:1;max-width:1400px;margin:0 auto;padding:36px 32px}
-    .ph{display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:28px}
-    .ptitle{font-size:26px;font-weight:900;color:white;letter-spacing:-.6px}
-    .psub{font-size:10px;text-transform:uppercase;letter-spacing:.25em;color:var(--accent);font-weight:700;margin-bottom:5px}
+  // ── Tour steps — targets are real HTML id/class values ───────────────────
+  steps: {
 
-    /* STATS */
-    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:28px}
-    .sc{background:rgba(18,24,39,.7);border:1px solid var(--border);border-radius:14px;padding:20px 22px}
-    .sv{font-size:26px;font-weight:900;font-family:'Space Mono',monospace;color:white;letter-spacing:-1px}
-    .sl{font-size:9px;text-transform:uppercase;letter-spacing:.18em;color:var(--muted);font-weight:700;margin-top:4px}
-
-    /* TOOLBAR */
-    .toolbar{display:flex;align-items:center;gap:10px;margin-bottom:18px}
-    .si{flex:1;background:rgba(18,24,39,.8);border:1px solid var(--border);color:var(--text);
-      font-size:11px;padding:9px 12px 9px 34px;border-radius:10px;outline:none;font-family:'Inter',sans-serif}
-    .si:focus{border-color:var(--accent)}
-    .si::placeholder{color:var(--muted)}
-    .sw{position:relative;flex:1}
-    .si-icon{position:absolute;left:11px;top:50%;transform:translateY(-50%);color:var(--muted);font-size:13px;pointer-events:none}
-    .fs{background:rgba(18,24,39,.8);border:1px solid var(--border);color:var(--text);
-      font-size:10px;font-weight:700;padding:9px 13px;border-radius:10px;outline:none;
-      cursor:pointer;text-transform:uppercase;letter-spacing:.08em}
-    .fs:focus{border-color:var(--accent)}
-    .fs option{background:#121827}
-    .btn{display:inline-flex;align-items:center;gap:6px;padding:9px 18px;font-size:10px;
-      font-weight:800;letter-spacing:.08em;text-transform:uppercase;border-radius:8px;
-      cursor:pointer;border:none;transition:all .15s}
-    .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:white}
-    .btn-outline{background:transparent;color:var(--muted);border:1px solid var(--border)}
-    .btn-outline:hover{border-color:var(--accent);color:white}
-    .btn-sm{padding:6px 12px;font-size:9px}
-
-    /* ACCOUNTS GRID */
-    .ag{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-    @media(max-width:1100px){.ag{grid-template-columns:repeat(2,1fr)}}
-    @media(max-width:700px){.ag{grid-template-columns:1fr}}
-
-    .ac{background:rgba(18,24,39,.7);border:1px solid var(--border);border-radius:14px;
-      padding:20px 22px;cursor:pointer;transition:all .2s;position:relative}
-    .ac:hover{border-color:rgba(168,85,247,.4);background:rgba(168,85,247,.04);transform:translateY(-2px)}
-    .ac.hot{border-color:rgba(239,68,68,.3);background:rgba(239,68,68,.03)}
-    .ac.warm{border-color:rgba(245,158,11,.3);background:rgba(245,158,11,.03)}
-
-    .ac-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px}
-    .ac-name{font-size:14px;font-weight:800;color:white;letter-spacing:-.2px}
-    .ac-domain{font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.12em;margin-top:2px}
-    .intent-ring{text-align:right;flex-shrink:0}
-    .intent-num{font-size:22px;font-weight:900;font-family:'Space Mono',monospace}
-    .intent-lbl{font-size:8px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted)}
-
-    .tier-badge{display:inline-block;font-size:8px;font-weight:900;text-transform:uppercase;
-      letter-spacing:.12em;padding:3px 9px;border-radius:4px;margin-bottom:10px}
-    .tier-HOT{background:rgba(239,68,68,.12);color:var(--red);border:1px solid rgba(239,68,68,.25)}
-    .tier-WARM{background:rgba(245,158,11,.12);color:var(--amber);border:1px solid rgba(245,158,11,.25)}
-    .tier-COLD{background:rgba(107,114,128,.1);color:var(--muted);border:1px solid rgba(107,114,128,.2)}
-
-    .sig-pills{display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px}
-    .sig-pill{font-size:8px;font-weight:700;padding:2px 7px;border-radius:4px;
-      background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.18);color:#c4b5fd}
-    .sig-pill.hiring{background:rgba(34,197,94,.08);border-color:rgba(34,197,94,.2);color:#86efac}
-    .sig-pill.product{background:rgba(59,130,246,.08);border-color:rgba(59,130,246,.2);color:#93c5fd}
-    .sig-pill.website{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.2);color:#fcd34d}
-
-    .tech-chips{display:flex;flex-wrap:wrap;gap:3px;margin-bottom:10px}
-    .tech-chip{font-size:8px;font-weight:600;padding:2px 6px;border-radius:4px;
-      background:rgba(31,41,55,.6);border:1px solid var(--border);color:#9ca3af}
-
-    .ac-footer{display:flex;align-items:center;justify-content:space-between;
-      padding-top:12px;border-top:1px solid rgba(31,41,55,.5)}
-    .ac-meta{font-size:9px;color:var(--muted);font-family:'Space Mono',monospace}
-    .ac-actions{display:flex;gap:5px;opacity:0;transition:opacity .15s}
-    .ac:hover .ac-actions{opacity:1}
-
-    /* DRAWER */
-    #drawer{position:fixed;right:-720px;top:0;bottom:0;width:720px;background:#0D1120;
-      border-left:1px solid var(--border);z-index:200;overflow-y:auto;
-      transition:right .3s cubic-bezier(.34,1.56,.64,1)}
-    #drawer.open{right:0}
-    .doverlay{position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);
-      z-index:199;display:none}
-    .doverlay.show{display:block}
-    .dhead{padding:28px 32px 20px;border-bottom:1px solid var(--border)}
-    .dco{font-size:22px;font-weight:900;color:white;letter-spacing:-.5px;margin-bottom:4px}
-    .dmeta{font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.15em}
-    .dclose{position:absolute;top:18px;right:20px;background:none;border:none;
-      color:var(--muted);font-size:20px;cursor:pointer}
-    .dclose:hover{color:white}
-    .dbody{padding:24px 32px}
-
-    .dsec{margin-bottom:24px}
-    .dstitle{font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.22em;
-      color:var(--accent);margin-bottom:12px;display:flex;align-items:center;gap:8px}
-    .dstitle::before{content:'';width:3px;height:14px;background:linear-gradient(var(--accent),var(--accent2));border-radius:2px}
-
-    .score-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin-bottom:16px}
-    .score-box{background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:10px;
-      padding:14px;text-align:center}
-    .score-val{font-size:24px;font-weight:900;font-family:'Space Mono',monospace;color:white}
-    .score-lab{font-size:8px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-top:3px}
-
-    .sig-row{display:flex;align-items:center;gap:10px;padding:8px 12px;
-      background:rgba(0,0,0,.25);border-radius:8px;margin-bottom:6px}
-    .sig-icon{font-size:14px;flex-shrink:0}
-    .sig-type{font-size:10px;font-weight:700;color:white;text-transform:capitalize}
-    .sig-score{font-size:10px;font-weight:800;color:var(--accent);margin-left:auto;font-family:'Space Mono',monospace}
-    .sig-age{font-size:9px;color:var(--muted);font-family:'Space Mono',monospace}
-
-    .rec-row{display:flex;align-items:flex-start;gap:10px;padding:8px 12px;
-      background:rgba(0,0,0,.2);border-radius:8px;margin-bottom:6px;border-left:3px solid var(--accent)}
-    .rec-priority{font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;
-      padding:2px 7px;border-radius:4px;flex-shrink:0}
-    .rec-HIGH{background:rgba(239,68,68,.12);color:var(--red)}
-    .rec-MEDIUM{background:rgba(245,158,11,.12);color:var(--amber)}
-    .rec-LOW{background:rgba(107,114,128,.1);color:var(--muted)}
-    .rec-text{font-size:11px;color:#d1d5db;line-height:1.5}
-
-    .timeline-item{display:flex;align-items:flex-start;gap:10px;padding:7px 0;
-      border-bottom:1px solid rgba(31,41,55,.3)}
-    .tl-dot{width:8px;height:8px;border-radius:50%;background:var(--accent);margin-top:3px;flex-shrink:0}
-    .tl-dot.outreach{background:var(--blue)}
-    .tl-label{font-size:10px;color:var(--text);text-transform:capitalize}
-    .tl-date{font-size:9px;color:var(--muted);font-family:'Space Mono',monospace;margin-left:auto;white-space:nowrap}
-
-    /* EMPTY / LOADING */
-    .es{text-align:center;padding:60px 40px}
-    .es-icon{font-size:40px;margin-bottom:16px}
-    .es-title{font-size:16px;font-weight:800;color:white;margin-bottom:8px}
-    .es-sub{font-size:12px;color:var(--muted);margin-bottom:20px}
-    .skeleton{background:rgba(18,24,39,.7);border:1px solid var(--border);border-radius:14px;
-      padding:20px;animation:pulse 1.5s ease-in-out infinite}
-    .sk-line{height:10px;background:rgba(255,255,255,.06);border-radius:5px;margin-bottom:8px}
-    @keyframes pulse{0%,100%{opacity:.6}50%{opacity:1}}
-
-    #toast{position:fixed;bottom:24px;right:24px;background:rgba(18,24,39,.95);
-      border:1px solid var(--border);border-radius:12px;padding:12px 18px;
-      font-size:11px;font-weight:700;color:white;z-index:300;opacity:0;
-      transform:translateY(8px);transition:all .25s;pointer-events:none}
-    #toast.show{opacity:1;transform:none}
-    #toast.success{border-color:rgba(34,197,94,.4);color:var(--green)}
-    #toast.error{border-color:rgba(239,68,68,.4);color:var(--red)}
-  </style>
-</head>
-<body>
-
-<!-- AUTH GUARD -->
-<script src="auth-guard.js"></script>
-  <script src="tour.js"></script>
-
-<nav id="topnav">
-  <a href="index.html" class="nav-brand">
-    <div class="nav-mark">ABE</div>
-    <div><div class="nbname">ABE</div><div class="nbsub">Enterprise AI Revenue Infrastructure</div></div>
-  </a>
-  <div class="nav-tabs">
-    <a href="dashboard.html"    class="nav-tab">Command Centre</a>
-    <a href="gtm-strategy.html" class="nav-tab">GTM Strategy</a>
-    <a href="vault.html"        class="nav-tab">Strategy Vault</a>
-    <button class="nav-tab active">Account Intelligence</button>
-    <a href="leads.html"        class="nav-tab">Lead Manager</a>
-  </div>
-  <div style="display:flex;align-items:center;gap:10px;">
-    <button class="btn btn-outline btn-sm" onclick="runSignalScan()">⚡ Scan Signals</button>
-    <button class="btn btn-outline btn-sm" onclick="handleSignOut()">Sign Out</button>
-  </div>
-</nav>
-
-<div class="wrap">
-  <div class="ph">
-    <div style="display:flex;align-items:center;gap:12px">
-      <button onclick="history.back()" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#6b7280;border-radius:8px;padding:6px 12px;font-size:10px;cursor:pointer;font-weight:700">← Back</button>
-      <div>
-        <div class="psub">Intelligence Layer</div>
-        <div class="ptitle">Account Intelligence</div>
-      </div>
-    </div>
-    <div style="display:flex;gap:8px;">
-      <button class="btn btn-outline" onclick="runLearningCycle()">🧠 Run Learning Cycle</button>
-      <button class="btn btn-primary" onclick="openAddCompany()">+ Add Company</button>
-    </div>
-  </div>
-
-  <!-- Stats -->
-  <div class="stats">
-    <div class="sc"><div class="sv" id="stat-hot">—</div><div class="sl">Hot Accounts</div></div>
-    <div class="sc"><div class="sv" id="stat-signals" style="color:var(--accent)">—</div><div class="sl">Signals (7 days)</div></div>
-    <div class="sc"><div class="sv" id="stat-reply" style="color:var(--green)">—</div><div class="sl">Reply Rate</div></div>
-    <div class="sc"><div class="sv" id="stat-meetings" style="color:var(--amber)">—</div><div class="sl">Meetings Booked</div></div>
-  </div>
-
-  <!-- Toolbar -->
-  <div class="toolbar">
-    <div class="sw">
-      <span class="si-icon">🔍</span>
-      <input type="text" class="si" id="search" placeholder="Search accounts..." oninput="debounceSearch()" />
-    </div>
-    <select class="fs" id="tier-filter" onchange="applyFilters()">
-      <option value="">All Tiers</option>
-      <option value="HOT">🔥 Hot</option>
-      <option value="WARM">🌡 Warm</option>
-      <option value="COLD">❄ Cold</option>
-    </select>
-    <select class="fs" id="sort-filter" onchange="applyFilters()">
-      <option value="score">Sort: Intent Score</option>
-      <option value="signals">Sort: Signal Count</option>
-      <option value="name">Sort: Name</option>
-    </select>
-    <button class="btn btn-outline btn-sm" onclick="refreshAccounts()">↺</button>
-  </div>
-
-  <!-- Accounts Grid -->
-  <div id="accounts-container">
-    <!-- FIX Bug 6: Template literals ${} don't work in .html files — replaced with static HTML -->
-    <div class="ag" id="skeleton-grid">
-      <div class="skeleton"><div class="sk-line" style="width:55%"></div><div class="sk-line" style="width:35%;margin-bottom:14px"></div><div class="sk-line"></div><div class="sk-line" style="width:75%"></div><div class="sk-line" style="width:50%"></div></div>
-      <div class="skeleton"><div class="sk-line" style="width:60%"></div><div class="sk-line" style="width:40%;margin-bottom:14px"></div><div class="sk-line"></div><div class="sk-line" style="width:80%"></div><div class="sk-line" style="width:45%"></div></div>
-      <div class="skeleton"><div class="sk-line" style="width:50%"></div><div class="sk-line" style="width:30%;margin-bottom:14px"></div><div class="sk-line"></div><div class="sk-line" style="width:70%"></div><div class="sk-line" style="width:55%"></div></div>
-      <div class="skeleton"><div class="sk-line" style="width:65%"></div><div class="sk-line" style="width:35%;margin-bottom:14px"></div><div class="sk-line"></div><div class="sk-line" style="width:75%"></div><div class="sk-line" style="width:50%"></div></div>
-      <div class="skeleton"><div class="sk-line" style="width:55%"></div><div class="sk-line" style="width:45%;margin-bottom:14px"></div><div class="sk-line"></div><div class="sk-line" style="width:65%"></div><div class="sk-line" style="width:40%"></div></div>
-      <div class="skeleton"><div class="sk-line" style="width:58%"></div><div class="sk-line" style="width:38%;margin-bottom:14px"></div><div class="sk-line"></div><div class="sk-line" style="width:72%"></div><div class="sk-line" style="width:48%"></div></div>
-    </div>
-    <div class="ag" id="accounts-grid" style="display:none;"></div>
-    <div id="empty-state" class="es" style="display:none;">
-      <div class="es-icon" id="es-icon">🧠</div>
-      <div class="es-title" id="es-title">No accounts in intelligence graph</div>
-      <div class="es-sub" id="es-sub">Add companies to start tracking intent signals and buying behaviour.</div>
-      <button class="btn btn-primary" id="es-btn" onclick="openAddCompany()">+ Add First Company</button>
-    </div>
-  </div>
-</div>
-
-<!-- ACCOUNT DRAWER -->
-<div class="doverlay" id="doverlay" onclick="closeDrawer()"></div>
-<div id="drawer">
-  <button class="dclose" onclick="closeDrawer()">×</button>
-  <div class="dhead">
-    <div class="dco" id="d-name">—</div>
-    <div class="dmeta" id="d-meta">—</div>
-    <div style="display:flex;gap:8px;margin-top:14px;" id="d-actions"></div>
-  </div>
-  <div class="dbody" id="d-body">
-    <div style="text-align:center;padding:40px;color:var(--muted);">Loading…</div>
-  </div>
-</div>
-
-<div id="toast">✓ <span id="toast-msg"></span></div>
-
-<script>
-/* ═══════════════════════════════════
-   STATE
-═══════════════════════════════════ */
-let _accounts     = [];
-let _searchTimer  = null;
-let _openCompanyId = null;
-
-/* ═══════════════════════════════════
-   INIT
-═══════════════════════════════════ */
-document.addEventListener('DOMContentLoaded', () => setTimeout(init, 400));
-
-async function init() {
-  if (!window.APP.user) { setTimeout(init, 400); return; }
-  // ── FIX Bug 7: loadAccounts FIRST so _accounts is populated before loadStats reads it
-  await loadAccounts();
-  await loadStats();
-}
-
-async function loadAccounts() {
-  const token = await getToken();
-  try {
-    const res = await api('/api/account-graph', { action: 'get_hot_accounts', limit: 60 }, token);
-    _accounts = res.accounts || [];
-    renderAccounts(_accounts);
-  } catch(e) {
-    document.getElementById('skeleton-grid').style.display = 'none';
-    document.getElementById('empty-state').style.display   = 'block';
-  }
-}
-
-async function loadStats() {
-  const token = await getToken();
-  try {
-    const res = await api('/api/metrics', { action: 'dashboard' }, token);
-    const hot = (_accounts.filter(a => a.intent_tier === 'HOT')).length;
-    document.getElementById('stat-hot').textContent      = hot;
-    document.getElementById('stat-reply').textContent    = res.outreach?.reply_rate || '—';
-    document.getElementById('stat-meetings').textContent = res.outreach?.meeting_booked || 0;
-
-    // Signal count from last 7 days (from metrics)
-    const signalRes = await api('/api/metrics', { action: 'daily', days: 7 }, token);
-    const totalSig  = (signalRes.days || []).reduce((s, d) => s + (d.calls || 0), 0);
-    document.getElementById('stat-signals').textContent = totalSig;
-  } catch {}
-}
-
-function refreshAccounts() { loadAccounts(); showToast('Refreshing…'); }
-
-/* ═══════════════════════════════════
-   RENDER
-═══════════════════════════════════ */
-function renderAccounts(accounts) {
-  document.getElementById('skeleton-grid').style.display = 'none';
-  const grid  = document.getElementById('accounts-grid');
-  const empty = document.getElementById('empty-state');
-
-  if (!accounts.length) {
-    grid.style.display  = 'none';
-    empty.style.display = 'block';
-    // Show context-aware message based on whether filter is active
-    const tier = document.getElementById('tier-filter')?.value || '';
-    const q    = document.getElementById('search')?.value?.trim() || '';
-    if (tier || q) {
-      // Filtered empty — don't show "Add First Company"
-      const icon = document.getElementById('es-icon');
-      const title = document.getElementById('es-title');
-      const sub  = document.getElementById('es-sub');
-      const btn  = document.getElementById('es-btn');
-      if (icon)  icon.textContent  = tier === 'HOT' ? '🔥' : tier === 'WARM' ? '🌡' : '🔍';
-      if (title) title.textContent = `No ${tier || ''} accounts match your filter`.trim();
-      if (sub)   sub.textContent   = 'Try clearing the filter to see all monitored companies.';
-      if (btn)   btn.style.display = 'none';
-    } else {
-      // Truly empty — show add company
-      const icon = document.getElementById('es-icon');
-      const title = document.getElementById('es-title');
-      const sub  = document.getElementById('es-sub');
-      const btn  = document.getElementById('es-btn');
-      if (icon)  icon.textContent  = '🧠';
-      if (title) title.textContent = 'No accounts in intelligence graph';
-      if (sub)   sub.textContent   = 'Add companies to start tracking intent signals and buying behaviour.';
-      if (btn)   btn.style.display = '';
-    }
-    return;
-  }
-  empty.style.display = 'none';
-  grid.style.display  = 'grid';
-
-  grid.innerHTML = accounts.map(a => {
-    const score     = a.total_intent_score || 0;
-    const tier      = a.intent_tier || 'COLD';
-    const sigTypes  = Array.isArray(a.signal_types) ? a.signal_types.filter(Boolean) : [];
-    const techs     = Array.isArray(a.tech_stack)   ? a.tech_stack.filter(Boolean)   : [];
-    const lastSig   = a.last_signal_at
-      ? new Date(a.last_signal_at).toLocaleDateString('en-GB', {day:'2-digit',month:'short'})
-      : 'No signals';
-    const intColor  = tier === 'HOT' ? 'var(--red)' : tier === 'WARM' ? 'var(--amber)' : 'var(--muted)';
-
-    return `
-    <div class="ac ${tier.toLowerCase()}" onclick="openDrawer('${a.company_id}')">
-      <div class="ac-header">
-        <div>
-          <div class="ac-name">${esc(a.company_name)}</div>
-          <div class="ac-domain">${esc(a.domain || a.industry || '—')}</div>
-        </div>
-        <div class="intent-ring">
-          <div class="intent-num" style="color:${intColor}">${score}</div>
-          <div class="intent-lbl">Intent</div>
-        </div>
-      </div>
-      <span class="tier-badge tier-${tier}">${tier === 'HOT' ? '🔥' : tier === 'WARM' ? '🌡' : '❄'} ${tier}</span>
-      <div class="sig-pills">
-        ${sigTypes.slice(0,4).map(t => `<span class="sig-pill ${getSigClass(t)}">${t.replace(/_/g,' ')}</span>`).join('')}
-        ${sigTypes.length > 4 ? `<span class="sig-pill">+${sigTypes.length - 4} more</span>` : ''}
-      </div>
-      ${techs.length ? `<div class="tech-chips">${techs.slice(0,5).map(t=>`<span class="tech-chip">${esc(t)}</span>`).join('')}</div>` : ''}
-      <div class="ac-footer">
-        <div class="ac-meta">${a.signal_count || 0} signals · ${lastSig}</div>
-        <div class="ac-actions" onclick="event.stopPropagation()">
-          <button class="btn btn-outline btn-sm" onclick="openDrawer('${a.company_id}')">View</button>
-        </div>
-      </div>
-    </div>`;
-  }).join('');
-}
-
-function getSigClass(type) {
-  if (type?.includes('hiring')) return 'hiring';
-  if (type?.includes('product')) return 'product';
-  if (type?.includes('website')) return 'website';
-  return '';
-}
-
-/* ═══════════════════════════════════
-   SEARCH + FILTER
-═══════════════════════════════════ */
-function debounceSearch() { clearTimeout(_searchTimer); _searchTimer = setTimeout(applyFilters, 300); }
-
-function applyFilters() {
-  const q    = document.getElementById('search').value.toLowerCase().trim();
-  const tier = document.getElementById('tier-filter').value;
-  const sort = document.getElementById('sort-filter').value;
-
-  let filtered = _accounts.filter(a => {
-    const mq = !q || a.company_name.toLowerCase().includes(q) || (a.domain||'').toLowerCase().includes(q);
-    const mt = !tier || a.intent_tier === tier;
-    return mq && mt;
-  });
-
-  if (sort === 'signals') filtered.sort((a,b) => (b.signal_count||0) - (a.signal_count||0));
-  else if (sort === 'name') filtered.sort((a,b) => a.company_name.localeCompare(b.company_name));
-  else filtered.sort((a,b) => (b.total_intent_score||0) - (a.total_intent_score||0));
-
-  renderAccounts(filtered);
-}
-
-/* ═══════════════════════════════════
-   DRAWER — full account graph
-═══════════════════════════════════ */
-async function openDrawer(companyId) {
-  _openCompanyId = companyId;
-  document.getElementById('drawer').classList.add('open');
-  document.getElementById('doverlay').classList.add('show');
-  document.getElementById('d-name').textContent = 'Loading…';
-  document.getElementById('d-body').innerHTML   = '<div style="text-align:center;padding:40px;color:var(--muted)">Loading graph…</div>';
-
-  const token = await getToken();
-  try {
-    const res = await api('/api/account-graph', { action: 'get_graph', company_id: companyId }, token);
-    renderDrawer(res);
-  } catch(e) {
-    document.getElementById('d-body').innerHTML = `<div style="color:var(--red);padding:20px">${e.message}</div>`;
-  }
-}
-
-function closeDrawer() {
-  document.getElementById('drawer').classList.remove('open');
-  document.getElementById('doverlay').classList.remove('show');
-  _openCompanyId = null;
-}
-
-function renderDrawer(g) {
-  const co   = g.company       || {};
-  const intel = g.intelligence || {};
-  const tier = intel.intent_score >= 60 ? 'HOT' : intel.intent_score >= 30 ? 'WARM' : 'COLD';
-
-  document.getElementById('d-name').textContent = co.name || '—';
-  document.getElementById('d-meta').textContent =
-    `${co.domain||co.industry||'—'} · Intent: ${intel.intent_score||0} · ${tier}`;
-
-  // FIX: Do NOT embed dynamic co.id / co.domain inside onclick="" string literals.
-  // Template literal nesting + quote escaping causes "missing ) after argument list".
-  // Use a direct event listener instead — clean and safe.
-  document.getElementById('d-actions').innerHTML =
-    '<button class="btn btn-primary btn-sm" id="gtm-btn-drawer">&#9889; Open GTM Strategy</button>' +
-    '<button class="btn btn-outline btn-sm" id="scan-btn-drawer">&#128269; Scan Signals</button>' +
-    '<button class="btn btn-outline btn-sm" id="edit-btn-drawer">&#9998; Edit</button>';
-
-  // GTM Strategy — find existing strategy in vault, resume it
-  const gtmBtn = document.getElementById('gtm-btn-drawer');
-  if (gtmBtn) gtmBtn.onclick = async function() {
-    gtmBtn.disabled = true; gtmBtn.textContent = 'Finding strategy…';
-    try {
-      const token = await getToken();
-      const res = await fetch('/api/gtm', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-        body: JSON.stringify({ action: 'get_vault', search: co.name, limit: 5 }),
-      });
-      const data = await res.json();
-      const strategies = data.strategies || [];
-      // Find best match
-      const match = strategies.find(s =>
-        s.company_name.toLowerCase().trim() === (co.name||'').toLowerCase().trim()
-      ) || strategies[0];
-
-      if (match) {
-        // Resume existing strategy
-        window.location.href = 'gtm-strategy.html?resume=' + match.id;
-      } else {
-        // No strategy yet — start new one
-        window.location.href = 'gtm-strategy.html?company=' + encodeURIComponent(co.name||'') +
-          '&industry=' + encodeURIComponent(co.industry||'');
+    // ── 1. LOGIN (login.html) ──────────────────────────────────────────────
+    login: [
+      {
+        id: 'login-tabs',
+        target: '#tab-in',
+        title: '🔐 Sign In / Sign Up Tabs',
+        content: 'Toggle between Sign In and Sign Up. Min 8-char password enforced on registration. Supabase Auth handles JWT session management.',
+        position: 'bottom'
+      },
+      {
+        id: 'login-email',
+        target: '#in-email',
+        title: '📧 Work Email',
+        content: 'Enter your work email. Press Enter to submit — no need to click the button. Auto-redirects to dashboard if a valid session already exists.',
+        position: 'bottom'
+      },
+      {
+        id: 'login-pass',
+        target: '#in-pass',
+        title: '🔑 Password',
+        content: 'Show/Hide toggle on every password field. Friendly error messages translate all Supabase error codes: "Invalid credentials", "Too many attempts", etc.',
+        position: 'bottom'
+      },
+      {
+        id: 'login-submit',
+        target: '#btn-in',
+        title: '→ Authenticate',
+        content: 'Loading spinner shows "Authenticating…" state. On success, auth-guard.js validates the JWT server-side before rendering any page — client-side bypass is impossible.',
+        position: 'top'
+      },
+      {
+        id: 'login-signup',
+        target: '#btn-up',
+        title: '📝 Self-Service Sign Up',
+        content: 'No admin approval required — instant access. Password mismatch validation client-side. "Check email to confirm" shown on success.',
+        position: 'top'
       }
-    } catch(e) {
-      window.location.href = 'gtm-strategy.html?company=' + encodeURIComponent(co.name||'');
-    }
-  };
+    ],
 
-  // Scan Signals
-  const scanBtn = document.getElementById('scan-btn-drawer');
-  if (scanBtn) scanBtn.onclick = function() { scanCompany(co.id, co.domain || ''); };
+    // ── 2. DASHBOARD / COMMAND CENTRE (dashboard.html) ────────────────────
+    dashboard: [
+      {
+        id: 'dash-tabs',
+        target: '#tab-live',
+        title: '🧭 Command Center Tab',
+        content: 'Two main views: Command Center (live pipeline) and Repository (saved leads). This is your daily working screen — import files, run AI analysis, monitor your pipeline.',
+        position: 'bottom'
+      },
+      {
+        id: 'dash-tab-saved',
+        target: '#tab-saved',
+        title: '🗂 Strategic Repository Tab',
+        content: 'All leads you\'ve saved after AI analysis live here. Search, filter, export, track actions taken, and expand any lead to see full AI intelligence inline.',
+        position: 'bottom'
+      },
+      {
+        id: 'dash-nav',
+        target: '#topnav',
+        title: '🗺 Platform Navigation',
+        content: 'Access all 5 modules from the top nav: Command Centre · Repository · GTM Strategy · Strategy Vault · Account Intelligence. LOCAL and SUPABASE save toggles sit here too.',
+        position: 'bottom'
+      },
+      {
+        id: 'dash-save-local',
+        target: '#modeLocal',
+        title: '💽 Local Save Toggle',
+        content: 'When checked, leads are saved to localStorage — survives page refresh, works offline. Both Local and Supabase can be active simultaneously.',
+        position: 'bottom'
+      },
+      {
+        id: 'dash-save-cloud',
+        target: '#modeCloud',
+        title: '☁ Supabase Save Toggle',
+        content: 'When checked, leads upsert to your Supabase leads table — synced across devices, user-scoped by JWT. on_conflict prevents duplicates on re-save.',
+        position: 'bottom'
+      },
+      {
+        id: 'dash-vault-grid',
+        target: '#file-vault-grid',
+        title: '🗂 Multi-File Data Vault',
+        content: 'Every imported file is stored here as a named card showing file name and lead count. Click any card to load that file. Purple border marks the active file.',
+        position: 'bottom'
+      },
+      {
+        id: 'dash-vault-count',
+        target: '#vault-count',
+        title: '📁 Files Stored Count',
+        content: 'Live count of all files in your vault. Use Merge Files to combine any two vault files. Delete a vault file with the ✕ button — saves in Repository are preserved.',
+        position: 'bottom'
+      },
+      {
+        id: 'dash-kpi-total',
+        target: '#card-total-leads',
+        title: '📊 Total Leads KPI',
+        content: 'Real-time count of all leads in the currently loaded file. Updates instantly on file load or import.',
+        position: 'bottom'
+      },
+      {
+        id: 'dash-kpi-intent',
+        target: '#card-high-intent',
+        title: '🔥 High Intent Leads',
+        content: 'Count of leads scoring ≥75%. The inline dropdown filters the Verified Leads table to show only that score tier — click the card to activate the filter.',
+        position: 'bottom'
+      },
+      {
+        id: 'dash-kpi-mapped',
+        target: '#card-leads-mapped',
+        title: '✅ Leads Mapped',
+        content: 'Leads that have been analyzed and saved. Filterable by All / High / Medium / Low score tier. Tracks progression from raw import to actioned lead.',
+        position: 'bottom'
+      },
+      {
+        id: 'dash-kpi-pending',
+        target: '#card-pending-review',
+        title: '⏳ Pending Review',
+        content: 'Analyzed leads not yet saved to Repository. Filterable by Analyzed / Unprocessed / All. Drives your daily prioritisation — this is what needs action today.',
+        position: 'bottom'
+      },
+      {
+        id: 'dash-intent-chart',
+        target: '#intentScoreChart',
+        title: '🍩 Intent Score Distribution',
+        content: 'Doughnut chart showing High / Medium / Low intent split with legend. Updates on every file load and after each AI analysis run.',
+        position: 'right'
+      },
+      {
+        id: 'dash-funnel-chart',
+        target: '#statusFunnelChart',
+        title: '📊 Lead Status Funnel',
+        content: 'Bar chart: Unprocessed → Analyzed → Mapped funnel stages. Shows exactly where leads are dropping off in your pipeline.',
+        position: 'left'
+      },
+      {
+        id: 'dash-source-chart',
+        target: '#sourceFileChart',
+        title: '🥧 Source File Distribution',
+        content: 'Pie chart showing % of leads from each imported file. Essential when running campaigns from multiple lead sources simultaneously.',
+        position: 'right'
+      },
+      {
+        id: 'dash-activity-chart',
+        target: '#timeActivityChart',
+        title: '📅 7-Day Activity Chart',
+        content: 'Line chart tracking daily AI analysis activity over the last 7 days. Tracks API calls, tokens used, and cache hits.',
+        position: 'left'
+      },
+      {
+        id: 'dash-heat-score',
+        target: '#heat-avg-score',
+        title: '🌡 Avg Intent Score',
+        content: 'Mean ICP score across all loaded leads. The single most important quality indicator for any imported database.',
+        position: 'top'
+      },
+      {
+        id: 'dash-heat-intent',
+        target: '#heat-high-intent',
+        title: '% High Intent',
+        content: 'Percentage of leads scoring ≥75. Combined with Avg Intent Score, tells you whether a database is worth processing at all.',
+        position: 'top'
+      },
+      {
+        id: 'dash-heat-conversion',
+        target: '#heat-conversion',
+        title: '🔄 Conversion Rate',
+        content: 'Mapped leads ÷ Analyzed leads — tracks how efficiently analyzed leads are being actioned and saved.',
+        position: 'top'
+      },
+      {
+        id: 'dash-heat-pending',
+        target: '#heat-pending',
+        title: '⏳ Pending Ratio',
+        content: 'Unactioned leads as % of total. High pending ratio = backlog building up. Use Bulk Analyze to clear it fast.',
+        position: 'top'
+      },
+      {
+        id: 'dash-intel-layer',
+        target: '#intel-visual-layer',
+        title: '🔬 Lead Intelligence Tables',
+        content: 'Two tables: Raw Leads (Name, Title, Company, LinkedIn) and Verified Leads (Name, Company, Score %, Analyze button). Score colour-coded: green ≥75, amber ≥50, red <50.',
+        position: 'top'
+      },
+      {
+        id: 'dash-bulk-analyze',
+        target: '#analyzeAllBtn',
+        title: '⚡ Bulk Analyze Intel',
+        content: 'Processes 5 leads simultaneously per batch using Promise.allSettled — ~5x faster than sequential. Skips already-analyzed leads. Progress bar + Stop button visible during run.',
+        position: 'top'
+      },
+      {
+        id: 'dash-bulk-progress',
+        target: '#bulkProgressBar',
+        title: '📊 Bulk Progress Bar',
+        content: 'Live animated bar showing % complete during bulk analysis. "Analyzing X / Y leads…" status text updates per batch. Stop button halts after current batch finishes.',
+        position: 'top'
+      },
+      {
+        id: 'dash-bulk-stop',
+        target: '#bulkStopBtn',
+        title: '⏹ Stop Bulk Analysis',
+        content: 'Graceful stop — never cuts mid-batch. Sets a flag that breaks the loop after the current 5-lead batch completes. Shows exact count of completed leads on stop.',
+        position: 'top'
+      },
+      {
+        id: 'dash-architecture',
+        target: '#architecture',
+        title: '🏛 Automation Architecture',
+        content: '5-step vision pipeline: Capture → Enrich → Score → Route → Outreach. Shows the full capability roadmap — webhook ingestion, Apollo/Clearbit enrichment, CRM routing, Smartlead sequencing.',
+        position: 'top'
+      },
+      {
+        id: 'dash-ai-modal-pain',
+        target: '#painArea',
+        title: '🔴 AI Modal — Pain Area',
+        content: 'When you click Analyze on any lead, the AI identifies the specific business pain based on title, company, and role context. This is the hook for your outreach.',
+        position: 'top'
+      },
+      {
+        id: 'dash-ai-modal-insight',
+        target: '#keyInsight',
+        title: '🟡 AI Modal — Key Strategic Insight',
+        content: 'Strategic insight: market context, competitive pressure, growth signals for this specific prospect. Shown in amber — the "why now" for your outreach.',
+        position: 'top'
+      },
+      {
+        id: 'dash-ai-modal-solution',
+        target: '#proposedSolution',
+        title: '🟣 AI Modal — Proposed Solution',
+        content: 'ABE\'s recommended solution approach tailored to this lead\'s pain area and company context. Shown in purple — the "what to offer" for your call.',
+        position: 'top'
+      },
+      {
+        id: 'dash-ai-modal-outreach',
+        target: '#outreachMsg',
+        title: '🔵 AI Modal — Cold Outreach Draft',
+        content: 'Ready-to-use personalised cold outreach message. Based on all 3 panels above. Copy and send immediately or refine with the Custom Prompt editor.',
+        position: 'top'
+      },
+      {
+        id: 'dash-ai-custom-prompt',
+        target: '#customPrompt',
+        title: '✨ Custom Prompt Editor',
+        content: 'Write any refinement: "Focus on SaaS pain points", "Rewrite outreach more casually", "Emphasize ROI angle". Re-Analyze regenerates all 4 panels with your instruction.',
+        position: 'top'
+      },
+      {
+        id: 'dash-chat',
+        target: '#chatHistory',
+        title: '🤖 AI Chat Interface',
+        content: 'Conversational follow-up panel — right side of the AI modal. Type refinements in the chat input for iterative AI responses without losing the 4-panel output.',
+        position: 'left'
+      },
+      {
+        id: 'dash-chat-input',
+        target: '#chatInput',
+        title: '💬 Chat Input',
+        content: 'Type any follow-up: "Make it shorter", "Focus on CHRO pain points", "Add a P.S. line". Each chat turn sends full lead context to the AI engine.',
+        position: 'top'
+      },
+      {
+        id: 'dash-save-btn',
+        target: '#saveAnalysisBtn',
+        title: '💾 Save Strategy Button',
+        content: 'Saves this lead + all 4 AI panels to the Strategic Repository. Respects Local/Supabase toggle. Upserts on re-save — no duplicates ever created.',
+        position: 'top'
+      },
+      {
+        id: 'dash-repo-search',
+        target: '#repoSearch',
+        title: '🔍 Repository Live Search',
+        content: 'Search across Name, Company, Source File, Status, and Tags simultaneously. Fires on every keystroke — no submit needed.',
+        position: 'bottom'
+      },
+      {
+        id: 'dash-repo-table',
+        target: '#saved-leads-table',
+        title: '📋 Strategic Repository Table',
+        content: 'All saved leads with: Score %, Source File, Status badge, Actions Taken dropdown (10 CRM-style options), Updated timestamp. Expand any row to see full AI intel inline.',
+        position: 'top'
+      },
+      {
+        id: 'dash-save-mapped',
+        target: '#saveMappedBtn',
+        title: '✅ Save Mapped Lead',
+        content: 'Saves the currently viewed lead as "Mapped" status — the final stage in the pipeline indicating it\'s been processed and actioned.',
+        position: 'top'
+      }
+    ],
 
-  // Edit company
-  const editBtn = document.getElementById('edit-btn-drawer');
-  if (editBtn) editBtn.onclick = function() { openEditCompany(co.id, co.name||'', co.domain||'', co.industry||''); };
+    // ── 3. GTM STRATEGY BUILDER (gtm-strategy.html) ───────────────────────
+    gtm: [
+      {
+        id: 'gtm-company',
+        target: '#company-input',
+        title: '🏢 Company Input',
+        content: 'Enter the target company name here. Combined with the website URL for auto-extraction, this seeds all 6 AI steps with accurate context.',
+        position: 'bottom'
+      },
+      {
+        id: 'gtm-industry',
+        target: '#industry-input',
+        title: '🏭 Industry Input',
+        content: 'Specify the company\'s industry to sharpen ICP modeling and TAM sizing. The AI uses this to select relevant competitors and market benchmarks.',
+        position: 'bottom'
+      },
+      {
+        id: 'gtm-step-1',
+        target: '#card-1',
+        title: '1️⃣ Step 1 — Market Research',
+        content: 'AI analyses company website (auto-extracted), overview, market position, products/services, growth signals, tech stack hints. Produces GTM Relevance Score with reasoning.',
+        position: 'right'
+      },
+      {
+        id: 'gtm-body-1',
+        target: '#body-1',
+        title: '📄 Step 1 Output',
+        content: 'Market Research output renders here. Includes company overview, GTM fit score, market position, product summary, and growth signals — all sourced from the live website.',
+        position: 'right'
+      },
+      {
+        id: 'gtm-step-2',
+        target: '#card-2',
+        title: '2️⃣ Step 2 — TAM Mapping',
+        content: 'Total Addressable Market sizing with segment breakdown, market sizing methodology, growth projections, and competitive landscape overview.',
+        position: 'right'
+      },
+      {
+        id: 'gtm-step-3',
+        target: '#card-3',
+        title: '3️⃣ Step 3 — ICP Modeling',
+        content: 'Ideal Customer Profile: firmographics, decision maker titles, core pain points, buying triggers, objections, primary ICP summary. Saved to icp_profiles table for lead scoring.',
+        position: 'right'
+      },
+      {
+        id: 'gtm-step-4',
+        target: '#card-4',
+        title: '4️⃣ Step 4 — Account Sourcing',
+        content: 'Target account database recommendations, filtering criteria, account tiers, and sourcing strategy per ICP segment. Tells you exactly where to find your buyers.',
+        position: 'right'
+      },
+      {
+        id: 'gtm-step-5',
+        target: '#card-5',
+        title: '5️⃣ Step 5 — Keyword Generation',
+        content: 'Boolean search strings, LinkedIn search queries, and keyword clusters for finding target accounts. Ready to paste directly into LinkedIn Sales Navigator.',
+        position: 'right'
+      },
+      {
+        id: 'gtm-step-6',
+        target: '#card-6',
+        title: '6️⃣ Step 6 — Messaging Creation',
+        content: 'Full email sequence (subject, body, CTA), LinkedIn connection note, follow-up cadence — all tailored to this specific company and ICP. Ready to deploy.',
+        position: 'right'
+      },
+      {
+        id: 'gtm-token-counter',
+        target: '#token-counter',
+        title: '📊 Token Counter',
+        content: 'Live token count per step and running total. Tracks API spend in real time. KV cache means repeated runs for the same company cost zero tokens for cached steps.',
+        position: 'bottom'
+      },
+      {
+        id: 'gtm-progress',
+        target: '#main-progress-fill',
+        title: '📈 Strategy Progress Bar',
+        content: 'Visual progress across all 6 steps. Each completed step updates the fill. Use the step navigation sidebar to jump to any completed step.',
+        position: 'bottom'
+      },
+      {
+        id: 'gtm-bulk-zone',
+        target: '#bulk-upload-zone',
+        title: '⚡ Bulk GTM Generator',
+        content: 'Upload a CSV of up to 10 companies. AI runs all 6 steps on each company sequentially. Progress shown per company. All saved to Strategy Vault automatically.',
+        position: 'right'
+      },
+      {
+        id: 'gtm-bulk-run',
+        target: '#bulk-run-btn',
+        title: '▶ Run Bulk Strategy',
+        content: 'Starts the bulk engine. Each company gets a full 6-step GTM strategy. Auto-retry on parse errors. Crash-safe — auto-saves after every completed step.',
+        position: 'top'
+      },
+      {
+        id: 'gtm-bulk-stop',
+        target: '#bulk-stop-btn',
+        title: '⏹ Stop Bulk Run',
+        content: 'Gracefully stops bulk generation after the current company\'s active step completes. All completed strategies remain saved in the vault.',
+        position: 'top'
+      },
+      {
+        id: 'gtm-export-modal',
+        target: '#exportModal',
+        title: '📄 Export PDF Modal',
+        content: 'Selective PDF export — choose which of the 6 steps to include via checkboxes. Only exports the sections you need for a specific proposal or meeting.',
+        position: 'top'
+      },
+      {
+        id: 'gtm-api-modal',
+        target: '#apiModal',
+        title: '⚙ API Key Config',
+        content: 'Configure your own OpenAI API key here. Stored securely — never exposed in the DOM. The pluggable AI architecture supports OpenAI, Claude, or any compatible endpoint.',
+        position: 'top'
+      },
+      {
+        id: 'gtm-logs',
+        target: '#exec-logs-panel',
+        title: '📋 Execution Logs',
+        content: 'Real-time log of every AI call, token count, cache hit, and error. Essential for debugging and understanding cost per step.',
+        position: 'left'
+      }
+    ],
 
-  const intColor = tier === 'HOT' ? 'var(--red)' : tier === 'WARM' ? 'var(--amber)' : 'var(--muted)';
-  const field = (label, val) => val ? `<div style="margin-bottom:10px"><div style="font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.18em;color:var(--muted);margin-bottom:4px">${esc(label)}</div><div style="font-size:11px;color:#d1d5db;line-height:1.6;background:rgba(0,0,0,.3);border-radius:8px;padding:9px 11px">${esc(String(val))}</div></div>` : '';
+    // ── 4. STRATEGY VAULT (vault.html) ────────────────────────────────────
+    vault: [
+      {
+        id: 'vault-stats',
+        target: '#stat-total',
+        title: '📊 Vault Stats Bar',
+        content: '4 live stat cards: Total Strategies, Complete count, Average GTM Score, Total Tokens Used. All update in real time as strategies are added or deleted.',
+        position: 'bottom'
+      },
+      {
+        id: 'vault-complete',
+        target: '#stat-complete',
+        title: '✅ Complete Strategies',
+        content: 'Count of strategies where all 6 steps have been successfully generated. These are ready for Lead Manager push or PDF export.',
+        position: 'bottom'
+      },
+      {
+        id: 'vault-avg-score',
+        target: '#stat-avg-score',
+        title: '🎯 Average GTM Score',
+        content: 'Mean GTM Relevance Score across all strategies in the vault. Gives you an instant read on the overall quality of your target account universe.',
+        position: 'bottom'
+      },
+      {
+        id: 'vault-tokens',
+        target: '#stat-tokens',
+        title: '💰 Total Tokens Used',
+        content: 'Cumulative API tokens consumed across all strategy runs. Multiply by your model cost to track total USD spend. KV cache keeps this low on repeated runs.',
+        position: 'bottom'
+      },
+      {
+        id: 'vault-search',
+        target: '#search-input',
+        title: '🔍 Search Strategies',
+        content: 'Real-time search by company name or industry. Debounced — fires 300ms after typing stops. Combine with the Status filter for precise vault navigation.',
+        position: 'bottom'
+      },
+      {
+        id: 'vault-filter',
+        target: '#filter-status',
+        title: '🔽 Status Filter',
+        content: 'Filter by Complete / In Progress / Archived. Combinable with search. "In Progress" shows strategies where the run stopped mid-way — resume them with one click.',
+        position: 'bottom'
+      },
+      {
+        id: 'vault-grid',
+        target: '#vault-grid',
+        title: '🃏 Strategy Cards',
+        content: 'Each strategy card shows: company name, industry, GTM Score (colour-coded HIGH/MED/LOW), steps completed, TAM size, token count, primary ICP, status badge, and date.',
+        position: 'top'
+      },
+      {
+        id: 'vault-select-all',
+        target: '#vault-select-all-btn',
+        title: '☐ Select All / Deselect All',
+        content: 'Toggle all visible cards checked/unchecked. Activates the bulk action bar with Send to Lead Manager and Delete options.',
+        position: 'bottom'
+      },
+      {
+        id: 'vault-bulk-bar',
+        target: '#vault-bulk-bar',
+        title: '⚡ Bulk Action Bar',
+        content: 'Appears when any card is selected. Send all selected strategies to Lead Manager in one click — processes sequentially, reports sent/duplicate/failed count via toast.',
+        position: 'top'
+      },
+      {
+        id: 'vault-bulk-monitor',
+        target: '#btn-bulk-monitor',
+        title: '→ Bulk Send to Lead Manager',
+        content: 'Pushes all selected strategies to Lead Manager carrying their GTM Score directly — no rescoring. Server-side dedup prevents duplicate rows.',
+        position: 'top'
+      },
+      {
+        id: 'vault-drawer',
+        target: '#strategy-drawer',
+        title: '📖 Strategy Drawer',
+        content: 'Click any card to open the full strategy drawer. Shows all 6 steps in expandable sections. Copy to clipboard, PDF export, Re-run, and Send to Lead Manager all available inside.',
+        position: 'left'
+      },
+      {
+        id: 'vault-pdf-btn',
+        target: '#pdf-generate-btn',
+        title: '📄 Export Full Report',
+        content: 'Opens report.html with the complete 6-step formatted report for this account. Printable. PDF export button in both header and footer.',
+        position: 'top'
+      },
+      {
+        id: 'vault-pdf-modal',
+        target: '#pdf-modal',
+        title: '📋 PDF Section Selector',
+        content: 'Choose which of the 6 steps to include in the PDF export. Section checkboxes let you tailor the output for a specific audience — e.g. just ICP + Messaging for an SDR.',
+        position: 'top'
+      },
+      {
+        id: 'vault-intel-alert',
+        target: '#intel-alert-bar',
+        title: '🔔 Intelligence Alert',
+        content: 'If Account Intelligence has flagged HOT signals for a company in your vault, an alert bar appears on their card — direct link between buying signals and your strategy.',
+        position: 'bottom'
+      }
+    ],
 
-  document.getElementById('d-body').innerHTML = `
-    <!-- Score summary -->
-    <div class="score-grid">
-      <div class="score-box"><div class="score-val" style="color:${intColor}">${intel.intent_score||0}</div><div class="score-lab">Intent Score</div></div>
-      <div class="score-box"><div class="score-val">${intel.avg_icp_score||'—'}</div><div class="score-lab">Avg ICP Score</div></div>
-      <div class="score-box"><div class="score-val">${intel.total_touchpoints||0}</div><div class="score-lab">Touchpoints</div></div>
-    </div>
-    <div class="score-grid" style="margin-bottom:20px">
-      <div class="score-box"><div class="score-val">${intel.lead_count||0}</div><div class="score-lab">Leads</div></div>
-      <div class="score-box"><div class="score-val">${intel.signal_count||0}</div><div class="score-lab">Signals</div></div>
-      <div class="score-box"><div class="score-val" style="color:var(--green)">${intel.response_rate||'0.0%'}</div><div class="score-lab">Response Rate</div></div>
-    </div>
+    // ── 5. LEAD MANAGER (leads.html) ──────────────────────────────────────
+    leads: [
+      {
+        id: 'leads-stats-total',
+        target: '#s-total',
+        title: '📊 Stats Bar — Total Leads',
+        content: 'Live count of all leads in Lead Manager across all files and import sources. Updates in real time as leads are imported, scored, or deleted.',
+        position: 'bottom'
+      },
+      {
+        id: 'leads-stats-high',
+        target: '#s-high',
+        title: '🔥 High Priority Count',
+        content: 'Leads with priority = HIGH (ICP score ≥75). This is your daily call list — start here every morning.',
+        position: 'bottom'
+      },
+      {
+        id: 'leads-stats-analyzed',
+        target: '#s-analyzed',
+        title: '✅ Analyzed Count',
+        content: 'Leads with status "analyzed" or "mapped" — processed and ready for outreach. Track this against Total to know your pipeline coverage.',
+        position: 'bottom'
+      },
+      {
+        id: 'leads-stats-outreach',
+        target: '#s-outreach',
+        title: '✉ Outreach Sent',
+        content: 'Leads where outreach_status = sent or replied. The activity metric — are you actually sending the messages the AI is generating?',
+        position: 'bottom'
+      },
+      {
+        id: 'leads-stats-replied',
+        target: '#s-replied',
+        title: '💬 Replied',
+        content: 'Leads who have replied to outreach. The money metric. Track sent → replied conversion rate to measure message quality.',
+        position: 'bottom'
+      },
+      {
+        id: 'leads-import-zone',
+        target: '#drop-zone',
+        title: '📥 CSV Import Drop Zone',
+        content: 'Drag and drop or click to upload any CSV of contacts. AI auto-maps column headers to standard fields — works even if your columns are named differently.',
+        position: 'bottom'
+      },
+      {
+        id: 'leads-file-input',
+        target: '#csv-file',
+        title: '📁 File Input',
+        content: 'Upload CSV files here. AI schema detection (GPT-4o-mini) maps non-standard column names automatically. Falls back to fuzzy matching if AI fails — import never blocks.',
+        position: 'bottom'
+      },
+      {
+        id: 'leads-filter-priority',
+        target: '#filter-priority',
+        title: '🎯 Priority Filter',
+        content: 'Filter by HIGH (≥75) / MEDIUM (50–74) / LOW (<50) ICP fit score. Use HIGH daily to focus on your best leads first.',
+        position: 'bottom'
+      },
+      {
+        id: 'leads-filter-intent',
+        target: '#filter-intent',
+        title: '⚡ Intent Filter',
+        content: 'Filter by HIGH (≥60) / MEDIUM (30–59) / LOW (<30) intent. For vault leads, intent is derived from the GTM Score when intent_score is absent.',
+        position: 'bottom'
+      },
+      {
+        id: 'leads-filter-status',
+        target: '#filter-status',
+        title: '📋 Status Filter',
+        content: 'Filter by Unprocessed / Analyzed / Mapped pipeline stage. "Unprocessed" = imported but not yet scored. Use this to find leads still needing attention.',
+        position: 'bottom'
+      },
+      {
+        id: 'leads-filter-outreach',
+        target: '#filter-outreach',
+        title: '✉ Outreach Filter',
+        content: 'Filter by Not Sent / Sent / Replied. Cross with Priority filter to find HIGH priority leads you haven\'t reached out to yet.',
+        position: 'bottom'
+      },
+      {
+        id: 'leads-filter-file',
+        target: '#filter-file',
+        title: '📁 Source File Filter',
+        content: 'Filter leads by which import file they came from. Dropdown auto-populates with all distinct source files — essential when running multiple campaigns.',
+        position: 'bottom'
+      },
+      {
+        id: 'leads-search',
+        target: '#search',
+        title: '🔍 Live Search',
+        content: 'Real-time search across name, company, and email simultaneously. Combine with filters for surgical lead lookup.',
+        position: 'bottom'
+      },
+      {
+        id: 'leads-table',
+        target: '#leads-body',
+        title: '📋 Leads Table',
+        content: 'ICP Score (colour-coded), Intent (HIGH/MED/LOW), Priority, Status badge, Outreach badge, Score/GTM lock button, Outreach button, Delete. Vault leads show 🔒 GTM Score locked.',
+        position: 'top'
+      },
+      {
+        id: 'leads-score-btn',
+        target: '#score-btn',
+        title: '⚡ Score Button',
+        content: 'CSV leads: click to run deterministic ICP scoring (5 dimensions). Vault leads show 🔒 GTM badge instead — their score is locked and protected from overwrite.',
+        position: 'top'
+      },
+      {
+        id: 'leads-outreach-btn',
+        target: '#outreach-btn',
+        title: '✉ Generate Outreach',
+        content: 'Before outreach: purple ✉ button generates hyper-personalised email + LinkedIn note using GTM context. After saving: becomes green 📧 locked icon.',
+        position: 'top'
+      },
+      {
+        id: 'leads-bulk-bar',
+        target: '#bulk-bar',
+        title: '⚡ Bulk Action Bar',
+        content: 'Select any rows to activate. Bulk Score (vault leads auto-excluded), Bulk Export CSV, Bulk Delete. Row-level checkboxes + Select All header checkbox.',
+        position: 'top'
+      },
+      {
+        id: 'leads-select-all',
+        target: '#select-all',
+        title: '☐ Select All Checkbox',
+        content: 'Select or deselect all visible leads in one click. Activates the bulk action bar. Use with filters to bulk-score only Unprocessed HIGH priority leads.',
+        position: 'top'
+      },
+      {
+        id: 'leads-drawer',
+        target: '#lead-drawer',
+        title: '📋 Lead Detail Drawer',
+        content: 'Click any lead row to open the full detail drawer. Two tabs: Details (full profile + AI score breakdown + notes + status buttons) and Outreach (email + LinkedIn copy).',
+        position: 'left'
+      },
+      {
+        id: 'leads-drawer-tabs',
+        target: '#tab-details',
+        title: '📑 Details & Outreach Tabs',
+        content: 'Details tab: name, title, company, email, LinkedIn, location, industry, ICP score, priority, notes. Outreach tab: generated email and LinkedIn note with copy buttons.',
+        position: 'bottom'
+      },
+      {
+        id: 'leads-drawer-score',
+        target: '#btn-drawer-score',
+        title: '⚡ Score from Drawer',
+        content: 'Score individual lead directly from the detail drawer. Vault leads show 🔒 GTM Score Locked badge instead — no overwrite possible.',
+        position: 'top'
+      },
+      {
+        id: 'leads-drawer-outreach',
+        target: '#btn-drawer-outreach',
+        title: '📧 View / Regenerate Outreach',
+        content: 'If outreach exists: shows "📧 View / Regenerate" in green. If not: "✉ Generate Outreach" in purple. Regeneration replaces the previous message.',
+        position: 'top'
+      },
+      {
+        id: 'leads-drawer-save',
+        target: '#btn-save-outreach',
+        title: '💾 Save Outreach + Auto-Close',
+        content: 'Saving outreach locks the mail icon to 📧 in the table row, shows success toast, then auto-closes the drawer after 1.2 seconds. Smooth single-lead workflow.',
+        position: 'top'
+      },
+      {
+        id: 'leads-pagination',
+        target: '#pagination',
+        title: '📄 Pagination',
+        content: 'Paginated lead table — handles thousands of leads without performance issues. Page info shows current range. Prev/Next controls keep the view clean.',
+        position: 'top'
+      }
+    ],
 
-    <!-- Technologies -->
-    ${(g.technologies||[]).length ? `
-    <div class="dsec">
-      <div class="dstitle">Technology Stack</div>
-      <div class="tech-chips">${(g.technologies||[]).map(t=>`<span class="tech-chip">${esc(t)}</span>`).join('')}</div>
-    </div>` : ''}
+    // ── 6. ACCOUNT INTELLIGENCE (accounts.html) ───────────────────────────
+    accounts: [
+      {
+        id: 'acc-stats-hot',
+        target: '#stat-hot',
+        title: '🔥 HOT Accounts',
+        content: 'Count of accounts with intent score ≥60. These are showing active buying signals right now — prioritise outreach to HOT accounts above all others.',
+        position: 'bottom'
+      },
+      {
+        id: 'acc-stats-signals',
+        target: '#stat-signals',
+        title: '⚡ Signals (7 Days)',
+        content: 'Total intent signals detected across all tracked companies in the last 7 days. Spike here = buying activity is increasing in your target universe.',
+        position: 'bottom'
+      },
+      {
+        id: 'acc-stats-reply',
+        target: '#stat-reply',
+        title: '💬 Reply Rate',
+        content: 'Outreach reply rate from Lead Manager data — bridges intent signals with actual outreach performance.',
+        position: 'bottom'
+      },
+      {
+        id: 'acc-stats-meetings',
+        target: '#stat-meetings',
+        title: '📅 Meetings Booked',
+        content: 'Meetings booked from outreach tracked in Lead Manager. The ultimate downstream metric for intent signal quality.',
+        position: 'bottom'
+      },
+      {
+        id: 'acc-search',
+        target: '#search',
+        title: '🔍 Search Accounts',
+        content: 'Real-time search across account names. Combine with the Tier filter to find all HOT accounts in a specific segment.',
+        position: 'bottom'
+      },
+      {
+        id: 'acc-tier-filter',
+        target: '#tier-filter',
+        title: '🔥 Intent Tier Filter',
+        content: 'Filter by HOT (≥60) / WARM (30–59) / COLD (<30). Focus your day on HOT accounts — they\'re signalling buying intent right now.',
+        position: 'bottom'
+      },
+      {
+        id: 'acc-sort',
+        target: '#sort-filter',
+        title: '🔽 Sort Options',
+        content: 'Sort by Intent Score or Signal Count. Sort by Signal Count to find accounts generating the most activity — highest engagement = highest priority.',
+        position: 'bottom'
+      },
+      {
+        id: 'acc-grid',
+        target: '#accounts-grid',
+        title: '🃏 Account Cards',
+        content: 'Each card: company name, industry, intent score ring, tier badge (HOT/WARM/COLD), signal type chips, signal count, last signal date. 8 signal types tracked.',
+        position: 'top'
+      },
+      {
+        id: 'acc-drawer',
+        target: '#drawer',
+        title: '📖 Account Detail Drawer',
+        content: 'Click any account to open the full intelligence drawer. Shows: intent score, avg ICP score, touchpoints, signal history with recency decay, recommended actions, activity timeline.',
+        position: 'left'
+      },
+      {
+        id: 'acc-scan-btn',
+        target: '#scan-btn-drawer',
+        title: '🔍 Scan Signals',
+        content: 'Triggers website analysis for this company. Detects 8 signal types: Hiring Growth, Product Launch, Tech Adoption, Content Activity, Website Change, Funding, Leadership Change, Expansion.',
+        position: 'top'
+      },
+      {
+        id: 'acc-gtm-btn',
+        target: '#gtm-btn-drawer',
+        title: '⚡ Open GTM Strategy',
+        content: 'One click to open or resume the GTM Strategy for this account. Finds existing strategy in vault automatically — no duplicate strategies created.',
+        position: 'top'
+      }
+    ],
 
-    <!-- Signals -->
-    ${(g.signals||[]).length ? `
-    <div class="dsec">
-      <div class="dstitle">Intent Signals</div>
-      ${g.signals.map(s => {
-        const age = Math.round((Date.now() - new Date(s.detected_at).getTime()) / 86400000);
-        const icon = {hiring_growth:'📈',product_launch:'🚀',tech_adoption:'⚙',content_activity:'📝',website_change:'🌐',funding_signal:'💰',leadership_change:'👤',expansion_signal:'🌍'}[s.type]||'•';
-        return `<div class="sig-row"><span class="sig-icon">${icon}</span><div><div class="sig-type">${s.type.replace(/_/g,' ')}</div></div><div class="sig-age">${age}d ago</div><div class="sig-score">+${s.score}</div></div>`;
-      }).join('')}
-    </div>` : '<div style="font-size:11px;color:var(--muted);margin-bottom:20px">No signals detected yet. Click Scan Signals to analyse this company\'s website.</div>'}
+    // ── 7. REPORT PAGE (report.html) ──────────────────────────────────────
+    report: [
+      {
+        id: 'report-nav',
+        target: '#topnav',
+        title: '📄 Strategy Report Page',
+        content: 'Full formatted 6-step GTM strategy report for a single account. Opened from Strategy Vault. Printable and PDF-exportable. Each section is expandable.',
+        position: 'bottom'
+      },
+      {
+        id: 'report-content',
+        target: '#report-content',
+        title: '📋 Report Content',
+        content: 'All 6 steps rendered: Market Research, TAM Mapping, ICP Profile, Account Sourcing, Keywords, Outreach Messaging. Arrays rendered as visual tag chips. Emails as formatted cards.',
+        position: 'top'
+      },
+      {
+        id: 'report-sections',
+        target: '#sections-container',
+        title: '📑 Expandable Sections',
+        content: 'Each of the 6 strategy sections is individually expandable. Growth signals, tech stack, buying triggers, and decision maker lists render as coloured tag chips.',
+        position: 'top'
+      },
+      {
+        id: 'report-export-top',
+        target: '#btn-export',
+        title: '⬇ Export PDF (Header)',
+        content: 'PDF export in the page header. Same section-selection modal as the vault — choose which steps to include. Two export buttons (header + footer) for accessibility.',
+        position: 'bottom'
+      },
+      {
+        id: 'report-export-bottom',
+        target: '#btn-export2',
+        title: '⬇ Export PDF (Footer)',
+        content: 'Duplicate PDF export button in the page footer — so you never have to scroll back to the top after reading the full report.',
+        position: 'top'
+      },
+      {
+        id: 'report-score',
+        target: '#r-score',
+        title: '🎯 GTM Score',
+        content: 'The GTM Relevance Score for this account — generated in Step 1 Market Research. Colour-coded HIGH/MED/LOW. This score flows into Lead Manager when you push from vault.',
+        position: 'bottom'
+      },
+      {
+        id: 'report-tam',
+        target: '#r-tam',
+        title: '💰 TAM Size',
+        content: 'Total Addressable Market figure from Step 2. Used on the Strategy Vault card and in bulk filtering to prioritise accounts by market opportunity.',
+        position: 'bottom'
+      }
+    ]
 
-    <!-- Recommendations -->
-    ${(g.recommendations||[]).length ? `
-    <div class="dsec">
-      <div class="dstitle">Recommended Actions</div>
-      ${g.recommendations.map(r=>`<div class="rec-row"><span class="rec-priority rec-${r.priority}">${r.priority}</span><div class="rec-text">${esc(r.action)}</div></div>`).join('')}
-    </div>` : ''}
+  }, // end steps
 
-    <!-- Timeline -->
-    ${(g.timeline||[]).length ? `
-    <div class="dsec">
-      <div class="dstitle">Activity Timeline</div>
-      ${g.timeline.slice(0,10).map(t=>`<div class="timeline-item"><div class="tl-dot ${t.type}"></div><div class="tl-label">${esc(t.label)}${t.channel?' · '+t.channel:''}</div><div class="tl-date">${new Date(t.date).toLocaleDateString('en-GB',{day:'2-digit',month:'short'})}</div></div>`).join('')}
-    </div>` : ''}
-  `;
-}
+  // ── State ─────────────────────────────────────────────────────────────────
+  currentStep: 0,
+  tourActive: false,
+  completedSteps: [],
 
-/* ═══════════════════════════════════
-   ACTIONS
-═══════════════════════════════════ */
-async function scanCompany(companyId, domain) {
-  if (!domain) {
-    showToast('No domain set — click ✎ Edit to add this company\'s domain first.', 'error');
-    return;
-  }
-  const btn = document.getElementById('scan-btn-drawer');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Scanning…'; }
-  showToast('🔍 Scanning ' + domain + ' for buying signals…');
+  // ── Methods ───────────────────────────────────────────────────────────────
 
-  try {
-    const token = await getToken();
-    const a = _accounts.find(a => a.company_id === companyId);
-    const res = await fetch('/api/analyze-website', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      body: JSON.stringify({
-        company_id:   companyId,
-        website_url:  'https://' + domain,
-        company_name: a ? a.company_name : '',
-      }),
+  init: function () {
+    this.injectStyles();
+    this.loadState();
+    this.injectButton();
+    this.bindKeys();
+  },
+
+  injectStyles: function () {
+    if (document.getElementById('abe-tour-css')) return;
+    const s = document.createElement('style');
+    s.id = 'abe-tour-css';
+    s.textContent = [
+      '@keyframes abe-fade{from{opacity:0}to{opacity:1}}',
+      '@keyframes abe-pop{from{opacity:0;transform:scale(.9)}to{opacity:1;transform:scale(1)}}',
+      '@keyframes abe-slide{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}',
+      '#abe-overlay{animation:abe-fade .2s ease-out}',
+      '#abe-tooltip{animation:abe-pop .25s cubic-bezier(.34,1.56,.64,1)}',
+      '.abe-toast{animation:abe-slide .3s ease-out}',
+    ].join('');
+    document.head.appendChild(s);
+  },
+
+  loadState: function () {
+    try {
+      const s = JSON.parse(localStorage.getItem('abe_tour_v2') || '{}');
+      this.completedSteps = s.completedSteps || [];
+      this.currentStep    = typeof s.currentStep === 'number' ? s.currentStep : 0;
+    } catch (e) {}
+  },
+
+  saveState: function () {
+    try {
+      localStorage.setItem('abe_tour_v2', JSON.stringify({
+        completedSteps: this.completedSteps,
+        currentStep: this.currentStep,
+        ts: Date.now()
+      }));
+    } catch (e) {}
+  },
+
+  injectButton: function () {
+    const nav = document.querySelector('#topnav') || document.querySelector('nav');
+    if (!nav || document.getElementById('abe-tour-btn')) return;
+    const btn = document.createElement('button');
+    btn.id = 'abe-tour-btn';
+    btn.textContent = '✨ Tour';
+    btn.style.cssText = [
+      'background:linear-gradient(135deg,#a855f7,#7c3aed)',
+      'color:#fff',
+      'border:none',
+      'border-radius:7px',
+      'padding:6px 14px',
+      'font-size:10px',
+      'font-weight:800',
+      'letter-spacing:.08em',
+      'text-transform:uppercase',
+      'cursor:pointer',
+      'margin-left:10px',
+      'font-family:inherit',
+    ].join(';');
+    btn.onclick = function () { TOUR_CONFIG.start(); };
+    nav.appendChild(btn);
+  },
+
+  bindKeys: function () {
+    document.addEventListener('keydown', function (e) {
+      if (!TOUR_CONFIG.tourActive) return;
+      if (e.key === 'Escape')                   TOUR_CONFIG.end();
+      if (e.shiftKey && e.key === 'ArrowRight') TOUR_CONFIG.next();
+      if (e.shiftKey && e.key === 'ArrowLeft')  TOUR_CONFIG.prev();
     });
-    const data = await res.json();
+  },
 
-    if (!res.ok) {
-      showToast('Scan failed: ' + (data.error || 'HTTP ' + res.status), 'error');
-      if (btn) { btn.disabled = false; btn.textContent = '🔍 Scan Signals'; }
+  getPage: function () {
+    const p = window.location.pathname;
+    for (const [file, key] of Object.entries(this.pageMap)) {
+      if (p.includes(file)) return key;
+    }
+    return 'dashboard'; // default — dashboard is the real landing page after login
+  },
+
+  start: function () {
+    const page  = this.getPage();
+    const steps = this.steps[page];
+    if (!steps || !steps.length) {
+      this.toast('No tour available for this page.', 'info');
+      return;
+    }
+    this.tourActive  = true;
+    this.currentStep = 0;
+    this.saveState();
+    this.render();
+  },
+
+  render: function () {
+    const page  = this.getPage();
+    const steps = this.steps[page];
+    if (!this.tourActive || !steps || this.currentStep >= steps.length) {
+      this.end();
+      return;
+    }
+    this.cleanup();
+    const step = steps[this.currentStep];
+
+    // Overlay
+    const ov = document.createElement('div');
+    ov.id = 'abe-overlay';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:9998;background:rgba(0,0,0,.72);backdrop-filter:blur(3px)';
+    ov.onclick = function () { TOUR_CONFIG.end(); };
+    document.body.appendChild(ov);
+
+    // Tooltip
+    const tt = document.createElement('div');
+    tt.id = 'abe-tooltip';
+    tt.style.cssText = [
+      'position:fixed',
+      'width:380px',
+      'max-width:calc(100vw - 32px)',
+      'z-index:10000',
+      'background:#0F1420',
+      'border:1px solid rgba(168,85,247,.4)',
+      'border-radius:14px',
+      'padding:18px 20px 14px',
+      'box-shadow:0 20px 60px rgba(0,0,0,.7)',
+      'font-family:Inter,sans-serif',
+    ].join(';');
+    tt.innerHTML = [
+      '<div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:10px">',
+        '<div>',
+          '<div style="font-size:9px;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:#a855f7;margin-bottom:4px">',
+            (this.currentStep + 1) + ' / ' + steps.length,
+          '</div>',
+          '<div style="font-size:13px;font-weight:800;color:#fff;letter-spacing:-.2px">' + step.title + '</div>',
+        '</div>',
+        '<button id="abe-tt-close" style="background:none;border:none;color:#6b7280;font-size:18px;cursor:pointer;line-height:1;padding:0;margin-left:12px;flex-shrink:0">×</button>',
+      '</div>',
+      '<p style="font-size:12px;line-height:1.65;color:#9ca3af;margin:0 0 14px">' + step.content + '</p>',
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px">',
+        '<button id="abe-tt-prev" style="padding:6px 14px;font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;border-radius:7px;cursor:pointer;border:1px solid #1f2937;background:transparent;color:#6b7280;font-family:inherit">← Prev</button>',
+        '<a href="#" id="abe-tt-skip" style="font-size:10px;color:#4b5563;text-decoration:none">Skip</a>',
+        '<button id="abe-tt-next" style="padding:6px 14px;font-size:9px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;border-radius:7px;cursor:pointer;border:none;background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff;font-family:inherit">Next →</button>',
+      '</div>',
+    ].join('');
+    document.body.appendChild(tt);
+
+    // Wire buttons
+    document.getElementById('abe-tt-close').onclick = function () { TOUR_CONFIG.end(); };
+    document.getElementById('abe-tt-skip').onclick  = function (e) { e.preventDefault(); TOUR_CONFIG.end(); };
+    document.getElementById('abe-tt-prev').onclick  = function () { TOUR_CONFIG.prev(); };
+    document.getElementById('abe-tt-next').onclick  = function () { TOUR_CONFIG.next(); };
+
+    // Highlight + position
+    this.highlight(step.target, step.position);
+    this.scrollTo(step.target);
+
+    if (!this.completedSteps.includes(step.id)) this.completedSteps.push(step.id);
+    this.saveState();
+  },
+
+  highlight: function (selector, position) {
+    const el = document.querySelector(selector);
+    const tt = document.getElementById('abe-tooltip');
+    if (!tt) return;
+
+    if (!el) {
+      // Element not found — skip to next step gracefully
+      const page  = this.getPage();
+      const total = (this.steps[page] || []).length;
+      this.currentStep++;
+      if (this.currentStep < total) { this.render(); } else { this.end(); }
       return;
     }
 
-    const sigCount = data.signals_detected || 0;
-    const sigs     = (data.signals || []).map(function(s){ return s.type.replace(/_/g,' '); });
+    const r  = el.getBoundingClientRect();
+    const TW = 380, TH = 170, G = 14, M = 14;
 
-    if (sigCount === 0) {
-      showToast('Scan complete — no buying signals detected on ' + domain, '');
-    } else {
-      showToast('✓ ' + sigCount + ' signal' + (sigCount>1?'s':'') + ' detected: ' + sigs.join(', '), 'success');
+    // Elevate target above overlay
+    el.setAttribute('data-tour-style', el.getAttribute('style') || '');
+    el.style.position = el.style.position || 'relative';
+    el.style.zIndex   = '9999';
+    el.style.outline  = '2px solid #a855f7';
+    el.style.outlineOffset = '3px';
+    el.style.borderRadius  = '6px';
+
+    // Position tooltip
+    let top, left;
+    switch (position) {
+      case 'top':    top = r.top - TH - G;              left = r.left + r.width/2 - TW/2; break;
+      case 'bottom': top = r.bottom + G;                left = r.left + r.width/2 - TW/2; break;
+      case 'left':   top = r.top + r.height/2 - TH/2;  left = r.left - TW - G; break;
+      case 'right':  top = r.top + r.height/2 - TH/2;  left = r.right + G; break;
+      default:       top = r.bottom + G;                left = r.left + r.width/2 - TW/2;
     }
+    top  = Math.max(M, Math.min(top,  window.innerHeight - TH - M));
+    left = Math.max(M, Math.min(left, window.innerWidth  - TW - M));
+    tt.style.top  = top  + 'px';
+    tt.style.left = left + 'px';
+  },
 
-    // Refresh accounts list and reopen drawer with updated score
-    await loadAccounts();
-    setTimeout(function() {
-      if (_openCompanyId) openDrawer(_openCompanyId);
-    }, 600);
+  scrollTo: function (selector) {
+    const el = document.querySelector(selector);
+    if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  },
 
-  } catch(e) {
-    showToast('Scan error: ' + e.message, 'error');
-    if (btn) { btn.disabled = false; btn.textContent = '🔍 Scan Signals'; }
-  }
-}
-
-// ── SCAN SIGNALS — scans ALL monitored companies for buying signals ──
-async function runSignalScan() {
-  const withDomain = _accounts.filter(function(a){ return a.domain; });
-  const noDomain   = _accounts.filter(function(a){ return !a.domain; });
-
-  if (!_accounts.length) {
-    showToast('No companies to scan. Add companies first.', 'error');
-    return;
-  }
-  if (!withDomain.length) {
-    showToast('No companies have a domain set. Click ✎ Edit on each company to add their domain.', 'error');
-    return;
-  }
-
-  const scanBtn = document.querySelector('[onclick="runSignalScan()"]');
-  if (scanBtn) { scanBtn.disabled = true; scanBtn.textContent = '⏳ Scanning…'; }
-  showToast('⚡ Scanning ' + withDomain.length + ' companies for buying signals…');
-
-  const token = await getToken();
-  let totalSignals = 0;
-  const results = [];
-
-  for (const a of withDomain) {
-    try {
-      const res = await fetch('/api/analyze-website', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-        body: JSON.stringify({
-          company_id:   a.company_id,
-          website_url:  'https://' + a.domain,
-          company_name: a.company_name,
-        }),
-      });
-      const data = await res.json();
-      const sigs = data.signals_detected || 0;
-      totalSignals += sigs;
-      results.push({ name: a.company_name, signals: sigs, ok: res.ok });
-    } catch(e) {
-      results.push({ name: a.company_name, signals: 0, ok: false, err: e.message });
-    }
-  }
-
-  if (scanBtn) { scanBtn.disabled = false; scanBtn.textContent = '⚡ Scan Signals'; }
-
-  // Show summary
-  const detected  = results.filter(function(r){ return r.signals > 0; });
-  const noSignals = results.filter(function(r){ return r.signals === 0 && r.ok; });
-  const failed    = results.filter(function(r){ return !r.ok; });
-
-  var msg = '⚡ Scan complete — ' + totalSignals + ' signal' + (totalSignals !== 1 ? 's' : '') + ' across ' + withDomain.length + ' companies';
-  if (detected.length) msg += ' · ' + detected.length + ' with signals';
-  if (noDomain.length) msg += ' · ' + noDomain.length + ' skipped (no domain)';
-  showToast(msg, totalSignals > 0 ? 'success' : '');
-
-  // Auto-run learning cycle to update scores
-  if (totalSignals > 0) {
-    setTimeout(async function() {
-      showToast('🧠 Updating intent scores…');
-      try {
-        const r2 = await fetch('/api/intent-engine', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-          body: JSON.stringify({ action: 'score_all' }),
-        });
-        const d2 = await r2.json();
-        const hot    = (d2.summary || []).filter(function(s){ return s.tier === 'HOT'; }).length;
-        const warm   = (d2.summary || []).filter(function(s){ return s.tier === 'WARM'; }).length;
-        const changed = d2.tiers_changed || 0;
-        var scoreMsg = '✓ Scores updated — ' + hot + ' HOT · ' + warm + ' WARM';
-        if (changed > 0) scoreMsg += ' · ' + changed + ' tier' + (changed>1?'s':'') + ' changed';
-        showToast(scoreMsg, 'success');
-        setTimeout(loadAccounts, 500);
-      } catch(e) {
-        showToast('Score update failed: ' + e.message, 'error');
-      }
-    }, 1500);
-  } else {
-    setTimeout(loadAccounts, 800);
-  }
-}
-
-// ── RUN LEARNING CYCLE — recalculates intent scores for ALL companies ──
-async function runLearningCycle() {
-  if (!_accounts.length) {
-    showToast('No companies to score.', 'error');
-    return;
-  }
-  const btn = document.querySelector('[onclick="runLearningCycle()"]');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Scoring…'; }
-  showToast('🧠 Recalculating intent scores…');
-
-  // Use setTimeout to prevent UI blocking
-  setTimeout(async function() {
-    try {
-      const token = await getToken();
-      const r = await fetch('/api/intent-engine', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-        body: JSON.stringify({ action: 'score_all' }),
-      });
-      const d = await r.json();
-      if (!r.ok) {
-        showToast('Score update failed: ' + (d.error || 'HTTP ' + r.status), 'error');
-        if (btn) { btn.disabled = false; btn.textContent = '🧠 Run Learning Cycle'; }
-        return;
-      }
-      const scored  = d.companies_scored || 0;
-      const changed = d.tiers_changed    || 0;
-      const hot     = (d.summary || []).filter(function(s){ return s.tier === 'HOT';  }).length;
-      const warm    = (d.summary || []).filter(function(s){ return s.tier === 'WARM'; }).length;
-      const cold    = (d.summary || []).filter(function(s){ return s.tier === 'COLD'; }).length;
-
-      var msg = '🧠 ' + scored + ' companies scored';
-      if (hot || warm) msg += ' — ' + hot + ' HOT · ' + warm + ' WARM · ' + cold + ' COLD';
-      if (changed > 0) msg += ' · ' + changed + ' tier' + (changed > 1 ? 's' : '') + ' changed';
-      else if (scored > 0 && !hot && !warm) msg += ' — no signals found yet. Run Scan Signals first.';
-
-      showToast(msg, scored > 0 ? 'success' : '');
-      if (btn) { btn.disabled = false; btn.textContent = '🧠 Run Learning Cycle'; }
-      setTimeout(loadAccounts, 500);
-    } catch(e) {
-      showToast('Error: ' + e.message, 'error');
-      if (btn) { btn.disabled = false; btn.textContent = '🧠 Run Learning Cycle'; }
-    }
-  }, 0);
-}
-
-function openAddCompany() {
-  const name = prompt('Company name:');
-  if (!name?.trim()) return;
-  const domain = prompt('Company domain (e.g. stripe.com) — press OK to skip:') || '';
-  addCompany(name.trim(), domain.trim());
-}
-
-async function addCompany(name, domain) {
-  const token = await getToken();
-  try {
-    const res = await fetch('/api/account-graph', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body: JSON.stringify({ action: 'add_company', name, domain }),
+  cleanup: function () {
+    // Restore highlighted elements
+    document.querySelectorAll('[data-tour-style]').forEach(function (el) {
+      el.setAttribute('style', el.getAttribute('data-tour-style'));
+      el.removeAttribute('data-tour-style');
     });
-    const data = await res.json();
-    if (!res.ok) {
-      // Treat as duplicate if 409 or error mentions conflict
-      const err = data.error || '';
-      if (res.status === 409 || err.includes('duplicate') || err.includes('already')) {
-        showToast(`${name} is already being monitored ✓`, 'success');
-      } else {
-        showToast('Failed: ' + err, 'error');
-      }
+    const ov = document.getElementById('abe-overlay');
+    const tt = document.getElementById('abe-tooltip');
+    if (ov) ov.remove();
+    if (tt) tt.remove();
+  },
+
+  next: function () {
+    const steps = this.steps[this.getPage()] || [];
+    if (this.currentStep < steps.length - 1) {
+      this.currentStep++;
+      this.saveState();
+      this.render();
     } else {
-      showToast(`${name} added to Account Intelligence ✓`, 'success');
+      this.end();
+      this.toast('🎉 Tour complete! You know the platform.', 'success');
     }
-    setTimeout(() => loadAccounts(), 800);
-  } catch(e) {
-    showToast(e.message, 'error');
-  }
-}
+  },
 
-/* ═══════════════════════════════════
-   UTILS
-═══════════════════════════════════ */
-async function api(endpoint, body, token) {
-  const res = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-    body: JSON.stringify(body),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-  return data;
-}
-
-async function getToken() {
-  const { data: { session } } = await window.APP.sb.auth.getSession();
-  return session?.access_token || '';
-}
-
-function showToast(msg, type = '') {
-  const t = document.getElementById('toast');
-  t.className = type;
-  document.getElementById('toast-msg').textContent = msg;
-  t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 3200);
-}
-
-function esc(s) {
-  if (typeof s !== 'string') return String(s||'');
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
-
-/* ═══════════════════════════════════
-   EDIT COMPANY
-═══════════════════════════════════ */
-function openEditCompany(companyId, name, domain, industry) {
-  var ex = document.getElementById('edit-co-modal');
-  if (ex) ex.remove();
-
-  var overlay = document.createElement('div');
-  overlay.id = 'edit-co-modal';
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:600;background:rgba(0,0,0,.75);display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(6px)';
-
-  var box = document.createElement('div');
-  box.style.cssText = 'width:100%;max-width:400px;background:#0F1420;border:1px solid #1C2235;border-radius:14px;overflow:hidden;font-family:inherit';
-
-  var hdr = document.createElement('div');
-  hdr.style.cssText = 'display:flex;align-items:center;justify-content:space-between;padding:14px 18px;background:rgba(0,0,0,.3);border-bottom:1px solid #1C2235';
-  var htitle = document.createElement('div');
-  htitle.style.cssText = 'font-size:13px;font-weight:800;color:white';
-  htitle.textContent = '\u270e Edit Company';
-  var xBtn = document.createElement('button');
-  xBtn.textContent = '\u2715';
-  xBtn.style.cssText = 'background:none;border:none;color:#6B7280;cursor:pointer;font-size:16px;font-family:inherit';
-  xBtn.onclick = function(){ overlay.remove(); };
-  hdr.appendChild(htitle);
-  hdr.appendChild(xBtn);
-
-  var body = document.createElement('div');
-  body.style.cssText = 'padding:20px 18px';
-
-  function mkField(label, id, val, ph) {
-    var w = document.createElement('div');
-    w.style.marginBottom = '12px';
-    var l = document.createElement('div');
-    l.style.cssText = 'font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.14em;color:#6B7280;margin-bottom:5px';
-    l.textContent = label;
-    var inp = document.createElement('input');
-    inp.id = id; inp.type = 'text'; inp.value = val || ''; inp.placeholder = ph || '';
-    inp.style.cssText = 'width:100%;background:rgba(0,0,0,.3);border:1px solid #1C2235;color:#E2E8F0;font-size:12px;padding:9px 12px;border-radius:7px;font-family:inherit;outline:none;box-sizing:border-box';
-    w.appendChild(l); w.appendChild(inp);
-    return w;
-  }
-
-  body.appendChild(mkField('Company Name',             'eco-name',     name,     ''));
-  body.appendChild(mkField('Domain (e.g. stripe.com)', 'eco-domain',   domain,   'company.com'));
-  body.appendChild(mkField('Industry',                 'eco-industry', industry, 'e.g. Fintech'));
-
-  var footer = document.createElement('div');
-  footer.style.cssText = 'display:flex;gap:8px;justify-content:flex-end;margin-top:6px';
-
-  var cancelBtn = document.createElement('button');
-  cancelBtn.textContent = 'Cancel';
-  cancelBtn.style.cssText = 'padding:8px 16px;border-radius:7px;font-size:10px;font-weight:800;background:rgba(31,41,55,.5);border:1px solid #1C2235;color:#6B7280;cursor:pointer;font-family:inherit';
-  cancelBtn.onclick = function(){ overlay.remove(); };
-
-  var saveBtn = document.createElement('button');
-  saveBtn.textContent = 'Save Changes';
-  saveBtn.style.cssText = 'padding:8px 16px;border-radius:7px;font-size:10px;font-weight:800;background:linear-gradient(135deg,#a855f7,#7c3aed);color:white;border:none;cursor:pointer;font-family:inherit';
-  saveBtn.onclick = function(){ saveEditCompany(companyId); };
-
-  footer.appendChild(cancelBtn);
-  footer.appendChild(saveBtn);
-  body.appendChild(footer);
-  box.appendChild(hdr);
-  box.appendChild(body);
-  overlay.appendChild(box);
-  document.body.appendChild(overlay);
-  setTimeout(function(){ var n=document.getElementById('eco-name'); if(n) n.focus(); }, 100);
-}
-
-async function saveEditCompany(companyId) {
-  var name     = (document.getElementById('eco-name').value     || '').trim();
-  var domain   = (document.getElementById('eco-domain').value   || '').trim();
-  var industry = (document.getElementById('eco-industry').value || '').trim();
-  if (!name) { showToast('Company name is required', 'error'); return; }
-
-  // Normalise domain
-  domain = domain.replace(/^https?:\/\//i,'').replace(/^www\./i,'').split('/')[0].toLowerCase();
-
-  try {
-    const token = await getToken();
-    const res = await fetch('/api/account-graph', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      body: JSON.stringify({
-        action:     'update_company',
-        company_id: companyId,
-        name:       name,
-        domain:     domain,
-        industry:   industry,
-      }),
-    });
-    const data = await res.json();
-    if (!res.ok) { showToast('Save failed: ' + (data.error||'unknown'), 'error'); return; }
-    document.getElementById('edit-co-modal').remove();
-    showToast(name + ' updated ✓', 'success');
-    // Close drawer, reload accounts, reopen drawer — ensures fresh co.domain in closure
-    closeDrawer();
-    await loadAccounts();
-    if (companyId) {
-      setTimeout(function(){ openDrawer(companyId); }, 300);
+  prev: function () {
+    if (this.currentStep > 0) {
+      this.currentStep--;
+      this.saveState();
+      this.render();
     }
-  } catch(e) {
-    showToast('Error: ' + e.message, 'error');
+  },
+
+  end: function () {
+    this.tourActive = false;
+    this.cleanup();
+    this.saveState();
+  },
+
+  toast: function (msg, type) {
+    var ex = document.querySelector('.abe-toast');
+    if (ex) ex.remove();
+    var colors = { info: '#3b82f6', success: '#22c55e', error: '#ef4444' };
+    var t = document.createElement('div');
+    t.className = 'abe-toast';
+    t.textContent = msg;
+    t.style.cssText = [
+      'position:fixed',
+      'bottom:24px',
+      'right:24px',
+      'background:#0f1420',
+      'border:1px solid ' + (colors[type] || colors.info),
+      'border-radius:10px',
+      'padding:11px 16px',
+      'font-size:11px',
+      'font-weight:700',
+      'color:#fff',
+      'z-index:10001',
+      'font-family:Inter,sans-serif',
+    ].join(';');
+    document.body.appendChild(t);
+    setTimeout(function () {
+      t.style.transition = 'opacity .3s,transform .3s';
+      t.style.opacity    = '0';
+      t.style.transform  = 'translateY(6px)';
+      setTimeout(function () { t.remove(); }, 300);
+    }, 3000);
   }
-}
 
-async function handleSignOut() {
-  try { await window.APP.sb.auth.signOut({ scope:'local' }); } catch(_) {}
-  Object.keys(localStorage).forEach(k => { if (k.startsWith('sb-')||k.includes('supabase')) localStorage.removeItem(k); });
-  window.location.replace('login.html');
-}
-</script>
+};
 
-</body>
-</html>
+// Bootstrap
+document.addEventListener('DOMContentLoaded', function () { TOUR_CONFIG.init(); });
+
+// Global aliases
+window.TOUR_CONFIG = TOUR_CONFIG;
+window.TOUR        = TOUR_CONFIG;
