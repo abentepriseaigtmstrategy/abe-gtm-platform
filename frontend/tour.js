@@ -892,9 +892,9 @@ const TOUR_CONFIG = {
   },
 
   injectButton: function () {
-    const nav = document.querySelector('#topnav') || document.querySelector('nav');
-    if (!nav || document.getElementById('abe-tour-btn')) return;
-    const btn = document.createElement('button');
+    if (document.getElementById('abe-tour-btn')) return;
+
+    var btn = document.createElement('button');
     btn.id = 'abe-tour-btn';
     btn.textContent = '✨ Tour';
     btn.style.cssText = [
@@ -908,11 +908,39 @@ const TOUR_CONFIG = {
       'letter-spacing:.08em',
       'text-transform:uppercase',
       'cursor:pointer',
-      'margin-left:10px',
       'font-family:inherit',
+      'flex-shrink:0',
     ].join(';');
     btn.onclick = function () { TOUR_CONFIG.start(); };
-    nav.appendChild(btn);
+
+    // Strategy 1: find the Sign Out button and insert Tour before it
+    // Works for dashboard.html (no #topnav) and all other pages
+    var allBtns = document.querySelectorAll('button');
+    var signOutBtn = null;
+    for (var i = 0; i < allBtns.length; i++) {
+      var txt = (allBtns[i].textContent || '').trim().toLowerCase();
+      if (txt === 'sign out' || txt.includes('sign out')) {
+        signOutBtn = allBtns[i];
+        break;
+      }
+    }
+    if (signOutBtn && signOutBtn.parentNode) {
+      signOutBtn.parentNode.insertBefore(btn, signOutBtn);
+      return;
+    }
+
+    // Strategy 2: #topnav (vault, leads, accounts, gtm-strategy, report)
+    var topnav = document.getElementById('topnav');
+    if (topnav) {
+      topnav.appendChild(btn);
+      return;
+    }
+
+    // Strategy 3: any nav element
+    var nav = document.querySelector('nav');
+    if (nav) {
+      nav.appendChild(btn);
+    }
   },
 
   bindKeys: function () {
