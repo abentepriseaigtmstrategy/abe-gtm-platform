@@ -46,10 +46,13 @@ var ABE_FAQ = (function () {
       return (m.role === 'user' ? 'User: ' : 'Assistant: ') + m.content;
     }).join('\n');
 
-    var fullPrompt = SYSTEM_PROMPT
+    // /api/analyze always parses AI response as JSON — so we MUST return JSON.
+    // We wrap everything in a prompt that forces {"answer": "..."} output.
+    var fullPrompt = 'You are the ABE Platform Help Assistant. Answer the question below using the platform knowledge provided.'
+      + '\n\nPLATFORM KNOWLEDGE:\n' + SYSTEM_PROMPT
       + (recentHistory ? '\n\nPREVIOUS CONVERSATION:\n' + recentHistory : '')
-      + '\n\nUSER QUESTION: ' + question
-      + '\n\nIMPORTANT: Reply in plain text only. No JSON. No markdown. Be concise.';
+      + '\n\nQUESTION: ' + question
+      + '\n\nRESPOND WITH ONLY THIS JSON (no markdown, no code fences):\n{"answer": "your concise plain-text answer here"}';
 
     getToken().then(function(token) {
       var headers = { 'Content-Type': 'application/json' };
