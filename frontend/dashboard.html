@@ -827,6 +827,7 @@
                       <div id="bulkProgressBar" class="h-full bg-purple-500 rounded-full transition-all duration-300" style="width:0%"></div>
                     </div>
                     <button id="bulkStopBtn" onclick="stopBulkAnalyze()" class="text-[9px] font-black uppercase tracking-widest text-red-400 border border-red-500/30 px-4 py-1.5 rounded-lg hover:bg-red-500/10 transition-all">⏹ Stop</button>
+                    <button id="bulkSaveAllBtn" onclick="saveAllAnalyzed()" class="hidden text-[9px] font-black uppercase tracking-widest text-white bg-green-600 border border-green-500/40 px-5 py-1.5 rounded-lg hover:bg-green-500 transition-all">💾 Save All Analyzed</button>
                 </div>
             </div>
         </div>
@@ -2837,6 +2838,9 @@ async function analyzeAllLeads() {
       }
     });
 
+    // FIX 1: Update dashboard cards after every batch so counts stay live
+    updateDashboardCards();
+
     // Update progress
     const pct = Math.round((completed / total) * 100);
     if (progressBar) progressBar.style.width = pct + '%';
@@ -2850,18 +2854,106 @@ async function analyzeAllLeads() {
     }
   }
 
-  loader?.classList.add('hidden');
-  btn?.classList.remove('hidden');
-  if (progressBar) progressBar.style.width = '0%';
-
+  // FIX 2 & 3: Show Save All button after bulk completes so user can save to Local/Supabase
   const doneCount = state.allLeads.filter(l => l.gtmAnalysis).length;
-  if (statusText) statusText.innerText = 'Synchronizing Neural Intel...';
+  if (statusText) statusText.innerText = `✓ ${doneCount} leads analyzed — click Save All to store them`;
+  if (progressBar) progressBar.style.width = '100%';
 
+  // Hide spinner, hide stop button, show Save All button
+  const spinner = loader?.querySelector('.animate-spin');
+  if (spinner) spinner.classList.add('hidden');
+  const stopBtn = document.getElementById('bulkStopBtn');
+  if (stopBtn) stopBtn.classList.add('hidden');
+  const saveAllBtn = document.getElementById('bulkSaveAllBtn');
+  if (saveAllBtn) saveAllBtn.classList.remove('hidden');
+
+  btn?.classList.remove('hidden');
   updateDashboardCards();
 
   if (bulkStopped) {
-    alert(`Stopped. ${doneCount} of ${state.allLeads.length} leads analyzed so far.`);
+    if (statusText) statusText.innerText = `Stopped at ${doneCount} leads — click Save All to store them`;
   }
+}
+
+/* =========================
+   BULK SAVE ALL ANALYZED
+========================= */
+
+async function saveAllAnalyzed() {
+  const analyzed = state.allLeads.filter(l => l.gtmAnalysis);
+  if (!analyzed.length) {
+    alert('No analyzed leads to save.');
+    return;
+  }
+
+  const saveLocal = document.getElementById('modeLocal')?.checked;
+  const saveCloud = document.getElementById('modeCloud')?.checked;
+
+  if (!saveLocal && !saveCloud) {
+    alert('Please select at least one save mode — LOCAL or SUPABASE — in the top bar.');
+    return;
+  }
+
+  const saveAllBtn = document.getElementById('bulkSaveAllBtn');
+  const statusText = document.getElementById('bulkStatusText');
+  if (saveAllBtn) { saveAllBtn.disabled = true; saveAllBtn.textContent = '⏳ Saving...'; }
+
+  let savedCount = 0;
+  const now = new Date().toISOString();
+
+  for (const lead of analyzed) {
+    lead.status     = 'Mapped';
+    lead.updated_at = now;
+
+    if (saveLocal) {
+      const idx = state.savedLeads.findIndex(l => l.id === lead.id);
+      if (idx >= 0) { state.savedLeads[idx] = { ...lead }; }
+      else           { state.savedLeads.push({ ...lead }); }
+    }
+
+    if (saveCloud) {
+      try {
+        await window.APP.sb.from('leads').upsert({
+          id:                lead.id,
+          name:              lead.name,
+          title:             lead.title,
+          company:           lead.company,
+          linkedin:          lead.linkedin,
+          source_file:       lead.source || lead.sourceFile,
+          score:             lead.score,
+          status:            lead.status,
+          tags:              lead.tags,
+          updated_at:        lead.updated_at,
+          pain_area:         lead.gtmAnalysis?.['Pain Area']             || null,
+          key_insight:       lead.gtmAnalysis?.['Key Insight']           || null,
+          proposed_solution: lead.gtmAnalysis?.['Proposed Solution']     || null,
+          outreach_message:  lead.gtmAnalysis?.['Cold Outreach Message'] || null
+        }, { onConflict: 'id' });
+      } catch (e) {
+        console.warn('Supabase save failed for', lead.name, e.message);
+      }
+    }
+    savedCount++;
+  }
+
+  if (saveLocal) saveStateToStorage();
+  renderSaved();
+  updateDashboardCards();
+
+  // Reset bulk loader UI back to initial state
+  const loader      = document.getElementById('bulkLoader');
+  const spinner     = loader?.querySelector('.animate-spin');
+  const stopBtn     = document.getElementById('bulkStopBtn');
+  const progressBar = document.getElementById('bulkProgressBar');
+  if (spinner)     spinner.classList.remove('hidden');
+  if (stopBtn)     stopBtn.classList.remove('hidden');
+  if (saveAllBtn)  { saveAllBtn.classList.add('hidden'); saveAllBtn.disabled = false; saveAllBtn.textContent = '💾 Save All Analyzed'; }
+  if (progressBar) progressBar.style.width = '0%';
+  if (statusText)  statusText.innerText = 'Synchronizing Neural Intel...';
+  loader?.classList.add('hidden');
+
+  const modes = [saveLocal && 'Local', saveCloud && 'Supabase'].filter(Boolean).join(' + ');
+  alert('✓ ' + savedCount + ' leads saved to ' + modes + ' and moved to Strategic Repository.');
 }
 
 /* =========================
