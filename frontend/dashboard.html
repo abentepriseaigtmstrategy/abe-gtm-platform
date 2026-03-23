@@ -594,7 +594,7 @@
             <span>Local</span>
           </label>
           <label class="flex items-center gap-1 text-[9px] font-bold uppercase text-gray-400 cursor-pointer">
-            <input type="checkbox" id="modeCloud" class="accent-purple-500" onchange="handleCloudToggle(this.checked); saveCheckboxStates()">
+            <input type="checkbox" id="modeCloud" class="accent-purple-500" onchange="handleCloudToggle(this.checked)">
             <span>Supabase</span>
           </label>
         </div>
@@ -1262,15 +1262,15 @@ async function initApp() {
   renderSaved();
   updateDashboardCards();
 
-  // 5. Restore checkbox states from last session
-  restoreCheckboxStates();
-
-  // 6. Only auto-sync if user explicitly had Supabase checked last session
-  // Uses saved state, not just the HTML default
-  const cloudWasChecked = localStorage.getItem(LS.MODE_CLOUD) === '1';
-  if (cloudWasChecked) {
-    await loadSavedFromDB();
-  }
+  // 5. Restore checkbox states — always load as unchecked for cloud
+  // Cloud sync is intentional action only, never automatic on page load
+  const localSaved = localStorage.getItem(LS.MODE_LOCAL);
+  const localEl = document.getElementById('modeLocal');
+  if (localSaved !== null && localEl) localEl.checked = localSaved === '1';
+  // Always restore cloud as UNCHECKED — user must manually tick to sync
+  const cloudEl = document.getElementById('modeCloud');
+  if (cloudEl) cloudEl.checked = false;
+  localStorage.setItem(LS.MODE_CLOUD, '0');
 
   // 6. Restore Execute Mapping table if leads exist
   if (state.allLeads.length > 0) {
@@ -2122,11 +2122,13 @@ document.getElementById('saveAnalysisBtn').onclick = async () => {
 // ── Cloud toggle handler — fires when user ticks the Supabase checkbox ────
 async function handleCloudToggle(checked) {
   if (checked) {
-    await loadSavedFromDB();
-    // Auto-uncheck after sync — Supabase is a one-time pull, not a persistent mode
+    // Immediately uncheck and save '0' BEFORE async starts
+    // This prevents the modal appearing on every page reload
     const el = document.getElementById('modeCloud');
     if (el) el.checked = false;
-    saveCheckboxStates();
+    localStorage.setItem(LS.MODE_CLOUD, '0');
+    // Now run the sync
+    await loadSavedFromDB();
   }
 }
 
