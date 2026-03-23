@@ -1094,6 +1094,28 @@
       max-width:480px;width:100%;
       box-shadow:0 32px 80px rgba(0,0,0,0.7),0 0 0 1px rgba(168,85,247,0.08);
       position:relative;">
+      <!-- Close button -->
+      <button onclick="(function(){var o=document.getElementById('abe-modal-overlay');o.style.display='none';})()" style="
+        position:absolute;top:14px;right:16px;
+        background:rgba(255,255,255,0.06);
+        border:1px solid rgba(255,255,255,0.08);
+        color:#6b7280;font-size:16px;line-height:1;
+        width:28px;height:28px;border-radius:50%;
+        cursor:pointer;display:flex;align-items:center;justify-content:center;
+        font-family:inherit;transition:all .15s;"
+        onmouseenter="this.style.color='#fff';this.style.background='rgba(255,255,255,0.12)'"
+        onmouseleave="this.style.color='#6b7280';this.style.background='rgba(255,255,255,0.06)'"
+      >×</button>
+      <!-- Close X button -->
+      <button id="abe-modal-close" onclick="document.getElementById('abe-modal-overlay').style.display='none'" style="
+        position:absolute;top:14px;right:16px;
+        background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);
+        color:#6b7280;width:28px;height:28px;border-radius:8px;
+        font-size:16px;line-height:1;cursor:pointer;
+        display:flex;align-items:center;justify-content:center;
+        font-family:inherit;transition:all .15s;"
+        onmouseenter="this.style.color='#fff';this.style.background='rgba(255,255,255,0.12)'"
+        onmouseleave="this.style.color='#6b7280';this.style.background='rgba(255,255,255,0.06)'">×</button>
       <!-- Icon + Title -->
       <div id="abe-modal-icon" style="font-size:32px;margin-bottom:12px;text-align:center"></div>
       <div id="abe-modal-title" style="
@@ -2105,7 +2127,17 @@ function clearBulkSelection() {
 function deleteSelected() {
   if (!_selectedLeadIds.size) return;
   if (!confirm(`Delete ${_selectedLeadIds.size} selected lead(s)? This cannot be undone.`)) return;
+  // Remove from repo
   state.savedLeads = state.savedLeads.filter(l => !_selectedLeadIds.has(l.id));
+  // Reset analysis in allLeads and fileRegistry for each deleted lead
+  _selectedLeadIds.forEach(function(id) {
+    const lead = state.allLeads.find(l => l.id === id);
+    if (lead) { lead.gtmAnalysis = null; lead.status = 'Unprocessed'; }
+    state.fileRegistry.forEach(function(file) {
+      const fl = file.data.find(l => l.id === id);
+      if (fl) { fl.gtmAnalysis = null; fl.status = 'Unprocessed'; }
+    });
+  });
   _selectedLeadIds = new Set();
   saveStateToStorage();
   renderSaved();
@@ -2907,8 +2939,8 @@ async function analyzeAllLeads() {
   }
 
   const total        = unanalyzed.length;
-  const totalSecs    = Math.ceil(total * 1.5);   // ~1.5s per lead avg at batch=5 (adapts down if needed)
-  const batchSecs    = Math.ceil(Math.min(50, total) * 1.5);
+  const totalSecs    = Math.ceil(total * 3.5);   // ~3.5s per lead at batch=2
+  const batchSecs    = Math.ceil(Math.min(50, total) * 3.5);
   const totalTime    = fmtTime(totalSecs);
   const batchTime    = fmtTime(batchSecs);
 
@@ -2923,12 +2955,13 @@ async function analyzeAllLeads() {
     icon: '🧠',
     title: 'AI Intelligence Engine Ready',
     body:
-      '<span style="color:#e5e7eb;font-weight:700;font-size:14px">' + total + ' leads</span> are queued for analysis.<br><br>' +
+      '<span style="color:#e5e7eb;font-weight:700;font-size:14px">' + total + ' leads</span> queued · ' +
+      '<span style="color:#6b7280;font-size:12px">' + (state.allLeads.length - total) + ' already analyzed</span><br><br>' +
       '<span style="color:#a855f7;font-weight:700">⏱ Full run estimated:</span> <span style="color:#e5e7eb;font-weight:700">~' + totalTime + '</span><br>' +
       '<span style="color:#a855f7;font-weight:700">⏱ First batch (50 leads):</span> <span style="color:#e5e7eb;font-weight:700">~' + batchTime + '</span><br><br>' +
-      '<span style="color:#6b7280;font-size:11px">AI processes 1 lead at a time to ensure accuracy.<br>No hallucinations. Every insight is fully verified.</span>',
+      '<span style="color:#6b7280;font-size:11px">AI processes 2 leads simultaneously for speed without compromising accuracy.<br>No hallucinations. Every insight is fully verified.</span>',
     tip:
-      '💡 <strong>Recommended:</strong> Use batch mode (50 at a time). You can review and act on analyzed leads while the next batch runs in the background.',
+      '💡 <strong>Recommended:</strong> Use batch mode (50 at a time). Analyzed leads auto-save so you can start outreach while the next batch processes.',
     buttons: [
       { label: '⚡ Analyze All ' + total,  value: 'all',   primary: true  },
       { label: '📦 Batch of 50',           value: 'batch', primary: false },
@@ -3009,9 +3042,9 @@ async function _runBulkAnalyze(unanalyzed, total, autosave = false, startOffset 
   // Starts at batch=5, auto-reduces on 429, auto-recovers after success streak
   // Self-tunes to your OpenAI tier — no manual config needed
   // Free tier → settles at 1-2 | Tier 1 ($5 spent) → runs at 5-10
-  let batchSize        = 5;    // start optimistic
+  let batchSize        = 2;    // 2 concurrent — balances speed and stability
   const BATCH_MIN      = 1;
-  const BATCH_MAX      = 5;
+  const BATCH_MAX      = 2;   // user preference: 2 concurrent for stable quality
   let consecutiveOK    = 0;    // track successes to try increasing batch
   const GROW_AFTER     = 10;   // increase batch after 10 consecutive successes
   const INTER_BATCH_MS = 300;  // ms between batches
@@ -3320,7 +3353,19 @@ async function saveAllAnalyzed() {
 ========================= */
 
 function deleteRepoLead(leadId) {
+  // Remove from repo
   state.savedLeads = state.savedLeads.filter(l => l.id !== leadId);
+  // Reset in allLeads so it shows as unanalyzed again for bulk analyze
+  const lead = state.allLeads.find(l => l.id === leadId);
+  if (lead) {
+    lead.gtmAnalysis = null;
+    lead.status      = 'Unprocessed';
+  }
+  // Also reset in fileRegistry so it persists on refresh
+  state.fileRegistry.forEach(function(file) {
+    const fl = file.data.find(l => l.id === leadId);
+    if (fl) { fl.gtmAnalysis = null; fl.status = 'Unprocessed'; }
+  });
   saveStateToStorage();
   renderSaved();
   updateDashboardCards();
@@ -3329,6 +3374,11 @@ function deleteRepoLead(leadId) {
 function clearAllRepository() {
   if (!state.savedLeads.length) { alert('Repository is already empty.'); return; }
   if (!confirm(`Delete all ${state.savedLeads.length} saved leads from the repository? This cannot be undone.`)) return;
+  // Reset analysis on ALL leads in allLeads and fileRegistry
+  state.allLeads.forEach(function(l) { l.gtmAnalysis = null; l.status = 'Unprocessed'; });
+  state.fileRegistry.forEach(function(file) {
+    file.data.forEach(function(l) { l.gtmAnalysis = null; l.status = 'Unprocessed'; });
+  });
   state.savedLeads = [];
   saveStateToStorage();
   renderSaved();
