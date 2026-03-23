@@ -2839,10 +2839,32 @@ function exportPDF() {
 
   y = addPageHeader('Top Account Intelligence Cards');
 
+  // Helper: draw one intel row inside a card
+  function drawIntelRow(label, labelClr, text, xLeft, yPos, maxW) {
+    if (!text) return 0;
+    setRGB(labelClr);
+    doc.setFontSize(6); doc.setFont('helvetica','bold');
+    doc.text(label, xLeft, yPos);
+    setRGB(clr.textMid);
+    doc.setFontSize(6.5); doc.setFont('helvetica','normal');
+    const lines = doc.splitTextToSize(String(text).slice(0, 220), maxW - 28);
+    const capped = lines.slice(0, 3);
+    doc.text(capped, xLeft + 26, yPos);
+    return capped.length * 7;   // height used
+  }
+
   topLeads.forEach((l, i) => {
     const sc    = parseInt(l.score) || 0;
     const scClr = sc >= 80 ? clr.green : sc >= 60 ? clr.amber : clr.red;
-    const CARD_H = 36;
+    const gtm   = l.gtmAnalysis || {};
+    const hasIntel = gtm['Pain Area'] || gtm['Key Insight'] || gtm['Proposed Solution'] || gtm['Cold Outreach Message'];
+
+    // Calculate card height dynamically based on intel present
+    const intelRows = [
+      gtm['Pain Area'], gtm['Key Insight'],
+      gtm['Proposed Solution'], gtm['Cold Outreach Message']
+    ].filter(Boolean).length;
+    const CARD_H = hasIntel ? Math.min(22 + intelRows * 13 + (l.notes ? 10 : 0), 80) : 36;
 
     if (y + CARD_H > PH - 18) {
       setRGB(clr.textGray);
@@ -2857,55 +2879,65 @@ function exportPDF() {
     doc.setLineWidth(0.3);
     doc.roundedRect(ML, y, CW, CARD_H, 2, 2, 'FD');
 
-    // Left accent strip
+    // Left accent strip — colour by score
     fillRGB(scClr);
     doc.rect(ML, y, 2.5, CARD_H, 'F');
 
-    // Score badge
+    // Score badge top-right
     doc.setFillColor(
       Math.round(scClr[0] + (255-scClr[0]) * 0.85),
       Math.round(scClr[1] + (255-scClr[1]) * 0.85),
       Math.round(scClr[2] + (255-scClr[2]) * 0.85)
     );
-    doc.roundedRect(PW - MR - 20, y + 4, 18, 10, 2, 2, 'F');
+    doc.roundedRect(PW - MR - 20, y + 3, 18, 11, 2, 2, 'F');
     setRGB(scClr);
     doc.setFontSize(9); doc.setFont('helvetica','bold');
-    doc.text(`${sc}%`, PW - MR - 11, y + 10.5, { align:'center' });
-    setRGB(scClr);
+    doc.text(`${sc}%`, PW - MR - 11, y + 9.5, { align:'center' });
     doc.setFontSize(5); doc.setFont('helvetica','normal');
-    doc.text('GTM SCORE', PW - MR - 11, y + 16.5, { align:'center' });
+    doc.text('GTM SCORE', PW - MR - 11, y + 13.5, { align:'center' });
 
-    // Name and company
+    // Name + company + status
     setRGB(clr.textDark);
     doc.setFontSize(8.5); doc.setFont('helvetica','bold');
-    doc.text(String(l.name || '').slice(0,36), ML + 6, y + 9);
+    doc.text(String(l.name || '').slice(0, 36), ML + 6, y + 8);
     setRGB(clr.textGray);
     doc.setFontSize(7); doc.setFont('helvetica','normal');
-    doc.text(String(l.company || '').slice(0,36), ML + 6, y + 15.5);
-
-    // Status pill
-    const stClr = l.status === 'Contacted' || l.status === 'Meeting Set' ? clr.green : clr.textGray;
+    doc.text(String(l.company || '').slice(0, 36), ML + 6, y + 14);
+    const stClr = l.status === 'Mapped' ? clr.green : clr.textGray;
     setRGB(stClr);
-    doc.setFontSize(6); doc.setFont('helvetica','bold');
-    doc.text(String(l.status || 'New').toUpperCase(), ML + 6, y + 21.5);
+    doc.setFontSize(5.5); doc.setFont('helvetica','bold');
+    doc.text(String(l.status || 'New').toUpperCase(), ML + 6, y + 19.5);
 
-    // GTM analysis fields
-    if (l.gtmAnalysis) {
-      const pain    = l.gtmAnalysis['Pain Area']         || '';
-      const insight = l.gtmAnalysis['Key Insight']       || '';
-      const sol     = l.gtmAnalysis['Proposed Solution'] || '';
-      const fields  = [pain, insight, sol].filter(Boolean).join('  ·  ').slice(0, 130);
-      if (fields) {
-        setRGB(clr.textMid);
-        doc.setFontSize(6.5); doc.setFont('helvetica','normal');
-        const wrapped = doc.splitTextToSize(fields, CW - 30);
-        doc.text(wrapped.slice(0, 2), ML + 6, y + 27);
+    // ── Intel section — each field on its own labeled row ──
+    if (hasIntel) {
+      // Light intel background band
+      doc.setFillColor(245, 240, 255);
+      doc.rect(ML + 2.5, y + 22, CW - 2.5, CARD_H - 23, 'F');
+
+      let iy = y + 28;  // intel y start
+      const IX = ML + 8;
+      const IW = CW - 30;
+
+      if (gtm['Pain Area']) {
+        const used = drawIntelRow('Pain Area:', [220, 38, 38], gtm['Pain Area'], IX, iy, IW);
+        iy += Math.max(used, 7) + 2;
+      }
+      if (gtm['Key Insight']) {
+        const used = drawIntelRow('Key Insight:', [180, 83, 9], gtm['Key Insight'], IX, iy, IW);
+        iy += Math.max(used, 7) + 2;
+      }
+      if (gtm['Proposed Solution']) {
+        const used = drawIntelRow('Solution:', [124, 58, 237], gtm['Proposed Solution'], IX, iy, IW);
+        iy += Math.max(used, 7) + 2;
+      }
+      if (gtm['Cold Outreach Message']) {
+        drawIntelRow('Outreach:', [8, 145, 178], gtm['Cold Outreach Message'], IX, iy, IW);
       }
     } else if (l.notes) {
       setRGB(clr.textMid);
-      doc.setFontSize(6.5);
-      const wrapped = doc.splitTextToSize(String(l.notes).slice(0, 130), CW - 30);
-      doc.text(wrapped.slice(0, 2), ML + 6, y + 27);
+      doc.setFontSize(6.5); doc.setFont('helvetica','normal');
+      const wrapped = doc.splitTextToSize(String(l.notes).slice(0, 200), CW - 30);
+      doc.text(wrapped.slice(0, 3), ML + 6, y + 26);
     }
 
     y += CARD_H + 4;
