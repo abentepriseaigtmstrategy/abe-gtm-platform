@@ -2784,45 +2784,128 @@ function stopBulkAnalyze() {
 async function analyzeAllLeads() {
   if (!state.allLeads.length) return;
 
-  // Only analyze leads that haven't been analyzed yet
   const unanalyzed = state.allLeads.filter(l => !l.gtmAnalysis);
   if (!unanalyzed.length) {
     alert('All leads in this file have already been analyzed!');
     return;
   }
 
-  bulkStopped = false;
-  const btn        = document.getElementById('analyzeAllBtn');
-  const loader     = document.getElementById('bulkLoader');
+  const total = unanalyzed.length;
+  const BATCH_SIZE = 5;
+  // Time estimate: ~6s per batch of 5 leads
+  const estimatedSecs = Math.ceil(total / BATCH_SIZE) * 6;
+  const estimatedMins = Math.ceil(estimatedSecs / 60);
+
+  // ── Smart routing based on lead count ──────────────────────────
+  if (total <= 25) {
+    // AUTO: analyze all immediately, no prompt needed
+    _runBulkAnalyze(unanalyzed, total);
+
+  } else {
+    // LARGE DATASET: ask user how they want to proceed
+    const timeMsg = estimatedSecs < 60
+      ? estimatedSecs + ' seconds'
+      : estimatedMins + ' minute' + (estimatedMins > 1 ? 's' : '');
+
+    const choice = window.confirm(
+      'You have ' + total + ' leads to analyze.\n\n' +
+      '• Estimated time for full analysis: ~' + timeMsg + '\n' +
+      '• Important: Keep this tab active during analysis\n\n' +
+      'Click OK to analyze ALL ' + total + ' leads in one run.\n' +
+      'Click Cancel to analyze in batches of 50 instead.'
+    );
+
+    if (choice) {
+      // Analyze all at once - user confirmed they understand the time
+      _runBulkAnalyze(unanalyzed, total);
+    } else {
+      // Batch mode: analyze 50 at a time, ask to continue after each batch
+      _runBatchMode(unanalyzed, total, 0);
+    }
+  }
+}
+
+// ── Batch mode: 50 at a time with continue prompt ──────────────
+async function _runBatchMode(unanalyzed, total, startFrom) {
+  const CHUNK = 50;
+  const chunk = unanalyzed.slice(startFrom, startFrom + CHUNK);
+  if (!chunk.length) return;
+
+  const chunkEnd = Math.min(startFrom + CHUNK, total);
   const statusText = document.getElementById('bulkStatusText');
-  const progressBar= document.getElementById('bulkProgressBar');
+  if (statusText) statusText.innerText = `Analyzing leads ${startFrom + 1}–${chunkEnd} of ${total}...`;
+
+  await _runBulkAnalyze(chunk, chunk.length, true);
+
+  // After this chunk, auto-save and ask to continue
+  const remaining = unanalyzed.slice(startFrom + CHUNK);
+  if (remaining.length > 0) {
+    const cont = window.confirm(
+      '✓ Leads ' + (startFrom + 1) + '–' + chunkEnd + ' analyzed and saved.\n\n' +
+      remaining.length + ' leads still remaining.\n\n' +
+      'Click OK to analyze the next 50.\n' +
+      'Click Cancel to stop here.'
+    );
+    if (cont) {
+      _runBatchMode(unanalyzed, total, startFrom + CHUNK);
+    }
+  }
+}
+
+// ── Core bulk engine — runs the actual analysis ────────────────
+async function _runBulkAnalyze(unanalyzed, total, autosave = false) {
+  bulkStopped = false;
+  const btn         = document.getElementById('analyzeAllBtn');
+  const loader      = document.getElementById('bulkLoader');
+  const statusText  = document.getElementById('bulkStatusText');
+  const progressBar = document.getElementById('bulkProgressBar');
+  const spinner     = loader?.querySelector('.animate-spin');
+  const stopBtn     = document.getElementById('bulkStopBtn');
+  const saveAllBtn  = document.getElementById('bulkSaveAllBtn');
 
   btn?.classList.add('hidden');
   loader?.classList.remove('hidden');
+  if (spinner)    spinner.classList.remove('hidden');
+  if (stopBtn)    stopBtn.classList.remove('hidden');
+  if (saveAllBtn) saveAllBtn.classList.add('hidden');
 
-  const BATCH_SIZE = 5; // concurrent API calls per batch — safe for most providers
-  const BATCH_DELAY_MS = 300; // small pause between batches to respect rate limits
+  const BATCH_SIZE     = 5;
+  const BATCH_DELAY_MS = 100; // reduced from 300ms — less throttle risk on tab switch
   let completed = 0;
-  const total = unanalyzed.length;
 
-  // Process in batches of BATCH_SIZE
+  // Page Visibility API — detect tab switching and wait for tab to be active again
+  // This prevents Chrome from throttling the async loop when you switch away
+  async function waitForVisible() {
+    if (document.visibilityState === 'visible') return;
+    return new Promise(resolve => {
+      const handler = () => {
+        if (document.visibilityState === 'visible') {
+          document.removeEventListener('visibilitychange', handler);
+          resolve();
+        }
+      };
+      document.addEventListener('visibilitychange', handler);
+    });
+  }
+
   for (let i = 0; i < unanalyzed.length; i += BATCH_SIZE) {
+    if (bulkStopped) break;
+
+    // Wait if tab is not visible — prevents Chrome throttling
+    await waitForVisible();
     if (bulkStopped) break;
 
     const batch = unanalyzed.slice(i, i + BATCH_SIZE);
 
-    // Run all in this batch simultaneously
     const results = await Promise.allSettled(
       batch.map(lead => getAIIntel(lead).then(data => ({ lead, data })))
     );
 
-    // Apply results and update rows in-place (no full re-render)
     results.forEach(result => {
       if (result.status === 'fulfilled') {
         const { lead, data } = result.value;
         lead.gtmAnalysis = data;
         lead.status = 'Analyzed';
-        // Update just this row's score cell to show ✓ AI badge
         const row = document.getElementById('p2-row-' + lead.id);
         if (row) {
           const scoreCell = row.querySelectorAll('td')[2];
@@ -2838,41 +2921,81 @@ async function analyzeAllLeads() {
       }
     });
 
-    // FIX 1: Update dashboard cards after every batch so counts stay live
     updateDashboardCards();
 
-    // Update progress
     const pct = Math.round((completed / total) * 100);
     if (progressBar) progressBar.style.width = pct + '%';
     if (statusText)  statusText.innerText = bulkStopped
       ? `Stopped at ${completed} / ${total}`
       : `Analyzing ${completed} / ${total} leads...`;
 
-    // Small inter-batch delay to avoid hammering the API
     if (!bulkStopped && i + BATCH_SIZE < unanalyzed.length) {
       await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
     }
   }
 
-  // FIX 2 & 3: Show Save All button after bulk completes so user can save to Local/Supabase
   const doneCount = state.allLeads.filter(l => l.gtmAnalysis).length;
-  if (statusText) statusText.innerText = `✓ ${doneCount} leads analyzed — click Save All to store them`;
-  if (progressBar) progressBar.style.width = '100%';
 
-  // Hide spinner, hide stop button, show Save All button
-  const spinner = loader?.querySelector('.animate-spin');
-  if (spinner) spinner.classList.add('hidden');
-  const stopBtn = document.getElementById('bulkStopBtn');
-  if (stopBtn) stopBtn.classList.add('hidden');
-  const saveAllBtn = document.getElementById('bulkSaveAllBtn');
-  if (saveAllBtn) saveAllBtn.classList.remove('hidden');
+  if (autosave) {
+    // Batch mode: auto-save silently after each chunk
+    await _autoSaveAnalyzed();
+    if (spinner)    spinner.classList.remove('hidden');
+    if (stopBtn)    stopBtn.classList.remove('hidden');
+    if (saveAllBtn) saveAllBtn.classList.add('hidden');
+    loader?.classList.add('hidden');
+    if (progressBar) progressBar.style.width = '0%';
+    if (statusText)  statusText.innerText = 'Synchronizing Neural Intel...';
+    btn?.classList.remove('hidden');
+  } else {
+    // Manual mode: show Save All button
+    if (statusText)  statusText.innerText = `✓ ${doneCount} leads analyzed — click Save All to store them`;
+    if (progressBar) progressBar.style.width = '100%';
+    if (spinner)    spinner.classList.add('hidden');
+    if (stopBtn)    stopBtn.classList.add('hidden');
+    if (saveAllBtn) saveAllBtn.classList.remove('hidden');
+    btn?.classList.remove('hidden');
+    updateDashboardCards();
+  }
 
-  btn?.classList.remove('hidden');
-  updateDashboardCards();
-
-  if (bulkStopped) {
+  if (bulkStopped && !autosave) {
     if (statusText) statusText.innerText = `Stopped at ${doneCount} leads — click Save All to store them`;
   }
+}
+
+// ── Auto-save for batch mode (silent, no UI prompt) ────────────
+async function _autoSaveAnalyzed() {
+  const analyzed  = state.allLeads.filter(l => l.gtmAnalysis);
+  const saveLocal = document.getElementById('modeLocal')?.checked;
+  const saveCloud = document.getElementById('modeCloud')?.checked;
+  if (!saveLocal && !saveCloud) return;
+  const now = new Date().toISOString();
+  for (const lead of analyzed) {
+    lead.status     = 'Mapped';
+    lead.updated_at = now;
+    if (saveLocal) {
+      const idx = state.savedLeads.findIndex(l => l.id === lead.id);
+      if (idx >= 0) { state.savedLeads[idx] = { ...lead }; }
+      else           { state.savedLeads.push({ ...lead }); }
+    }
+    if (saveCloud) {
+      try {
+        await window.APP.sb.from('leads').upsert({
+          id: lead.id, name: lead.name, title: lead.title,
+          company: lead.company, linkedin: lead.linkedin,
+          source_file: lead.source || lead.sourceFile,
+          score: lead.score, status: lead.status,
+          tags: lead.tags, updated_at: lead.updated_at,
+          pain_area:         lead.gtmAnalysis?.['Pain Area']             || null,
+          key_insight:       lead.gtmAnalysis?.['Key Insight']           || null,
+          proposed_solution: lead.gtmAnalysis?.['Proposed Solution']     || null,
+          outreach_message:  lead.gtmAnalysis?.['Cold Outreach Message'] || null
+        }, { onConflict: 'id' });
+      } catch (e) { console.warn('Auto-save failed:', lead.name, e.message); }
+    }
+  }
+  if (saveLocal) saveStateToStorage();
+  renderSaved();
+  updateDashboardCards();
 }
 
 /* =========================
@@ -2939,6 +3062,32 @@ async function saveAllAnalyzed() {
   if (saveLocal) saveStateToStorage();
   renderSaved();
   updateDashboardCards();
+
+  // Refresh Verified Leads table — show only leads NOT yet saved to repo
+  const savedIds = new Set(state.savedLeads.map(l => l.id));
+  const unsaved  = state.allLeads.filter(l => !savedIds.has(l.id));
+  const p2Body   = document.getElementById('body-p2');
+  if (p2Body) {
+    if (unsaved.length) {
+      p2Body.innerHTML = unsaved.map(l => `
+        <tr id="p2-row-${l.id}">
+          <td class="font-bold text-white">${l.name}</td>
+          <td>${l.company}</td>
+          <td class="${getScoreClass(l.score)}">${l.score}%
+            ${l.gtmAnalysis ? '<span class="ml-2 text-[8px] text-green-400 font-black uppercase">✓ AI</span>' : ''}
+          </td>
+          <td class="text-right">
+            <button onclick="openAnalyze('${l.id}')"
+              class="text-purple-400 px-3 py-1 rounded-lg bg-purple-400/10 hover:bg-purple-400/20 text-[10px] font-bold transition-all">
+              Analyze
+            </button>
+          </td>
+        </tr>
+      `).join('');
+    } else {
+      p2Body.innerHTML = '<tr><td colspan="4" class="text-center py-20 text-green-400 font-black uppercase tracking-widest text-[10px]">✓ All leads saved to Repository</td></tr>';
+    }
+  }
 
   // Reset bulk loader UI back to initial state
   const loader      = document.getElementById('bulkLoader');
