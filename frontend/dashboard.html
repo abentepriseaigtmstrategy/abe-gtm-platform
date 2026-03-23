@@ -1202,18 +1202,37 @@ async function initApp() {
     }
   }
 
-  // 3. Re-render all views
+  // 3. SYNC CHECK: Reset gtmAnalysis on any allLeads lead that is NOT in savedLeads
+  // This fixes stale analysis data when leads are deleted from repo between sessions
+  const savedIds = new Set(state.savedLeads.map(l => l.id));
+  state.allLeads.forEach(function(lead) {
+    if (!savedIds.has(lead.id) && lead.gtmAnalysis) {
+      lead.gtmAnalysis = null;
+      lead.status      = 'Unprocessed';
+    }
+  });
+  // Also sync fileRegistry so the reset persists
+  state.fileRegistry.forEach(function(file) {
+    file.data.forEach(function(lead) {
+      if (!savedIds.has(lead.id) && lead.gtmAnalysis) {
+        lead.gtmAnalysis = null;
+        lead.status      = 'Unprocessed';
+      }
+    });
+  });
+
+  // 4. Re-render all views
   renderVault();
   renderP1();
   renderSaved();
   updateDashboardCards();
 
-  // 4. If cloud mode was on, pull latest from Supabase
+  // 5. If cloud mode was on, pull latest from Supabase
   if (document.getElementById('modeCloud')?.checked) {
     await loadSavedFromDB();
   }
 
-  // 5. Restore Execute Mapping table if leads exist
+  // 6. Restore Execute Mapping table if leads exist
   if (state.allLeads.length > 0) {
     document.getElementById('analyzeAllBtn')?.classList.remove('hidden');
   }
