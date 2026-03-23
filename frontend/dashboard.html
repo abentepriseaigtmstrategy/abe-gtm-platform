@@ -594,7 +594,7 @@
             <span>Local</span>
           </label>
           <label class="flex items-center gap-1 text-[9px] font-bold uppercase text-gray-400 cursor-pointer">
-            <input type="checkbox" id="modeCloud" class="accent-purple-500">
+            <input type="checkbox" id="modeCloud" class="accent-purple-500" onchange="handleCloudToggle(this.checked)">
             <span>Supabase</span>
           </label>
         </div>
@@ -843,10 +843,10 @@
                 <div class="relative">
                     <input type="text" id="repoSearch" oninput="renderSaved()" placeholder="Search Leads/Companies..." class="bg-gray-900 border border-gray-800 text-[10px] font-bold uppercase tracking-widest px-4 py-2.5 rounded-xl focus:outline-none focus:border-purple-500 w-64 text-white">
                 </div>
-                <button onclick="exportRepository('xlsx')" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest text-white shadow-lg shadow-emerald-600/20 transition-all">Export XLSX</button>
-                <button onclick="exportRepository('csv')" class="bg-blue-600 hover:bg-blue-500 px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest text-white shadow-lg shadow-blue-600/20 transition-all">Export CSV</button>
-                <button onclick="exportPDF()" class="bg-red-600 hover:bg-red-500 px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest text-white shadow-lg shadow-red-600/20 transition-all">Export PDF</button>
-                <button onclick="exportWord()" class="bg-orange-600 hover:bg-orange-500 px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest text-white shadow-lg shadow-orange-600/20 transition-all">Export Word</button>
+                <button onclick="exportGate('xlsx')" class="bg-emerald-600 hover:bg-emerald-500 px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest text-white shadow-lg shadow-emerald-600/20 transition-all">Export XLSX</button>
+                <button onclick="exportGate('csv')" class="bg-blue-600 hover:bg-blue-500 px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest text-white shadow-lg shadow-blue-600/20 transition-all">Export CSV</button>
+                <button onclick="exportGate('pdf')" class="bg-red-600 hover:bg-red-500 px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest text-white shadow-lg shadow-red-600/20 transition-all">Export PDF</button>
+                <button onclick="exportGate('word')" class="bg-orange-600 hover:bg-orange-500 px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest text-white shadow-lg shadow-orange-600/20 transition-all">Export Word</button>
                 <button onclick="clearAllRepository()" class="bg-gray-800 hover:bg-red-900/60 border border-red-500/20 hover:border-red-500/50 px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest text-red-400 hover:text-red-300 transition-all">🗑 Clear All</button>
             </div>
         </div>
@@ -2074,17 +2074,50 @@ document.getElementById('saveAnalysisBtn').onclick = async () => {
    LOAD FROM SUPABASE
 ========================= */
 
-async function loadSavedFromDB() {
-  const { data, error } = await window.APP.sb
-    .from('leads')
-    .select('*')
-    .order('updated_at', { ascending: false });
+// ── Cloud toggle handler — fires when user ticks the Supabase checkbox ────
+async function handleCloudToggle(checked) {
+  if (checked) {
+    await loadSavedFromDB();
+  }
+}
 
-  if (!error && data) {
-    // Reconstruct gtmAnalysis from flat Supabase columns so Intel expand works
-    // Supabase stores: pain_area, key_insight, proposed_solution, outreach_message
-    // Frontend expects: lead.gtmAnalysis['Pain Area'], ['Key Insight'] etc.
-    state.savedLeads = data.map(function(lead) {
+// ── Cloud import with animated progress bar + dedup ────────────────────
+async function loadSavedFromDB() {
+  // Show the cloud transfer overlay
+  showCloudImportOverlay();
+
+  try {
+    const { data, error } = await window.APP.sb
+      .from('leads')
+      .select('*')
+      .order('updated_at', { ascending: false });
+
+    if (error) {
+      hideCloudImportOverlay();
+      await abeAlert({
+        icon: '⚠️',
+        title: 'Cloud Sync Failed',
+        body: 'Could not connect to Supabase: <span style="color:#ef4444">' + error.message + '</span><br><br>Your local data is safe and unchanged.',
+      });
+      return;
+    }
+
+    if (!data || !data.length) {
+      hideCloudImportOverlay();
+      return;
+    }
+
+    // Simulate transfer progress (each lead = one "file" being transferred)
+    const total = data.length;
+    let processed = 0;
+    const duplicates = [];
+    const merged = [];
+
+    // Build set of existing local lead IDs for dedup
+    const localIds = new Set(state.savedLeads.map(l => l.id));
+
+    for (const lead of data) {
+      // Reconstruct gtmAnalysis from flat Supabase columns
       if (!lead.gtmAnalysis && (lead.pain_area || lead.key_insight || lead.proposed_solution || lead.outreach_message)) {
         lead.gtmAnalysis = {
           'Pain Area':             lead.pain_area             || '',
@@ -2093,10 +2126,113 @@ async function loadSavedFromDB() {
           'Cold Outreach Message': lead.outreach_message      || ''
         };
       }
-      return lead;
-    });
+
+      if (localIds.has(lead.id)) {
+        duplicates.push(lead);
+        // Update existing local lead with latest cloud data
+        const idx = state.savedLeads.findIndex(l => l.id === lead.id);
+        if (idx >= 0) state.savedLeads[idx] = lead;
+      } else {
+        merged.push(lead);
+        state.savedLeads.push(lead);
+      }
+
+      processed++;
+      updateCloudImportProgress(processed, total, lead.name);
+
+      // Small yield to keep UI responsive
+      if (processed % 10 === 0) {
+        await new Promise(r => setTimeout(r, 0));
+      }
+    }
+
+    hideCloudImportOverlay();
     renderSaved();
     updateDashboardCards();
+
+    // Show summary
+    const newCount  = merged.length;
+    const dupCount  = duplicates.length;
+    await abeAlert({
+      icon: '☁️',
+      title: 'Cloud Sync Complete',
+      body:
+        '<span style="color:#22c55e;font-weight:700;font-size:14px">✓ ' + total + ' leads loaded</span> from Supabase.<br><br>' +
+        (newCount  ? '<span style="color:#a855f7;font-weight:700">' + newCount + ' new leads</span> added to Repository.<br>' : '') +
+        (dupCount  ? '<span style="color:#6b7280">' + dupCount + ' existing leads updated</span> with latest cloud data.' : ''),
+    });
+
+  } catch (e) {
+    hideCloudImportOverlay();
+    console.error('loadSavedFromDB error:', e);
+  }
+}
+
+// ── Cloud import overlay helpers ─────────────────────────────────────
+function showCloudImportOverlay() {
+  // Remove existing if any
+  var ex = document.getElementById('cloud-import-overlay');
+  if (ex) ex.remove();
+
+  var overlay = document.createElement('div');
+  overlay.id = 'cloud-import-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:99990;background:rgba(7,9,18,0.88);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;font-family:Inter,sans-serif';
+
+  overlay.innerHTML = [
+    '<div style="text-align:center;width:420px;padding:40px 36px;background:linear-gradient(145deg,#0d1120,#111827);border:1px solid rgba(168,85,247,0.25);border-radius:20px;box-shadow:0 32px 80px rgba(0,0,0,0.7)">',
+
+      // Animated cloud transfer illustration
+      '<div style="display:flex;align-items:center;justify-content:center;gap:20px;margin-bottom:28px">',
+        '<div style="text-align:center">',
+          '<div style="font-size:36px;margin-bottom:6px">☁️</div>',
+          '<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.15em;color:#6b7280">Supabase</div>',
+        '</div>',
+        '<div id="cloud-arrow-anim" style="font-size:22px;color:#a855f7;animation:cloud-fly 1s ease-in-out infinite alternate">→</div>',
+        '<div style="text-align:center">',
+          '<div style="font-size:36px;margin-bottom:6px">💾</div>',
+          '<div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.15em;color:#6b7280">Local</div>',
+        '</div>',
+      '</div>',
+
+      '<div style="font-size:15px;font-weight:900;color:#fff;margin-bottom:6px">Syncing from Cloud</div>',
+      '<div id="cloud-import-status" style="font-size:11px;color:#6b7280;margin-bottom:20px">Connecting to Supabase...</div>',
+
+      // Progress bar
+      '<div style="background:rgba(255,255,255,0.06);border-radius:8px;height:6px;overflow:hidden;margin-bottom:12px">',
+        '<div id="cloud-import-bar" style="height:100%;width:0%;background:linear-gradient(90deg,#a855f7,#7c3aed);border-radius:8px;transition:width .3s ease"></div>',
+      '</div>',
+      '<div id="cloud-import-count" style="font-size:10px;color:#4b5563;font-weight:700">0 / 0 leads</div>',
+
+    '</div>',
+  ].join('');
+
+  // Inject keyframe for arrow animation
+  if (!document.getElementById('cloud-anim-css')) {
+    var s = document.createElement('style');
+    s.id = 'cloud-anim-css';
+    s.textContent = '@keyframes cloud-fly{from{transform:translateX(-4px);opacity:.5}to{transform:translateX(4px);opacity:1}}';
+    document.head.appendChild(s);
+  }
+
+  document.body.appendChild(overlay);
+}
+
+function updateCloudImportProgress(done, total, leadName) {
+  var bar    = document.getElementById('cloud-import-bar');
+  var status = document.getElementById('cloud-import-status');
+  var count  = document.getElementById('cloud-import-count');
+  var pct    = Math.round((done / total) * 100);
+  if (bar)    bar.style.width = pct + '%';
+  if (status) status.textContent = 'Syncing ' + (leadName || '').split(' ')[0] + '...';
+  if (count)  count.textContent  = done + ' / ' + total + ' leads';
+}
+
+function hideCloudImportOverlay() {
+  var ov = document.getElementById('cloud-import-overlay');
+  if (ov) {
+    ov.style.transition = 'opacity .3s';
+    ov.style.opacity = '0';
+    setTimeout(function() { if (ov.parentNode) ov.remove(); }, 300);
   }
 }
 
@@ -2402,6 +2538,36 @@ function toggleRepoExpand(leadId) {
   expandRow.classList.toggle('hidden', !isHidden);
   const btn = document.getElementById('btn-expand-' + leadId);
   if (btn) btn.innerText = isHidden ? '▲ Hide' : '▼ Intel';
+}
+
+// ── Export gate — ensures user has intentionally chosen a source ──────
+async function exportGate(type) {
+  const saveLocal = document.getElementById('modeLocal')?.checked;
+  const saveCloud = document.getElementById('modeCloud')?.checked;
+
+  if (!saveLocal && !saveCloud) {
+    await abeAlert({
+      icon: '📤',
+      title: 'Select Export Source',
+      body:
+        'Please tick at least one data source in the top bar before exporting:<br><br>' +
+        '<span style="color:#a855f7;font-weight:700">✓ LOCAL</span> — data saved on this device<br>' +
+        '<span style="color:#a855f7;font-weight:700">✓ SUPABASE</span> — data saved in the cloud<br><br>' +
+        '<span style="color:#6b7280;font-size:11px">You can tick both to export the combined dataset.</span>',
+    });
+    return;
+  }
+
+  // If cloud is checked but not yet loaded, load it first
+  if (saveCloud && !saveLocal) {
+    await loadSavedFromDB();
+  }
+
+  // Route to the right export format
+  if (type === 'xlsx') exportRepository('xlsx');
+  else if (type === 'csv')  exportRepository('csv');
+  else if (type === 'pdf')  exportPDF();
+  else if (type === 'word') exportWord();
 }
 
 function exportRepository(type = "xlsx") {
@@ -2757,15 +2923,30 @@ function exportPDF() {
 
 function exportWord() {
   const leads = getExportLeads();
-  let content = "<h1>Strategic Repository</h1>";
-  leads.forEach(l => {
-    content += `<h3>${l.name} — ${l.company}</h3>`;
-    content += `<p><b>Score:</b> ${l.score}% | <b>Status:</b> ${l.status} | <b>Source:</b> ${l.source_file || l.source || ''}</p>`;
-    if (l.gtmAnalysis?.['Pain Area'])       content += `<p><b>Pain Area:</b> ${l.gtmAnalysis['Pain Area']}</p>`;
-    if (l.gtmAnalysis?.['Key Insight'])     content += `<p><b>Key Insight:</b> ${l.gtmAnalysis['Key Insight']}</p>`;
-    if (l.gtmAnalysis?.['Proposed Solution']) content += `<p><b>Solution:</b> ${l.gtmAnalysis['Proposed Solution']}</p>`;
-    if (l.notes)                             content += `<p><b>Notes:</b> ${l.notes}</p>`;
-    content += '<hr>';
+  let content = '<h1 style="color:#1a1a2e;font-family:Arial">AB Enterprise · Strategic Repository</h1>';
+  content += '<p style="color:#666;font-size:12px">Exported ' + new Date().toLocaleDateString() + ' · ' + leads.length + ' leads · Confidential</p><hr>';
+  leads.forEach((l, i) => {
+    const gtm = l.gtmAnalysis || {};
+    const hasIntel = gtm['Pain Area'] || gtm['Key Insight'] || gtm['Proposed Solution'] || gtm['Cold Outreach Message'];
+    content += '<h2 style="color:#1a1a2e;margin-top:28px">' + (i+1) + '. ' + (l.name||'') + ' — ' + (l.company||'') + '</h2>';
+    content += '<table style="width:100%;border-collapse:collapse;margin-bottom:12px">';
+    content += '<tr><td style="padding:4px 8px;color:#666;font-size:11px;width:120px"><b>Title</b></td><td style="padding:4px 8px;font-size:11px">' + (l.title||'—') + '</td>';
+    content += '<td style="padding:4px 8px;color:#666;font-size:11px;width:120px"><b>Score</b></td><td style="padding:4px 8px;font-size:11px;color:' + (l.score>=75?'#16a34a':l.score>=50?'#d97706':'#dc2626') + '"><b>' + l.score + '%</b></td></tr>';
+    content += '<tr><td style="padding:4px 8px;color:#666;font-size:11px"><b>Status</b></td><td style="padding:4px 8px;font-size:11px">' + (l.status||'—') + '</td>';
+    content += '<td style="padding:4px 8px;color:#666;font-size:11px"><b>Source</b></td><td style="padding:4px 8px;font-size:11px">' + (l.source_file||l.source||'—') + '</td></tr>';
+    if (l.actionTaken) content += '<tr><td style="padding:4px 8px;color:#666;font-size:11px"><b>Action Taken</b></td><td colspan="3" style="padding:4px 8px;font-size:11px">' + l.actionTaken + '</td></tr>';
+    content += '</table>';
+    if (hasIntel) {
+      content += '<div style="background:#f8f4ff;border-left:4px solid #7c3aed;padding:14px 16px;margin:12px 0;border-radius:4px">';
+      content += '<p style="font-size:10px;font-weight:bold;text-transform:uppercase;letter-spacing:0.1em;color:#7c3aed;margin:0 0 10px">AI Intelligence</p>';
+      if (gtm['Pain Area'])             content += '<p style="margin:6px 0;font-size:12px"><b style="color:#dc2626">🔴 Pain Area:</b> ' + gtm['Pain Area'] + '</p>';
+      if (gtm['Key Insight'])           content += '<p style="margin:6px 0;font-size:12px"><b style="color:#d97706">🟡 Key Insight:</b> ' + gtm['Key Insight'] + '</p>';
+      if (gtm['Proposed Solution'])     content += '<p style="margin:6px 0;font-size:12px"><b style="color:#7c3aed">🟣 Proposed Solution:</b> ' + gtm['Proposed Solution'] + '</p>';
+      if (gtm['Cold Outreach Message']) content += '<p style="margin:6px 0;font-size:12px"><b style="color:#0891b2">🔵 Cold Outreach Draft:</b><br><i style="color:#374151">' + gtm['Cold Outreach Message'] + '</i></p>';
+      content += '</div>';
+    }
+    if (l.notes) content += '<p style="font-size:12px;color:#374151;background:#f9fafb;padding:10px;border-radius:4px"><b>📝 Notes:</b> ' + l.notes + '</p>';
+    content += '<hr style="border:none;border-top:1px solid #e5e7eb;margin:20px 0">';
   });
   const blob = new Blob(['\ufeff', content], { type: 'application/msword' });
   const link = document.createElement('a');
