@@ -2123,6 +2123,10 @@ document.getElementById('saveAnalysisBtn').onclick = async () => {
 async function handleCloudToggle(checked) {
   if (checked) {
     await loadSavedFromDB();
+    // Auto-uncheck after sync — Supabase is a one-time pull, not a persistent mode
+    const el = document.getElementById('modeCloud');
+    if (el) el.checked = false;
+    saveCheckboxStates();
   }
 }
 
@@ -2249,8 +2253,8 @@ async function loadSavedFromDB() {
     // Show summary
     const newCount  = merged.length;
     const dupCount  = duplicates.length;
-    const supabaseUrl = 'https://supabase.com/dashboard/project/' +
-      (window.APP?.sb?.supabaseUrl || '').replace('https://','').split('.')[0];
+    // Direct link to the alo_leads table in Supabase Table Editor
+    const TABLE_EDITOR_URL = 'https://supabase.com/dashboard/project/cwcvneluhlimhlzowabv/editor';
 
     await abeModal({
       icon: '☁️',
@@ -2259,15 +2263,15 @@ async function loadSavedFromDB() {
         '<span style="color:#22c55e;font-weight:700;font-size:14px">✓ ' + total + ' leads loaded</span> from Supabase.<br><br>' +
         (newCount ? '<span style="color:#a855f7;font-weight:700">' + newCount + ' new leads</span> added to Repository.<br>' : '') +
         (dupCount ? '<span style="color:#6b7280">' + dupCount + ' existing leads updated</span> with latest cloud data.<br><br>' : '<br>') +
-        '<span style="color:#6b7280;font-size:11px">View your data directly in Supabase:</span><br>' +
-        '<a href="https://supabase.com/dashboard" target="_blank" style="color:#a855f7;font-weight:700;font-size:12px;text-decoration:none">🔗 Open Supabase Dashboard →</a>',
+        '<span style="color:#6b7280;font-size:11px">View your alo_leads table directly:</span><br>' +
+        '<a href="' + TABLE_EDITOR_URL + '" target="_blank" style="color:#a855f7;font-weight:700;font-size:12px;text-decoration:none">🔗 Open alo_leads Table →</a>',
       buttons: [
-        { label: 'Got it',               value: 'ok',       primary: true  },
-        { label: '🔗 Open Supabase',     value: 'open',     primary: false },
+        { label: 'Got it',             value: 'ok',   primary: true  },
+        { label: '🗄️ View Table',      value: 'open', primary: false },
       ]
     }).then(function(choice) {
       if (choice === 'open') {
-        window.open('https://supabase.com/dashboard', '_blank');
+        window.open(TABLE_EDITOR_URL, '_blank');
       }
     });
 
