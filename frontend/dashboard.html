@@ -2907,8 +2907,8 @@ async function analyzeAllLeads() {
   }
 
   const total        = unanalyzed.length;
-  const totalSecs    = total * 7;
-  const batchSecs    = Math.min(50, total) * 7;
+  const totalSecs    = Math.ceil(total * 1.5);   // ~1.5s per lead avg at batch=5 (adapts down if needed)
+  const batchSecs    = Math.ceil(Math.min(50, total) * 1.5);
   const totalTime    = fmtTime(totalSecs);
   const batchTime    = fmtTime(batchSecs);
 
@@ -3005,12 +3005,18 @@ async function _runBulkAnalyze(unanalyzed, total, autosave = false, startOffset 
   if (stopBtn)    stopBtn.classList.remove('hidden');
   if (saveAllBtn) saveAllBtn.classList.add('hidden');
 
-  // Sequential processing — 1 lead at a time to stay within 10 req/min server limit
-  // With automatic retry on 429 (rate limit) — waits 12s then retries
-  const INTER_LEAD_DELAY_MS = 6500;  // ~6.5s between leads = ~9 req/min safely
-  const RETRY_DELAY_MS      = 15000; // wait 15s on 429 before retrying
-  const MAX_RETRIES         = 3;
-  let completed = 0;
+  // ── ADAPTIVE BATCH ENGINE ──────────────────────────────────────
+  // Starts at batch=5, auto-reduces on 429, auto-recovers after success streak
+  // Self-tunes to your OpenAI tier — no manual config needed
+  // Free tier → settles at 1-2 | Tier 1 ($5 spent) → runs at 5-10
+  let batchSize        = 5;    // start optimistic
+  const BATCH_MIN      = 1;
+  const BATCH_MAX      = 5;
+  let consecutiveOK    = 0;    // track successes to try increasing batch
+  const GROW_AFTER     = 10;   // increase batch after 10 consecutive successes
+  const INTER_BATCH_MS = 300;  // ms between batches
+  const BACKOFF_MS     = 8000; // wait 8s on 429 before retry
+  let completed        = 0;
 
   // Page Visibility API — pause when tab is hidden, resume on return
   async function waitForVisible() {
@@ -3027,67 +3033,95 @@ async function _runBulkAnalyze(unanalyzed, total, autosave = false, startOffset 
     });
   }
 
-  // Single lead analyzer with retry on 429
-  async function analyzeWithRetry(lead, retries) {
-    for (let attempt = 0; attempt <= retries; attempt++) {
-      try {
-        const data = await getAIIntel(lead);
-        return { success: true, data };
-      } catch (err) {
-        const is429 = err.message && (err.message.includes('429') || err.message.includes('Too many'));
-        if (is429 && attempt < retries) {
-          const waitSecs = Math.round(RETRY_DELAY_MS / 1000);
-          if (statusText) statusText.innerText = `Rate limit hit — waiting ${waitSecs}s before retrying ${lead.name}...`;
-          await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
-        } else {
-          return { success: false, error: err.message };
-        }
-      }
+  // Single lead analyzer — returns result with 429 flag for adaptive logic
+  async function analyzeOne(lead) {
+    try {
+      const data = await getAIIntel(lead);
+      return { lead, success: true, data, is429: false };
+    } catch (err) {
+      const is429 = err.message && (err.message.includes('429') || err.message.includes('Too many'));
+      return { lead, success: false, error: err.message, is429 };
     }
-    return { success: false, error: 'Max retries exceeded' };
   }
 
-  for (let i = 0; i < unanalyzed.length; i++) {
+  let i = 0;
+  while (i < unanalyzed.length) {
     if (bulkStopped) break;
 
-    // Pause if tab not visible
     await waitForVisible();
     if (bulkStopped) break;
 
-    const lead = unanalyzed[i];
-    const globalCompleted = startOffset + completed;
+    // Fire current batchSize leads simultaneously
+    const batch = unanalyzed.slice(i, i + batchSize);
+    const names = batch.map(l => l.name.split(' ')[0]).join(', ');
+    if (statusText) statusText.innerText =
+      `⚡ Analyzing ${startOffset + completed + 1}–${Math.min(startOffset + completed + batch.length, total)} / ${total} — ${names}...`;
 
-    if (statusText) statusText.innerText = `Analyzing ${globalCompleted + 1} / ${total} — ${lead.name}...`;
+    const results = await Promise.allSettled(batch.map(l => analyzeOne(l)));
 
-    const result = await analyzeWithRetry(lead, MAX_RETRIES);
+    let hit429 = false;
+    const failed429 = [];
 
-    if (result.success) {
-      lead.gtmAnalysis = result.data;
-      lead.status = 'Analyzed';
-      const row = document.getElementById('p2-row-' + lead.id);
-      if (row) {
-        const scoreCell = row.querySelectorAll('td')[2];
-        if (scoreCell) {
-          scoreCell.innerHTML = `<span class="${getScoreClass(lead.score)}">${lead.score}%</span>
+    for (const r of results) {
+      if (r.status !== 'fulfilled') { completed++; continue; }
+      const res = r.value;
+
+      if (res.success) {
+        // Success — apply result
+        res.lead.gtmAnalysis = res.data;
+        res.lead.status = 'Analyzed';
+        const row = document.getElementById('p2-row-' + res.lead.id);
+        if (row) {
+          const sc = row.querySelectorAll('td')[2];
+          if (sc) sc.innerHTML = `<span class="${getScoreClass(res.lead.score)}">${res.lead.score}%</span>
             <span class="ml-2 text-[8px] text-green-400 font-black uppercase">✓ AI</span>`;
         }
+        completed++;
+        consecutiveOK++;
+      } else if (res.is429) {
+        // 429 — this lead needs to be retried, don't increment completed
+        hit429 = true;
+        failed429.push(res.lead);
+      } else {
+        // Other error — skip this lead
+        console.warn('Lead failed:', res.lead?.name, res.error);
+        completed++;
+        consecutiveOK = 0;
       }
-    } else {
-      console.warn('Lead failed after retries:', lead.name, result.error);
     }
-    completed++;
+
+    if (hit429) {
+      // Throttle down: halve batch size, wait, then retry failed leads
+      batchSize = Math.max(BATCH_MIN, Math.floor(batchSize / 2));
+      consecutiveOK = 0;
+      if (statusText) statusText.innerText =
+        `⏳ Rate limit detected — reducing to ${batchSize} concurrent, retrying in 8s...`;
+      await new Promise(r => setTimeout(r, BACKOFF_MS));
+      // Re-insert failed leads at current position so they get retried
+      unanalyzed.splice(i, 0, ...failed429);
+      // Don't advance i — retry same position with smaller batch
+    } else {
+      // No 429 — try increasing batch after streak of successes
+      if (consecutiveOK >= GROW_AFTER && batchSize < BATCH_MAX) {
+        batchSize = Math.min(BATCH_MAX, batchSize + 1);
+        consecutiveOK = 0;
+        if (statusText) statusText.innerText =
+          `✨ Running smoothly — increasing to ${batchSize} concurrent...`;
+        await new Promise(r => setTimeout(r, 300));
+      }
+      i += batch.length; // advance normally
+    }
 
     updateDashboardCards();
 
     const pct = Math.round(((startOffset + completed) / total) * 100);
     if (progressBar) progressBar.style.width = pct + '%';
-    if (statusText && !bulkStopped) {
+    if (statusText && !bulkStopped && !hit429) {
       statusText.innerText = `Analyzing ${startOffset + completed} / ${total} leads...`;
     }
 
-    // Inter-lead delay — only if more leads remain
-    if (!bulkStopped && i < unanalyzed.length - 1) {
-      await new Promise(r => setTimeout(r, INTER_LEAD_DELAY_MS));
+    if (!bulkStopped && i < unanalyzed.length) {
+      await new Promise(r => setTimeout(r, INTER_BATCH_MS));
     }
   }
 
