@@ -168,17 +168,20 @@ export const okRes  = (data, h) => new Response(JSON.stringify(data), { status: 
 export const errRes = (msg, status, h) => new Response(JSON.stringify({ error: msg }), { status, headers: h });
 
 // ── Supabase fetch helper ───────────────────────────────────────────
-export const sbFetch = (url, key, table, method, body, qs = '') =>
-  fetch(`${url}/rest/v1/${table}${qs}`, {
+export const sbFetch = (url, key, table, method, body, qs = '', prefer = '') => {
+  const defaultPrefer = method === 'POST' ? 'return=representation' : 'return=minimal';
+  const preferHeader  = prefer ? prefer : defaultPrefer;
+  return fetch(`${url}/rest/v1/${table}${qs}`, {
     method,
     headers: {
       'Content-Type':  'application/json',
       apikey:          key,
       Authorization:   `Bearer ${key}`,
-      Prefer:          method === 'POST' ? 'return=representation' : 'return=minimal',
+      Prefer:          preferHeader,
     },
     body: body || undefined,
   });
+};
 
 // ── Cloudflare Pages global middleware (handles OPTIONS for all routes) ─
 export async function onRequest(context) {
