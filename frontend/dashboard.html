@@ -2068,7 +2068,8 @@ document.getElementById('saveAnalysisBtn').onclick = async () => {
       const { data: upsertData, error } = await window.APP.sb
         .from('leads')
         .upsert({
-          id: lead.id,
+          id:                lead.id,
+          user_id:           window.APP?.user?.id || null,
           name: lead.name,
           title: lead.title,
           company: lead.company,
@@ -2177,6 +2178,7 @@ async function loadSavedFromDB() {
           'Cold Outreach Message': lead.outreach_message      || ''
         };
       }
+      // Map user_id (don't need it in frontend state but preserve it)
       // Reconstruct action_taken → actionTaken (camelCase for frontend)
       if (lead.action_taken && !lead.actionTaken) {
         lead.actionTaken = lead.action_taken;
@@ -3515,7 +3517,8 @@ async function _autoSaveAnalyzed() {
     if (saveCloud) {
       try {
         await window.APP.sb.from('leads').upsert({
-          id: lead.id, name: lead.name, title: lead.title,
+          id:                lead.id,
+          user_id:           window.APP?.user?.id || null, name: lead.name, title: lead.title,
           company: lead.company, linkedin: lead.linkedin,
           source_file: lead.source || lead.sourceFile,
           score: lead.score, status: lead.status,
@@ -3585,6 +3588,7 @@ async function saveAllAnalyzed() {
       try {
         await window.APP.sb.from('leads').upsert({
           id:                lead.id,
+          user_id:           window.APP?.user?.id || null,
           name:              lead.name,
           title:             lead.title,
           company:           lead.company,
@@ -3700,6 +3704,7 @@ async function pushAllLocalToCloud() {
     try {
       await window.APP.sb.from('leads').upsert({
         id:                lead.id,
+        user_id:           window.APP?.user?.id || null,
         name:              lead.name,
         title:             lead.title,
         company:           lead.company,
