@@ -630,6 +630,18 @@
       <div class="status-dot"></div>
       <span class="status-label">Systems Nominal</span>
     </div>
+    <!-- Cloud save status indicator -->
+    <div id="gtm-cloud-status" style="
+      display:none;align-items:center;gap:6px;
+      background:rgba(168,85,247,0.08);
+      border:1px solid rgba(168,85,247,0.2);
+      border-radius:8px;padding:5px 10px;
+      font-size:9px;font-weight:800;
+      text-transform:uppercase;letter-spacing:.08em;
+      color:#a855f7;transition:all .3s;">
+      <span id="gtm-cloud-icon">☁️</span>
+      <span id="gtm-cloud-label">Saving to Cloud...</span>
+    </div>
     <button onclick="history.back()" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#6b7280;border-radius:8px;padding:6px 12px;font-size:10px;cursor:pointer;font-weight:700;margin-right:4px">← Back</button>
     <button class="btn btn-outline btn-sm" onclick="openApiModal()">⚙ Config</button>
     <button class="btn btn-outline btn-sm" onclick="handleSignOut()" style="color:#9ca3af;">Sign Out</button>
@@ -2576,15 +2588,57 @@ window.runStep = async function(n) {
 };
 
 let _saveTimer = null;
+function setCloudStatus(state, label) {
+  const el    = document.getElementById('gtm-cloud-status');
+  const icon  = document.getElementById('gtm-cloud-icon');
+  const lbl   = document.getElementById('gtm-cloud-label');
+  if (!el) return;
+  el.style.display = 'flex';
+  if (state === 'saving') {
+    el.style.borderColor  = 'rgba(168,85,247,0.3)';
+    el.style.color        = '#a855f7';
+    icon.textContent      = '☁️';
+    lbl.textContent       = label || 'Saving to Cloud...';
+  } else if (state === 'saved') {
+    el.style.borderColor  = 'rgba(34,197,94,0.3)';
+    el.style.color        = '#22c55e';
+    icon.textContent      = '✓';
+    lbl.textContent       = label || 'Saved to Cloud';
+    // Auto-hide after 4s
+    setTimeout(() => { el.style.display = 'none'; }, 4000);
+  } else if (state === 'error') {
+    el.style.borderColor  = 'rgba(239,68,68,0.3)';
+    el.style.color        = '#ef4444';
+    icon.textContent      = '✗';
+    lbl.textContent       = label || 'Cloud Save Failed';
+    setTimeout(() => { el.style.display = 'none'; }, 6000);
+  }
+}
+
 async function autoSaveToVault() {
   clearTimeout(_saveTimer);
   _saveTimer = setTimeout(async () => {
+    setCloudStatus('saving', 'Saving to Cloud...');
     try {
       const steps = {};
       for (let i = 1; i <= 6; i++) {
         if (state.steps[i].data) steps[i] = state.steps[i].data;
       }
       const token = await getAuthToken();
+      // Build human-readable report text for direct Supabase visibility
+      const stepLabels = {1:'Market Research',2:'TAM Mapping',3:'ICP Modeling',
+        4:'Account Sourcing',5:'Keyword Generation',6:'Messaging Creation'};
+      const reportLines = [`GTM STRATEGY REPORT — ${state.company.toUpperCase()}`,
+        `Generated: ${new Date().toLocaleDateString()}`, ''];
+      for (let si = 1; si <= 6; si++) {
+        if (steps[si]) {
+          reportLines.push(`STEP ${si}: ${stepLabels[si]}`);
+          reportLines.push(JSON.stringify(steps[si], null, 2));
+          reportLines.push('');
+        }
+      }
+      const fullReport = reportLines.join('\n');
+
       const res = await fetch('/api/gtm', {
         method: 'POST',
         headers: {
@@ -2598,17 +2652,24 @@ async function autoSaveToVault() {
           industry:     state.industry || null,
           steps,
           total_tokens: state.totalTokens,
+          full_report:  fullReport,
         }),
       });
       const data = await res.json();
       if (data.strategy_id) {
         state.strategyId = data.strategy_id;
-        addLog('OK', 0, `Strategy auto-saved to vault (ID: ${data.strategy_id.slice(0,8)}…)`);
+        const stepsCount = Object.keys(steps).length;
+        setCloudStatus('saved', `✓ Saved — ${stepsCount}/6 steps`);
+        addLog('OK', 0, `Strategy saved to Supabase (ID: ${data.strategy_id.slice(0,8)}…)`);
+      } else {
+        setCloudStatus('error', data.error || 'Save failed');
+        addLog('WARN', 0, 'Cloud save error: ' + (data.error || 'Unknown'));
       }
     } catch(e) {
+      setCloudStatus('error', 'Connection error');
       addLog('WARN', 0, 'Auto-save to vault failed: ' + e.message);
     }
-  }, 2000); // debounce 2s
+  }, 2000);
 }
 
 // ── Inject website profile into runStep's API call ────────────────
