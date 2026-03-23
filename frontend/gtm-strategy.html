@@ -46,6 +46,60 @@
     }
 
     /* ── TOP NAV ── */
+    /* ── MOBILE NAV ── */
+    #mobile-menu-btn {
+      display: none;
+      flex-direction: column;
+      gap: 5px;
+      cursor: pointer;
+      padding: 8px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+    }
+    #mobile-menu-btn span {
+      width: 20px; height: 2px;
+      background: #9ca3af;
+      border-radius: 2px;
+      transition: all 0.3s;
+      display: block;
+    }
+    #mobile-menu-btn.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+    #mobile-menu-btn.open span:nth-child(2) { opacity: 0; }
+    #mobile-menu-btn.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+    #mobile-nav-drawer {
+      display: none;
+      position: fixed;
+      top: 58px; left: 0; right: 0;
+      background: rgba(11,15,26,0.98);
+      backdrop-filter: blur(24px);
+      border-bottom: 1px solid rgba(31,41,55,0.8);
+      padding: 16px 20px;
+      z-index: 99;
+      flex-direction: column;
+      gap: 4px;
+    }
+    #mobile-nav-drawer.open { display: flex; }
+    #mobile-nav-drawer a,
+    #mobile-nav-drawer button {
+      display: block; width: 100%;
+      padding: 12px 16px;
+      font-size: 11px; font-weight: 800;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      color: #9ca3af; text-decoration: none;
+      border-radius: 10px; border: none;
+      background: transparent; cursor: pointer;
+      text-align: left; transition: all 0.15s;
+    }
+    #mobile-nav-drawer a:hover,
+    #mobile-nav-drawer button:hover { background: rgba(168,85,247,0.1); color: white; }
+    #mobile-nav-drawer a.active-mobile { color: #a855f7; background: rgba(168,85,247,0.1); }
+    @media (max-width: 768px) {
+      #mobile-menu-btn { display: flex !important; }
+      .nav-center { display: none !important; }
+      .nav-right .status-label { display: none; }
+    }
+
     #topnav {
       position: sticky; top: 0; z-index: 100;
       background: rgba(11,15,26,0.95);
@@ -646,7 +700,19 @@
     <button class="btn btn-outline btn-sm" onclick="openApiModal()">⚙ Config</button>
     <button class="btn btn-outline btn-sm" onclick="handleSignOut()" style="color:#9ca3af;">Sign Out</button>
   </div>
+
+  <button id="mobile-menu-btn" onclick="toggleMobileNav()" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
 </nav>
+<div id="mobile-nav-drawer">
+  <a href="index.html">Home</a>
+  <a href="dashboard.html">Command Centre</a>
+  <button class="active-mobile" style="color:#a855f7;background:rgba(168,85,247,0.1)">GTM Strategy</button>
+  <a href="vault.html">Strategy Vault</a>
+  <a href="dashboard.html">Repository</a>
+  <button onclick="handleSignOut()" style="color:#ef4444;">Sign Out</button>
+</div>
 
 <!-- ── MAIN PAGE ── -->
 <div class="page">
@@ -3254,6 +3320,25 @@ async function processBulkCompany(row) {
   </div>
 </div>
 
-  <script src="faq-chat.js"></script>
+  <script src="faq-chat.js">
+// ── Mobile nav toggle ──────────────────────────────────────────
+function toggleMobileNav() {
+  const btn    = document.getElementById('mobile-menu-btn');
+  const drawer = document.getElementById('mobile-nav-drawer');
+  if (!btn || !drawer) return;
+  btn.classList.toggle('open');
+  drawer.classList.toggle('open');
+}
+document.addEventListener('click', function(e) {
+  const btn    = document.getElementById('mobile-menu-btn');
+  const drawer = document.getElementById('mobile-nav-drawer');
+  if (!btn || !drawer) return;
+  if (!btn.contains(e.target) && !drawer.contains(e.target)) {
+    btn.classList.remove('open');
+    drawer.classList.remove('open');
+  }
+});
+
+</script>
 </body>
 </html>

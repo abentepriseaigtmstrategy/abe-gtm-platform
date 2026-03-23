@@ -555,6 +555,80 @@
       border-radius: 12px; padding: 12px 16px; font-size: 10px;
       color: #fbbf24; font-weight: 700; display: flex; align-items: center; gap: 10px;
     }
+    /* ── MOBILE NAV ── */
+    #mobile-menu-btn {
+      display: none;
+      flex-direction: column;
+      gap: 5px;
+      cursor: pointer;
+      padding: 8px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+    }
+    #mobile-menu-btn span {
+      width: 20px; height: 2px;
+      background: #9ca3af;
+      border-radius: 2px;
+      transition: all 0.3s;
+      display: block;
+    }
+    #mobile-menu-btn.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+    #mobile-menu-btn.open span:nth-child(2) { opacity: 0; }
+    #mobile-menu-btn.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+    #mobile-nav-drawer {
+      display: none;
+      position: fixed;
+      top: 58px; left: 0; right: 0;
+      background: rgba(11,15,26,0.98);
+      backdrop-filter: blur(24px);
+      border-bottom: 1px solid rgba(31,41,55,0.8);
+      padding: 16px 20px;
+      z-index: 99;
+      flex-direction: column;
+      gap: 4px;
+    }
+    #mobile-nav-drawer.open { display: flex; }
+    #mobile-nav-drawer a,
+    #mobile-nav-drawer button {
+      display: block; width: 100%;
+      padding: 12px 16px;
+      font-size: 11px; font-weight: 800;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      color: #9ca3af; text-decoration: none;
+      border-radius: 10px; border: none;
+      background: transparent; cursor: pointer;
+      text-align: left; transition: all 0.15s;
+    }
+    #mobile-nav-drawer a:hover,
+    #mobile-nav-drawer button:hover { background: rgba(168,85,247,0.1); color: white; }
+    #mobile-nav-drawer a.active-mobile { color: #a855f7; background: rgba(168,85,247,0.1); }
+    @media (max-width: 768px) {
+      #mobile-menu-btn { display: flex !important; }
+      .nav-center { display: none !important; }
+      .nav-right .status-label { display: none; }
+    }
+
+    /* ── TOAST NOTIFICATIONS ── */
+    #abe-toast {
+      position: fixed; bottom: 28px; right: 28px; z-index: 99998;
+      background: rgba(13,17,32,0.97);
+      border: 1px solid rgba(168,85,247,0.4);
+      border-radius: 14px; padding: 13px 18px;
+      font-size: 12px; font-weight: 700;
+      color: white; font-family: 'Inter', sans-serif;
+      display: flex; align-items: center; gap: 10px;
+      transform: translateY(16px) scale(0.96); opacity: 0;
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      max-width: 340px; pointer-events: none;
+    }
+    #abe-toast.show { transform: none; opacity: 1; pointer-events: auto; }
+    #abe-toast.toast-success { border-color: rgba(34,197,94,0.5); }
+    #abe-toast.toast-error   { border-color: rgba(239,68,68,0.5); }
+    #abe-toast.toast-info    { border-color: rgba(99,102,241,0.5); }
+
   </style>
 </head>
 <body>
@@ -3867,6 +3941,45 @@ function closeModal() {
 
 
   </script>
-  <script src="faq-chat.js"></script>
+  <script src="faq-chat.js">
+function toggleMobileNav() {
+  var btn    = document.getElementById('mobile-menu-btn');
+  var drawer = document.getElementById('mobile-nav-drawer');
+  if (!btn || !drawer) return;
+  btn.classList.toggle('open');
+  drawer.classList.toggle('open');
+}
+document.addEventListener('click', function(e) {
+  var btn    = document.getElementById('mobile-menu-btn');
+  var drawer = document.getElementById('mobile-nav-drawer');
+  if (!btn || !drawer) return;
+  if (!btn.contains(e.target) && !drawer.contains(e.target)) {
+    btn.classList.remove('open');
+    drawer.classList.remove('open');
+  }
+});
+
+function abeToast(msg, type, duration) {
+  type = type || 'success'; duration = duration || 3200;
+  var toast = document.getElementById('abe-toast');
+  if (!toast) {
+    toast = document.createElement('div'); toast.id = 'abe-toast';
+    toast.innerHTML = '<span id="abe-toast-icon"></span><span id="abe-toast-msg"></span>';
+    document.body.appendChild(toast);
+  }
+  var icons = {success:'✓', error:'✕', info:'ℹ'};
+  toast.className = '';
+  var icon = document.getElementById('abe-toast-icon');
+  var msgEl = document.getElementById('abe-toast-msg');
+  if (icon) icon.textContent = icons[type] || '✓';
+  if (msgEl) msgEl.textContent = msg;
+  toast.classList.add('show', 'toast-' + type);
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(function(){ toast.classList.remove('show'); }, duration);
+}
+
+</script>
+
+  <div id="abe-toast"><span id="abe-toast-icon">✓</span><span id="abe-toast-msg"></span></div>
 </body>
 </html>

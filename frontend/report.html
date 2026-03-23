@@ -93,7 +93,84 @@
     .ebo{font-size:11px;color:#D1D5DB;line-height:1.7;white-space:pre-wrap}
     .ec{font-size:10px;font-weight:700;color:var(--accent);margin-top:10px;padding-top:10px;
       border-top:1px solid rgba(168,85,247,.15)}
-  </style>
+      /* ── SKELETON LOADING ── */
+    .abe-skeleton {
+      background: linear-gradient(90deg,
+        rgba(31,41,55,0.6) 0%,
+        rgba(55,65,81,0.4) 50%,
+        rgba(31,41,55,0.6) 100%);
+      background-size: 200% 100%;
+      animation: abe-shimmer 1.5s infinite;
+      border-radius: 8px;
+    }
+    @keyframes abe-shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    .abe-skeleton-line {
+      height: 10px; border-radius: 5px; margin-bottom: 8px;
+    }
+    .abe-skeleton-card {
+      background: rgba(18,24,39,0.7);
+      border: 1px solid rgba(31,41,55,0.5);
+      border-radius: 20px; padding: 20px;
+    }
+
+      /* ── MOBILE NAV ── */
+    #mobile-menu-btn {
+      display: none;
+      flex-direction: column;
+      gap: 5px;
+      cursor: pointer;
+      padding: 8px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+    }
+    #mobile-menu-btn span {
+      width: 20px; height: 2px;
+      background: #9ca3af;
+      border-radius: 2px;
+      transition: all 0.3s;
+      display: block;
+    }
+    #mobile-menu-btn.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+    #mobile-menu-btn.open span:nth-child(2) { opacity: 0; }
+    #mobile-menu-btn.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+    #mobile-nav-drawer {
+      display: none;
+      position: fixed;
+      top: 58px; left: 0; right: 0;
+      background: rgba(11,15,26,0.98);
+      backdrop-filter: blur(24px);
+      border-bottom: 1px solid rgba(31,41,55,0.8);
+      padding: 16px 20px;
+      z-index: 99;
+      flex-direction: column;
+      gap: 4px;
+    }
+    #mobile-nav-drawer.open { display: flex; }
+    #mobile-nav-drawer a,
+    #mobile-nav-drawer button {
+      display: block; width: 100%;
+      padding: 12px 16px;
+      font-size: 11px; font-weight: 800;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      color: #9ca3af; text-decoration: none;
+      border-radius: 10px; border: none;
+      background: transparent; cursor: pointer;
+      text-align: left; transition: all 0.15s;
+    }
+    #mobile-nav-drawer a:hover,
+    #mobile-nav-drawer button:hover { background: rgba(168,85,247,0.1); color: white; }
+    #mobile-nav-drawer a.active-mobile { color: #a855f7; background: rgba(168,85,247,0.1); }
+    @media (max-width: 768px) {
+      #mobile-menu-btn { display: flex !important; }
+      .nav-center { display: none !important; }
+      .nav-right .status-label { display: none; }
+    }
+
+</style>
 </head>
 <body>
 <nav id="topnav">
@@ -106,13 +183,40 @@
     <button id="btn-export" class="btn btn-primary" onclick="exportPDF()" disabled>Export PDF</button>
     <button onclick="window.APP.signOut()" class="btn btn-outline">Sign Out</button>
   </div>
+
+  <button id="mobile-menu-btn" onclick="toggleMobileNav()" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
 </nav>
+<div id="mobile-nav-drawer">
+  <a href="dashboard.html">Command Centre</a>
+  <a href="gtm-strategy.html">GTM Strategy</a>
+  <a href="vault.html">Strategy Vault</a>
+  <button class="active-mobile" style="color:#a855f7;background:rgba(168,85,247,0.1)">Report</button>
+  <button onclick="window.APP.signOut()" style="color:#ef4444;">Sign Out</button>
+</div>
 
 <div class="wrap">
   <!-- Loading -->
   <div id="loading-state">
-    <div class="spinner"></div>
-    <p style="color:var(--muted);font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.2em">Loading report…</p>
+    <div style="max-width:800px;margin:40px auto;padding:0 20px">
+      <div class="abe-skeleton-card" style="margin-bottom:20px">
+        <div class="abe-skeleton abe-skeleton-line" style="width:40%;height:14px;margin-bottom:16px"></div>
+        <div class="abe-skeleton abe-skeleton-line" style="width:70%"></div>
+        <div class="abe-skeleton abe-skeleton-line" style="width:55%"></div>
+      </div>
+      <div class="abe-skeleton-card" style="margin-bottom:20px">
+        <div class="abe-skeleton abe-skeleton-line" style="width:30%;height:12px;margin-bottom:14px"></div>
+        <div class="abe-skeleton abe-skeleton-line"></div>
+        <div class="abe-skeleton abe-skeleton-line" style="width:85%"></div>
+        <div class="abe-skeleton abe-skeleton-line" style="width:60%"></div>
+      </div>
+      <div class="abe-skeleton-card">
+        <div class="abe-skeleton abe-skeleton-line" style="width:35%;height:12px;margin-bottom:14px"></div>
+        <div class="abe-skeleton abe-skeleton-line"></div>
+        <div class="abe-skeleton abe-skeleton-line" style="width:75%"></div>
+      </div>
+    </div>
   </div>
 
   <!-- Error -->
@@ -388,6 +492,60 @@ const _guardInterval = setInterval(() => {
 }, 100);
 </script>
   <script src="tour.js"></script>
-  <script src="faq-chat.js"></script>
+  <script src="faq-chat.js">
+// ── Toast notification system ──────────────────────────────────
+function abeToast(msg, type, duration) {
+  type = type || 'success';
+  duration = duration || 3200;
+  var toast = document.getElementById('abe-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'abe-toast';
+    toast.innerHTML = '<span id="abe-toast-icon"></span><span id="abe-toast-msg"></span>';
+    document.body.appendChild(toast);
+  }
+  var icon   = document.getElementById('abe-toast-icon');
+  var msgEl  = document.getElementById('abe-toast-msg');
+  var icons  = {success:'✓', error:'✕', info:'ℹ'};
+  toast.className = '';
+  if (icon)  icon.textContent  = icons[type] || '✓';
+  if (msgEl) msgEl.textContent = msg;
+  toast.classList.add('show', 'toast-' + type);
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(function(){ toast.classList.remove('show'); }, duration);
+}
+
+
+function toggleMobileNav() {
+  var btn    = document.getElementById('mobile-menu-btn');
+  var drawer = document.getElementById('mobile-nav-drawer');
+  if (!btn || !drawer) return;
+  btn.classList.toggle('open');
+  drawer.classList.toggle('open');
+}
+document.addEventListener('click', function(e) {
+  var btn    = document.getElementById('mobile-menu-btn');
+  var drawer = document.getElementById('mobile-nav-drawer');
+  if (!btn || !drawer) return;
+  if (!btn.contains(e.target) && !drawer.contains(e.target)) {
+    btn.classList.remove('open');
+    drawer.classList.remove('open');
+  }
+});
+
+
+function signOut() {
+  if (window.APP && window.APP.signOut) { window.APP.signOut(); return; }
+  try { window.APP.sb.auth.signOut({scope:'local'}); } catch(_) {}
+  window.location.replace('login.html');
+}
+function handleSignOut() { signOut(); }
+
+</script>
+  <!-- Toast notification -->
+  <div id="abe-toast">
+    <span id="abe-toast-icon">✓</span>
+    <span id="abe-toast-msg"></span>
+  </div>
 </body>
 </html>
