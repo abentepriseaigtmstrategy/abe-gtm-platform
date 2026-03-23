@@ -1074,6 +1074,47 @@
 
 
 <script src="auth-guard.js"></script>
+  
+  <!-- ═══════════════════════════════════════════════════
+       ABE BRANDED MODAL SYSTEM
+       Replaces all browser alert/confirm dialogs
+  ═══════════════════════════════════════════════════ -->
+  <div id="abe-modal-overlay" class="hidden" style="
+    position:fixed;inset:0;z-index:99999;
+    background:rgba(7,9,18,0.85);
+    backdrop-filter:blur(8px);
+    display:flex;align-items:center;justify-content:center;
+    padding:20px;font-family:'Inter',sans-serif;">
+    <div id="abe-modal-box" style="
+      background:linear-gradient(145deg,#0d1120,#111827);
+      border:1px solid rgba(168,85,247,0.25);
+      border-radius:20px;
+      padding:32px 36px 28px;
+      max-width:480px;width:100%;
+      box-shadow:0 32px 80px rgba(0,0,0,0.7),0 0 0 1px rgba(168,85,247,0.08);
+      position:relative;">
+      <!-- Icon + Title -->
+      <div id="abe-modal-icon" style="font-size:32px;margin-bottom:12px;text-align:center"></div>
+      <div id="abe-modal-title" style="
+        font-size:16px;font-weight:900;color:#fff;
+        letter-spacing:-0.4px;margin-bottom:8px;
+        text-align:center"></div>
+      <!-- Body -->
+      <div id="abe-modal-body" style="
+        font-size:12px;line-height:1.75;color:#9ca3af;
+        margin-bottom:24px;text-align:center"></div>
+      <!-- Tip box (optional) -->
+      <div id="abe-modal-tip" style="
+        display:none;
+        background:rgba(168,85,247,0.07);
+        border:1px solid rgba(168,85,247,0.18);
+        border-radius:10px;padding:12px 14px;
+        font-size:11px;color:#c4b5fd;
+        margin-bottom:20px;line-height:1.6;text-align:left"></div>
+      <!-- Buttons -->
+      <div id="abe-modal-btns" style="display:flex;gap:10px;justify-content:center"></div>
+    </div>
+  </div>
   <script src="tour.js"></script>
 <script>
 /* =========================
@@ -2783,80 +2824,166 @@ function stopBulkAnalyze() {
   bulkStopped = true;
 }
 
+// ═══════════════════════════════════════════════════════
+//  ABE MODAL ENGINE — replaces browser alert/confirm
+// ═══════════════════════════════════════════════════════
+function abeModal({ icon, title, body, tip, buttons }) {
+  return new Promise(resolve => {
+    const overlay = document.getElementById('abe-modal-overlay');
+    const box     = document.getElementById('abe-modal-box');
+    overlay.style.display = 'flex';
+    overlay.classList.remove('hidden');
+
+    document.getElementById('abe-modal-icon').innerHTML  = icon  || '';
+    document.getElementById('abe-modal-title').innerHTML = title || '';
+    document.getElementById('abe-modal-body').innerHTML  = body  || '';
+
+    const tipEl = document.getElementById('abe-modal-tip');
+    if (tip) {
+      tipEl.innerHTML     = tip;
+      tipEl.style.display = 'block';
+    } else {
+      tipEl.style.display = 'none';
+    }
+
+    const btnsEl = document.getElementById('abe-modal-btns');
+    btnsEl.innerHTML = '';
+    (buttons || [{ label: 'OK', value: true, primary: true }]).forEach(btn => {
+      const b = document.createElement('button');
+      b.innerHTML = btn.label;
+      b.style.cssText = [
+        'padding:10px 28px',
+        'border-radius:10px',
+        'font-size:11px',
+        'font-weight:800',
+        'letter-spacing:.08em',
+        'text-transform:uppercase',
+        'cursor:pointer',
+        'border:none',
+        'font-family:Inter,sans-serif',
+        'transition:all .15s',
+        btn.primary
+          ? 'background:linear-gradient(135deg,#a855f7,#7c3aed);color:#fff;box-shadow:0 4px 16px rgba(168,85,247,0.35)'
+          : 'background:rgba(255,255,255,0.06);color:#9ca3af;border:1px solid rgba(255,255,255,0.1)'
+      ].join(';');
+      b.onmouseenter = () => { b.style.opacity = '0.85'; b.style.transform = 'translateY(-1px)'; };
+      b.onmouseleave = () => { b.style.opacity = '1';    b.style.transform = 'translateY(0)';    };
+      b.onclick = () => {
+        overlay.style.display = 'none';
+        resolve(btn.value);
+      };
+      btnsEl.appendChild(b);
+    });
+  });
+}
+
+function abeAlert({ icon, title, body, tip }) {
+  return abeModal({ icon, title, body, tip, buttons: [{ label: 'Got it', value: true, primary: true }] });
+}
+
+// ── Format seconds into human-readable time ──────────────
+function fmtTime(secs) {
+  if (secs < 60)  return secs + ' seconds';
+  const m = Math.floor(secs / 60);
+  const s = secs % 60;
+  return m + ' min' + (m > 1 ? 's' : '') + (s > 0 ? ' ' + s + 's' : '');
+}
+
+// ═══════════════════════════════════════════════════════
+//  MAIN ENTRY — analyzeAllLeads
+// ═══════════════════════════════════════════════════════
 async function analyzeAllLeads() {
   if (!state.allLeads.length) return;
 
   const unanalyzed = state.allLeads.filter(l => !l.gtmAnalysis);
   if (!unanalyzed.length) {
-    alert('All leads in this file have already been analyzed!');
+    await abeAlert({
+      icon: '✅',
+      title: 'All Leads Already Analyzed',
+      body: 'Every lead in this file has been processed by the AI engine. You're good to go!'
+    });
     return;
   }
 
-  const total = unanalyzed.length;
-  const BATCH_SIZE = 1; // Sequential — 1 at a time to respect 10 req/min server limit
-  // Server allows 10 req/min = ~6s per lead with retry buffer
-  const estimatedSecs = total * 7; // ~7 seconds per lead (6s API + 1s buffer)
-  const estimatedMins = Math.ceil(estimatedSecs / 60);
+  const total        = unanalyzed.length;
+  const totalSecs    = total * 7;
+  const batchSecs    = Math.min(50, total) * 7;
+  const totalTime    = fmtTime(totalSecs);
+  const batchTime    = fmtTime(batchSecs);
 
-  // ── Smart routing based on lead count ──────────────────────────
   if (total <= 25) {
-    // AUTO: small dataset — analyze all immediately, ~7s per lead
+    // Small dataset — start immediately with no prompt
     _runBulkAnalyze(unanalyzed, total);
+    return;
+  }
 
+  // Large dataset — show professional modal
+  const choice = await abeModal({
+    icon: '🧠',
+    title: 'AI Intelligence Engine Ready',
+    body:
+      '<span style="color:#e5e7eb;font-weight:700;font-size:14px">' + total + ' leads</span> are queued for analysis.<br><br>' +
+      '<span style="color:#a855f7;font-weight:700">⏱ Full run estimated:</span> <span style="color:#e5e7eb;font-weight:700">~' + totalTime + '</span><br>' +
+      '<span style="color:#a855f7;font-weight:700">⏱ First batch (50 leads):</span> <span style="color:#e5e7eb;font-weight:700">~' + batchTime + '</span><br><br>' +
+      '<span style="color:#6b7280;font-size:11px">AI processes 1 lead at a time to ensure accuracy.<br>No hallucinations. Every insight is fully verified.</span>',
+    tip:
+      '💡 <strong>Recommended:</strong> Use batch mode (50 at a time). You can review and act on analyzed leads while the next batch runs in the background.',
+    buttons: [
+      { label: '⚡ Analyze All ' + total,  value: 'all',   primary: true  },
+      { label: '📦 Batch of 50',           value: 'batch', primary: false },
+    ]
+  });
+
+  if (!choice) return;
+
+  if (choice === 'all') {
+    _runBulkAnalyze(unanalyzed, total);
   } else {
-    // LARGE DATASET: ask user how they want to proceed
-    const timeMsg = estimatedSecs < 60
-      ? estimatedSecs + ' seconds'
-      : estimatedMins + ' minute' + (estimatedMins > 1 ? 's' : '');
-
-    const choice = window.confirm(
-      'You have ' + total + ' leads to analyze.\n\n' +
-      '• Estimated time: ~' + timeMsg + '\n' +
-      '• Processed 1 lead at a time (AI rate limit: 10/min)\n' +
-      '• Keep this tab active — analysis pauses if you switch away\n' +
-      '• Auto-retries if rate limit is hit\n\n' +
-      'Click OK to analyze ALL ' + total + ' leads in one run.\n' +
-      'Click Cancel to analyze in batches of 50 instead.'
-    );
-
-    if (choice) {
-      // Analyze all at once - user confirmed they understand the time
-      _runBulkAnalyze(unanalyzed, total);
-    } else {
-      // Batch mode: analyze 50 at a time, ask to continue after each batch
-      _runBatchMode(unanalyzed, total, 0);
-    }
+    _runBatchMode(unanalyzed, total, 0);
   }
 }
 
-// ── Batch mode: 50 at a time with continue prompt ──────────────
+// ── Batch mode: 50 at a time with professional continue modal ──
 async function _runBatchMode(unanalyzed, total, startFrom) {
   const CHUNK    = 50;
   const chunk    = unanalyzed.slice(startFrom, startFrom + CHUNK);
   if (!chunk.length) return;
 
-  const chunkEnd = Math.min(startFrom + CHUNK, total);
-
-  // Pass total (full dataset) so progress % reflects overall progress
   await _runBulkAnalyze(chunk, total, true, startFrom);
 
-  // After this chunk auto-save and ask to continue
-  const remaining = unanalyzed.slice(startFrom + CHUNK);
+  const remaining   = unanalyzed.slice(startFrom + CHUNK);
+  const alreadyDone = state.allLeads.filter(l => l.gtmAnalysis).length;
+
   if (remaining.length > 0) {
-    const alreadyDone = state.allLeads.filter(l => l.gtmAnalysis).length;
-    const cont = window.confirm(
-      '✓ ' + alreadyDone + ' of ' + total + ' leads analyzed and saved.\n\n' +
-      remaining.length + ' leads still remaining.\n\n' +
-      'Click OK to analyze the next ' + Math.min(50, remaining.length) + '.\n' +
-      'Click Cancel to stop here.'
-    );
+    const nextBatch   = Math.min(50, remaining.length);
+    const nextTimeSec = nextBatch * 7;
+
+    const cont = await abeModal({
+      icon: '🎯',
+      title: 'Batch Complete — Great Progress!',
+      body:
+        '<span style="color:#22c55e;font-weight:700;font-size:14px">✓ ' + alreadyDone + ' leads analyzed</span> and saved to your Repository.<br><br>' +
+        '<span style="color:#9ca3af">' + remaining.length + ' leads remaining in queue.</span><br>' +
+        '<span style="color:#a855f7;font-weight:700">⏱ Next batch (' + nextBatch + ' leads):</span> <span style="color:#e5e7eb;font-weight:700">~' + fmtTime(nextTimeSec) + '</span>',
+      tip:
+        '💼 <strong>While AI works:</strong> Head to the Repository tab to review analyzed leads, assign actions, and start your outreach — no need to wait!',
+      buttons: [
+        { label: '▶ Continue Next Batch', value: true,  primary: true  },
+        { label: '⏸ Stop Here',           value: false, primary: false },
+      ]
+    });
+
     if (cont) {
       _runBatchMode(unanalyzed, total, startFrom + CHUNK);
     }
   } else {
-    // All done
-    const statusText = document.getElementById('bulkStatusText');
-    if (statusText) statusText.innerText = '✓ All ' + total + ' leads analyzed and saved to Repository';
+    await abeAlert({
+      icon: '🏆',
+      title: 'Analysis Complete!',
+      body:
+        '<span style="color:#22c55e;font-weight:700;font-size:14px">✓ All ' + total + ' leads</span> have been analyzed and saved to your Strategic Repository.<br><br>' +
+        '<span style="color:#9ca3af">Head to the Repository tab to review insights, assign actions, and launch your outreach.</span>',
+    });
   }
 }
 
@@ -2887,7 +3014,7 @@ async function _runBulkAnalyze(unanalyzed, total, autosave = false, startOffset 
   // Page Visibility API — pause when tab is hidden, resume on return
   async function waitForVisible() {
     if (document.visibilityState === 'visible') return;
-    if (statusText) statusText.innerText = '⏸ Paused — return to this tab to continue...';
+    if (statusText) statusText.innerText = '⏸ Analysis paused — return to this tab to resume...';
     return new Promise(resolve => {
       const handler = () => {
         if (document.visibilityState === 'visible') {
@@ -3034,7 +3161,11 @@ async function _autoSaveAnalyzed() {
 async function saveAllAnalyzed() {
   const analyzed = state.allLeads.filter(l => l.gtmAnalysis);
   if (!analyzed.length) {
-    alert('No analyzed leads to save.');
+    await abeAlert({
+      icon: '🔍',
+      title: 'No Analyzed Leads Yet',
+      body: 'Run <span style="color:#a855f7;font-weight:700">Bulk Analyze Intel</span> first to generate AI insights for your leads, then save them here.',
+    });
     return;
   }
 
@@ -3042,7 +3173,11 @@ async function saveAllAnalyzed() {
   const saveCloud = document.getElementById('modeCloud')?.checked;
 
   if (!saveLocal && !saveCloud) {
-    alert('Please select at least one save mode — LOCAL or SUPABASE — in the top bar.');
+    await abeAlert({
+      icon: '⚠️',
+      title: 'Save Mode Not Selected',
+      body: 'Please select at least one save destination in the top bar — <span style="color:#a855f7;font-weight:700">LOCAL</span> or <span style="color:#a855f7;font-weight:700">SUPABASE</span> — before saving.',
+    });
     return;
   }
 
@@ -3136,7 +3271,13 @@ async function saveAllAnalyzed() {
   loader?.classList.add('hidden');
 
   const modes = [saveLocal && 'Local', saveCloud && 'Supabase'].filter(Boolean).join(' + ');
-  alert('✓ ' + savedCount + ' leads saved to ' + modes + ' and moved to Strategic Repository.');
+  await abeAlert({
+    icon: '💾',
+    title: 'Leads Saved Successfully',
+    body:
+      '<span style="color:#22c55e;font-weight:700;font-size:14px">✓ ' + savedCount + ' leads</span> saved to <span style="color:#a855f7;font-weight:700">' + modes + '</span> and moved to your Strategic Repository.<br><br>' +
+      '<span style="color:#9ca3af">Switch to the Repository tab to review insights,<br>assign actions, and start your outreach.</span>',
+  });
 }
 
 /* =========================
