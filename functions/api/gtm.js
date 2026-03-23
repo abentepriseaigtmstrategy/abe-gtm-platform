@@ -142,7 +142,7 @@ async function handleSaveStrategy(body, userId, supabaseUrl, supabaseKey, env, c
   const errors = validate({ company_name: 'string|required' }, body);
   if (errors.length) return errRes(errors[0], 400, cors);
 
-  const { company_name, industry, steps, total_tokens, company_url, scraped_profile } = body;
+  const { company_name, industry, steps, total_tokens, company_url, scraped_profile, full_report } = body;
   const cacheKey = await hash(company_name.toLowerCase().trim());
 
   const stepsCompleted = Object.values(steps || {}).filter(Boolean).length;
@@ -165,6 +165,7 @@ async function handleSaveStrategy(body, userId, supabaseUrl, supabaseKey, env, c
     status,
     cache_key:        cacheKey,
     updated_at:       new Date().toISOString(),
+    full_report:      full_report || null,
   };
 
   // FIX: Must pass resolution=merge-duplicates so subsequent step saves UPDATE the row
