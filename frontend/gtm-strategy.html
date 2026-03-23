@@ -3320,25 +3320,25 @@ async function processBulkCompany(row) {
   </div>
 </div>
 
-  <script src="faq-chat.js">
+  <script src="faq-chat.js"></script>
+<script>
 // ── Mobile nav toggle ──────────────────────────────────────────
 function toggleMobileNav() {
-  const btn    = document.getElementById('mobile-menu-btn');
-  const drawer = document.getElementById('mobile-nav-drawer');
+  var btn    = document.getElementById('mobile-menu-btn');
+  var drawer = document.getElementById('mobile-nav-drawer');
   if (!btn || !drawer) return;
   btn.classList.toggle('open');
   drawer.classList.toggle('open');
 }
 document.addEventListener('click', function(e) {
-  const btn    = document.getElementById('mobile-menu-btn');
-  const drawer = document.getElementById('mobile-nav-drawer');
+  var btn    = document.getElementById('mobile-menu-btn');
+  var drawer = document.getElementById('mobile-nav-drawer');
   if (!btn || !drawer) return;
   if (!btn.contains(e.target) && !drawer.contains(e.target)) {
     btn.classList.remove('open');
     drawer.classList.remove('open');
   }
 });
-
 </script>
 </body>
 </html>

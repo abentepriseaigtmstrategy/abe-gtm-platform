@@ -1624,7 +1624,8 @@ document.addEventListener('DOMContentLoaded', function() {
 });
 
 </script>
-  <script src="faq-chat.js">
+  <script src="faq-chat.js"></script>
+<script>
 // ── Mobile nav toggle ──────────────────────────────────────────
 function toggleMobileNav() {
   const btn    = document.getElementById('mobile-menu-btn');
@@ -1665,7 +1666,6 @@ function abeToast(msg, type, duration) {
   clearTimeout(toast._timer);
   toast._timer = setTimeout(function(){ toast.classList.remove('show'); }, duration);
 }
-
 </script>
 </body>
 </html>
