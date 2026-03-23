@@ -847,6 +847,7 @@
                 <button onclick="exportGate('csv')" class="bg-blue-600 hover:bg-blue-500 px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest text-white shadow-lg shadow-blue-600/20 transition-all">Export CSV</button>
                 <button onclick="exportGate('pdf')" class="bg-red-600 hover:bg-red-500 px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest text-white shadow-lg shadow-red-600/20 transition-all">Export PDF</button>
                 <button onclick="exportGate('word')" class="bg-orange-600 hover:bg-orange-500 px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest text-white shadow-lg shadow-orange-600/20 transition-all">Export Word</button>
+                <button onclick="pushAllLocalToCloud()" class="bg-indigo-900/40 hover:bg-indigo-800/60 border border-indigo-500/30 hover:border-indigo-400/50 px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest text-indigo-300 hover:text-indigo-200 transition-all">☁️ Push to Cloud</button>
                 <button onclick="clearAllRepository()" class="bg-gray-800 hover:bg-red-900/60 border border-red-500/20 hover:border-red-500/50 px-4 py-2.5 rounded-xl font-black text-[10px] uppercase tracking-widest text-red-400 hover:text-red-300 transition-all">🗑 Clear All</button>
             </div>
         </div>
@@ -2041,7 +2042,11 @@ document.getElementById('saveAnalysisBtn').onclick = async () => {
           pain_area: lead.gtmAnalysis?.['Pain Area'] || null,
           key_insight: lead.gtmAnalysis?.['Key Insight'] || null,
           proposed_solution: lead.gtmAnalysis?.['Proposed Solution'] || null,
-          outreach_message: lead.gtmAnalysis?.['Cold Outreach Message'] || null
+          outreach_message: lead.gtmAnalysis?.['Cold Outreach Message'] || null,
+          notes:             lead.notes             || null,
+          action_taken:      lead.actionTaken       || null,
+          score_override:    lead.scoreOverride     || false,
+          activity_log:      lead.activityLog       ? JSON.stringify(lead.activityLog) : null
         }, { onConflict: 'id' });
 
       if (error) {
@@ -2108,7 +2113,7 @@ async function loadSavedFromDB() {
     }
 
     // Simulate transfer progress (each lead = one "file" being transferred)
-    const total = data.length;
+    const total = data.filter(l => !(l.source_file||'').toLowerCase().startsWith('strategy vault')).length;
     let processed = 0;
     const duplicates = [];
     const merged = [];
@@ -2116,7 +2121,14 @@ async function loadSavedFromDB() {
     // Build set of existing local lead IDs for dedup
     const localIds = new Set(state.savedLeads.map(l => l.id));
 
-    for (const lead of data) {
+    // Filter out Strategy Vault entries — they have source_file starting with 'Strategy Vault'
+    // and belong to vault.html, not the ALO lead repository
+    const leadsOnly = data.filter(function(l) {
+      const src = (l.source_file || '').toLowerCase();
+      return !src.startsWith('strategy vault');
+    });
+
+    for (const lead of leadsOnly) {
       // Reconstruct gtmAnalysis from flat Supabase columns
       if (!lead.gtmAnalysis && (lead.pain_area || lead.key_insight || lead.proposed_solution || lead.outreach_message)) {
         lead.gtmAnalysis = {
@@ -2126,6 +2138,20 @@ async function loadSavedFromDB() {
           'Cold Outreach Message': lead.outreach_message      || ''
         };
       }
+      // Reconstruct action_taken → actionTaken (camelCase for frontend)
+      if (lead.action_taken && !lead.actionTaken) {
+        lead.actionTaken = lead.action_taken;
+      }
+      // Reconstruct activity_log from JSON string
+      if (lead.activity_log && !lead.activityLog) {
+        try {
+          lead.activityLog = typeof lead.activity_log === 'string'
+            ? JSON.parse(lead.activity_log)
+            : lead.activity_log;
+        } catch(e) { lead.activityLog = []; }
+      }
+      // score_override
+      if (lead.score_override) lead.scoreOverride = true;
 
       if (localIds.has(lead.id)) {
         duplicates.push(lead);
@@ -2153,13 +2179,26 @@ async function loadSavedFromDB() {
     // Show summary
     const newCount  = merged.length;
     const dupCount  = duplicates.length;
-    await abeAlert({
+    const supabaseUrl = 'https://supabase.com/dashboard/project/' +
+      (window.APP?.sb?.supabaseUrl || '').replace('https://','').split('.')[0];
+
+    await abeModal({
       icon: '☁️',
       title: 'Cloud Sync Complete',
       body:
         '<span style="color:#22c55e;font-weight:700;font-size:14px">✓ ' + total + ' leads loaded</span> from Supabase.<br><br>' +
-        (newCount  ? '<span style="color:#a855f7;font-weight:700">' + newCount + ' new leads</span> added to Repository.<br>' : '') +
-        (dupCount  ? '<span style="color:#6b7280">' + dupCount + ' existing leads updated</span> with latest cloud data.' : ''),
+        (newCount ? '<span style="color:#a855f7;font-weight:700">' + newCount + ' new leads</span> added to Repository.<br>' : '') +
+        (dupCount ? '<span style="color:#6b7280">' + dupCount + ' existing leads updated</span> with latest cloud data.<br><br>' : '<br>') +
+        '<span style="color:#6b7280;font-size:11px">View your data directly in Supabase:</span><br>' +
+        '<a href="https://supabase.com/dashboard" target="_blank" style="color:#a855f7;font-weight:700;font-size:12px;text-decoration:none">🔗 Open Supabase Dashboard →</a>',
+      buttons: [
+        { label: 'Got it',               value: 'ok',       primary: true  },
+        { label: '🔗 Open Supabase',     value: 'open',     primary: false },
+      ]
+    }).then(function(choice) {
+      if (choice === 'open') {
+        window.open('https://supabase.com/dashboard', '_blank');
+      }
     });
 
   } catch (e) {
@@ -2695,7 +2734,8 @@ function exportPDF() {
   const activeLeads  = leads.filter(l => l.status !== 'Ignored').length;
   const avgScore     = leads.length ? Math.round(leads.reduce((a,l)=>a+(parseInt(l.score)||0),0)/leads.length) : 0;
   const highPriority = leads.filter(l => (parseInt(l.score)||0) >= 80).length;
-  const contacted    = leads.filter(l => l.status === 'Contacted' || l.status === 'Meeting Set').length;
+  // Count by actionTaken field — our status values are Mapped/Analyzed/Unprocessed not Contacted
+  const contacted    = leads.filter(l => l.actionTaken && l.actionTaken !== '' && l.actionTaken !== 'no_response' && l.actionTaken !== 'not_interested').length;
 
   const stats = [
     { label: 'TOTAL LEADS',     value: String(leads.length),    color: clr.white  },
@@ -3444,7 +3484,11 @@ async function _autoSaveAnalyzed() {
           pain_area:         lead.gtmAnalysis?.['Pain Area']             || null,
           key_insight:       lead.gtmAnalysis?.['Key Insight']           || null,
           proposed_solution: lead.gtmAnalysis?.['Proposed Solution']     || null,
-          outreach_message:  lead.gtmAnalysis?.['Cold Outreach Message'] || null
+          outreach_message:  lead.gtmAnalysis?.['Cold Outreach Message'] || null,
+          notes:             lead.notes             || null,
+          action_taken:      lead.actionTaken       || null,
+          score_override:    lead.scoreOverride     || false,
+          activity_log:      lead.activityLog       ? JSON.stringify(lead.activityLog) : null
         }, { onConflict: 'id' });
       } catch (e) { console.warn('Auto-save failed:', lead.name, e.message); }
     }
@@ -3514,7 +3558,11 @@ async function saveAllAnalyzed() {
           pain_area:         lead.gtmAnalysis?.['Pain Area']             || null,
           key_insight:       lead.gtmAnalysis?.['Key Insight']           || null,
           proposed_solution: lead.gtmAnalysis?.['Proposed Solution']     || null,
-          outreach_message:  lead.gtmAnalysis?.['Cold Outreach Message'] || null
+          outreach_message:  lead.gtmAnalysis?.['Cold Outreach Message'] || null,
+          notes:             lead.notes             || null,
+          action_taken:      lead.actionTaken       || null,
+          score_override:    lead.scoreOverride     || false,
+          activity_log:      lead.activityLog       ? JSON.stringify(lead.activityLog) : null
         }, { onConflict: 'id' });
       } catch (e) {
         console.warn('Supabase save failed for', lead.name, e.message);
@@ -3577,6 +3625,75 @@ async function saveAllAnalyzed() {
     body:
       '<span style="color:#22c55e;font-weight:700;font-size:14px">✓ ' + savedCount + ' leads</span> saved to <span style="color:#a855f7;font-weight:700">' + modes + '</span> and moved to your Strategic Repository.<br><br>' +
       '<span style="color:#9ca3af">Switch to the Repository tab to review insights,<br>assign actions, and start your outreach.</span>',
+  });
+}
+
+/* =========================
+   PUSH ALL LOCAL TO CLOUD
+   One-time sync: sends every local savedLead to Supabase
+========================= */
+
+async function pushAllLocalToCloud() {
+  if (!state.savedLeads.length) {
+    await abeAlert({ icon: '📭', title: 'Nothing to Push', body: 'Your local Repository is empty. Save some leads first.' });
+    return;
+  }
+
+  const choice = await abeModal({
+    icon: '☁️',
+    title: 'Push All Local Leads to Supabase',
+    body:
+      'This will upload <span style="color:#e5e7eb;font-weight:700">' + state.savedLeads.length + ' leads</span> ' +
+      'from your local storage to Supabase cloud.<br><br>' +
+      '<span style="color:#6b7280;font-size:11px">Existing cloud records will be updated. No data will be deleted.</span>',
+    buttons: [
+      { label: '☁️ Push All ' + state.savedLeads.length + ' Leads', value: true,  primary: true  },
+      { label: 'Cancel',                                              value: false, primary: false },
+    ]
+  });
+  if (!choice) return;
+
+  showCloudImportOverlay();
+  let pushed = 0;
+  const total = state.savedLeads.length;
+
+  for (const lead of state.savedLeads) {
+    try {
+      await window.APP.sb.from('leads').upsert({
+        id:                lead.id,
+        name:              lead.name,
+        title:             lead.title,
+        company:           lead.company,
+        linkedin:          lead.linkedin,
+        source_file:       lead.source || lead.sourceFile || lead.source_file,
+        score:             lead.score,
+        status:            lead.status,
+        tags:              lead.tags,
+        updated_at:        lead.updated_at || new Date().toISOString(),
+        pain_area:         lead.gtmAnalysis?.['Pain Area']             || null,
+        key_insight:       lead.gtmAnalysis?.['Key Insight']           || null,
+        proposed_solution: lead.gtmAnalysis?.['Proposed Solution']     || null,
+        outreach_message:  lead.gtmAnalysis?.['Cold Outreach Message'] || null,
+        notes:             lead.notes             || null,
+        action_taken:      lead.actionTaken       || null,
+        score_override:    lead.scoreOverride     || false,
+        activity_log:      lead.activityLog       ? JSON.stringify(lead.activityLog) : null
+      }, { onConflict: 'id' });
+      pushed++;
+      updateCloudImportProgress(pushed, total, lead.name);
+    } catch (e) {
+      console.warn('Push failed for', lead.name, e.message);
+    }
+  }
+
+  hideCloudImportOverlay();
+  await abeAlert({
+    icon: '🎉',
+    title: 'All Leads Pushed to Cloud!',
+    body:
+      '<span style="color:#22c55e;font-weight:700;font-size:14px">✓ ' + pushed + ' of ' + total + ' leads</span> ' +
+      'successfully synced to Supabase.<br><br>' +
+      '<span style="color:#9ca3af">Your cloud and local data are now identical.</span>',
   });
 }
 
