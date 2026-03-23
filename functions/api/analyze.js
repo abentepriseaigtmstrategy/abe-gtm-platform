@@ -11,7 +11,9 @@
  */
 
 // Rate limit: max requests per IP per minute
-const RATE_LIMIT_RPM = 10;
+// Set to 100 — adaptive frontend engine self-throttles based on 429 responses
+// OpenAI tier is the real limit; this just prevents abuse from external callers
+const RATE_LIMIT_RPM = 100;
 
 // In-memory rate limit map (resets on Worker cold start — acceptable for this use case)
 // For persistent rate limiting, use Cloudflare KV: env.RATE_LIMIT_KV
