@@ -2066,7 +2066,7 @@ document.getElementById('saveAnalysisBtn').onclick = async () => {
     if (saveCloud) {
       // FIX 4: upsert with onConflict to prevent duplicates + proper error surface
       const { data: upsertData, error } = await window.APP.sb
-        .from('leads')
+        .from('alo_leads')
         .upsert({
           id:                lead.id,
           user_id:           window.APP?.user?.id || null,
@@ -2133,7 +2133,7 @@ async function loadSavedFromDB() {
 
   try {
     const { data, error } = await window.APP.sb
-      .from('leads')
+      .from('alo_leads')
       .select('*')
       .order('updated_at', { ascending: false });
 
@@ -2149,24 +2149,53 @@ async function loadSavedFromDB() {
 
     if (!data || !data.length) {
       hideCloudImportOverlay();
+      // Table is empty - tell the user clearly
+      await abeAlert({
+        icon: '☁️',
+        title: 'Supabase Connected — No Leads Yet',
+        body:
+          'Your Supabase table is <span style="color:#e5e7eb;font-weight:700">empty</span> — ' +
+          'no leads have been pushed to the cloud yet.<br><br>' +
+          '<span style="color:#a855f7;font-weight:700">Next step:</span> ' +
+          'Go to the <span style="color:#e5e7eb;font-weight:700">Repository tab</span> ' +
+          'and click <span style="color:#e5e7eb;font-weight:700">☁️ Push to Cloud</span> ' +
+          'to upload all your local leads to Supabase.',
+      });
+      return;
+    }
+
+    // Separate leads from strategy vault entries
+    const leadsOnly = data.filter(function(l) {
+      const src = (l.source_file || '').toLowerCase();
+      return !src.startsWith('strategy vault');
+    });
+    const vaultOnly = data.length - leadsOnly.length;
+
+    // If ALL rows are vault entries, explain clearly
+    if (!leadsOnly.length) {
+      hideCloudImportOverlay();
+      await abeAlert({
+        icon: '☁️',
+        title: 'Supabase Connected — No ALO Leads Yet',
+        body:
+          'Supabase has <span style="color:#e5e7eb;font-weight:700">' + data.length + ' Strategy Vault entries</span> ' +
+          'but <span style="color:#ef4444;font-weight:700">0 ALO leads</span> yet.<br><br>' +
+          'Your 149 local leads have never been pushed to the cloud.<br><br>' +
+          '<span style="color:#a855f7;font-weight:700">→</span> Go to ' +
+          '<span style="color:#e5e7eb;font-weight:700">Repository tab</span> ' +
+          'and click <span style="color:#e5e7eb;font-weight:700">☁️ Push to Cloud</span> to fix this.',
+      });
       return;
     }
 
     // Simulate transfer progress (each lead = one "file" being transferred)
-    const total = data.filter(l => !(l.source_file||'').toLowerCase().startsWith('strategy vault')).length;
+    const total = leadsOnly.length;
     let processed = 0;
     const duplicates = [];
     const merged = [];
 
     // Build set of existing local lead IDs for dedup
     const localIds = new Set(state.savedLeads.map(l => l.id));
-
-    // Filter out Strategy Vault entries — they have source_file starting with 'Strategy Vault'
-    // and belong to vault.html, not the ALO lead repository
-    const leadsOnly = data.filter(function(l) {
-      const src = (l.source_file || '').toLowerCase();
-      return !src.startsWith('strategy vault');
-    });
 
     for (const lead of leadsOnly) {
       // Reconstruct gtmAnalysis from flat Supabase columns
@@ -3516,7 +3545,7 @@ async function _autoSaveAnalyzed() {
     }
     if (saveCloud) {
       try {
-        await window.APP.sb.from('leads').upsert({
+        await window.APP.sb.from('alo_leads').upsert({
           id:                lead.id,
           user_id:           window.APP?.user?.id || null, name: lead.name, title: lead.title,
           company: lead.company, linkedin: lead.linkedin,
@@ -3586,7 +3615,7 @@ async function saveAllAnalyzed() {
 
     if (saveCloud) {
       try {
-        await window.APP.sb.from('leads').upsert({
+        await window.APP.sb.from('alo_leads').upsert({
           id:                lead.id,
           user_id:           window.APP?.user?.id || null,
           name:              lead.name,
@@ -3702,7 +3731,7 @@ async function pushAllLocalToCloud() {
 
   for (const lead of state.savedLeads) {
     try {
-      await window.APP.sb.from('leads').upsert({
+      await window.APP.sb.from('alo_leads').upsert({
         id:                lead.id,
         user_id:           window.APP?.user?.id || null,
         name:              lead.name,
