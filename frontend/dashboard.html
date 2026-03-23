@@ -1248,33 +1248,35 @@ function applyCardFilter(card) {
     if (subEl)   subEl.innerText   = sub;
     if (valEl)   valEl.innerText   = count;
 
-    // ✅ FIX: Re-render Verified Leads table filtered by selected intent tier
-    // Only re-render if Execute Mapping has been run (body-p2 has real rows)
-    const p2Body = document.getElementById('body-p2');
-    if (p2Body && state.allLeads.length) {
-      const filtered = filter === 'high'   ? state.allLeads.filter(l => l.score >= 75)
-                     : filter === 'medium' ? state.allLeads.filter(l => l.score >= 50 && l.score < 75)
-                     : state.allLeads.filter(l => l.score < 50);
+    // Only re-render body-p2 if NOT locked by a post-save filter
+    // _p2Locked is set true by saveAllAnalyzed to prevent overwrite
+    if (!window._p2Locked) {
+      const p2Body = document.getElementById('body-p2');
+      if (p2Body && state.allLeads.length) {
+        const filtered = filter === 'high'   ? state.allLeads.filter(l => l.score >= 75)
+                       : filter === 'medium' ? state.allLeads.filter(l => l.score >= 50 && l.score < 75)
+                       : state.allLeads.filter(l => l.score < 50);
 
-      if (!filtered.length) {
-        p2Body.innerHTML = `<tr><td colspan="4" class="text-center py-20 text-gray-600 font-bold uppercase tracking-widest text-[10px]">No ${label.toLowerCase()} in current file</td></tr>`;
-        return;
+        if (!filtered.length) {
+          p2Body.innerHTML = `<tr><td colspan="4" class="text-center py-20 text-gray-600 font-bold uppercase tracking-widest text-[10px]">No ${label.toLowerCase()} in current file</td></tr>`;
+          return;
+        }
+        p2Body.innerHTML = filtered.map(l => `
+          <tr id="p2-row-${l.id}">
+            <td class="font-bold text-white">${l.name}</td>
+            <td>${l.company}</td>
+            <td class="${getScoreClass(l.score)}">${l.score}%
+              ${l.gtmAnalysis ? '<span class="ml-2 text-[8px] text-green-400 font-black uppercase">✓ Analyzed</span>' : ''}
+            </td>
+            <td class="text-right">
+              <button onclick="openAnalyze('${l.id}')"
+                class="text-purple-400 px-3 py-1 rounded-lg bg-purple-400/10 hover:bg-purple-400/20 text-[10px] font-bold transition-all">
+                Analyze
+              </button>
+            </td>
+          </tr>
+        `).join('');
       }
-      p2Body.innerHTML = filtered.map(l => `
-        <tr>
-          <td class="font-bold text-white">${l.name}</td>
-          <td>${l.company}</td>
-          <td class="${getScoreClass(l.score)}">${l.score}%
-            ${l.gtmAnalysis ? '<span class="ml-2 text-[8px] text-green-400 font-black uppercase">✓ Analyzed</span>' : ''}
-          </td>
-          <td class="text-right">
-            <button onclick="openAnalyze('${l.id}')"
-              class="text-purple-400 px-3 py-1 rounded-lg bg-purple-400/10 hover:bg-purple-400/20 text-[10px] font-bold transition-all">
-              Analyze
-            </button>
-          </td>
-        </tr>
-      `).join('');
     }
   }
 
@@ -2791,14 +2793,14 @@ async function analyzeAllLeads() {
   }
 
   const total = unanalyzed.length;
-  const BATCH_SIZE = 5;
-  // Time estimate: ~6s per batch of 5 leads
-  const estimatedSecs = Math.ceil(total / BATCH_SIZE) * 6;
+  const BATCH_SIZE = 1; // Sequential — 1 at a time to respect 10 req/min server limit
+  // Server allows 10 req/min = ~6s per lead with retry buffer
+  const estimatedSecs = total * 7; // ~7 seconds per lead (6s API + 1s buffer)
   const estimatedMins = Math.ceil(estimatedSecs / 60);
 
   // ── Smart routing based on lead count ──────────────────────────
   if (total <= 25) {
-    // AUTO: analyze all immediately, no prompt needed
+    // AUTO: small dataset — analyze all immediately, ~7s per lead
     _runBulkAnalyze(unanalyzed, total);
 
   } else {
@@ -2809,8 +2811,10 @@ async function analyzeAllLeads() {
 
     const choice = window.confirm(
       'You have ' + total + ' leads to analyze.\n\n' +
-      '• Estimated time for full analysis: ~' + timeMsg + '\n' +
-      '• Important: Keep this tab active during analysis\n\n' +
+      '• Estimated time: ~' + timeMsg + '\n' +
+      '• Processed 1 lead at a time (AI rate limit: 10/min)\n' +
+      '• Keep this tab active — analysis pauses if you switch away\n' +
+      '• Auto-retries if rate limit is hit\n\n' +
       'Click OK to analyze ALL ' + total + ' leads in one run.\n' +
       'Click Cancel to analyze in batches of 50 instead.'
     );
@@ -2827,33 +2831,37 @@ async function analyzeAllLeads() {
 
 // ── Batch mode: 50 at a time with continue prompt ──────────────
 async function _runBatchMode(unanalyzed, total, startFrom) {
-  const CHUNK = 50;
-  const chunk = unanalyzed.slice(startFrom, startFrom + CHUNK);
+  const CHUNK    = 50;
+  const chunk    = unanalyzed.slice(startFrom, startFrom + CHUNK);
   if (!chunk.length) return;
 
   const chunkEnd = Math.min(startFrom + CHUNK, total);
-  const statusText = document.getElementById('bulkStatusText');
-  if (statusText) statusText.innerText = `Analyzing leads ${startFrom + 1}–${chunkEnd} of ${total}...`;
 
-  await _runBulkAnalyze(chunk, chunk.length, true);
+  // Pass total (full dataset) so progress % reflects overall progress
+  await _runBulkAnalyze(chunk, total, true, startFrom);
 
-  // After this chunk, auto-save and ask to continue
+  // After this chunk auto-save and ask to continue
   const remaining = unanalyzed.slice(startFrom + CHUNK);
   if (remaining.length > 0) {
+    const alreadyDone = state.allLeads.filter(l => l.gtmAnalysis).length;
     const cont = window.confirm(
-      '✓ Leads ' + (startFrom + 1) + '–' + chunkEnd + ' analyzed and saved.\n\n' +
+      '✓ ' + alreadyDone + ' of ' + total + ' leads analyzed and saved.\n\n' +
       remaining.length + ' leads still remaining.\n\n' +
-      'Click OK to analyze the next 50.\n' +
+      'Click OK to analyze the next ' + Math.min(50, remaining.length) + '.\n' +
       'Click Cancel to stop here.'
     );
     if (cont) {
       _runBatchMode(unanalyzed, total, startFrom + CHUNK);
     }
+  } else {
+    // All done
+    const statusText = document.getElementById('bulkStatusText');
+    if (statusText) statusText.innerText = '✓ All ' + total + ' leads analyzed and saved to Repository';
   }
 }
 
 // ── Core bulk engine — runs the actual analysis ────────────────
-async function _runBulkAnalyze(unanalyzed, total, autosave = false) {
+async function _runBulkAnalyze(unanalyzed, total, autosave = false, startOffset = 0) {
   bulkStopped = false;
   const btn         = document.getElementById('analyzeAllBtn');
   const loader      = document.getElementById('bulkLoader');
@@ -2869,14 +2877,17 @@ async function _runBulkAnalyze(unanalyzed, total, autosave = false) {
   if (stopBtn)    stopBtn.classList.remove('hidden');
   if (saveAllBtn) saveAllBtn.classList.add('hidden');
 
-  const BATCH_SIZE     = 5;
-  const BATCH_DELAY_MS = 100; // reduced from 300ms — less throttle risk on tab switch
+  // Sequential processing — 1 lead at a time to stay within 10 req/min server limit
+  // With automatic retry on 429 (rate limit) — waits 12s then retries
+  const INTER_LEAD_DELAY_MS = 6500;  // ~6.5s between leads = ~9 req/min safely
+  const RETRY_DELAY_MS      = 15000; // wait 15s on 429 before retrying
+  const MAX_RETRIES         = 3;
   let completed = 0;
 
-  // Page Visibility API — detect tab switching and wait for tab to be active again
-  // This prevents Chrome from throttling the async loop when you switch away
+  // Page Visibility API — pause when tab is hidden, resume on return
   async function waitForVisible() {
     if (document.visibilityState === 'visible') return;
+    if (statusText) statusText.innerText = '⏸ Paused — return to this tab to continue...';
     return new Promise(resolve => {
       const handler = () => {
         if (document.visibilityState === 'visible') {
@@ -2888,49 +2899,67 @@ async function _runBulkAnalyze(unanalyzed, total, autosave = false) {
     });
   }
 
-  for (let i = 0; i < unanalyzed.length; i += BATCH_SIZE) {
+  // Single lead analyzer with retry on 429
+  async function analyzeWithRetry(lead, retries) {
+    for (let attempt = 0; attempt <= retries; attempt++) {
+      try {
+        const data = await getAIIntel(lead);
+        return { success: true, data };
+      } catch (err) {
+        const is429 = err.message && (err.message.includes('429') || err.message.includes('Too many'));
+        if (is429 && attempt < retries) {
+          const waitSecs = Math.round(RETRY_DELAY_MS / 1000);
+          if (statusText) statusText.innerText = `Rate limit hit — waiting ${waitSecs}s before retrying ${lead.name}...`;
+          await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
+        } else {
+          return { success: false, error: err.message };
+        }
+      }
+    }
+    return { success: false, error: 'Max retries exceeded' };
+  }
+
+  for (let i = 0; i < unanalyzed.length; i++) {
     if (bulkStopped) break;
 
-    // Wait if tab is not visible — prevents Chrome throttling
+    // Pause if tab not visible
     await waitForVisible();
     if (bulkStopped) break;
 
-    const batch = unanalyzed.slice(i, i + BATCH_SIZE);
+    const lead = unanalyzed[i];
+    const globalCompleted = startOffset + completed;
 
-    const results = await Promise.allSettled(
-      batch.map(lead => getAIIntel(lead).then(data => ({ lead, data })))
-    );
+    if (statusText) statusText.innerText = `Analyzing ${globalCompleted + 1} / ${total} — ${lead.name}...`;
 
-    results.forEach(result => {
-      if (result.status === 'fulfilled') {
-        const { lead, data } = result.value;
-        lead.gtmAnalysis = data;
-        lead.status = 'Analyzed';
-        const row = document.getElementById('p2-row-' + lead.id);
-        if (row) {
-          const scoreCell = row.querySelectorAll('td')[2];
-          if (scoreCell) {
-            scoreCell.innerHTML = `<span class="${getScoreClass(lead.score)}">${lead.score}%</span>
-              <span class="ml-2 text-[8px] text-green-400 font-black uppercase">✓ AI</span>`;
-          }
+    const result = await analyzeWithRetry(lead, MAX_RETRIES);
+
+    if (result.success) {
+      lead.gtmAnalysis = result.data;
+      lead.status = 'Analyzed';
+      const row = document.getElementById('p2-row-' + lead.id);
+      if (row) {
+        const scoreCell = row.querySelectorAll('td')[2];
+        if (scoreCell) {
+          scoreCell.innerHTML = `<span class="${getScoreClass(lead.score)}">${lead.score}%</span>
+            <span class="ml-2 text-[8px] text-green-400 font-black uppercase">✓ AI</span>`;
         }
-        completed++;
-      } else {
-        console.warn('Batch item failed:', result.reason?.message);
-        completed++;
       }
-    });
+    } else {
+      console.warn('Lead failed after retries:', lead.name, result.error);
+    }
+    completed++;
 
     updateDashboardCards();
 
-    const pct = Math.round((completed / total) * 100);
+    const pct = Math.round(((startOffset + completed) / total) * 100);
     if (progressBar) progressBar.style.width = pct + '%';
-    if (statusText)  statusText.innerText = bulkStopped
-      ? `Stopped at ${completed} / ${total}`
-      : `Analyzing ${completed} / ${total} leads...`;
+    if (statusText && !bulkStopped) {
+      statusText.innerText = `Analyzing ${startOffset + completed} / ${total} leads...`;
+    }
 
-    if (!bulkStopped && i + BATCH_SIZE < unanalyzed.length) {
-      await new Promise(r => setTimeout(r, BATCH_DELAY_MS));
+    // Inter-lead delay — only if more leads remain
+    if (!bulkStopped && i < unanalyzed.length - 1) {
+      await new Promise(r => setTimeout(r, INTER_LEAD_DELAY_MS));
     }
   }
 
@@ -3061,9 +3090,12 @@ async function saveAllAnalyzed() {
 
   if (saveLocal) saveStateToStorage();
   renderSaved();
+
+  // Lock body-p2 so updateDashboardCards doesn't overwrite our filtered view
+  window._p2Locked = true;
   updateDashboardCards();
 
-  // Refresh Verified Leads table — show only leads NOT yet saved to repo
+  // Now render the filtered Verified Leads — only unsaved leads remain
   const savedIds = new Set(state.savedLeads.map(l => l.id));
   const unsaved  = state.allLeads.filter(l => !savedIds.has(l.id));
   const p2Body   = document.getElementById('body-p2');
@@ -3088,6 +3120,8 @@ async function saveAllAnalyzed() {
       p2Body.innerHTML = '<tr><td colspan="4" class="text-center py-20 text-green-400 font-black uppercase tracking-widest text-[10px]">✓ All leads saved to Repository</td></tr>';
     }
   }
+  // Unlock after render complete
+  window._p2Locked = false;
 
   // Reset bulk loader UI back to initial state
   const loader      = document.getElementById('bulkLoader');
