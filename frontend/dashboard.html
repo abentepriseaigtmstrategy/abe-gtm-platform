@@ -590,11 +590,11 @@
         
         <div class="hidden lg:flex items-center gap-4 mr-2">
           <label class="flex items-center gap-1 text-[9px] font-bold uppercase text-gray-400 cursor-pointer">
-            <input type="checkbox" id="modeLocal" checked class="accent-purple-500">
+            <input type="checkbox" id="modeLocal" checked class="accent-purple-500" onchange="saveCheckboxStates()">
             <span>Local</span>
           </label>
           <label class="flex items-center gap-1 text-[9px] font-bold uppercase text-gray-400 cursor-pointer">
-            <input type="checkbox" id="modeCloud" class="accent-purple-500" onchange="handleCloudToggle(this.checked)">
+            <input type="checkbox" id="modeCloud" class="accent-purple-500" onchange="handleCloudToggle(this.checked); saveCheckboxStates()">
             <span>Supabase</span>
           </label>
         </div>
@@ -1161,8 +1161,29 @@ const state = {
 const LS = {
   REGISTRY:     'ab_fileRegistry',
   SAVED:        'ab_savedLeads',
-  CURRENT_FILE: 'ab_currentSourceFile'
+  CURRENT_FILE: 'ab_currentSourceFile',
+  MODE_LOCAL:   'ab_modeLocal',
+  MODE_CLOUD:   'ab_modeCloud'
 };
+
+function saveCheckboxStates() {
+  localStorage.setItem(LS.MODE_LOCAL, document.getElementById('modeLocal')?.checked ? '1' : '0');
+  localStorage.setItem(LS.MODE_CLOUD, document.getElementById('modeCloud')?.checked ? '1' : '0');
+}
+
+function restoreCheckboxStates() {
+  const localSaved = localStorage.getItem(LS.MODE_LOCAL);
+  const cloudSaved = localStorage.getItem(LS.MODE_CLOUD);
+  // Only restore if previously saved — otherwise keep HTML defaults
+  if (localSaved !== null) {
+    const el = document.getElementById('modeLocal');
+    if (el) el.checked = localSaved === '1';
+  }
+  if (cloudSaved !== null) {
+    const el = document.getElementById('modeCloud');
+    if (el) el.checked = cloudSaved === '1';
+  }
+}
 
 function saveStateToStorage() {
   try {
@@ -1179,8 +1200,21 @@ function loadStateFromStorage() {
     const reg   = localStorage.getItem(LS.REGISTRY);
     const saved = localStorage.getItem(LS.SAVED);
     const cur   = localStorage.getItem(LS.CURRENT_FILE);
-    if (reg)   state.fileRegistry      = JSON.parse(reg);
-    if (saved) state.savedLeads        = JSON.parse(saved);
+    if (reg)   state.fileRegistry = JSON.parse(reg);
+    if (saved) {
+      const all = JSON.parse(saved);
+      // Filter out any Strategy Vault entries that leaked into savedLeads
+      // These have source_file starting with 'Strategy Vault'
+      state.savedLeads = all.filter(function(l) {
+        const src = (l.source_file || l.source || l.sourceFile || '').toLowerCase();
+        return !src.startsWith('strategy vault');
+      });
+      // If we filtered some out, re-persist the clean version immediately
+      if (state.savedLeads.length !== all.length) {
+        localStorage.setItem(LS.SAVED, JSON.stringify(state.savedLeads));
+        console.log('Cleaned ' + (all.length - state.savedLeads.length) + ' vault entries from local storage');
+      }
+    }
     if (cur)   state.currentSourceFile = cur || null;
   } catch (e) {
     console.warn('localStorage read failed:', e);
@@ -1228,8 +1262,13 @@ async function initApp() {
   renderSaved();
   updateDashboardCards();
 
-  // 5. If cloud mode was on, pull latest from Supabase
-  if (document.getElementById('modeCloud')?.checked) {
+  // 5. Restore checkbox states from last session
+  restoreCheckboxStates();
+
+  // 6. Only auto-sync if user explicitly had Supabase checked last session
+  // Uses saved state, not just the HTML default
+  const cloudWasChecked = localStorage.getItem(LS.MODE_CLOUD) === '1';
+  if (cloudWasChecked) {
     await loadSavedFromDB();
   }
 
