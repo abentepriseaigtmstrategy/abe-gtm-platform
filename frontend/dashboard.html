@@ -1995,7 +1995,20 @@ async function loadSavedFromDB() {
     .order('updated_at', { ascending: false });
 
   if (!error && data) {
-    state.savedLeads = data;
+    // Reconstruct gtmAnalysis from flat Supabase columns so Intel expand works
+    // Supabase stores: pain_area, key_insight, proposed_solution, outreach_message
+    // Frontend expects: lead.gtmAnalysis['Pain Area'], ['Key Insight'] etc.
+    state.savedLeads = data.map(function(lead) {
+      if (!lead.gtmAnalysis && (lead.pain_area || lead.key_insight || lead.proposed_solution || lead.outreach_message)) {
+        lead.gtmAnalysis = {
+          'Pain Area':             lead.pain_area             || '',
+          'Key Insight':           lead.key_insight           || '',
+          'Proposed Solution':     lead.proposed_solution     || '',
+          'Cold Outreach Message': lead.outreach_message      || ''
+        };
+      }
+      return lead;
+    });
     renderSaved();
     updateDashboardCards();
   }
