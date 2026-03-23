@@ -2137,7 +2137,11 @@ document.getElementById('saveAnalysisBtn').onclick = async () => {
   const saveCloud = document.getElementById('modeCloud').checked;
 
   if (!saveLocal && !saveCloud) {
-    alert("Select at least one save mode.");
+    abeAlert({
+      icon: '⚠️',
+      title: 'Select Save Destination',
+      body: 'Please tick <span style="color:#a855f7;font-weight:700">LOCAL</span> or <span style="color:#a855f7;font-weight:700">SUPABASE</span> (or both) in the top bar before saving this strategy.',
+    });
     return;
   }
 

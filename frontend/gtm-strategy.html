@@ -1457,6 +1457,16 @@ const STEP_META = {
   const resumeId = params.get('resume');
   const company  = params.get('company');
   const industry = params.get('industry');
+  const autoTour = params.get('tour');
+
+  // Auto-start GTM tour if ?tour=1 in URL (triggered from dashboard tour choice)
+  if (autoTour === '1') {
+    setTimeout(function () {
+      if (window.TOUR_CONFIG && window.TOUR_CONFIG.start) {
+        window.TOUR_CONFIG.start();
+      }
+    }, 1200); // wait for page to settle
+  }
 
   if (resumeId) {
     // Load strategy from vault and restore all steps

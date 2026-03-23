@@ -900,7 +900,10 @@ const TOUR_CONFIG = {
       tourBtn.style.transform = 'scale(1)';
       tourBtn.style.boxShadow = '0 4px 20px rgba(168,85,247,.45)';
     };
-    tourBtn.onclick = function (e) { e.stopPropagation(); TOUR_CONFIG.start(); };
+    tourBtn.onclick = function (e) {
+      e.stopPropagation();
+      TOUR_CONFIG.showTourChoice();
+    };
 
     // ── FAQ chat button ──
     var chatBtn = document.createElement('button');
@@ -1026,6 +1029,133 @@ const TOUR_CONFIG = {
       if (p.includes(file)) return key;
     }
     return 'dashboard'; // default — dashboard is the real landing page after login
+  },
+
+  showTourChoice: function () {
+    var page = this.getPage();
+
+    // On non-dashboard pages — start directly, no choice needed
+    if (page !== 'dashboard') {
+      this.start();
+      return;
+    }
+
+    // On dashboard — show choice between ALO, GTM or Both
+    var overlay = document.createElement('div');
+    overlay.id = 'abe-tour-choice';
+    overlay.style.cssText = [
+      'position:fixed','inset:0','z-index:99999',
+      'background:rgba(7,9,18,0.88)',
+      'backdrop-filter:blur(8px)',
+      'display:flex','align-items:center','justify-content:center',
+      'font-family:Inter,sans-serif','padding:20px'
+    ].join(';');
+
+    overlay.innerHTML = [
+      '<div style="background:linear-gradient(145deg,#0d1120,#111827);border:1px solid rgba(168,85,247,0.25);border-radius:20px;padding:36px 32px;max-width:460px;width:100%;box-shadow:0 32px 80px rgba(0,0,0,0.7);position:relative">',
+
+        // Close X — use data attribute to avoid quote conflict
+        '<button data-close-tour style="position:absolute;top:14px;right:16px;background:rgba(255,255,255,0.06);border:1px solid rgba(255,255,255,0.1);color:#6b7280;width:28px;height:28px;border-radius:8px;font-size:16px;cursor:pointer;display:flex;align-items:center;justify-content:center">×</button>',
+
+        // Icon + Title
+        '<div style="font-size:28px;text-align:center;margin-bottom:12px">✨</div>',
+        '<div style="font-size:17px;font-weight:900;color:#fff;text-align:center;margin-bottom:6px;letter-spacing:-0.4px">Choose Your Tour</div>',
+        '<div style="font-size:12px;color:#6b7280;text-align:center;margin-bottom:28px">Select which part of the platform you want to explore</div>',
+
+        // Choice buttons
+        '<div style="display:flex;flex-direction:column;gap:10px">',
+
+          // ALO Tour
+          '<button id="abe-tour-alo" style="display:flex;align-items:center;gap:14px;padding:16px 18px;background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.25);border-radius:12px;cursor:pointer;text-align:left;transition:all .15s;width:100%">',
+            '<span style="font-size:24px">📋</span>',
+            '<div>',
+              '<div style="font-size:12px;font-weight:800;color:#e5e7eb;text-transform:uppercase;letter-spacing:.06em">ALO Platform Tour</div>',
+              '<div style="font-size:11px;color:#6b7280;margin-top:2px">Command Center · Repository · Lead Intelligence</div>',
+            '</div>',
+          '</button>',
+
+          // GTM Tour
+          '<button id="abe-tour-gtm" style="display:flex;align-items:center;gap:14px;padding:16px 18px;background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.25);border-radius:12px;cursor:pointer;text-align:left;transition:all .15s;width:100%">',
+            '<span style="font-size:24px">🧠</span>',
+            '<div>',
+              '<div style="font-size:12px;font-weight:800;color:#e5e7eb;text-transform:uppercase;letter-spacing:.06em">GTM Strategy Tour</div>',
+              '<div style="font-size:11px;color:#6b7280;margin-top:2px">Strategy Builder · Vault · Reports</div>',
+            '</div>',
+          '</button>',
+
+          // Full Tour
+          '<button id="abe-tour-both" style="display:flex;align-items:center;gap:14px;padding:16px 18px;background:rgba(16,185,129,0.06);border:1px solid rgba(16,185,129,0.2);border-radius:12px;cursor:pointer;text-align:left;transition:all .15s;width:100%">',
+            '<span style="font-size:24px">🗺</span>',
+            '<div>',
+              '<div style="font-size:12px;font-weight:800;color:#e5e7eb;text-transform:uppercase;letter-spacing:.06em">Full Platform Tour</div>',
+              '<div style="font-size:11px;color:#6b7280;margin-top:2px">Complete walkthrough — ALO + GTM + all features</div>',
+            '</div>',
+          '</button>',
+
+        '</div>',
+      '</div>'
+    ].join('');
+
+    document.body.appendChild(overlay);
+
+    // Wire close button (data attribute avoids quote conflict in HTML string)
+    var closeBtn = overlay.querySelector('[data-close-tour]');
+    if (closeBtn) closeBtn.onclick = function () { overlay.remove(); };
+
+    // Wire up buttons
+    var self = this;
+
+    document.getElementById('abe-tour-alo').onclick = function () {
+      overlay.remove();
+      self.startSpecific('dashboard');
+    };
+
+    document.getElementById('abe-tour-gtm').onclick = function () {
+      overlay.remove();
+      // Navigate to GTM strategy with tour flag
+      window.location.href = 'gtm-strategy.html?tour=1';
+    };
+
+    document.getElementById('abe-tour-both').onclick = function () {
+      overlay.remove();
+      self.startSpecific('dashboard');
+      // After ALO tour ends, auto-navigate to GTM with tour
+      var origEnd = self.end.bind(self);
+      self.end = function () {
+        origEnd();
+        self.end = origEnd; // restore
+        setTimeout(function () {
+          self.toast('Continuing to GTM Strategy Tour…', 'info');
+          setTimeout(function () {
+            window.location.href = 'gtm-strategy.html?tour=1';
+          }, 1800);
+        }, 400);
+      };
+    };
+
+    // Hover effects
+    ['abe-tour-alo','abe-tour-gtm','abe-tour-both'].forEach(function(id) {
+      var btn = document.getElementById(id);
+      btn.onmouseenter = function () { btn.style.opacity = '0.85'; btn.style.transform = 'translateY(-1px)'; };
+      btn.onmouseleave = function () { btn.style.opacity = '1'; btn.style.transform = 'translateY(0)'; };
+    });
+  },
+
+  startSpecific: function (pageKey) {
+    var steps = this.steps[pageKey];
+    if (!steps || !steps.length) {
+      this.toast('No tour available.', 'info');
+      return;
+    }
+    this.tourActive  = true;
+    this.currentStep = 0;
+    // Temporarily override getPage so render() uses the right steps
+    var self = this;
+    var origGetPage = this.getPage.bind(this);
+    this.getPage = function () { return pageKey; };
+    this.render();
+    // Restore after first render (subsequent renders use current page detection)
+    this.getPage = origGetPage;
   },
 
   start: function () {
