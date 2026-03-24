@@ -717,6 +717,46 @@
             <p class="text-[10px] text-gray-500 font-bold uppercase tracking-[0.3em]">Real-time Intelligent Lead Orchestration</p>
         </div>
 
+        <!-- ── ONBOARDING GUIDE — shown only when no leads imported ── -->
+        <div id="onboard-guide" style="display:none;background:linear-gradient(135deg,rgba(168,85,247,0.06),rgba(99,102,241,0.04));border:1px solid rgba(168,85,247,0.2);border-radius:20px;padding:36px;margin-bottom:24px;text-align:center">
+          <div style="font-size:28px;margin-bottom:14px">🚀</div>
+          <div style="font-size:16px;font-weight:900;color:white;margin-bottom:6px;letter-spacing:-0.3px">Welcome to ABE Command Center</div>
+          <div style="font-size:12px;color:#6b7280;margin-bottom:28px;line-height:1.7;max-width:420px;margin-left:auto;margin-right:auto">Your AI-powered lead intelligence platform. Three steps to get started:</div>
+          <div style="display:flex;gap:16px;justify-content:center;flex-wrap:wrap;margin-bottom:28px">
+            <div style="background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.2);border-radius:14px;padding:20px 24px;min-width:140px;text-align:center">
+              <div style="font-size:22px;margin-bottom:8px">⬆️</div>
+              <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#a855f7;margin-bottom:4px">Step 1</div>
+              <div style="font-size:12px;font-weight:700;color:white">Import Leads</div>
+              <div style="font-size:10px;color:#6b7280;margin-top:4px">Upload CSV or XLSX file</div>
+            </div>
+            <div style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:14px;padding:20px 24px;min-width:140px;text-align:center">
+              <div style="font-size:22px;margin-bottom:8px">⚡</div>
+              <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#818cf8;margin-bottom:4px">Step 2</div>
+              <div style="font-size:12px;font-weight:700;color:white">Execute Map</div>
+              <div style="font-size:10px;color:#6b7280;margin-top:4px">Score and rank leads by intent</div>
+            </div>
+            <div style="background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.15);border-radius:14px;padding:20px 24px;min-width:140px;text-align:center">
+              <div style="font-size:22px;margin-bottom:8px">🧠</div>
+              <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#22c55e;margin-bottom:4px">Step 3</div>
+              <div style="font-size:12px;font-weight:700;color:white">Analyze Intel</div>
+              <div style="font-size:10px;color:#6b7280;margin-top:4px">AI generates outreach intel</div>
+            </div>
+          </div>
+          <button onclick="document.getElementById('leadInbound').click()" style="padding:12px 28px;background:linear-gradient(135deg,#a855f7,#7c3aed);color:white;border:none;border-radius:10px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;cursor:pointer;box-shadow:0 4px 20px rgba(168,85,247,0.3)">
+            ⬆ Import Your First File
+          </button>
+        </div>
+
+        <!-- ── STEP HINT — contextual next-step indicator ── -->
+        <div id="step-hint" style="display:none;background:rgba(168,85,247,0.08);border:1px solid rgba(168,85,247,0.25);border-radius:12px;padding:12px 18px;margin-bottom:16px;display:none;align-items:center;gap:12px">
+          <span style="font-size:18px" id="step-hint-icon">⚡</span>
+          <div style="flex:1">
+            <div style="font-size:11px;font-weight:800;color:white" id="step-hint-title">Next Step</div>
+            <div style="font-size:10px;color:#9ca3af;margin-top:2px" id="step-hint-desc">Follow the next step</div>
+          </div>
+          <button onclick="document.getElementById('step-hint').style.display='none'" style="background:none;border:none;color:#6b7280;cursor:pointer;font-size:16px">×</button>
+        </div>
+
         <div class="space-y-4">
             <div class="flex items-center justify-between px-2">
                 <h3 class="text-[11px] font-black uppercase tracking-[0.3em] text-cyan-400">Command Center · Data Vault</h3>
@@ -1938,9 +1978,15 @@ function renderP1() {
   const body = document.getElementById('body-p1');
 
   if (!state.allLeads.length) {
-    body.innerHTML = `<tr><td colspan="4" class="text-center py-20 text-gray-600">Import file to begin</td></tr>`;
+    // Show onboarding guide when no leads imported yet
+    var onboardHTML = document.getElementById('onboard-guide');
+    if (onboardHTML) onboardHTML.style.display = 'block';
+    body.innerHTML = '';
     return;
   }
+  // Hide onboarding once leads are present
+  var og = document.getElementById('onboard-guide');
+  if (og) og.style.display = 'none';
 
   body.innerHTML = state.allLeads.map(l => `
     <tr>
@@ -1984,6 +2030,7 @@ document.getElementById('saveMappedBtn').onclick = () => {
   `).join('');
 
   document.getElementById('analyzeAllBtn')?.classList.remove('hidden');
+  showStepHint('analyze');
 };
 
 /* =========================
@@ -2600,7 +2647,22 @@ async function renderSaved() {
     : state.savedLeads;
 
   if (!leads.length) {
-    body.innerHTML = `<tr><td colspan="10" class="text-center py-20 text-gray-600 font-bold uppercase tracking-widest text-[10px]">${searchTerm ? 'No results for "' + searchTerm + '"' : 'No saved leads'}</td></tr>`;
+    if (searchTerm) {
+      body.innerHTML = `<tr><td colspan="10" class="text-center py-16 text-gray-600 font-bold uppercase tracking-widest text-[10px]">No results for "${searchTerm}"</td></tr>`;
+    } else {
+      body.innerHTML = `<tr><td colspan="10" class="text-center py-16">
+        <div style="display:inline-block;text-align:center">
+          <div style="font-size:32px;margin-bottom:12px">🗃️</div>
+          <div style="font-size:12px;font-weight:800;color:#e5e7eb;margin-bottom:6px">Repository is Empty</div>
+          <div style="font-size:10px;color:#6b7280;margin-bottom:16px;line-height:1.6">
+            Analyze leads in Command Center,<br/>then click <span style="color:#a855f7;font-weight:700">💾 Save All Analyzed</span> to build your repository.
+          </div>
+          <button onclick="switchMainView('live')" style="padding:8px 20px;background:linear-gradient(135deg,#a855f7,#7c3aed);color:white;border:none;border-radius:8px;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.08em;cursor:pointer">
+            ← Go to Command Center
+          </button>
+        </div>
+      </td></tr>`;
+    }
     clearBulkSelection();
     return;
   }
@@ -3282,6 +3344,7 @@ function finalizeImport({ fileName, processed }) {
   renderP1();
   updateDashboardCards();
   document.getElementById('analyzeAllBtn')?.classList.remove('hidden');
+  showStepHint('map');
 }
 
 /* =========================
@@ -4001,6 +4064,29 @@ function abeToast(msg, type, duration) {
   clearTimeout(toast._timer);
   toast._timer = setTimeout(function(){ toast.classList.remove('show'); }, duration);
 }
+
+// ── Step hints — guide user through import → map → analyze ──
+function showStepHint(step) {
+  var el    = document.getElementById('step-hint');
+  var icon  = document.getElementById('step-hint-icon');
+  var title = document.getElementById('step-hint-title');
+  var desc  = document.getElementById('step-hint-desc');
+  if (!el) return;
+  var hints = {
+    map:     { icon: '⚡', title: 'Next: Execute Map', desc: 'Click the ⚡ Map button in the top bar to score and rank your leads.' },
+    analyze: { icon: '🧠', title: 'Next: Bulk Analyze Intel', desc: 'Click Bulk Analyze Intel button above the table to generate AI-powered outreach intel for each lead.' },
+  };
+  var h = hints[step];
+  if (!h) return;
+  icon.textContent  = h.icon;
+  title.textContent = h.title;
+  desc.textContent  = h.desc;
+  el.style.display  = 'flex';
+  // Auto-hide after 12 seconds
+  clearTimeout(el._timer);
+  el._timer = setTimeout(function() { el.style.display = 'none'; }, 12000);
+}
+
 </script>
 
   <div id="abe-toast"><span id="abe-toast-icon">✓</span><span id="abe-toast-msg"></span></div>

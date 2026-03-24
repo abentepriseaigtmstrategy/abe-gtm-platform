@@ -603,7 +603,7 @@ function renderVault(strategies) {
       </div>
       <div class="vault-actions" onclick="event.stopPropagation()">
         <button class="btn btn-primary btn-sm" onclick="openDrawer('${s.id}')">Open</button>
-        <a href="report.html?id=${s.id}" class="btn btn-outline btn-sm" onclick="event.stopPropagation()">Report</a>
+        <a href="report.html?id=${s.id}" class="btn btn-primary btn-sm" onclick="event.stopPropagation()" style="background:linear-gradient(135deg,#a855f7,#7c3aed);font-weight:800">📄 Full Report</a>
         <button class="btn btn-outline btn-sm" data-send-id="${s.id}" onclick="sendToLeadManager('${s.id}','${escDQ(s.company_name)}','${escDQ(s.industry||'')}','${escDQ(s.primary_icp||'')}','${escDQ(s.company_url||'')}',${s.gtm_score||0});event.stopPropagation()" style="color:#22c55e;border-color:rgba(34,197,94,.3)">→ LM</button>
         <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteStrategy('${s.id}','${escDQ(s.company_name)}');event.stopPropagation()" title="Delete">🗑</button>
       </div>
