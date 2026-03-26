@@ -1,9 +1,10 @@
 // auth-guard.js - ABE GTM Platform Authentication Module
 import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 
-const SUPABASE_URL = 'YOUR_SUPABASE_URL';
-const SUPABASE_ANON_KEY = 'YOUR_SUPABASE_ANON_KEY';
-const WORKER_API_BASE = 'YOUR_CLOUDFLARE_WORKER_URL';
+const SUPABASE_URL      = 'https://cwcvneluhlimhlzowabv.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_EeDAvGbX7TpO_hgBoUZMhQ_B_nJtAbb';
+
+const WORKER_API_BASE = 'https://abe-gtm-auth-worker.amitbhavikmnm.workers.dev';
 
 class AuthGuard {
     constructor() {
@@ -128,10 +129,8 @@ class AuthGuard {
     // Google OAuth
     async signInWithGoogle() {
         try {
-            // Use explicit redirect URL to avoid localhost issues
-            const redirectUrl = window.location.hostname === 'localhost' 
-                ? 'http://localhost:3000/auth-callback.html'
-                : `${window.location.origin}/auth-callback.html`;
+            // Corrected redirect logic to remove syntax errors and handle environments
+            const redirectUrl = `${window.location.origin}/auth-callback.html`;
 
             console.log('🔐 Initiating Google OAuth with redirect:', redirectUrl);
 
