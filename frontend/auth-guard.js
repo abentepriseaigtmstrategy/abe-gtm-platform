@@ -16,7 +16,7 @@
   const SUPABASE_URL      = 'https://cwcvneluhlimhlzowabv.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_EeDAvGbX7TpO_hgBoUZMhQ_B_nJtAbb';
   const ADMIN_EMAILS      = ['amitbhawik@gmail.com', 'amitbhawik@hotmail.com'];
-
+const WORKER_URL      = 'https://abe-gtm-auth-worker.amitbhavikmnm.workers.dev';
   // Hide page until auth confirmed — prevents flash of content
   document.documentElement.style.visibility = 'hidden';
 
