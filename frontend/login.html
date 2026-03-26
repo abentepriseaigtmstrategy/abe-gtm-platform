@@ -256,6 +256,71 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;bac
 </div>
 
 <script>
+// Add this at the top of your login.html script section
+(async function checkOAuthCallback() {
+  // Check if this is an OAuth callback
+  if (window.location.pathname === '/auth/callback' || 
+      window.location.search.includes('code=') ||
+      window.location.hash.includes('access_token=')) {
+    
+    console.log('Detected OAuth callback');
+    
+    const { data: { session }, error } = await sb.auth.getSession();
+    
+    if (error) {
+      console.error('OAuth session error:', error);
+      showError('Authentication failed. Please try again.');
+      return;
+    }
+    
+    if (session) {
+      console.log('✅ OAuth successful');
+      
+      // Check for profile
+      const { data: profile } = await sb
+        .from('user_profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+      
+      if (!profile || !profile.onboarding_completed) {
+        // Show onboarding modal
+        document.getElementById('onboarding-modal')?.classList.add('active');
+      } else {
+        // Go to dashboard
+        window.location.href = '/dashboard.html';
+      }
+    }
+  }
+})();
+```
+
+---
+
+## 🧪 **Testing the Fix**
+
+### **Test 1: Check Supabase Configuration**
+1. Go to Supabase → Authentication → URL Configuration
+2. Verify Site URL = `https://abe-gtm-platform-bza.pages.dev`
+3. Verify Redirect URLs contains your domain
+4. Verify NO `localhost` entries
+
+### **Test 2: Test Google OAuth Flow**
+1. Open: `https://abe-gtm-platform-bza.pages.dev/login.html`
+2. Click **"GOOGLE"** tab
+3. Click **"Continue with Google"**
+4. Should redirect to Google login ✅
+5. Select account
+6. Should redirect back to: `https://abe-gtm-platform-bza.pages.dev/auth/callback` ✅
+7. Should then redirect to dashboard or onboarding ✅
+
+### **Test 3: Check Browser Console**
+Open DevTools (F12), go to Console tab:
+```
+✅ Should see: "Redirecting to Google..."
+✅ Should see: "OAuth successful, user: email@example.com"
+❌ Should NOT see: "localhost" anywhere
+❌ Should NOT see: "Unsafe attempt to load URL"
 /* ── Config ────────────────────────────────────────────────────── */
 const SUPABASE_URL = 'https://cwcvneluhlimhlzowabv.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_EeDAvGbX7TpO_hgBoUZMhQ_B_nJtAbb';
