@@ -450,18 +450,40 @@ async function signUp() {
 }
 
 /* ── Google OAuth ───────────────────────────────────────────────── */
-async function signInGoogle() {
-  const msg = document.getElementById('msg-google');
-  msg.className = 'msg';
+// Google OAuth handler (around line 450-500 in your login.html)
+document.getElementById('google-btn')?.addEventListener('click', async (e) => {
+  e.preventDefault();
+  
+  const btn = e.target.closest('button');
+  if (!btn) return;
+  
+  btn.disabled = true;
+  btn.classList.add('loading');
+  
   try {
-    const { error } = await sb.auth.signInWithOAuth({
+    const { data, error } = await sb.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: window.location.href }
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent'
+        }
+      }
     });
-    if (error) showMsg(msg, error.message, 'error');
-  } catch (e) { showMsg(msg, 'Google sign-in failed.', 'error'); }
-}
-
+    
+    if (error) throw error;
+    
+    // OAuth will redirect - this code won't run
+    console.log('Redirecting to Google...');
+    
+  } catch (err) {
+    console.error('Google OAuth error:', err);
+    showError(err.message || 'Failed to sign in with Google');
+    btn.disabled = false;
+    btn.classList.remove('loading');
+  }
+});
 /* ── Magic Link ─────────────────────────────────────────────────── */
 async function sendMagicLink() {
   const email = document.getElementById('magic-email').value.trim();
