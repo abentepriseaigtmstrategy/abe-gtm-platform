@@ -1,920 +1,701 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ABE GTM Platform - Login</title>
-    <style>
-        :root {
-            --bg-primary: #0D0D0D;
-            --bg-secondary: #1A1A1A;
-            --bg-tertiary: #262626;
-            --accent-cyan: #00F0FF;
-            --accent-magenta: #FF00FF;
-            --text-primary: #FFFFFF;
-            --text-secondary: #B3B3B3;
-            --text-muted: #666666;
-            --border-color: #333333;
-            --success: #00FF88;
-            --error: #FF3366;
-            --warning: #FFB800;
-        }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background: var(--bg-primary);
-            color: var(--text-primary);
-            line-height: 1.6;
-        }
-
-        .container {
-            max-width: 1400px;
-            margin: 0 auto;
-            padding: 2rem;
-        }
-
-        .header {
-            text-align: center;
-            margin-bottom: 3rem;
-        }
-
-        .logo {
-            font-size: 2.5rem;
-            font-weight: 700;
-            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-magenta));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 0.5rem;
-        }
-
-        .tagline {
-            color: var(--text-secondary);
-            font-size: 1.1rem;
-        }
-
-        /* Tabs for Auth Methods */
-        .auth-tabs {
-            display: flex;
-            gap: 1rem;
-            margin-bottom: 2rem;
-            border-bottom: 1px solid var(--border-color);
-        }
-
-        .auth-tab {
-            padding: 1rem 1.5rem;
-            background: none;
-            border: none;
-            color: var(--text-secondary);
-            cursor: pointer;
-            transition: all 0.3s ease;
-            border-bottom: 2px solid transparent;
-            font-size: 0.95rem;
-            font-weight: 500;
-        }
-
-        .auth-tab:hover {
-            color: var(--text-primary);
-        }
-
-        .auth-tab.active {
-            color: var(--accent-cyan);
-            border-bottom-color: var(--accent-cyan);
-        }
-
-        .auth-panel {
-            display: none;
-        }
-
-        .auth-panel.active {
-            display: block;
-        }
-
-        /* Auth Card */
-        .auth-card {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 2.5rem;
-            max-width: 500px;
-            margin: 0 auto 3rem;
-        }
-
-        .form-group {
-            margin-bottom: 1.5rem;
-        }
-
-        .form-label {
-            display: block;
-            margin-bottom: 0.5rem;
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-            font-weight: 500;
-        }
-
-        .form-input {
-            width: 100%;
-            padding: 0.75rem 1rem;
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            color: var(--text-primary);
-            font-size: 1rem;
-            transition: all 0.3s ease;
-        }
-
-        .form-input:focus {
-            outline: none;
-            border-color: var(--accent-cyan);
-            box-shadow: 0 0 0 3px rgba(0, 240, 255, 0.1);
-        }
-
-        .form-input.error {
-            border-color: var(--error);
-        }
-
-        .error-message {
-            color: var(--error);
-            font-size: 0.85rem;
-            margin-top: 0.5rem;
-            display: none;
-        }
-
-        .error-message.visible {
-            display: block;
-        }
-
-        .btn {
-            width: 100%;
-            padding: 0.875rem 1.5rem;
-            border: none;
-            border-radius: 6px;
-            font-size: 1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .btn-primary {
-            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-magenta));
-            color: var(--bg-primary);
-        }
-
-        .btn-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 20px rgba(0, 240, 255, 0.3);
-        }
-
-        .btn-secondary {
-            background: var(--bg-tertiary);
-            color: var(--text-primary);
-            border: 1px solid var(--border-color);
-        }
-
-        .btn-secondary:hover {
-            border-color: var(--accent-cyan);
-            color: var(--accent-cyan);
-        }
-
-        .btn:disabled {
-            opacity: 0.5;
-            cursor: not-allowed;
-        }
-
-        .btn-icon {
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 0.5rem;
-        }
-
-        .divider {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            margin: 1.5rem 0;
-            color: var(--text-muted);
-            font-size: 0.9rem;
-        }
-
-        .divider::before,
-        .divider::after {
-            content: '';
-            flex: 1;
-            height: 1px;
-            background: var(--border-color);
-        }
-
-        /* Checkbox */
-        .checkbox-group {
-            display: flex;
-            align-items: flex-start;
-            gap: 0.75rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .checkbox-input {
-            margin-top: 0.25rem;
-            width: 18px;
-            height: 18px;
-            cursor: pointer;
-        }
-
-        .checkbox-label {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-            line-height: 1.4;
-        }
-
-        .checkbox-label a {
-            color: var(--accent-cyan);
-            text-decoration: none;
-        }
-
-        .checkbox-label a:hover {
-            text-decoration: underline;
-        }
-
-        /* Onboarding Modal */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0, 0, 0, 0.9);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
-        }
-
-        .modal.active {
-            display: flex;
-        }
-
-        .modal-content {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 2.5rem;
-            max-width: 600px;
-            width: 90%;
-            max-height: 90vh;
-            overflow-y: auto;
-        }
-
-        .modal-header {
-            margin-bottom: 2rem;
-        }
-
-        .modal-title {
-            font-size: 1.75rem;
-            margin-bottom: 0.5rem;
-            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-magenta));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .modal-subtitle {
-            color: var(--text-secondary);
-            font-size: 0.95rem;
-        }
-
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
-        }
-
-        .form-select {
-            width: 100%;
-            padding: 0.75rem 1rem;
-            background: var(--bg-tertiary);
-            border: 1px solid var(--border-color);
-            border-radius: 6px;
-            color: var(--text-primary);
-            font-size: 1rem;
-            cursor: pointer;
-        }
-
-        .form-select:focus {
-            outline: none;
-            border-color: var(--accent-cyan);
-        }
-
-        /* Pricing Section */
-        .pricing-section {
-            margin-top: 4rem;
-        }
-
-        .section-title {
-            text-align: center;
-            font-size: 2rem;
-            margin-bottom: 1rem;
-            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-magenta));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-
-        .section-subtitle {
-            text-align: center;
-            color: var(--text-secondary);
-            margin-bottom: 3rem;
-        }
-
-        .pricing-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-            gap: 2rem;
-            margin-bottom: 3rem;
-        }
-
-        .pricing-card {
-            background: var(--bg-secondary);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 2rem;
-            transition: all 0.3s ease;
-        }
-
-        .pricing-card:hover {
-            transform: translateY(-5px);
-            border-color: var(--accent-cyan);
-            box-shadow: 0 10px 30px rgba(0, 240, 255, 0.2);
-        }
-
-        .pricing-card.featured {
-            border-color: var(--accent-cyan);
-            background: linear-gradient(135deg, rgba(0, 240, 255, 0.05), rgba(255, 0, 255, 0.05));
-        }
-
-        .plan-name {
-            font-size: 1.5rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-            color: var(--accent-cyan);
-        }
-
-        .plan-price {
-            font-size: 2.5rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-        }
-
-        .plan-price-small {
-            font-size: 1.25rem;
-            color: var(--text-secondary);
-        }
-
-        .plan-warning {
-            color: var(--warning);
-            font-size: 0.85rem;
-            margin-top: 0.5rem;
-            font-weight: 600;
-        }
-
-        .plan-features {
-            list-style: none;
-            margin-top: 1.5rem;
-        }
-
-        .plan-features li {
-            padding: 0.5rem 0;
-            color: var(--text-secondary);
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .plan-features li::before {
-            content: '✓';
-            color: var(--accent-cyan);
-            font-weight: 700;
-        }
-
-        .loading-spinner {
-            display: inline-block;
-            width: 20px;
-            height: 20px;
-            border: 3px solid rgba(255, 255, 255, 0.3);
-            border-radius: 50%;
-            border-top-color: var(--accent-cyan);
-            animation: spin 0.8s linear infinite;
-        }
-
-        @keyframes spin {
-            to { transform: rotate(360deg); }
-        }
-
-        .text-center {
-            text-align: center;
-        }
-
-        .mt-2 {
-            margin-top: 1rem;
-        }
-
-        .link {
-            color: var(--accent-cyan);
-            text-decoration: none;
-            cursor: pointer;
-        }
-
-        .link:hover {
-            text-decoration: underline;
-        }
-
-        @media (max-width: 768px) {
-            .pricing-grid {
-                grid-template-columns: 1fr;
-            }
-            .form-row {
-                grid-template-columns: 1fr;
-            }
-            .auth-tabs {
-                flex-wrap: wrap;
-            }
-        }
-    </style>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sign In · ABE AI Revenue Infrastructure</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<!-- 
+  ⚠️ CRITICAL: Replace YOUR_ACTUAL_DOMAIN with your real Cloudflare Pages domain
+  Find it at: https://dash.cloudflare.com → Workers & Pages → abe-gtm-platform
+-->
+
+<style>
+:root{
+--bg:#0B0F1A;
+--card:#121827;
+--border:#1F2937;
+--accent:#a855f7;
+--accent2:#7c3aed;
+--green:#22c55e;
+--red:#ef4444;
+--text:#E5E7EB;
+--muted:#6B7280;
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);display:flex;align-items:center;justify-content:center;min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;background-image:linear-gradient(rgba(168,85,247,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(168,85,247,.03) 1px,transparent 1px);background-size:48px 48px}
+.glow{position:fixed;top:50%;left:50%;transform:translate(-50%,-60%);width:800px;height:800px;pointer-events:none;z-index:0;background:radial-gradient(ellipse,rgba(124,58,237,.1) 0%,transparent 65%)}
+.card{position:relative;z-index:1;width:100%;max-width:440px;margin:24px;background:rgba(18,24,39,.85);backdrop-filter:blur(24px);border:1px solid rgba(31,41,55,.8);border-radius:24px;padding:44px 40px}
+.logo-row{display:flex;align-items:center;gap:12px;margin-bottom:32px}
+.logo-mark{width:40px;height:40px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:white;flex-shrink:0}
+.logo-name{font-size:13px;font-weight:800;color:white;line-height:1.2}
+.logo-sub{font-size:9px;color:var(--muted);letter-spacing:.18em;text-transform:uppercase}
+.title{font-size:22px;font-weight:900;color:white;letter-spacing:-.5px;margin-bottom:6px}
+.subtitle{font-size:12px;color:var(--muted);margin-bottom:28px;line-height:1.6}
+
+.tabs{display:flex;gap:4px;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:10px;padding:4px;margin-bottom:24px}
+.tab{flex:1;padding:7px 4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border:none;background:none;border-radius:7px;cursor:pointer;transition:all .15s;white-space:nowrap}
+.tab.active{background:rgba(168,85,247,.15);border:1px solid rgba(168,85,247,.3);color:white}
+
+.sub-tabs{display:flex;gap:0;margin-bottom:24px;border-bottom:1px solid var(--border)}
+.sub-tab{flex:1;padding:9px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);border:none;background:none;cursor:pointer;transition:all .15s;border-bottom:2px solid transparent}
+.sub-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+.panel{display:none}
+.panel.active{display:block}
+
+.label{display:block;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.18em;color:var(--muted);margin-bottom:7px}
+.input{width:100%;background:rgba(0,0,0,.4);border:1px solid var(--border);color:var(--text);font-size:13px;padding:12px 14px;border-radius:10px;font-family:'Inter',sans-serif;outline:none;transition:border-color .15s;margin-bottom:16px}
+.input:focus{border-color:var(--accent)}
+.input::placeholder{color:#4b5563}
+
+.check-row{display:flex;align-items:flex-start;gap:10px;margin-bottom:14px}
+.check-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent);flex-shrink:0;margin-top:2px;cursor:pointer}
+.check-row span{font-size:11px;color:var(--muted);line-height:1.5}
+.check-row a{color:var(--accent);text-decoration:none}
+.check-row a:hover{text-decoration:underline}
+
+.btn{width:100%;padding:13px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:white;border:none;border-radius:10px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;cursor:pointer;transition:all .15s;margin-top:4px}
+.btn:hover:not(:disabled){opacity:.9;transform:translateY(-1px)}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.btn.loading .btn-text{display:none}
+.btn.loading .spinner{display:block}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text);display:flex;align-items:center;justify-content:center;gap:10px;margin-top:10px}
+.btn-outline:hover{border-color:var(--accent);background:rgba(168,85,247,.06)}
+.btn-outline img{width:16px;height:16px}
+
+.spinner{display:none;width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:white;border-radius:50%;animation:spin .7s linear infinite;margin:0 auto}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.divider{display:flex;align-items:center;gap:12px;margin:16px 0;color:var(--muted);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border)}
+
+.msg{padding:12px 14px;border-radius:8px;font-size:12px;font-weight:600;margin-top:14px;display:none}
+.msg.error{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#fca5a5;display:block}
+.msg.success{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#86efac;display:block}
+
+.footer{margin-top:24px;text-align:center;font-size:10px;color:var(--muted);line-height:1.6}
+.secure{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:16px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:#374151}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--green)}
+
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(8px);z-index:999;display:none;align-items:center;justify-content:center;padding:24px}
+.modal-overlay.active{display:flex}
+.modal{background:#121827;border:1px solid rgba(168,85,247,.2);border-radius:20px;padding:40px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto}
+.modal h2{font-size:20px;font-weight:900;color:white;margin-bottom:6px}
+.modal p{font-size:12px;color:var(--muted);margin-bottom:28px;line-height:1.6}
+.modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.modal-grid .full{grid-column:1/-1}
+.modal .label{margin-top:4px}
+.modal select{width:100%;background:rgba(0,0,0,.4);border:1px solid var(--border);color:var(--text);font-size:13px;padding:12px 14px;border-radius:10px;font-family:'Inter',sans-serif;outline:none;margin-bottom:0;-webkit-appearance:none}
+.modal select:focus{border-color:var(--accent)}
+.modal select option{background:#121827}
+.progress{display:flex;gap:6px;margin-bottom:28px}
+.progress-dot{width:8px;height:8px;border-radius:50%;background:var(--border)}
+.progress-dot.done{background:var(--accent)}
+
+.link{color:var(--accent);text-decoration:none;font-size:12px;display:inline-block;margin-top:16px}
+.link:hover{text-decoration:underline}
+</style>
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <div class="logo">ABE GTM Platform</div>
-            <div class="tagline">Revenue Intelligence Operating System</div>
-        </div>
 
-        <!-- Authentication Card -->
-        <div class="auth-card">
-            <div class="auth-tabs">
-                <button class="auth-tab active" data-tab="email">Email</button>
-                <button class="auth-tab" data-tab="google">Google</button>
-                <button class="auth-tab" data-tab="magic">Magic Link</button>
-                <button class="auth-tab" data-tab="phone">Phone</button>
-            </div>
+<div class="glow"></div>
 
-            <!-- Email/Password Panel -->
-            <div class="auth-panel active" id="email-panel">
-                <form id="email-form">
-                    <div class="form-group">
-                        <label class="form-label">Email Address</label>
-                        <input type="email" class="form-input" id="email" required>
-                        <div class="error-message" id="email-error"></div>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Password</label>
-                        <input type="password" class="form-input" id="password" required>
-                        <div class="error-message" id="password-error"></div>
-                    </div>
-                    <div id="signup-fields" style="display: none;">
-                        <div class="form-group">
-                            <label class="form-label">Confirm Password</label>
-                            <input type="password" class="form-input" id="confirm-password">
-                            <div class="error-message" id="confirm-password-error"></div>
-                        </div>
-                        <div class="checkbox-group">
-                            <input type="checkbox" class="checkbox-input" id="terms-checkbox" required>
-                            <label class="checkbox-label" for="terms-checkbox">
-                                I agree to the <a href="#" target="_blank">Terms of Service</a> and <a href="#" target="_blank">Privacy Policy</a>
-                            </label>
-                        </div>
-                        <div class="checkbox-group">
-                            <input type="checkbox" class="checkbox-input" id="marketing-checkbox">
-                            <label class="checkbox-label" for="marketing-checkbox">
-                                I agree to receive platform updates and acknowledge the data processing agreement (GDPR Compliance)
-                            </label>
-                        </div>
-                    </div>
-                    <button type="submit" class="btn btn-primary" id="email-submit">
-                        <span id="email-submit-text">Sign In</span>
-                        <span id="email-submit-loader" style="display: none;" class="loading-spinner"></span>
-                    </button>
-                    <div class="text-center mt-2">
-                        <a href="#" class="link" id="toggle-mode">Don't have an account? Sign Up</a>
-                    </div>
-                </form>
-            </div>
+<div class="card">
+  <div class="logo-row">
+    <div class="logo-mark">ABE</div>
+    <div>
+      <div class="logo-name">ABE GTM PLATFORM</div>
+      <div class="logo-sub">Revenue Intelligence Operating System</div>
+    </div>
+  </div>
 
-            <!-- Google OAuth Panel -->
-            <div class="auth-panel" id="google-panel">
-                <button class="btn btn-secondary btn-icon" id="google-signin">
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M19.6 10.23c0-.82-.1-1.42-.25-2.05H10v3.72h5.5c-.15.96-.74 2.31-2.04 3.22v2.45h3.16c1.89-1.73 2.98-4.3 2.98-7.34z"/>
-                        <path d="M10 20c2.7 0 4.96-.89 6.62-2.42l-3.16-2.45c-.86.58-1.97.92-3.46.92-2.65 0-4.88-1.77-5.69-4.15H.96v2.52C2.62 17.05 6.03 20 10 20z"/>
-                        <path d="M4.31 11.9c-.25-.58-.38-1.21-.38-1.9 0-.69.14-1.32.38-1.9V5.58H.96C.35 6.79 0 8.15 0 10s.35 3.21.96 4.42l3.35-2.52z"/>
-                        <path d="M10 3.88c1.45 0 2.73.5 3.74 1.48l2.81-2.81C14.96.99 12.7 0 10 0 6.03 0 2.62 2.95.96 7.58l3.35 2.52c.81-2.38 3.04-4.22 5.69-4.22z"/>
-                    </svg>
-                    Continue with Google
-                </button>
-                <div class="text-center mt-2">
-                    <p class="text-secondary" style="font-size: 0.9rem;">One-click signup and login with your Google account</p>
-                </div>
-            </div>
+  <h1 class="title">Welcome Back</h1>
+  <p class="subtitle">Sign in to access your revenue intelligence dashboard</p>
 
-            <!-- Magic Link Panel -->
-            <div class="auth-panel" id="magic-panel">
-                <form id="magic-form">
-                    <div class="form-group">
-                        <label class="form-label">Email Address</label>
-                        <input type="email" class="form-input" id="magic-email" required>
-                        <div class="error-message" id="magic-email-error"></div>
-                    </div>
-                    <button type="submit" class="btn btn-primary">
-                        <span id="magic-submit-text">Send Magic Link</span>
-                        <span id="magic-submit-loader" style="display: none;" class="loading-spinner"></span>
-                    </button>
-                    <div class="text-center mt-2">
-                        <p class="text-secondary" style="font-size: 0.9rem;">We'll email you a secure login link</p>
-                    </div>
-                </form>
-            </div>
+  <!-- Auth Method Tabs -->
+  <div class="tabs">
+    <button class="tab active" data-method="email">Email</button>
+    <button class="tab" data-method="google">Google</button>
+    <button class="tab" data-method="magic">Magic Link</button>
+  </div>
 
-            <!-- Phone/SMS Panel -->
-            <div class="auth-panel" id="phone-panel">
-                <form id="phone-form">
-                    <div class="form-group">
-                        <label class="form-label">Phone Number</label>
-                        <input type="tel" class="form-input" id="phone-number" placeholder="+1 (555) 123-4567" required>
-                        <div class="error-message" id="phone-error"></div>
-                    </div>
-                    <button type="submit" class="btn btn-primary">
-                        <span id="phone-submit-text">Send OTP</span>
-                        <span id="phone-submit-loader" style="display: none;" class="loading-spinner"></span>
-                    </button>
-                    <div class="text-center mt-2">
-                        <p class="text-secondary" style="font-size: 0.9rem;">SMS authentication (Coming Soon)</p>
-                    </div>
-                </form>
-            </div>
-        </div>
-
-        <!-- Onboarding Modal -->
-        <div class="modal" id="onboarding-modal">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h2 class="modal-title">Complete Your Profile</h2>
-                    <p class="modal-subtitle">Help us personalize your experience</p>
-                </div>
-                <form id="onboarding-form">
-                    <div class="form-group">
-                        <label class="form-label">Full Name *</label>
-                        <input type="text" class="form-input" id="full-name" required>
-                    </div>
-                    <div class="form-group">
-                        <label class="form-label">Company Name *</label>
-                        <input type="text" class="form-input" id="company-name" required>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">Job Title *</label>
-                            <input type="text" class="form-input" id="job-title" required>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Department *</label>
-                            <select class="form-select" id="department" required>
-                                <option value="">Select Department</option>
-                                <option value="sales">Sales</option>
-                                <option value="marketing">Marketing</option>
-                                <option value="customer-success">Customer Success</option>
-                                <option value="operations">Operations</option>
-                                <option value="product">Product</option>
-                                <option value="engineering">Engineering</option>
-                                <option value="executive">Executive</option>
-                                <option value="other">Other</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="form-row">
-                        <div class="form-group">
-                            <label class="form-label">Company Size *</label>
-                            <select class="form-select" id="company-size" required>
-                                <option value="">Select Size</option>
-                                <option value="1-10">1-10 employees</option>
-                                <option value="11-50">11-50 employees</option>
-                                <option value="51-200">51-200 employees</option>
-                                <option value="201-500">201-500 employees</option>
-                                <option value="501-1000">501-1000 employees</option>
-                                <option value="1000+">1000+ employees</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label class="form-label">Geography *</label>
-                            <select class="form-select" id="geography" required>
-                                <option value="">Select Region</option>
-                                <option value="north-america">North America</option>
-                                <option value="europe">Europe</option>
-                                <option value="asia-pacific">Asia Pacific</option>
-                                <option value="latin-america">Latin America</option>
-                                <option value="middle-east-africa">Middle East & Africa</option>
-                            </select>
-                        </div>
-                    </div>
-                    <button type="submit" class="btn btn-primary">
-                        <span id="onboarding-submit-text">Complete Setup</span>
-                        <span id="onboarding-submit-loader" style="display: none;" class="loading-spinner"></span>
-                    </button>
-                </form>
-            </div>
-        </div>
-
-        <!-- Pricing Section -->
-        <div class="pricing-section">
-            <h2 class="section-title">Simple, Transparent Pricing</h2>
-            <p class="section-subtitle">Choose the plan that fits your revenue intelligence needs</p>
-            
-            <div class="pricing-grid">
-                <!-- Free Trial -->
-                <div class="pricing-card">
-                    <div class="plan-name">Free Trial</div>
-                    <div class="plan-price">$0</div>
-                    <div class="plan-warning">⚠️ One Time Per Device</div>
-                    <ul class="plan-features">
-                        <li>1 User</li>
-                        <li>5 GTM Strategies</li>
-                        <li>50 ALO Leads</li>
-                        <li>Basic Analytics</li>
-                        <li>Email Support</li>
-                    </ul>
-                </div>
-
-                <!-- Starter -->
-                <div class="pricing-card">
-                    <div class="plan-name">Starter</div>
-                    <div class="plan-price">$49<span class="plan-price-small">/mo</span></div>
-                    <ul class="plan-features">
-                        <li>1 User</li>
-                        <li>100 GTM Strategies</li>
-                        <li>1,000 ALO Leads</li>
-                        <li>Advanced Analytics</li>
-                        <li>Priority Email Support</li>
-                        <li>Export to CSV</li>
-                    </ul>
-                </div>
-
-                <!-- Professional -->
-                <div class="pricing-card featured">
-                    <div class="plan-name">Professional</div>
-                    <div class="plan-price">$149<span class="plan-price-small">/mo</span></div>
-                    <ul class="plan-features">
-                        <li>3 Team Seats</li>
-                        <li>Unlimited GTM Strategies</li>
-                        <li>Unlimited ALO Leads</li>
-                        <li>AI Model Choice</li>
-                        <li>Advanced Integrations</li>
-                        <li>Custom Reports</li>
-                        <li>Chat & Email Support</li>
-                    </ul>
-                </div>
-
-                <!-- Team -->
-                <div class="pricing-card">
-                    <div class="plan-name">Team</div>
-                    <div class="plan-price">$299<span class="plan-price-small">/mo</span></div>
-                    <ul class="plan-features">
-                        <li>10 Team Seats</li>
-                        <li>Everything in Professional</li>
-                        <li>Priority Support</li>
-                        <li>API Access</li>
-                        <li>Full Team Shared Vault</li>
-                        <li>Advanced Permissions</li>
-                        <li>Dedicated Account Manager</li>
-                    </ul>
-                </div>
-
-                <!-- Enterprise -->
-                <div class="pricing-card">
-                    <div class="plan-name">Enterprise</div>
-                    <div class="plan-price">Custom</div>
-                    <div class="plan-price-small">Starting at $800/mo</div>
-                    <ul class="plan-features">
-                        <li>Unlimited Seats</li>
-                        <li>White-label Solution</li>
-                        <li>CRM Sync (Salesforce, HubSpot)</li>
-                        <li>Dedicated Support Team</li>
-                        <li>Custom Integrations</li>
-                        <li>SLA Guarantees</li>
-                        <li>On-premise Deployment Option</li>
-                    </ul>
-                </div>
-            </div>
-        </div>
+  <!-- EMAIL Panel -->
+  <div class="panel active" id="email-panel">
+    <!-- Sign In / Sign Up Sub-tabs -->
+    <div class="sub-tabs">
+      <button class="sub-tab active" data-mode="signin">Sign In</button>
+      <button class="sub-tab" data-mode="signup">Sign Up</button>
     </div>
 
-    <script type="module" src="./auth-guard.js"></script>
-    <script>
-        // Check if we should show onboarding modal (for OAuth users)
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get('show_onboarding') === 'true') {
-            // Wait for page to load, then show onboarding
-            window.addEventListener('load', () => {
-                setTimeout(() => {
-                    const modal = document.getElementById('onboarding-modal');
-                    if (modal) {
-                        modal.classList.add('active');
-                    }
-                }, 500);
-            });
+    <!-- Sign In Form -->
+    <form id="signin-form" class="auth-form" autocomplete="on">
+      <label class="label">Email Address</label>
+      <input type="email" class="input" id="signin-email" placeholder="you@company.com" required autocomplete="email" />
+
+      <label class="label">Password</label>
+      <input type="password" class="input" id="signin-password" placeholder="Enter your password" required autocomplete="current-password" />
+
+      <button type="submit" class="btn">
+        <span class="btn-text">Sign In</span>
+        <div class="spinner"></div>
+      </button>
+
+      <a href="#" class="link" id="forgot-link">Forgot password?</a>
+    </form>
+
+    <!-- Sign Up Form -->
+    <form id="signup-form" class="auth-form" style="display:none" autocomplete="on">
+      <label class="label">Email Address</label>
+      <input type="email" class="input" id="signup-email" placeholder="you@company.com" required autocomplete="email" />
+
+      <label class="label">Password</label>
+      <input type="password" class="input" id="signup-password" placeholder="Create password (8+ characters)" required autocomplete="new-password" />
+
+      <label class="label">Confirm Password</label>
+      <input type="password" class="input" id="confirm-password" placeholder="Confirm password" required autocomplete="new-password" />
+
+      <label class="check-row">
+        <input type="checkbox" id="terms-checkbox" required />
+        <span>I accept the <a href="/terms.html" target="_blank">Terms of Service</a> and <a href="/privacy.html" target="_blank">Privacy Policy</a></span>
+      </label>
+
+      <label class="check-row">
+        <input type="checkbox" id="marketing-checkbox" />
+        <span>Send me product updates and marketing emails</span>
+      </label>
+
+      <button type="submit" class="btn">
+        <span class="btn-text">Create Account</span>
+        <div class="spinner"></div>
+      </button>
+    </form>
+
+    <div id="email-msg" class="msg"></div>
+  </div>
+
+  <!-- GOOGLE Panel -->
+  <div class="panel" id="google-panel">
+    <p class="subtitle">Sign in with your Google account for instant access</p>
+    
+    <button id="google-btn" class="btn-outline">
+      <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTgiIGhlaWdodD0iMTgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGcgZmlsbD0ibm9uZSIgZmlsbC1ydWxlPSJldmVub2RkIj48cGF0aCBkPSJNMTcuNiA5LjJsLS4xLTEuOEg5djMuNGg0LjhDMTMuNiAxMiAxMyAxMyAxMiAxMy42djIuMmgzYTguOCA4LjggMCAwIDAgMi42LTYuNnoiIGZpbGw9IiM0Mjg1RjQiIGZpbGwtcnVsZT0ibm9uemVybyIvPjxwYXRoIGQ9Ik05IDE4YzIuNCAwIDQuNS0uOCA2LTIuMmwtMy0yLjJhNS40IDUuNCAwIDAgMS04LTIuOUgxVjEzYTkgOSAwIDAgMCA4IDV6IiBmaWxsPSIjMzRBODUzIiBmaWxsLXJ1bGU9Im5vbnplcm8iLz48cGF0aCBkPSJNNCAxMC43YTUuNCA1LjQgMCAwIDEgMC0zLjRWNUgxYTkgOSAwIDAgMCAwIDhsMy0yLjN6IiBmaWxsPSIjRkJCQzA1IiBmaWxsLXJ1bGU9Im5vbnplcm8iLz48cGF0aCBkPSJNOSAzLjZjMS4zIDAgMi41LjQgMy40IDEuM0wxNSAyLjNBOSA5IDAgMCAwIDEgNWwzIDIuNGE1LjQgNS40IDAgMCAxIDUtMy43eiIgZmlsbD0iI0VBNDMzNSIgZmlsbC1ydWxlPSJub256ZXJvIi8+PHBhdGggZD0iTTAgMGgxOHYxOEgweiIvPjwvZz48L3N2Zz4=" alt="Google" />
+      <span class="btn-text">Continue with Google</span>
+      <div class="spinner"></div>
+    </button>
+
+    <div id="google-msg" class="msg"></div>
+  </div>
+
+  <!-- MAGIC LINK Panel -->
+  <div class="panel" id="magic-panel">
+    <p class="subtitle">We'll send you a secure login link via email</p>
+    
+    <form id="magic-form" class="auth-form" autocomplete="on">
+      <label class="label">Email Address</label>
+      <input type="email" class="input" id="magic-email" placeholder="you@company.com" required autocomplete="email" />
+
+      <button type="submit" class="btn">
+        <span class="btn-text">Send Magic Link</span>
+        <div class="spinner"></div>
+      </button>
+    </form>
+
+    <div id="magic-msg" class="msg"></div>
+  </div>
+
+  <div class="footer">
+    Don't have an account? <a href="#" class="link" id="signup-link">Sign Up</a>
+    <div class="secure">
+      <div class="dot"></div>
+      Secured by Supabase Authentication
+    </div>
+  </div>
+</div>
+
+<!-- Onboarding Modal -->
+<div class="modal-overlay" id="onboarding-modal">
+  <div class="modal">
+    <div class="progress">
+      <div class="progress-dot done"></div>
+      <div class="progress-dot"></div>
+    </div>
+    
+    <h2>Complete Your Profile</h2>
+    <p>Help us personalize your experience</p>
+    
+    <form id="onboarding-form">
+      <div class="modal-grid">
+        <div class="full">
+          <label class="label">Full Name</label>
+          <input type="text" class="input" id="full-name" required />
+        </div>
+        
+        <div class="full">
+          <label class="label">Company Name</label>
+          <input type="text" class="input" id="company-name" required />
+        </div>
+        
+        <div>
+          <label class="label">Job Title</label>
+          <input type="text" class="input" id="job-title" />
+        </div>
+        
+        <div>
+          <label class="label">Department</label>
+          <select class="input" id="department">
+            <option value="">Select...</option>
+            <option value="sales">Sales</option>
+            <option value="marketing">Marketing</option>
+            <option value="revenue_ops">Revenue Ops</option>
+            <option value="executive">Executive</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+        
+        <div>
+          <label class="label">Company Size</label>
+          <select class="input" id="company-size">
+            <option value="">Select...</option>
+            <option value="1-10">1-10</option>
+            <option value="11-50">11-50</option>
+            <option value="51-200">51-200</option>
+            <option value="201-1000">201-1000</option>
+            <option value="1000+">1000+</option>
+          </select>
+        </div>
+        
+        <div>
+          <label class="label">Geography</label>
+          <select class="input" id="geography">
+            <option value="">Select...</option>
+            <option value="north_america">North America</option>
+            <option value="europe">Europe</option>
+            <option value="asia">Asia</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+      </div>
+      
+      <button type="submit" class="btn" style="margin-top:24px">
+        <span class="btn-text">Complete Onboarding</span>
+        <div class="spinner"></div>
+      </button>
+    </form>
+  </div>
+</div>
+
+<script>
+// ⚠️ CRITICAL: Replace with your actual Cloudflare Pages domain
+const PRODUCTION_URL = 'https://YOUR_ACTUAL_DOMAIN.pages.dev';
+
+const SUPABASE_URL = 'https://cwcvneluhlimhlzowabv.supabase.co';
+const SUPABASE_ANON_KEY = 'sb_publishable_EeDAvGbX7TpO_hgBoUZMhQ_B_nJtAbb';
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Tab switching
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    
+    tab.classList.add('active');
+    const method = tab.dataset.method;
+    document.getElementById(`${method}-panel`).classList.add('active');
+  });
+});
+
+// Sub-tab switching (Sign In / Sign Up)
+document.querySelectorAll('.sub-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.sub-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    
+    const mode = tab.dataset.mode;
+    if (mode === 'signin') {
+      document.getElementById('signin-form').style.display = 'block';
+      document.getElementById('signup-form').style.display = 'none';
+    } else {
+      document.getElementById('signin-form').style.display = 'none';
+      document.getElementById('signup-form').style.display = 'block';
+    }
+  });
+});
+
+// Helper functions
+function showError(msg, elementId = 'email-msg') {
+  const el = document.getElementById(elementId);
+  el.textContent = msg;
+  el.className = 'msg error';
+}
+
+function showSuccess(msg, elementId = 'email-msg') {
+  const el = document.getElementById(elementId);
+  el.textContent = msg;
+  el.className = 'msg success';
+}
+
+function hideMsg(elementId = 'email-msg') {
+  document.getElementById(elementId).style.display = 'none';
+}
+
+function getDeviceFingerprint() {
+  const raw = JSON.stringify({
+    ua: navigator.userAgent,
+    lang: navigator.language,
+    tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    res: `${screen.width}x${screen.height}`,
+    cd: screen.colorDepth,
+  });
+  let h = 0;
+  for (let i = 0; i < raw.length; i++) {
+    h = Math.imul(31, h) + raw.charCodeAt(i) | 0;
+  }
+  return 'fp_' + Math.abs(h).toString(36);
+}
+
+// Sign In
+document.getElementById('signin-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  hideMsg();
+  
+  const btn = e.target.querySelector('.btn');
+  const email = document.getElementById('signin-email').value;
+  const password = document.getElementById('signin-password').value;
+  
+  btn.disabled = true;
+  btn.classList.add('loading');
+  
+  try {
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    
+    if (error) throw error;
+    
+    console.log('✅ Sign in successful:', data.user.email);
+    
+    // Check if onboarding completed
+    const { data: profile } = await sb
+      .from('user_profiles')
+      .select('onboarding_completed')
+      .eq('id', data.user.id)
+      .single();
+    
+    if (!profile || !profile.onboarding_completed) {
+      document.getElementById('onboarding-modal').classList.add('active');
+    } else {
+      window.location.href = '/dashboard.html';
+    }
+    
+  } catch (err) {
+    console.error('Sign in error:', err);
+    showError(err.message || 'Failed to sign in. Please check your credentials.');
+    btn.disabled = false;
+    btn.classList.remove('loading');
+  }
+});
+
+// Sign Up
+document.getElementById('signup-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  hideMsg();
+  
+  const btn = e.target.querySelector('.btn');
+  const email = document.getElementById('signup-email').value;
+  const password = document.getElementById('signup-password').value;
+  const confirmPassword = document.getElementById('confirm-password').value;
+  const termsAccepted = document.getElementById('terms-checkbox').checked;
+  const marketingConsent = document.getElementById('marketing-checkbox').checked;
+  
+  // Validation
+  if (password !== confirmPassword) {
+    showError('Passwords do not match');
+    return;
+  }
+  
+  if (password.length < 8) {
+    showError('Password must be at least 8 characters');
+    return;
+  }
+  
+  if (!termsAccepted) {
+    showError('You must accept the Terms of Service');
+    return;
+  }
+  
+  btn.disabled = true;
+  btn.classList.add('loading');
+  
+  try {
+    // Sign up with Supabase
+    const { data, error } = await sb.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          terms_accepted: termsAccepted,
+          marketing_consent: marketingConsent,
+          device_id: getDeviceFingerprint()
         }
+      }
+    });
+    
+    if (error) throw error;
+    
+    console.log('✅ Sign up successful:', data.user.email);
+    
+    // Create user profile and organization
+    await createUserProfile(data.user, { termsAccepted, marketingConsent });
+    
+    // Show onboarding
+    document.getElementById('onboarding-modal').classList.add('active');
+    
+  } catch (err) {
+    console.error('Sign up error:', err);
+    showError(err.message || 'Failed to create account. Please try again.');
+    btn.disabled = false;
+    btn.classList.remove('loading');
+  }
+});
 
-        // Tab switching
-        document.querySelectorAll('.auth-tab').forEach(tab => {
-            tab.addEventListener('click', () => {
-                const tabName = tab.dataset.tab;
-                
-                // Update active tab
-                document.querySelectorAll('.auth-tab').forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-                
-                // Update active panel
-                document.querySelectorAll('.auth-panel').forEach(p => p.classList.remove('active'));
-                document.getElementById(`${tabName}-panel`).classList.add('active');
-            });
-        });
+// Create user profile
+async function createUserProfile(user, options) {
+  try {
+    const deviceId = getDeviceFingerprint();
+    
+    // Create organization
+    const { data: org, error: orgError } = await sb
+      .from('organizations')
+      .insert({
+        name: `${user.email}'s Organization`,
+        plan_tier: 'free_trial',
+        owner_id: user.id
+      })
+      .select()
+      .single();
+    
+    if (orgError) throw orgError;
+    
+    // Create user profile
+    const { data: profile, error: profileError } = await sb
+      .from('user_profiles')
+      .insert({
+        id: user.id,
+        email: user.email,
+        organization_id: org.id,
+        plan: 'free_trial',
+        tc_accepted: options.termsAccepted,
+        marketing_consent: options.marketingConsent,
+        device_id: deviceId,
+        onboarding_completed: false,
+        created_at: new Date().toISOString()
+      })
+      .select()
+      .single();
+    
+    if (profileError) throw profileError;
+    
+    // Create organization membership
+    await sb
+      .from('organization_members')
+      .insert({
+        organization_id: org.id,
+        user_id: user.id,
+        role: 'owner'
+      });
+    
+    console.log('✅ User profile created');
+    
+  } catch (error) {
+    console.error('Create profile error:', error);
+    throw error;
+  }
+}
 
-        // Toggle between login and signup
-        let isSignup = false;
-        document.getElementById('toggle-mode').addEventListener('click', (e) => {
-            e.preventDefault();
-            isSignup = !isSignup;
-            const signupFields = document.getElementById('signup-fields');
-            const submitBtn = document.getElementById('email-submit-text');
-            const toggleLink = document.getElementById('toggle-mode');
-            
-            if (isSignup) {
-                signupFields.style.display = 'block';
-                submitBtn.textContent = 'Sign Up';
-                toggleLink.textContent = 'Already have an account? Sign In';
-            } else {
-                signupFields.style.display = 'none';
-                submitBtn.textContent = 'Sign In';
-                toggleLink.textContent = "Don't have an account? Sign Up";
-            }
-        });
-
-        // Form validation
-        function validateEmail(email) {
-            return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+// Google OAuth
+document.getElementById('google-btn').addEventListener('click', async (e) => {
+  e.preventDefault();
+  hideMsg('google-msg');
+  
+  const btn = e.currentTarget;
+  btn.disabled = true;
+  btn.classList.add('loading');
+  
+  try {
+    const { data, error } = await sb.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${PRODUCTION_URL}/dashboard.html`,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent'
         }
+      }
+    });
+    
+    if (error) throw error;
+    
+    console.log('✅ Redirecting to Google...');
+    
+  } catch (err) {
+    console.error('Google OAuth error:', err);
+    showError(err.message || 'Failed to sign in with Google', 'google-msg');
+    btn.disabled = false;
+    btn.classList.remove('loading');
+  }
+});
 
-        function showError(inputId, message) {
-            const input = document.getElementById(inputId);
-            const error = document.getElementById(`${inputId}-error`);
-            input.classList.add('error');
-            error.textContent = message;
-            error.classList.add('visible');
+// Magic Link
+document.getElementById('magic-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  hideMsg('magic-msg');
+  
+  const btn = e.target.querySelector('.btn');
+  const email = document.getElementById('magic-email').value;
+  
+  btn.disabled = true;
+  btn.classList.add('loading');
+  
+  try {
+    const { error } = await sb.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: `${PRODUCTION_URL}/dashboard.html`
+      }
+    });
+    
+    if (error) throw error;
+    
+    showSuccess('Magic link sent! Check your email.', 'magic-msg');
+    
+  } catch (err) {
+    console.error('Magic link error:', err);
+    showError(err.message || 'Failed to send magic link', 'magic-msg');
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('loading');
+  }
+});
+
+// Onboarding
+document.getElementById('onboarding-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  
+  const btn = e.target.querySelector('.btn');
+  btn.disabled = true;
+  btn.classList.add('loading');
+  
+  try {
+    const { data: { user } } = await sb.auth.getUser();
+    
+    const onboardingData = {
+      full_name: document.getElementById('full-name').value,
+      company_name: document.getElementById('company-name').value,
+      job_title: document.getElementById('job-title').value,
+      department: document.getElementById('department').value,
+      company_size: document.getElementById('company-size').value,
+      geography: document.getElementById('geography').value,
+      onboarding_completed: true,
+      updated_at: new Date().toISOString()
+    };
+    
+    const { error } = await sb
+      .from('user_profiles')
+      .update(onboardingData)
+      .eq('id', user.id);
+    
+    if (error) throw error;
+    
+    // Update organization name
+    const { data: profile } = await sb
+      .from('user_profiles')
+      .select('organization_id')
+      .eq('id', user.id)
+      .single();
+    
+    if (profile?.organization_id) {
+      await sb
+        .from('organizations')
+        .update({ name: onboardingData.company_name })
+        .eq('id', profile.organization_id);
+    }
+    
+    console.log('✅ Onboarding complete');
+    window.location.href = '/dashboard.html';
+    
+  } catch (err) {
+    console.error('Onboarding error:', err);
+    alert('Failed to complete onboarding. Please try again.');
+    btn.disabled = false;
+    btn.classList.remove('loading');
+  }
+});
+
+// Check for OAuth callback
+(async function checkOAuthReturn() {
+  const hash = window.location.hash;
+  const params = new URLSearchParams(window.location.search);
+  
+  if (hash.includes('access_token') || params.get('code')) {
+    console.log('OAuth callback detected');
+    
+    try {
+      const { data: { session }, error } = await sb.auth.getSession();
+      
+      if (error) throw error;
+      
+      if (session) {
+        console.log('✅ OAuth session established:', session.user.email);
+        
+        // Check/create profile for OAuth user
+        const { data: profile } = await sb
+          .from('user_profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+        
+        if (!profile) {
+          console.log('New OAuth user - creating profile');
+          await createUserProfile(session.user, {
+            termsAccepted: true,
+            marketingConsent: false
+          });
+          document.getElementById('onboarding-modal').classList.add('active');
+        } else if (!profile.onboarding_completed) {
+          document.getElementById('onboarding-modal').classList.add('active');
+        } else {
+          window.location.href = '/dashboard.html';
         }
+      }
+    } catch (err) {
+      console.error('OAuth callback error:', err);
+      showError('Authentication failed. Please try again.');
+    }
+  }
+})();
 
-        function clearError(inputId) {
-            const input = document.getElementById(inputId);
-            const error = document.getElementById(`${inputId}-error`);
-            input.classList.remove('error');
-            error.classList.remove('visible');
-        }
+// Handle URL parameters for onboarding
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('show_onboarding') === 'true') {
+  document.getElementById('onboarding-modal').classList.add('active');
+}
+if (urlParams.get('error')) {
+  showError(decodeURIComponent(urlParams.get('error')));
+}
 
-        function setLoading(formType, isLoading) {
-            const submitText = document.getElementById(`${formType}-submit-text`);
-            const submitLoader = document.getElementById(`${formType}-submit-loader`);
-            const submitBtn = submitText.closest('button');
-            
-            if (isLoading) {
-                submitText.style.display = 'none';
-                submitLoader.style.display = 'inline-block';
-                submitBtn.disabled = true;
-            } else {
-                submitText.style.display = 'inline';
-                submitLoader.style.display = 'none';
-                submitBtn.disabled = false;
-            }
-        }
+// Signup link click
+document.getElementById('signup-link').addEventListener('click', (e) => {
+  e.preventDefault();
+  document.querySelector('[data-mode="signup"]').click();
+});
 
-        // Email form handling
-        document.getElementById('email-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            
-            // Clear previous errors
-            clearError('email');
-            clearError('password');
-            clearError('confirm-password');
-            
-            // Validation
-            if (!validateEmail(email)) {
-                showError('email', 'Please enter a valid email address');
-                return;
-            }
-            
-            if (password.length < 8) {
-                showError('password', 'Password must be at least 8 characters');
-                return;
-            }
-            
-            if (isSignup) {
-                const confirmPassword = document.getElementById('confirm-password').value;
-                const termsChecked = document.getElementById('terms-checkbox').checked;
-                
-                if (password !== confirmPassword) {
-                    showError('confirm-password', 'Passwords do not match');
-                    return;
-                }
-                
-                if (!termsChecked) {
-                    alert('Please agree to the Terms of Service and Privacy Policy');
-                    return;
-                }
-            }
-            
-            setLoading('email', true);
-            
-            // Import and call auth function from auth-guard.js
-            try {
-                if (isSignup) {
-                    const marketingConsent = document.getElementById('marketing-checkbox').checked;
-                    await window.authGuard.signup(email, password, termsChecked, marketingConsent);
-                } else {
-                    await window.authGuard.login(email, password);
-                }
-            } catch (error) {
-                alert(error.message || 'Authentication failed');
-                setLoading('email', false);
-            }
-        });
+console.log('✅ Login page initialized');
+</script>
 
-        // Magic link form
-        document.getElementById('magic-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const email = document.getElementById('magic-email').value;
-            clearError('magic-email');
-            
-            if (!validateEmail(email)) {
-                showError('magic-email', 'Please enter a valid email address');
-                return;
-            }
-            
-            setLoading('magic', true);
-            
-            try {
-                await window.authGuard.sendMagicLink(email);
-                alert('Magic link sent! Check your email.');
-                setLoading('magic', false);
-            } catch (error) {
-                alert(error.message || 'Failed to send magic link');
-                setLoading('magic', false);
-            }
-        });
-
-        // Google OAuth
-        document.getElementById('google-signin').addEventListener('click', async () => {
-            try {
-                await window.authGuard.signInWithGoogle();
-            } catch (error) {
-                alert(error.message || 'Google sign-in failed');
-            }
-        });
-
-        // Phone/SMS (Placeholder)
-        document.getElementById('phone-form').addEventListener('submit', (e) => {
-            e.preventDefault();
-            alert('SMS authentication is coming soon!');
-        });
-
-        // Onboarding form
-        document.getElementById('onboarding-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const onboardingData = {
-                fullName: document.getElementById('full-name').value,
-                companyName: document.getElementById('company-name').value,
-                jobTitle: document.getElementById('job-title').value,
-                department: document.getElementById('department').value,
-                companySize: document.getElementById('company-size').value,
-                geography: document.getElementById('geography').value
-            };
-            
-            setLoading('onboarding', true);
-            
-            try {
-                await window.authGuard.completeOnboarding(onboardingData);
-                document.getElementById('onboarding-modal').classList.remove('active');
-                window.location.href = '/dashboard.html';
-            } catch (error) {
-                alert(error.message || 'Failed to complete onboarding');
-                setLoading('onboarding', false);
-            }
-        });
-    </script>
 </body>
 </html>
