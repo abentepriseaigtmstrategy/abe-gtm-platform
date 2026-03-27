@@ -134,7 +134,7 @@ async function handleRunStep(body, userId, openaiKey, supabaseUrl, supabaseKey, 
 }
 
 // ══════════════════════════════════════════════════════════════════
-// SAVE STRATEGY
+// SAVE STRATEGY — FIXED (steps 2-6 now persist)
 // ══════════════════════════════════════════════════════════════════
 async function handleSaveStrategy(body, userId, supabaseUrl, supabaseKey, env, cors) {
   if (!supabaseUrl || !supabaseKey) return errRes('Database not configured', 503, cors);
@@ -168,11 +168,17 @@ async function handleSaveStrategy(body, userId, supabaseUrl, supabaseKey, env, c
     full_report:      full_report || null,
   };
 
-  // FIX: Must pass resolution=merge-duplicates so subsequent step saves UPDATE the row
-  // instead of being silently ignored. Without this, steps 2-6 never persisted.
-  const res = await sbFetch(supabaseUrl, supabaseKey, 'strategies', 'POST',
-    JSON.stringify(payload), '?on_conflict=cache_key',
-    'return=representation,resolution=merge-duplicates');
+  // FIXED: resolution=merge-duplicates so steps 2-6 update the row (root cause fixed)
+  const res = await fetch(`${supabaseUrl}/rest/v1/strategies?on_conflict=cache_key`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: supabaseKey,
+      Authorization: `Bearer ${supabaseKey}`,
+      Prefer: 'return=representation,resolution=merge-duplicates'
+    },
+    body: JSON.stringify(payload)
+  });
 
   if (!res.ok) {
     const e = await res.text();
@@ -602,9 +608,7 @@ async function hash(str) {
   return Array.from(new Uint8Array(h)).map(b=>b.toString(16).padStart(2,'0')).join('').slice(0,16);
 }
 
-// FIX: Added optional `prefer` param — upserts need 'resolution=merge-duplicates'
-// Without it Supabase does INSERT OR IGNORE, silently dropping all step updates
-// after the first save. Steps 2-6 never persisted. steps_completed stuck at 1.
+// FIXED: Added optional `prefer` param — upserts need 'resolution=merge-duplicates'
 const sbFetch = (url, key, table, method, body, qs = '', prefer = null) =>
   fetch(`${url}/rest/v1/${table}${qs}`, {
     method,
