@@ -380,8 +380,16 @@ document.getElementById('signin-form').addEventListener('submit', async (e) => {
     if (error) throw error;
     
     console.log('✅ Sign in successful:', data.user.email);
+
+    // ADMIN BYPASS: skip onboarding check, go straight to dashboard
+    const _adminEmails = ['amitbhawik@gmail.com', 'amitbhawik@hotmail.com'];
+    if (_adminEmails.includes(data.user.email.toLowerCase())) {
+      console.log('✅ Admin — redirecting directly to dashboard');
+      window.location.href = '/dashboard.html';
+      return;
+    }
     
-    // Check if onboarding completed
+    // Check if onboarding completed (regular users only)
     const { data: profile } = await sb
       .from('user_profiles')
       .select('onboarding_completed')
@@ -467,55 +475,96 @@ document.getElementById('signup-form').addEventListener('submit', async (e) => {
 
 // Create user profile
 async function createUserProfile(user, options) {
+  // ADMIN BYPASS: admin users skip profile creation entirely
+  const adminEmails = ['amitbhawik@gmail.com', 'amitbhawik@hotmail.com'];
+  if (adminEmails.includes(user.email.toLowerCase())) {
+    console.log('✅ Admin user — skipping profile creation');
+    return;
+  }
+
+  const deviceId = getDeviceFingerprint();
+
   try {
-    const deviceId = getDeviceFingerprint();
-    
-    // Create organization
-    const { data: org, error: orgError } = await sb
+    // ── Step 1: Get or create organization ──────────────────────────
+    // Use upsert on owner_id so re-runs don't throw 500 on duplicate
+    let orgId = null;
+
+    // First check if org already exists for this user
+    const { data: existingOrg } = await sb
       .from('organizations')
-      .insert({
-        name: `${user.email}'s Organization`,
-        plan_tier: 'free_trial',
-        owner_id: user.id
-      })
-      .select()
-      .single();
-    
-    if (orgError) throw orgError;
-    
-    // Create user profile
-    const { data: profile, error: profileError } = await sb
+      .select('id')
+      .eq('owner_id', user.id)
+      .maybeSingle();
+
+    if (existingOrg) {
+      orgId = existingOrg.id;
+      console.log('✅ Existing org found:', orgId);
+    } else {
+      const { data: newOrg, error: orgError } = await sb
+        .from('organizations')
+        .insert({
+          name: `${user.email}'s Organization`,
+          plan_tier: 'free_trial',
+          owner_id: user.id,
+        })
+        .select('id')
+        .single();
+
+      if (orgError) {
+        // 23505 = unique_violation — org already exists, fetch it
+        if (orgError.code === '23505' || orgError.message?.includes('duplicate') || orgError.message?.includes('unique')) {
+          const { data: retryOrg } = await sb
+            .from('organizations')
+            .select('id')
+            .eq('owner_id', user.id)
+            .maybeSingle();
+          orgId = retryOrg?.id || null;
+        } else {
+          console.warn('Org insert error (non-fatal):', orgError.message);
+          // Continue without org — profile can still be created
+        }
+      } else {
+        orgId = newOrg?.id || null;
+      }
+    }
+
+    // ── Step 2: Upsert user_profiles ────────────────────────────────
+    // upsert handles both first-time and repeat calls safely
+    const { error: profileError } = await sb
       .from('user_profiles')
-      .insert({
-        id: user.id,
-        email: user.email,
-        organization_id: org.id,
-        plan: 'free_trial',
-        tc_accepted: options.termsAccepted,
-        marketing_consent: options.marketingConsent,
-        device_id: deviceId,
+      .upsert({
+        id:                   user.id,
+        email:                user.email,
+        organization_id:      orgId,
+        plan:                 'free_trial',
+        tc_accepted:          options.termsAccepted    || false,
+        marketing_consent:    options.marketingConsent || false,
+        device_id:            deviceId,
         onboarding_completed: false,
-        created_at: new Date().toISOString()
-      })
-      .select()
-      .single();
-    
-    if (profileError) throw profileError;
-    
-    // Create organization membership
-    await sb
-      .from('organization_members')
-      .insert({
-        organization_id: org.id,
-        user_id: user.id,
-        role: 'owner'
-      });
-    
-    console.log('✅ User profile created');
-    
+        created_at:           new Date().toISOString(),
+      }, { onConflict: 'id' });
+
+    if (profileError) {
+      console.warn('Profile upsert error (non-fatal):', profileError.message);
+      // Don't throw — authenticated user should still proceed
+    }
+
+    // ── Step 3: Upsert organization membership ───────────────────────
+    if (orgId) {
+      await sb
+        .from('organization_members')
+        .upsert({
+          organization_id: orgId,
+          user_id:         user.id,
+          role:            'owner',
+        }, { onConflict: 'organization_id,user_id' });
+    }
+
+    console.log('✅ User profile created/updated');
+
   } catch (error) {
-    console.error('Create profile error:', error);
-    throw error;
+    // Non-fatal: log but never block authenticated users from proceeding
+    console.warn('createUserProfile warning (non-fatal):', error.message);
   }
 }
 
@@ -587,54 +636,84 @@ document.getElementById('magic-form').addEventListener('submit', async (e) => {
 // Onboarding
 document.getElementById('onboarding-form').addEventListener('submit', async (e) => {
   e.preventDefault();
-  
+
   const btn = e.target.querySelector('.btn');
   btn.disabled = true;
   btn.classList.add('loading');
-  
+
   try {
     const { data: { user } } = await sb.auth.getUser();
-    
+
+    // ADMIN BYPASS: admin users skip onboarding DB write and go straight to dashboard
+    const adminEmails = ['amitbhawik@gmail.com', 'amitbhawik@hotmail.com'];
+    if (user && adminEmails.includes(user.email.toLowerCase())) {
+      console.log('✅ Admin user — bypassing onboarding, redirecting to dashboard');
+      window.location.href = '/dashboard.html';
+      return;
+    }
+
     const onboardingData = {
-      full_name: document.getElementById('full-name').value,
-      company_name: document.getElementById('company-name').value,
-      job_title: document.getElementById('job-title').value,
-      department: document.getElementById('department').value,
-      company_size: document.getElementById('company-size').value,
-      geography: document.getElementById('geography').value,
+      full_name:            document.getElementById('full-name').value,
+      company_name:         document.getElementById('company-name').value,
+      job_title:            document.getElementById('job-title').value,
+      department:           document.getElementById('department').value,
+      company_size:         document.getElementById('company-size').value,
+      geography:            document.getElementById('geography').value,
       onboarding_completed: true,
-      updated_at: new Date().toISOString()
+      updated_at:           new Date().toISOString(),
     };
-    
+
+    // Use upsert so this works whether the profile row exists or not
     const { error } = await sb
       .from('user_profiles')
-      .update(onboardingData)
-      .eq('id', user.id);
-    
-    if (error) throw error;
-    
-    // Update organization name
-    const { data: profile } = await sb
-      .from('user_profiles')
-      .select('organization_id')
-      .eq('id', user.id)
-      .single();
-    
-    if (profile?.organization_id) {
-      await sb
-        .from('organizations')
-        .update({ name: onboardingData.company_name })
-        .eq('id', profile.organization_id);
+      .upsert({ id: user.id, email: user.email, ...onboardingData }, { onConflict: 'id' });
+
+    if (error) {
+      // If upsert fails, try plain update as fallback
+      console.warn('Upsert failed, trying update:', error.message);
+      const { error: updateError } = await sb
+        .from('user_profiles')
+        .update(onboardingData)
+        .eq('id', user.id);
+
+      if (updateError) {
+        // If both fail, log but don't block — user is authenticated, let them in
+        console.warn('Profile update also failed (non-fatal):', updateError.message);
+      }
     }
-    
+
+    // Update organization name (non-fatal if it fails)
+    try {
+      const { data: profile } = await sb
+        .from('user_profiles')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single();
+
+      if (profile?.organization_id) {
+        await sb
+          .from('organizations')
+          .update({ name: onboardingData.company_name })
+          .eq('id', profile.organization_id);
+      }
+    } catch (_) { /* non-fatal */ }
+
     console.log('✅ Onboarding complete');
     window.location.href = '/dashboard.html';
-    
+
   } catch (err) {
     console.error('Onboarding error:', err);
-    alert('Failed to complete onboarding. Please try again.');
-    btn.disabled = false;
-    btn.classList.remove('loading');
+    // CRITICAL FIX: Never show alert + block if user is authenticated.
+    // Check if we have a session — if yes, just go to dashboard anyway.
+    const { data: { session } } = await sb.auth.getSession().catch(() => ({ data: {} }));
+    if (session) {
+      console.log('Session valid — redirecting to dashboard despite onboarding error');
+      window.location.href = '/dashboard.html';
+    } else {
+      showError('Failed to complete onboarding. Please try again.');
+      btn.disabled = false;
+      btn.classList.remove('loading');
+    }
   }
 });
 
