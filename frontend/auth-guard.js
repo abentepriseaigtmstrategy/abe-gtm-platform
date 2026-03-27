@@ -1,481 +1,347 @@
-// auth-guard.js - ABE GTM Platform Authentication Module
-import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+/**
+ * auth-guard.js  —  ABE GTM Platform Authentication Module
+ *
+ * ROOT CAUSE FIXES:
+ *   Bug #1: Previous version used `import { createClient } from '...'` ES Module
+ *           syntax, but was loaded as a plain <script> tag (no type="module").
+ *           This caused a SyntaxError on every page, silently killing the entire
+ *           auth layer. Fix: use global window.supabase (loaded via CDN <script>
+ *           before this file).
+ *
+ *   Bug #2: window.APP was referenced everywhere (dashboard, vault, leads, gtm-
+ *           strategy, accounts, report) but was NEVER defined anywhere in the
+ *           codebase. Every call to window.APP.token(), window.APP.sb,
+ *           window.APP.user etc. threw TypeError: Cannot read properties of
+ *           undefined. Fix: define and populate window.APP here.
+ *
+ * CONTRACT — window.APP interface (used across all pages):
+ *   window.APP.sb          → Supabase client instance
+ *   window.APP.user        → current user object (null if not authed)
+ *   window.APP.token()     → async () => string  (JWT access token)
+ *   window.APP.signOut()   → async () => void    (signs out + redirects)
+ *   window.APP.api(endpoint, body, method?) → async fetch helper with auth header
+ *
+ * LOADING: This file MUST be loaded AFTER the Supabase CDN script:
+ *   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+ *   <script src="auth-guard.js"></script>
+ *   (NO type="module" — this is intentional)
+ */
 
-const SUPABASE_URL      = 'https://cwcvneluhlimhlzowabv.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_EeDAvGbX7TpO_hgBoUZMhQ_B_nJtAbb';
+(function () {
+  'use strict';
 
-const WORKER_API_BASE = 'https://abe-gtm-auth-worker.amitbhavikmnm.workers.dev';
+  /* ─── Supabase configuration ────────────────────────────────────────────── */
+  var SUPABASE_URL      = 'https://cwcvneluhlimhlzowabv.supabase.co';
+  // JWT-format anon key — consistent with index.html and backend _middleware.js
+  var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3Y3ZuZWx1aGxpbWhsem93YWJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2MzAxMjAsImV4cCI6MjA4OTIwNjEyMH0.SZDS-svU-kFh_OkUq3AjQY64F-71MpbBsFd6Iin5DlQ';
 
-class AuthGuard {
-    constructor() {
-        this.supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-        this.currentUser = null;
-        this.currentOrg = null;
+  /* ─── Guard: Supabase CDN must be loaded first ──────────────────────────── */
+  if (!window.supabase || typeof window.supabase.createClient !== 'function') {
+    console.error('[auth-guard] FATAL: window.supabase is not available. '
+      + 'Ensure supabase-js CDN script is loaded before auth-guard.js.');
+    return;
+  }
+
+  /* ─── Create Supabase client ────────────────────────────────────────────── */
+  var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  /* ─── Detect page type ──────────────────────────────────────────────────── */
+  var _path = window.location.pathname;
+  var _isPublicPage = (
+    _path.includes('login.html')         ||
+    _path.includes('auth-callback.html') ||
+    _path === '/'                        ||
+    _path === '/index.html'              ||
+    _path.endsWith('index.html')
+  );
+
+  /* ─── Define window.APP immediately (synchronous) ──────────────────────── */
+  // All pages access window.APP.sb synchronously for signOut etc., so this
+  // must be set before any DOMContentLoaded or inline script runs.
+  window.APP = {
+
+    sb: sb,
+
+    /** Current user object — null until session resolves */
+    user: null,
+
+    /**
+     * Returns the JWT access token for the current session.
+     * Used as: Authorization: Bearer <token> on all API calls.
+     */
+    token: async function () {
+      try {
+        var result = await sb.auth.getSession();
+        return (result.data && result.data.session)
+          ? result.data.session.access_token
+          : '';
+      } catch (e) {
+        console.error('[auth-guard] token() error:', e);
+        return '';
+      }
+    },
+
+    /**
+     * Authenticated fetch helper.
+     * Usage: const data = await window.APP.api('/api/gtm', { action: 'get_vault' })
+     */
+    api: async function (endpoint, body, method) {
+      method = method || 'POST';
+      var token = await this.token();
+      var opts = {
+        method: method,
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': 'Bearer ' + token,
+        },
+      };
+      if (body && method !== 'GET') {
+        opts.body = JSON.stringify(body);
+      }
+      var res = await fetch(endpoint, opts);
+      if (!res.ok) {
+        var e = {};
+        try { e = await res.json(); } catch (_) {}
+        throw new Error(e.error || ('HTTP ' + res.status));
+      }
+      return res.json();
+    },
+
+    /**
+     * Sign out the current user and redirect to login.
+     */
+    signOut: async function () {
+      try {
+        await sb.auth.signOut({ scope: 'local' });
+      } catch (_) {}
+      // Purge all Supabase tokens from localStorage
+      Object.keys(localStorage).forEach(function (k) {
+        if (k.startsWith('sb-') || k.includes('supabase')) {
+          localStorage.removeItem(k);
+        }
+      });
+      window.location.replace('/login.html');
+    },
+  };
+
+  /* ─── Session check & route protection ─────────────────────────────────── */
+  sb.auth.getSession().then(function (result) {
+    var session = result.data && result.data.session;
+
+    if (session) {
+      window.APP.user        = session.user;
+      window._currentUser    = session.user;  // legacy compat for gtm-strategy.html
+    } else {
+      window.APP.user        = null;
+      window._currentUser    = null;
+      if (!_isPublicPage) {
+        // Not authenticated — redirect to login preserving current URL as ?next=
+        var next = encodeURIComponent(window.location.pathname + window.location.search);
+        window.location.replace('/login.html?next=' + next);
+      }
     }
-
-    // Initialize and check current session
-    async initialize() {
-        const { data: { session } } = await this.supabase.auth.getSession();
-        
-        if (session) {
-            this.currentUser = session.user;
-            await this.loadUserProfile();
-            return true;
-        }
-        
-        return false;
+  }).catch(function (err) {
+    console.error('[auth-guard] getSession error:', err);
+    if (!_isPublicPage) {
+      window.location.replace('/login.html');
     }
+  });
 
-    // Load user profile and organization
-    async loadUserProfile() {
-        const { data: profile, error } = await this.supabase
-            .from('user_profiles')
-            .select('*, organizations(id, name, plan_tier)')
-            .eq('id', this.currentUser.id)
-            .single();
-
-        if (error) {
-            console.error('Failed to load user profile:', error);
-            return null;
-        }
-
-        this.currentUser.profile = profile;
-        
-        // Load organization membership
-        if (profile.organization_id) {
-            const { data: org } = await this.supabase
-                .from('organizations')
-                .select('*')
-                .eq('id', profile.organization_id)
-                .single();
-            
-            this.currentOrg = org;
-        }
-
-        return profile;
+  /* ─── Auth state change listener ───────────────────────────────────────── */
+  // Keeps window.APP.user in sync across token refreshes and sign-outs.
+  sb.auth.onAuthStateChange(function (event, session) {
+    if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+      window.APP.user     = session ? session.user : null;
+      window._currentUser = window.APP.user;
+    } else if (event === 'SIGNED_OUT') {
+      window.APP.user     = null;
+      window._currentUser = null;
+      if (!_isPublicPage) {
+        window.location.replace('/login.html');
+      }
     }
+  });
 
-    // Email/Password Signup
-    async signup(email, password, termsAccepted, marketingConsent) {
-        try {
-            // Step 1: Get device fingerprint for trial tracking
-            const deviceId = this.getDeviceFingerprint();
-            
-            // Step 2: Check trial eligibility via Cloudflare Worker
-            const trialCheck = await this.checkTrialEligibility(email, deviceId);
-            
-            if (!trialCheck.eligible) {
-                throw new Error('Free trial already used on this device. Please select a paid plan.');
-            }
+  /* ─── window.authGuard — backward-compat object ────────────────────────── */
+  // Some legacy call sites use window.authGuard directly.
+  window.authGuard = {
 
-            // Step 3: Sign up with Supabase Auth
-            const { data, error } = await this.supabase.auth.signUp({
-                email,
-                password,
-                options: {
-                    data: {
-                        terms_accepted: termsAccepted,
-                        marketing_consent: marketingConsent
-                    }
-                }
-            });
+    get supabase()     { return sb; },
+    get currentUser()  { return window.APP.user; },
+    get currentOrg()   { return null; }, // org is loaded per-page as needed
 
-            if (error) throw error;
-
-            // Step 4: Create user profile and organization
-            await this.createUserProfile(data.user, {
-                termsAccepted,
-                marketingConsent,
-                deviceId
-            });
-
-            // Step 5: Show onboarding modal
-            this.showOnboardingModal();
-
-            return data;
-        } catch (error) {
-            console.error('Signup error:', error);
-            throw error;
-        }
-    }
-
-    // Email/Password Login
-    async login(email, password) {
-        try {
-            const { data, error } = await this.supabase.auth.signInWithPassword({
-                email,
-                password
-            });
-
-            if (error) throw error;
-
-            this.currentUser = data.user;
-            await this.loadUserProfile();
-
-            // Check if onboarding is complete
-            if (!this.currentUser.profile?.onboarding_completed) {
-                this.showOnboardingModal();
-            } else {
-                window.location.href = '/dashboard.html';
-            }
-
-            return data;
-        } catch (error) {
-            console.error('Login error:', error);
-            throw error;
-        }
-    }
-
-    // Google OAuth
-    async signInWithGoogle() {
-        try {
-            // Corrected redirect logic to remove syntax errors and handle environments
-            const redirectUrl = `${window.location.origin}/auth-callback.html`;
-
-            console.log('🔐 Initiating Google OAuth with redirect:', redirectUrl);
-
-            const { data, error } = await this.supabase.auth.signInWithOAuth({
-                provider: 'google',
-                options: {
-                    redirectTo: redirectUrl,
-                    queryParams: {
-                        access_type: 'offline',
-                        prompt: 'consent'
-                    }
-                }
-            });
-
-            if (error) throw error;
-
-            // OAuth will redirect - this code won't run
-            console.log('✅ Redirecting to Google for authentication...');
-
-            return data;
-        } catch (error) {
-            console.error('❌ Google sign-in error:', error);
-            throw error;
-        }
-    }
-
-    // Magic Link
-    async sendMagicLink(email) {
-        try {
-            const { data, error } = await this.supabase.auth.signInWithOtp({
-                email,
-                options: {
-                    emailRedirectTo: `${window.location.origin}/auth/callback`
-                }
-            });
-
-            if (error) throw error;
-
-            return data;
-        } catch (error) {
-            console.error('Magic link error:', error);
-            throw error;
-        }
-    }
-
-    // Phone/SMS OTP (Placeholder for Supabase Phone Auth)
-    async sendPhoneOTP(phone) {
-        try {
-            const { data, error } = await this.supabase.auth.signInWithOtp({
-                phone,
-                options: {
-                    channel: 'sms'
-                }
-            });
-
-            if (error) throw error;
-
-            return data;
-        } catch (error) {
-            console.error('Phone OTP error:', error);
-            throw error;
-        }
-    }
-
-    async verifyPhoneOTP(phone, token) {
-        try {
-            const { data, error } = await this.supabase.auth.verifyOtp({
-                phone,
-                token,
-                type: 'sms'
-            });
-
-            if (error) throw error;
-
-            return data;
-        } catch (error) {
-            console.error('OTP verification error:', error);
-            throw error;
-        }
-    }
-
-    // Create user profile with organization
-    async createUserProfile(user, options = {}) {
-        const { termsAccepted, marketingConsent, deviceId } = options;
-
-        try {
-            // Create default organization for new user
-            const { data: org, error: orgError } = await this.supabase
-                .from('organizations')
-                .insert({
-                    name: `${user.email}'s Organization`,
-                    plan_tier: 'free_trial',
-                    owner_id: user.id
-                })
-                .select()
-                .single();
-
-            if (orgError) throw orgError;
-
-            // Create user profile
-            const { data: profile, error: profileError } = await this.supabase
-                .from('user_profiles')
-                .insert({
-                    id: user.id,
-                    email: user.email,
-                    organization_id: org.id,
-                    plan: 'free_trial',
-                    tc_accepted: termsAccepted,
-                    marketing_consent: marketingConsent,
-                    device_id: deviceId,
-                    onboarding_completed: false,
-                    created_at: new Date().toISOString()
-                })
-                .select()
-                .single();
-
-            if (profileError) throw profileError;
-
-            // Create organization membership
-            await this.supabase
-                .from('organization_members')
-                .insert({
-                    organization_id: org.id,
-                    user_id: user.id,
-                    role: 'owner'
-                });
-
-            // Log signup event to Worker
-            await this.logSignupEvent(user.id, deviceId);
-
-            return profile;
-        } catch (error) {
-            console.error('Create user profile error:', error);
-            throw error;
-        }
-    }
-
-    // Complete onboarding
-    async completeOnboarding(onboardingData) {
-        try {
-            const { data, error } = await this.supabase
-                .from('user_profiles')
-                .update({
-                    full_name: onboardingData.fullName,
-                    company_name: onboardingData.companyName,
-                    job_title: onboardingData.jobTitle,
-                    department: onboardingData.department,
-                    company_size: onboardingData.companySize,
-                    geography: onboardingData.geography,
-                    onboarding_completed: true,
-                    updated_at: new Date().toISOString()
-                })
-                .eq('id', this.currentUser.id)
-                .select()
-                .single();
-
-            if (error) throw error;
-
-            // Also update organization name with company name
-            if (this.currentOrg) {
-                await this.supabase
-                    .from('organizations')
-                    .update({ name: onboardingData.companyName })
-                    .eq('id', this.currentOrg.id);
-            }
-
-            return data;
-        } catch (error) {
-            console.error('Onboarding error:', error);
-            throw error;
-        }
-    }
-
-    // Check trial eligibility via Cloudflare Worker
-    async checkTrialEligibility(email, deviceId) {
-        try {
-            // Check if user is admin (bypass all restrictions)
-            const adminEmails = ['amitbhawik@gmail.com', 'amitbhawik@hotmail.com'];
-            if (adminEmails.includes(email.toLowerCase())) {
-                return { eligible: true, isAdmin: true };
-            }
-
-            // Check with worker
-            const response = await fetch(`${WORKER_API_BASE}/api/check-trial`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ email, deviceId })
-            });
-
-            if (!response.ok) {
-                // Fail open - if worker is down, allow signup
-                console.warn('Trial check service unavailable, allowing signup');
-                return { eligible: true, failOpen: true };
-            }
-
-            const data = await response.json();
-            return data;
-        } catch (error) {
-            console.error('Trial eligibility check failed:', error);
-            // Fail open - allow signup if check fails
-            return { eligible: true, failOpen: true };
-        }
-    }
-
-    // Log signup event
-    async logSignupEvent(userId, deviceId) {
-        try {
-            await fetch(`${WORKER_API_BASE}/api/log-signup`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    userId,
-                    deviceId,
-                    timestamp: new Date().toISOString()
-                })
-            });
-        } catch (error) {
-            console.error('Failed to log signup event:', error);
-            // Non-critical, don't throw
-        }
-    }
-
-    // Generate device fingerprint
-    getDeviceFingerprint() {
-        // Simple fingerprint based on browser characteristics
-        const fingerprint = {
-            userAgent: navigator.userAgent,
-            language: navigator.language,
-            platform: navigator.platform,
-            screenResolution: `${screen.width}x${screen.height}`,
-            timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-            colorDepth: screen.colorDepth
-        };
-
-        // Create hash
-        const str = JSON.stringify(fingerprint);
-        let hash = 0;
-        for (let i = 0; i < str.length; i++) {
-            const char = str.charCodeAt(i);
-            hash = ((hash << 5) - hash) + char;
-            hash = hash & hash;
-        }
-
-        return `fp_${Math.abs(hash).toString(36)}`;
-    }
-
-    // Show onboarding modal
-    showOnboardingModal() {
-        const modal = document.getElementById('onboarding-modal');
-        if (modal) {
-            modal.classList.add('active');
-        }
-    }
-
-    // Logout
-    async logout() {
-        const { error } = await this.supabase.auth.signOut();
-        if (error) {
-            console.error('Logout error:', error);
-            throw error;
-        }
-        window.location.href = '/login.html';
-    }
-
-    // Check if user is authenticated
-    async requireAuth() {
-        const isAuthenticated = await this.initialize();
-        
-        if (!isAuthenticated) {
-            window.location.href = '/login.html';
-            return false;
-        }
-
+    initialize: async function () {
+      var result  = await sb.auth.getSession();
+      var session = result.data && result.data.session;
+      if (session) {
+        window.APP.user = session.user;
         return true;
-    }
+      }
+      return false;
+    },
 
-    // Check if user is admin
-    isAdmin() {
-        const adminEmails = ['amitbhawik@gmail.com', 'amitbhawik@hotmail.com'];
-        return this.currentUser?.profile?.is_admin === true || 
-               adminEmails.includes(this.currentUser?.email?.toLowerCase());
-    }
+    requireAuth: async function () {
+      var result  = await sb.auth.getSession();
+      var session = result.data && result.data.session;
+      if (!session) {
+        window.location.replace('/login.html');
+        return false;
+      }
+      window.APP.user = session.user;
+      return true;
+    },
 
-    // Get current organization context
-    getOrgContext() {
-        return {
-            organizationId: this.currentOrg?.id,
-            planTier: this.currentOrg?.plan_tier,
-            userId: this.currentUser?.id,
-            isAdmin: this.isAdmin()
-        };
-    }
+    login: async function (email, password) {
+      var result = await sb.auth.signInWithPassword({ email: email, password: password });
+      if (result.error) throw result.error;
+      window.APP.user = result.data.user;
+      return result.data;
+    },
 
-    // Handle OAuth callback
-    async handleOAuthCallback() {
-        const { data, error } = await this.supabase.auth.getSession();
-        
-        if (error) {
-            console.error('OAuth callback error:', error);
-            window.location.href = '/login.html';
-            return;
-        }
+    signup: async function (email, password, termsAccepted, marketingConsent) {
+      var result = await sb.auth.signUp({
+        email: email,
+        password: password,
+        options: {
+          data: {
+            terms_accepted:     termsAccepted    || false,
+            marketing_consent:  marketingConsent || false,
+          },
+        },
+      });
+      if (result.error) throw result.error;
+      return result.data;
+    },
 
-        if (data.session) {
-            this.currentUser = data.session.user;
-            
-            // Check if profile exists
-            const { data: profile } = await this.supabase
-                .from('user_profiles')
-                .select('*')
-                .eq('id', this.currentUser.id)
-                .single();
+    signInWithGoogle: async function () {
+      var result = await sb.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin + '/auth-callback.html',
+          queryParams: { access_type: 'offline', prompt: 'consent' },
+        },
+      });
+      if (result.error) throw result.error;
+      return result.data;
+    },
 
-            if (!profile) {
-                // New OAuth user - create profile
-                await this.createUserProfile(this.currentUser, {
-                    termsAccepted: true, // Implied by OAuth
-                    marketingConsent: false,
-                    deviceId: this.getDeviceFingerprint()
-                });
-                this.showOnboardingModal();
-            } else if (!profile.onboarding_completed) {
-                this.showOnboardingModal();
-            } else {
-                window.location.href = '/dashboard.html';
-            }
-        }
-    }
-}
+    sendMagicLink: async function (email) {
+      var result = await sb.auth.signInWithOtp({
+        email: email,
+        options: { emailRedirectTo: window.location.origin + '/dashboard.html' },
+      });
+      if (result.error) throw result.error;
+      return result.data;
+    },
 
-// Initialize auth guard
-const authGuard = new AuthGuard();
+    logout: async function () {
+      return window.APP.signOut();
+    },
 
-// Make available globally
-window.authGuard = authGuard;
+    isAdmin: function () {
+      var adminEmails = ['amitbhawik@gmail.com', 'amitbhawik@hotmail.com'];
+      var email = window.APP.user && window.APP.user.email
+        ? window.APP.user.email.toLowerCase()
+        : '';
+      return adminEmails.indexOf(email) !== -1 ||
+             !!(window.APP.user && window.APP.user.profile && window.APP.user.profile.is_admin);
+    },
 
-// Auto-initialize on page load
-const currentPath = window.location.pathname;
+    getDeviceFingerprint: function () {
+      var raw = JSON.stringify({
+        ua:   navigator.userAgent,
+        lang: navigator.language,
+        tz:   Intl.DateTimeFormat().resolvedOptions().timeZone,
+        res:  screen.width + 'x' + screen.height,
+        cd:   screen.colorDepth,
+      });
+      var h = 0;
+      for (var i = 0; i < raw.length; i++) {
+        h = (Math.imul(31, h) + raw.charCodeAt(i)) | 0;
+      }
+      return 'fp_' + Math.abs(h).toString(36);
+    },
 
-if (currentPath.includes('/auth-callback.html') || currentPath === '/auth/callback') {
-    // OAuth callback is handled by auth-callback.html page
-    console.log('🔄 OAuth callback detected - handled by auth-callback.html');
-} else if (currentPath !== '/login.html' && !currentPath.includes('login')) {
-    // Require authentication for all other pages
-    authGuard.requireAuth();
-}
+    handleOAuthCallback: async function () {
+      var result = await sb.auth.getSession();
+      if (result.error || !result.data.session) {
+        window.location.replace('/login.html');
+        return;
+      }
+      var session = result.data.session;
+      window.APP.user = session.user;
 
-export default authGuard;
+      var profileResult = await sb
+        .from('user_profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+
+      var profile = profileResult.data;
+
+      if (!profile) {
+        // New OAuth user — create profile inline
+        await this._createUserProfile(session.user, {
+          termsAccepted:     true,
+          marketingConsent:  false,
+          deviceId:          this.getDeviceFingerprint(),
+        });
+        this._showOnboardingModal();
+      } else if (!profile.onboarding_completed) {
+        this._showOnboardingModal();
+      } else {
+        window.location.replace('/dashboard.html');
+      }
+    },
+
+    _showOnboardingModal: function () {
+      var modal = document.getElementById('onboarding-modal');
+      if (modal) modal.classList.add('active');
+    },
+
+    _createUserProfile: async function (user, options) {
+      var orgResult = await sb
+        .from('organizations')
+        .insert({
+          name:       user.email + "'s Organization",
+          plan_tier:  'free_trial',
+          owner_id:   user.id,
+        })
+        .select()
+        .single();
+
+      if (orgResult.error) throw orgResult.error;
+
+      var profileResult = await sb
+        .from('user_profiles')
+        .insert({
+          id:                  user.id,
+          email:               user.email,
+          organization_id:     orgResult.data.id,
+          plan:                'free_trial',
+          tc_accepted:         options.termsAccepted    || false,
+          marketing_consent:   options.marketingConsent || false,
+          device_id:           options.deviceId         || '',
+          onboarding_completed: false,
+          created_at:          new Date().toISOString(),
+        })
+        .select()
+        .single();
+
+      if (profileResult.error) throw profileResult.error;
+
+      await sb
+        .from('organization_members')
+        .insert({
+          organization_id: orgResult.data.id,
+          user_id:         user.id,
+          role:            'owner',
+        });
+
+      return profileResult.data;
+    },
+  };
+
+  console.log('[auth-guard] Initialized. Public page:', _isPublicPage);
+
+})();

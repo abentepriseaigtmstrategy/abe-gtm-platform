@@ -291,11 +291,13 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;bac
 </div>
 
 <script>
-// ⚠️ CRITICAL: Replace with your actual Cloudflare Pages domain
-const PRODUCTION_URL = 'https://abe-gtm-platform.pages.dev/';
+// Dynamic — works on any domain (pages.dev, custom domain, localhost)
+// No hardcoded URL needed: window.location.origin resolves to wherever the app is hosted
+const PRODUCTION_URL = window.location.origin;
 
 const SUPABASE_URL = 'https://cwcvneluhlimhlzowabv.supabase.co';
-const SUPABASE_ANON_KEY = 'sb_publishable_EeDAvGbX7TpO_hgBoUZMhQ_B_nJtAbb';
+// JWT-format anon key — must match auth-guard.js and backend _middleware.js
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3Y3ZuZWx1aGxpbWhsem93YWJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2MzAxMjAsImV4cCI6MjA4OTIwNjEyMH0.SZDS-svU-kFh_OkUq3AjQY64F-71MpbBsFd6Iin5DlQ';
 
 const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
