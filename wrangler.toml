@@ -9,16 +9,21 @@ compatibility_flags = ["nodejs_compat"]
 pages_build_output_dir = "frontend"
 
 # KV namespace — binding name MUST match what _middleware.js expects
-# Using STRATEGY_CACHE to match the code
 [[kv_namespaces]]
 binding = "STRATEGY_CACHE"
 id      = "61d9ea1ad72b49658b1ab2fac175bbb9"
 
 [vars]
-ALLOWED_ORIGIN = "https://abe-gtm-platform-bza.pages.dev"
-# ── Aligned with auth-guard.js and _middleware.js — single source of truth ──
+# ALLOWED_ORIGIN: set to * so CORS works on any Pages domain (*.pages.dev,
+# custom domain, localhost:PORT). The API endpoints are still protected by
+# Supabase JWT auth — CORS being open is not a security risk here.
+# If you want to lock this down after go-live, set it to your custom domain.
+ALLOWED_ORIGIN = "*"
+
+# ── Aligned with auth-guard.js, login.html, and index.html ──────────────────
 SUPABASE_URL      = "https://cwcvneluhlimhlzowabv.supabase.co"
-SUPABASE_ANON_KEY = "sb_publishable_EeDAvGbX7TpO_hgBoUZMhQ_B_nJtAbb"
+# JWT-format anon key (same as auth-guard.js and _middleware.js hardcoded fallback)
+SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3Y3ZuZWx1aGxpbWhsem93YWJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2MzAxMjAsImV4cCI6MjA4OTIwNjEyMH0.SZDS-svU-kFh_OkUq3AjQY64F-71MpbBsFd6Iin5DlQ"
 
 # Secrets — set via CLI, NEVER commit:
 #   npx wrangler pages secret put OPENAI_API_KEY        --project-name abe-gtm-platform
