@@ -1,495 +1,255 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-<title>ABE · AI Revenue Infrastructure</title>
-<link rel="preconnect" href="https://fonts.googleapis.com"/>
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,600;0,9..144,700;1,9..144,300&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet"/>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Sign In · ABE AI Revenue Infrastructure</title>
+
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+<!-- 
+  ⚠️ CRITICAL: Replace YOUR_ACTUAL_DOMAIN with your real Cloudflare Pages domain
+  Find it at: https://dash.cloudflare.com → Workers & Pages → abe-gtm-platform
+-->
+
 <style>
-/* ── Reset & Base ────────────────────────────────────────────────── */
-*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --bg:        #07070A;
-  --surface:   #0E0E14;
-  --card:      #13131A;
-  --border:    rgba(255,255,255,.07);
-  --border-hi: rgba(255,255,255,.13);
-  --violet:    #7C3AED;
-  --violet-lo: rgba(124,58,237,.12);
-  --gold:      #F59E0B;
-  --gold-lo:   rgba(245,158,11,.1);
-  --green:     #10B981;
-  --red:       #F43F5E;
-  --text:      #F4F4F5;
-  --text-2:    #A1A1AA;
-  --text-3:    #52525B;
+--bg:#0B0F1A;
+--card:#121827;
+--border:#1F2937;
+--accent:#a855f7;
+--accent2:#7c3aed;
+--green:#22c55e;
+--red:#ef4444;
+--text:#E5E7EB;
+--muted:#6B7280;
 }
-html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(--bg);color:var(--text)}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html,body{height:100%}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);display:flex;align-items:center;justify-content:center;min-height:100vh;overflow-x:hidden}
+body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;background-image:linear-gradient(rgba(168,85,247,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(168,85,247,.03) 1px,transparent 1px);background-size:48px 48px}
+.glow{position:fixed;top:50%;left:50%;transform:translate(-50%,-60%);width:800px;height:800px;pointer-events:none;z-index:0;background:radial-gradient(ellipse,rgba(124,58,237,.1) 0%,transparent 65%)}
+.card{position:relative;z-index:1;width:100%;max-width:440px;margin:24px;background:rgba(18,24,39,.85);backdrop-filter:blur(24px);border:1px solid rgba(31,41,55,.8);border-radius:24px;padding:44px 40px}
+.logo-row{display:flex;align-items:center;gap:12px;margin-bottom:32px}
+.logo-mark{width:40px;height:40px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:white;flex-shrink:0}
+.logo-name{font-size:13px;font-weight:800;color:white;line-height:1.2}
+.logo-sub{font-size:9px;color:var(--muted);letter-spacing:.18em;text-transform:uppercase}
+.title{font-size:22px;font-weight:900;color:white;letter-spacing:-.5px;margin-bottom:6px}
+.subtitle{font-size:12px;color:var(--muted);margin-bottom:28px;line-height:1.6}
 
-/* ── Ambient background ─────────────────────────────────────────── */
-.ambient{position:fixed;inset:0;z-index:0;overflow:hidden;pointer-events:none}
-.orb{position:absolute;border-radius:50%;filter:blur(120px);opacity:.25}
-.orb-1{width:700px;height:700px;top:-200px;left:-150px;background:radial-gradient(circle,#7C3AED,transparent 70%)}
-.orb-2{width:500px;height:500px;bottom:-100px;right:-100px;background:radial-gradient(circle,#0EA5E9,transparent 70%)}
-.orb-3{width:400px;height:400px;top:40%;left:40%;background:radial-gradient(circle,#F59E0B,transparent 70%);opacity:.08}
-.grain{position:absolute;inset:0;opacity:.03;
-  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)'/%3E%3C/svg%3E");
-  background-repeat:repeat;background-size:128px}
+.tabs{display:flex;gap:4px;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:10px;padding:4px;margin-bottom:24px}
+.tab{flex:1;padding:7px 4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border:none;background:none;border-radius:7px;cursor:pointer;transition:all .15s;white-space:nowrap}
+.tab.active{background:rgba(168,85,247,.15);border:1px solid rgba(168,85,247,.3);color:white}
 
-/* ── Layout ─────────────────────────────────────────────────────── */
-.shell{position:relative;z-index:1;display:grid;grid-template-columns:1fr 480px;min-height:100vh}
-@media(max-width:960px){.shell{grid-template-columns:1fr}}
+.sub-tabs{display:flex;gap:0;margin-bottom:24px;border-bottom:1px solid var(--border)}
+.sub-tab{flex:1;padding:9px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);border:none;background:none;cursor:pointer;transition:all .15s;border-bottom:2px solid transparent}
+.sub-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
 
-/* ══════════════════════════════════════════════════════════════════
-   LEFT — PRICING PANEL
-═══════════════════════════════════════════════════════════════════ */
-.pricing-panel{
-  padding:48px 52px 48px 56px;
-  display:flex;flex-direction:column;
-  border-right:1px solid var(--border);
-  overflow-y:auto}
-@media(max-width:960px){.pricing-panel{display:none}}
+.panel{display:none}
+.panel.active{display:block}
 
-.brand{display:flex;align-items:center;gap:12px;margin-bottom:56px}
-.brand-icon{
-  width:36px;height:36px;border-radius:8px;
-  background:linear-gradient(135deg,#7C3AED,#4F46E5);
-  display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.brand-icon svg{width:18px;height:18px;fill:white}
-.brand-name{font-size:15px;font-weight:700;color:var(--text);letter-spacing:-.02em}
-.brand-tag{font-size:10px;color:var(--text-3);letter-spacing:.08em;text-transform:uppercase;margin-top:1px}
+.label{display:block;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.18em;color:var(--muted);margin-bottom:7px}
+.input{width:100%;background:rgba(0,0,0,.4);border:1px solid var(--border);color:var(--text);font-size:13px;padding:12px 14px;border-radius:10px;font-family:'Inter',sans-serif;outline:none;transition:border-color .15s;margin-bottom:16px}
+.input:focus{border-color:var(--accent)}
+.input::placeholder{color:#4b5563}
 
-.pricing-eyebrow{
-  display:inline-flex;align-items:center;gap:7px;
-  background:var(--gold-lo);border:1px solid rgba(245,158,11,.2);
-  color:var(--gold);font-size:11px;font-weight:600;
-  padding:5px 12px;border-radius:20px;letter-spacing:.03em;margin-bottom:20px}
-.pricing-eyebrow span{width:5px;height:5px;border-radius:50%;background:var(--gold);display:block;animation:pulse 2s infinite}
-@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.check-row{display:flex;align-items:flex-start;gap:10px;margin-bottom:14px}
+.check-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent);flex-shrink:0;margin-top:2px;cursor:pointer}
+.check-row span{font-size:11px;color:var(--muted);line-height:1.5}
+.check-row a{color:var(--accent);text-decoration:none}
+.check-row a:hover{text-decoration:underline}
 
-.pricing-headline{
-  font-family:'Fraunces',serif;font-size:42px;font-weight:600;line-height:1.1;
-  letter-spacing:-.03em;color:var(--text);margin-bottom:10px}
-.pricing-headline em{font-style:italic;color:var(--text-2)}
-.pricing-sub{font-size:14px;color:var(--text-2);line-height:1.7;margin-bottom:40px;max-width:480px}
+.btn{width:100%;padding:13px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:white;border:none;border-radius:10px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;cursor:pointer;transition:all .15s;margin-top:4px}
+.btn:hover:not(:disabled){opacity:.9;transform:translateY(-1px)}
+.btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.btn.loading .btn-text{display:none}
+.btn.loading .spinner{display:block}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text);display:flex;align-items:center;justify-content:center;gap:10px;margin-top:10px}
+.btn-outline:hover{border-color:var(--accent);background:rgba(168,85,247,.06)}
+.btn-outline img{width:16px;height:16px}
 
-/* Tier cards */
-.tiers{display:flex;flex-direction:column;gap:10px}
-.tier{
-  border:1px solid var(--border);border-radius:14px;
-  padding:18px 20px;cursor:default;
-  transition:border-color .2s,background .2s,transform .2s;
-  background:rgba(255,255,255,.015)}
-.tier:hover{border-color:var(--border-hi);background:rgba(255,255,255,.03);transform:translateX(3px)}
-.tier.featured{
-  border-color:rgba(245,158,11,.35);
-  background:linear-gradient(135deg,rgba(245,158,11,.06),rgba(124,58,237,.06));
-  position:relative}
-.tier.featured::before{
-  content:'MOST POPULAR';position:absolute;top:-9px;right:16px;
-  background:var(--gold);color:#07070A;font-size:8px;font-weight:800;
-  padding:3px 10px;border-radius:20px;letter-spacing:.1em}
-.tier-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
-.tier-name{font-size:14px;font-weight:700;color:var(--text)}
-.tier-price{text-align:right}
-.tier-amount{font-family:'Fraunces',serif;font-size:24px;font-weight:600;color:var(--text);line-height:1}
-.tier-amount.free{color:var(--green);font-size:20px}
-.tier-period{font-size:11px;color:var(--text-3);margin-top:2px}
-.tier-features{display:flex;flex-wrap:wrap;gap:6px}
-.feat{
-  font-size:11px;color:var(--text-2);padding:3px 9px;
-  background:rgba(255,255,255,.04);border:1px solid var(--border);
-  border-radius:20px}
-.tier.featured .feat{border-color:rgba(245,158,11,.15);background:rgba(245,158,11,.05)}
+.spinner{display:none;width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:white;border-radius:50%;animation:spin .7s linear infinite;margin:0 auto}
+@keyframes spin{to{transform:rotate(360deg)}}
 
-.upgrade-note{
-  margin-top:28px;padding:14px 18px;
-  border:1px dashed rgba(255,255,255,.08);border-radius:10px;
-  font-size:12px;color:var(--text-3);line-height:1.6}
-.upgrade-note strong{color:var(--text-2)}
-
-/* ══════════════════════════════════════════════════════════════════
-   RIGHT — AUTH PANEL
-═══════════════════════════════════════════════════════════════════ */
-.auth-panel{
-  display:flex;align-items:center;justify-content:center;
-  padding:40px 32px;background:rgba(0,0,0,.2)}
-
-.auth-card{
-  width:100%;max-width:400px;
-  background:var(--card);
-  border:1px solid var(--border-hi);
-  border-radius:20px;padding:36px 32px;
-  box-shadow:0 0 0 1px rgba(0,0,0,.5),0 32px 64px rgba(0,0,0,.4)}
-
-/* Mobile brand */
-.mobile-brand{display:none;align-items:center;gap:10px;margin-bottom:28px}
-@media(max-width:960px){.mobile-brand{display:flex}}
-.mobile-brand-icon{width:32px;height:32px;border-radius:7px;background:linear-gradient(135deg,#7C3AED,#4F46E5);display:flex;align-items:center;justify-content:center}
-.mobile-brand-icon svg{width:16px;height:16px;fill:white}
-.mobile-brand-name{font-size:14px;font-weight:700;color:var(--text)}
-
-.auth-greeting{font-family:'Fraunces',serif;font-size:26px;font-weight:600;color:var(--text);letter-spacing:-.03em;margin-bottom:4px}
-.auth-sub{font-size:13px;color:var(--text-2);margin-bottom:26px;line-height:1.6}
-
-/* Tabs */
-.tabs{display:flex;background:rgba(0,0,0,.4);border:1px solid var(--border);border-radius:10px;padding:3px;margin-bottom:22px;gap:3px}
-.tab{flex:1;padding:8px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--text-3);border:none;background:none;border-radius:7px;cursor:pointer;transition:all .15s;font-family:'Plus Jakarta Sans',sans-serif}
-.tab.active{background:rgba(124,58,237,.2);border:1px solid rgba(124,58,237,.3);color:var(--text)}
-
-/* Panels */
-.panel{display:none}.panel.active{display:block}
-
-/* Form elements */
-.field{margin-bottom:14px}
-.field-label{display:block;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--text-3);margin-bottom:6px}
-.field-input{
-  width:100%;background:rgba(0,0,0,.5);
-  border:1px solid var(--border);color:var(--text);
-  font-size:13px;padding:11px 14px;border-radius:9px;
-  font-family:'Plus Jakarta Sans',sans-serif;outline:none;
-  transition:border-color .15s,box-shadow .15s}
-.field-input:focus{border-color:var(--violet);box-shadow:0 0 0 3px rgba(124,58,237,.12)}
-.field-input::placeholder{color:var(--text-3)}
-
-/* Consent checkboxes */
-.consent-block{margin-bottom:16px}
-.consent-row{display:flex;align-items:flex-start;gap:10px;margin-bottom:10px}
-.consent-row input[type=checkbox]{
-  width:15px;height:15px;flex-shrink:0;margin-top:2px;
-  accent-color:var(--violet);cursor:pointer}
-.consent-row span{font-size:11px;color:var(--text-2);line-height:1.55}
-.consent-row a{color:#818CF8;text-decoration:none}
-.consent-row a:hover{text-decoration:underline}
-.consent-row .req{color:var(--red);font-size:9px;vertical-align:super}
-
-/* Buttons */
-.btn-primary{
-  width:100%;padding:13px;
-  background:linear-gradient(135deg,#7C3AED,#4F46E5);
-  color:white;border:none;border-radius:9px;
-  font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
-  cursor:pointer;transition:all .15s;
-  font-family:'Plus Jakarta Sans',sans-serif;
-  display:flex;align-items:center;justify-content:center;gap:8px;
-  position:relative;overflow:hidden;margin-top:4px}
-.btn-primary::before{
-  content:'';position:absolute;inset:0;
-  background:linear-gradient(135deg,rgba(255,255,255,.1),transparent);
-  opacity:0;transition:opacity .15s}
-.btn-primary:hover:not(:disabled)::before{opacity:1}
-.btn-primary:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 8px 24px rgba(124,58,237,.35)}
-.btn-primary:active:not(:disabled){transform:translateY(0)}
-.btn-primary:disabled{opacity:.4;cursor:not-allowed}
-
-.btn-google{
-  width:100%;padding:11px;background:rgba(255,255,255,.04);
-  border:1px solid var(--border-hi);color:var(--text);border-radius:9px;
-  font-size:12px;font-weight:600;cursor:pointer;transition:all .15s;
-  font-family:'Plus Jakarta Sans',sans-serif;
-  display:flex;align-items:center;justify-content:center;gap:9px;margin-top:8px}
-.btn-google:hover{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.2)}
-
-/* Divider */
-.divider{display:flex;align-items:center;gap:10px;margin:16px 0}
+.divider{display:flex;align-items:center;gap:12px;margin:16px 0;color:var(--muted);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em}
 .divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border)}
-.divider span{font-size:10px;font-weight:600;color:var(--text-3);text-transform:uppercase;letter-spacing:.08em;white-space:nowrap}
 
-/* Spinner */
-.spin{
-  width:14px;height:14px;border-radius:50%;
-  border:2px solid rgba(255,255,255,.25);border-top-color:white;
-  animation:spinning .6s linear infinite;display:none}
-@keyframes spinning{to{transform:rotate(360deg)}}
+.msg{padding:12px 14px;border-radius:8px;font-size:12px;font-weight:600;margin-top:14px;display:none}
+.msg.error{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#fca5a5;display:block}
+.msg.success{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#86efac;display:block}
 
-/* Message box */
-.msg-box{
-  padding:10px 14px;border-radius:8px;font-size:12px;font-weight:500;
-  line-height:1.5;margin-bottom:12px;display:none}
-.msg-box.err{background:rgba(244,63,94,.08);border:1px solid rgba(244,63,94,.2);color:#FDA4AF;display:block}
-.msg-box.ok{background:rgba(16,185,129,.08);border:1px solid rgba(16,185,129,.2);color:#6EE7B7;display:block}
+.footer{margin-top:24px;text-align:center;font-size:10px;color:var(--muted);line-height:1.6}
+.secure{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:16px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:#374151}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--green)}
 
-/* Footer note */
-.auth-footer{margin-top:20px;text-align:center;font-size:11px;color:var(--text-3)}
-.auth-footer a{color:var(--text-2);text-decoration:none}
-.auth-footer a:hover{color:var(--text)}
-.secure-row{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:12px}
-.secure-dot{width:5px;height:5px;border-radius:50%;background:var(--green)}
-.secure-text{font-size:10px;color:var(--text-3);letter-spacing:.05em}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(8px);z-index:999;display:none;align-items:center;justify-content:center;padding:24px}
+.modal-overlay.active{display:flex}
+.modal{background:#121827;border:1px solid rgba(168,85,247,.2);border-radius:20px;padding:40px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto}
+.modal h2{font-size:20px;font-weight:900;color:white;margin-bottom:6px}
+.modal p{font-size:12px;color:var(--muted);margin-bottom:28px;line-height:1.6}
+.modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.modal-grid .full{grid-column:1/-1}
+.modal .label{margin-top:4px}
+.modal select{width:100%;background:rgba(0,0,0,.4);border:1px solid var(--border);color:var(--text);font-size:13px;padding:12px 14px;border-radius:10px;font-family:'Inter',sans-serif;outline:none;margin-bottom:0;-webkit-appearance:none}
+.modal select:focus{border-color:var(--accent)}
+.modal select option{background:#121827}
+.progress{display:flex;gap:6px;margin-bottom:28px}
+.progress-dot{width:8px;height:8px;border-radius:50%;background:var(--border)}
+.progress-dot.done{background:var(--accent)}
 
-/* Onboarding modal */
-.modal-wrap{position:fixed;inset:0;background:rgba(0,0,0,.75);backdrop-filter:blur(12px);z-index:100;display:none;align-items:center;justify-content:center;padding:24px}
-.modal-wrap.open{display:flex}
-.modal{background:var(--card);border:1px solid var(--border-hi);border-radius:20px;padding:36px;width:100%;max-width:500px;max-height:90vh;overflow-y:auto}
-.modal-steps{display:flex;gap:5px;margin-bottom:24px}
-.modal-step{height:3px;flex:1;border-radius:3px;background:var(--border)}
-.modal-step.done{background:var(--violet)}
-.modal h2{font-family:'Fraunces',serif;font-size:22px;font-weight:600;color:var(--text);margin-bottom:6px}
-.modal p{font-size:13px;color:var(--text-2);margin-bottom:24px;line-height:1.6}
-.modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
-.modal-grid .span-2{grid-column:1/-1}
-.modal select{width:100%;background:rgba(0,0,0,.5);border:1px solid var(--border);color:var(--text);font-size:13px;padding:11px 14px;border-radius:9px;font-family:'Plus Jakarta Sans',sans-serif;outline:none;appearance:none}
-.modal select:focus{border-color:var(--violet)}
+.link{color:var(--accent);text-decoration:none;font-size:12px;display:inline-block;margin-top:16px}
+.link:hover{text-decoration:underline}
 </style>
 </head>
 <body>
 
-<!-- Ambient background -->
-<div class="ambient">
-  <div class="orb orb-1"></div>
-  <div class="orb orb-2"></div>
-  <div class="orb orb-3"></div>
-  <div class="grain"></div>
+<div class="glow"></div>
+
+<div class="card">
+  <div class="logo-row">
+    <div class="logo-mark">ABE</div>
+    <div>
+      <div class="logo-name">ABE GTM PLATFORM</div>
+      <div class="logo-sub">Revenue Intelligence Operating System</div>
+    </div>
+  </div>
+
+  <h1 class="title">Welcome Back</h1>
+  <p class="subtitle">Sign in to access your revenue intelligence dashboard</p>
+
+  <!-- Auth Method Tabs -->
+  <div class="tabs">
+    <button class="tab active" data-method="email">Email</button>
+    <button class="tab" data-method="google">Google</button>
+    <button class="tab" data-method="magic">Magic Link</button>
+  </div>
+
+  <!-- EMAIL Panel -->
+  <div class="panel active" id="email-panel">
+    <!-- Sign In / Sign Up Sub-tabs -->
+    <div class="sub-tabs">
+      <button class="sub-tab active" data-mode="signin">Sign In</button>
+      <button class="sub-tab" data-mode="signup">Sign Up</button>
+    </div>
+
+    <!-- Sign In Form -->
+    <form id="signin-form" class="auth-form" autocomplete="on">
+      <label class="label">Email Address</label>
+      <input type="email" class="input" id="signin-email" placeholder="you@company.com" required autocomplete="email" />
+
+      <label class="label">Password</label>
+      <input type="password" class="input" id="signin-password" placeholder="Enter your password" required autocomplete="current-password" />
+
+      <button type="submit" class="btn">
+        <span class="btn-text">Sign In</span>
+        <div class="spinner"></div>
+      </button>
+
+      <a href="#" class="link" id="forgot-link">Forgot password?</a>
+    </form>
+
+    <!-- Sign Up Form -->
+    <form id="signup-form" class="auth-form" style="display:none" autocomplete="on">
+      <label class="label">Email Address</label>
+      <input type="email" class="input" id="signup-email" placeholder="you@company.com" required autocomplete="email" />
+
+      <label class="label">Password</label>
+      <input type="password" class="input" id="signup-password" placeholder="Create password (8+ characters)" required autocomplete="new-password" />
+
+      <label class="label">Confirm Password</label>
+      <input type="password" class="input" id="confirm-password" placeholder="Confirm password" required autocomplete="new-password" />
+
+      <label class="check-row">
+        <input type="checkbox" id="terms-checkbox" required />
+        <span>I accept the <a href="/terms.html" target="_blank">Terms of Service</a> and <a href="/privacy.html" target="_blank">Privacy Policy</a></span>
+      </label>
+
+      <label class="check-row">
+        <input type="checkbox" id="marketing-checkbox" />
+        <span>Send me product updates and marketing emails</span>
+      </label>
+
+      <button type="submit" class="btn">
+        <span class="btn-text">Create Account</span>
+        <div class="spinner"></div>
+      </button>
+    </form>
+
+    <div id="email-msg" class="msg"></div>
+  </div>
+
+  <!-- GOOGLE Panel -->
+  <div class="panel" id="google-panel">
+    <p class="subtitle">Sign in with your Google account for instant access</p>
+    
+    <button id="google-btn" class="btn-outline">
+      <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTgiIGhlaWdodD0iMTgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGcgZmlsbD0ibm9uZSIgZmlsbC1ydWxlPSJldmVub2RkIj48cGF0aCBkPSJNMTcuNiA5LjJsLS4xLTEuOEg5djMuNGg0LjhDMTMuNiAxMiAxMyAxMyAxMiAxMy42djIuMmgzYTguOCA4LjggMCAwIDAgMi42LTYuNnoiIGZpbGw9IiM0Mjg1RjQiIGZpbGwtcnVsZT0ibm9uemVybyIvPjxwYXRoIGQ9Ik05IDE4YzIuNCAwIDQuNS0uOCA2LTIuMmwtMy0yLjJhNS40IDUuNCAwIDAgMS04LTIuOUgxVjEzYTkgOSAwIDAgMCA4IDV6IiBmaWxsPSIjMzRBODUzIiBmaWxsLXJ1bGU9Im5vbnplcm8iLz48cGF0aCBkPSJNNCAxMC43YTUuNCA1LjQgMCAwIDEgMC0zLjRWNUgxYTkgOSAwIDAgMCAwIDhsMy0yLjN6IiBmaWxsPSIjRkJCQzA1IiBmaWxsLXJ1bGU9Im5vbnplcm8iLz48cGF0aCBkPSJNOSAzLjZjMS4zIDAgMi41LjQgMy40IDEuM0wxNSAyLjNBOSA5IDAgMCAwIDEgNWwzIDIuNGE1LjQgNS40IDAgMCAxIDUtMy43eiIgZmlsbD0iI0VBNDMzNSIgZmlsbC1ydWxlPSJub256ZXJvIi8+PHBhdGggZD0iTTAgMGgxOHYxOEgweiIvPjwvZz48L3N2Zz4=" alt="Google" />
+      <span class="btn-text">Continue with Google</span>
+      <div class="spinner"></div>
+    </button>
+
+    <div id="google-msg" class="msg"></div>
+  </div>
+
+  <!-- MAGIC LINK Panel -->
+  <div class="panel" id="magic-panel">
+    <p class="subtitle">We'll send you a secure login link via email</p>
+    
+    <form id="magic-form" class="auth-form" autocomplete="on">
+      <label class="label">Email Address</label>
+      <input type="email" class="input" id="magic-email" placeholder="you@company.com" required autocomplete="email" />
+
+      <button type="submit" class="btn">
+        <span class="btn-text">Send Magic Link</span>
+        <div class="spinner"></div>
+      </button>
+    </form>
+
+    <div id="magic-msg" class="msg"></div>
+  </div>
+
+  <div class="footer">
+    Don't have an account? <a href="#" class="link" id="signup-link">Sign Up</a>
+    <div class="secure">
+      <div class="dot"></div>
+      Secured by Supabase Authentication
+    </div>
+  </div>
 </div>
 
-<div class="shell">
-
-  <!-- ═══════════════════════════════════════════════
-       LEFT — PRICING
-  ════════════════════════════════════════════════ -->
-  <div class="pricing-panel">
-
-    <div class="brand">
-      <div class="brand-icon">
-        <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-      </div>
-      <div>
-        <div class="brand-name">ABE AI</div>
-        <div class="brand-tag">Revenue Infrastructure</div>
-      </div>
-    </div>
-
-    <div class="pricing-eyebrow">
-      <span></span>
-      Upgrade anytime · No lock-in
-    </div>
-
-    <div class="pricing-headline">
-      Revenue intelligence<br/><em>built for closers</em>
-    </div>
-    <div class="pricing-sub">
-      ICP scoring, signal analysis, and AI-powered GTM strategy — all in one platform. Start free, scale as you grow.
-    </div>
-
-    <div class="tiers">
-
-      <div class="tier">
-        <div class="tier-row">
-          <div class="tier-name">Free Trial</div>
-          <div class="tier-price">
-            <div class="tier-amount free">Free</div>
-            <div class="tier-period">14 days</div>
-          </div>
-        </div>
-        <div class="tier-features">
-          <span class="feat">5 signal scores</span>
-          <span class="feat">1 GTM strategy</span>
-          <span class="feat">Basic ICP analysis</span>
-        </div>
-      </div>
-
-      <div class="tier">
-        <div class="tier-row">
-          <div class="tier-name">Starter</div>
-          <div class="tier-price">
-            <div class="tier-amount">$49</div>
-            <div class="tier-period">per month</div>
-          </div>
-        </div>
-        <div class="tier-features">
-          <span class="feat">100 signal scores</span>
-          <span class="feat">5 strategies</span>
-          <span class="feat">Full ICP engine</span>
-          <span class="feat">CSV export</span>
-        </div>
-      </div>
-
-      <div class="tier featured">
-        <div class="tier-row">
-          <div class="tier-name">Professional</div>
-          <div class="tier-price">
-            <div class="tier-amount">$149</div>
-            <div class="tier-period">per month</div>
-          </div>
-        </div>
-        <div class="tier-features">
-          <span class="feat">1,000 signal scores</span>
-          <span class="feat">Unlimited strategies</span>
-          <span class="feat">AI enrichment</span>
-          <span class="feat">PDF export</span>
-          <span class="feat">Priority support</span>
-        </div>
-      </div>
-
-      <div class="tier">
-        <div class="tier-row">
-          <div class="tier-name">Team</div>
-          <div class="tier-price">
-            <div class="tier-amount">$399</div>
-            <div class="tier-period">per month</div>
-          </div>
-        </div>
-        <div class="tier-features">
-          <span class="feat">5,000 signal scores</span>
-          <span class="feat">10 seats</span>
-          <span class="feat">Shared vault</span>
-          <span class="feat">Admin panel</span>
-          <span class="feat">API access</span>
-        </div>
-      </div>
-
-      <div class="tier">
-        <div class="tier-row">
-          <div class="tier-name">Enterprise</div>
-          <div class="tier-price">
-            <div class="tier-amount" style="font-size:18px;font-family:'Plus Jakarta Sans',sans-serif;font-weight:700">Custom</div>
-          </div>
-        </div>
-        <div class="tier-features">
-          <span class="feat">Unlimited everything</span>
-          <span class="feat">SSO / SAML</span>
-          <span class="feat">Dedicated SLA</span>
-          <span class="feat">Custom integrations</span>
-        </div>
-      </div>
-
-    </div>
-
-    <div class="upgrade-note">
-      <strong>Start free, upgrade when ready.</strong> All paid plans include a 7-day money-back guarantee. No credit card required to start.
-    </div>
-
-  </div>
-
-  <!-- ═══════════════════════════════════════════════
-       RIGHT — AUTH
-  ════════════════════════════════════════════════ -->
-  <div class="auth-panel">
-    <div class="auth-card">
-
-      <!-- Mobile brand (shows on small screens) -->
-      <div class="mobile-brand">
-        <div class="mobile-brand-icon">
-          <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
-        </div>
-        <div class="mobile-brand-name">ABE AI</div>
-      </div>
-
-      <div class="auth-greeting">Welcome back</div>
-      <div class="auth-sub">Sign in to your account or create a new one to get started.</div>
-
-      <!-- Sign In / Sign Up tabs -->
-      <div class="tabs">
-        <button class="tab active" id="tab-in" onclick="switchTab('in')">Sign In</button>
-        <button class="tab" id="tab-up" onclick="switchTab('up')">Sign Up</button>
-      </div>
-
-      <!-- ── SIGN IN ── -->
-      <div class="panel active" id="panel-in">
-        <div class="msg-box" id="si-msg"></div>
-
-        <div class="field">
-          <label class="field-label">Email</label>
-          <input class="field-input" id="si-email" type="email" placeholder="you@company.com" autocomplete="email"/>
-        </div>
-        <div class="field">
-          <label class="field-label">Password</label>
-          <input class="field-input" id="si-pw" type="password" placeholder="••••••••" autocomplete="current-password"/>
-        </div>
-
-        <button class="btn-primary" id="si-btn" onclick="doSignIn()">
-          <span id="si-lbl">Sign In</span>
-          <span class="spin" id="si-spin"></span>
-        </button>
-
-        <div class="divider"><span>or</span></div>
-
-        <button class="btn-google" onclick="doGoogle()">
-          <svg width="16" height="16" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-          Continue with Google
-        </button>
-      </div>
-
-      <!-- ── SIGN UP ── -->
-      <div class="panel" id="panel-up">
-        <div class="msg-box" id="su-msg"></div>
-
-        <div class="field">
-          <label class="field-label">Email</label>
-          <input class="field-input" id="su-email" type="email" placeholder="you@company.com" autocomplete="email"/>
-        </div>
-        <div class="field">
-          <label class="field-label">Password <span style="color:var(--text-3);font-weight:400;text-transform:none;letter-spacing:0">(min 8 characters)</span></label>
-          <input class="field-input" id="su-pw" type="password" placeholder="••••••••" autocomplete="new-password"/>
-        </div>
-
-        <div class="consent-block">
-          <div class="consent-row">
-            <input type="checkbox" id="cb-terms"/>
-            <span>I agree to the <a href="/terms.html" target="_blank">Terms of Service</a> and <a href="/privacy.html" target="_blank">Privacy Policy</a><span class="req">*</span></span>
-          </div>
-          <div class="consent-row">
-            <input type="checkbox" id="cb-consent"/>
-            <span>I consent to ABE processing my data to provide the service<span class="req">*</span></span>
-          </div>
-          <div class="consent-row">
-            <input type="checkbox" id="cb-mkt"/>
-            <span>Send me product updates and tips (optional)</span>
-          </div>
-        </div>
-
-        <button class="btn-primary" id="su-btn" onclick="doSignUp()">
-          <span id="su-lbl">Create Account</span>
-          <span class="spin" id="su-spin"></span>
-        </button>
-
-        <div class="divider"><span>or</span></div>
-
-        <button class="btn-google" onclick="doGoogle()">
-          <svg width="16" height="16" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-          Sign up with Google
-        </button>
-      </div>
-
-      <div class="auth-footer">
-        By continuing you agree to our <a href="/terms.html">Terms</a> &amp; <a href="/privacy.html">Privacy Policy</a>
-        <div class="secure-row">
-          <div class="secure-dot"></div>
-          <div class="secure-text">Enterprise-grade security · Data encrypted at rest</div>
-        </div>
-      </div>
-
-    </div>
-  </div>
-
-</div><!-- /shell -->
-
 <!-- Onboarding Modal -->
-<div class="modal-wrap" id="ob-modal">
+<div class="modal-overlay" id="onboarding-modal">
   <div class="modal">
-    <div class="modal-steps">
-      <div class="modal-step done"></div>
-      <div class="modal-step"></div>
+    <div class="progress">
+      <div class="progress-dot done"></div>
+      <div class="progress-dot"></div>
     </div>
-    <h2>Complete your profile</h2>
-    <p>Help us personalise your experience — takes 30 seconds.</p>
-    <div class="modal-grid" id="ob-form">
-      <div class="span-2">
-        <div class="field"><label class="field-label">Full Name</label><input class="field-input" id="ob-name" placeholder="Jane Smith"/></div>
-      </div>
-      <div class="span-2">
-        <div class="field"><label class="field-label">Company Name</label><input class="field-input" id="ob-company" placeholder="Acme Corp"/></div>
-      </div>
-      <div>
-        <div class="field"><label class="field-label">Job Title</label><input class="field-input" id="ob-title" placeholder="VP Sales"/></div>
-      </div>
-      <div>
-        <div class="field">
-          <label class="field-label">Department</label>
-          <select class="field-input" id="ob-dept">
-            <option value="">Select…</option>
+    
+    <h2>Complete Your Profile</h2>
+    <p>Help us personalize your experience</p>
+    
+    <form id="onboarding-form">
+      <div class="modal-grid">
+        <div class="full">
+          <label class="label">Full Name</label>
+          <input type="text" class="input" id="full-name" required />
+        </div>
+        
+        <div class="full">
+          <label class="label">Company Name</label>
+          <input type="text" class="input" id="company-name" required />
+        </div>
+        
+        <div>
+          <label class="label">Job Title</label>
+          <input type="text" class="input" id="job-title" />
+        </div>
+        
+        <div>
+          <label class="label">Department</label>
+          <select class="input" id="department">
+            <option value="">Select...</option>
             <option value="sales">Sales</option>
             <option value="marketing">Marketing</option>
             <option value="revenue_ops">Revenue Ops</option>
@@ -497,161 +257,526 @@ html,body{height:100%;font-family:'Plus Jakarta Sans',sans-serif;background:var(
             <option value="other">Other</option>
           </select>
         </div>
-      </div>
-      <div>
-        <div class="field">
-          <label class="field-label">Company Size</label>
-          <select class="field-input" id="ob-size">
-            <option value="">Select…</option>
-            <option value="1-10">1–10</option>
-            <option value="11-50">11–50</option>
-            <option value="51-200">51–200</option>
-            <option value="201-1000">201–1000</option>
+        
+        <div>
+          <label class="label">Company Size</label>
+          <select class="input" id="company-size">
+            <option value="">Select...</option>
+            <option value="1-10">1-10</option>
+            <option value="11-50">11-50</option>
+            <option value="51-200">51-200</option>
+            <option value="201-1000">201-1000</option>
             <option value="1000+">1000+</option>
           </select>
         </div>
-      </div>
-      <div>
-        <div class="field">
-          <label class="field-label">Geography</label>
-          <select class="field-input" id="ob-geo">
-            <option value="">Select…</option>
+        
+        <div>
+          <label class="label">Geography</label>
+          <select class="input" id="geography">
+            <option value="">Select...</option>
             <option value="north_america">North America</option>
             <option value="europe">Europe</option>
             <option value="asia">Asia</option>
-            <option value="middle_east">Middle East</option>
             <option value="other">Other</option>
           </select>
         </div>
       </div>
-    </div>
-    <button class="btn-primary" style="margin-top:20px" id="ob-btn" onclick="doOnboard()">
-      <span id="ob-lbl">Complete Setup</span>
-      <span class="spin" id="ob-spin"></span>
-    </button>
+      
+      <button type="submit" class="btn" style="margin-top:24px">
+        <span class="btn-text">Complete Onboarding</span>
+        <div class="spinner"></div>
+      </button>
+    </form>
   </div>
 </div>
 
-<!-- auth-guard.js provides window.APP — no Supabase SDK, no keys here -->
-<script src="auth-guard.js"></script>
 <script>
-/* ── Helpers ─────────────────────────────────────────────────── */
-function msg(id, text, type) {
-  var el = document.getElementById(id);
-  el.textContent = text;
-  el.className = 'msg-box ' + type;
-}
-function clearMsg(id) {
-  var el = document.getElementById(id);
-  el.className = 'msg-box';
-  el.textContent = '';
-}
-function setLoading(btn, lbl, spin, on) {
-  document.getElementById(btn).disabled = on;
-  document.getElementById(lbl).style.display = on ? 'none' : 'inline';
-  document.getElementById(spin).style.display = on ? 'inline-block' : 'none';
-}
+// Dynamic — works on any domain (pages.dev, custom domain, localhost)
+// No hardcoded URL needed: window.location.origin resolves to wherever the app is hosted
+const PRODUCTION_URL = window.location.origin;
 
-/* ── Tab switching ───────────────────────────────────────────── */
-function switchTab(t) {
-  ['in','up'].forEach(function(x) {
-    document.getElementById('tab-' + x).classList.toggle('active', x === t);
-    document.getElementById('panel-' + x).classList.toggle('active', x === t);
+const SUPABASE_URL = 'https://cwcvneluhlimhlzowabv.supabase.co';
+// JWT-format anon key — must match auth-guard.js and backend _middleware.js
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3Y3ZuZWx1aGxpbWhsem93YWJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2MzAxMjAsImV4cCI6MjA4OTIwNjEyMH0.SZDS-svU-kFh_OkUq3AjQY64F-71MpbBsFd6Iin5DlQ';
+
+const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// Tab switching
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    
+    tab.classList.add('active');
+    const method = tab.dataset.method;
+    document.getElementById(`${method}-panel`).classList.add('active');
   });
-  clearMsg('si-msg'); clearMsg('su-msg');
+});
+
+// Sub-tab switching (Sign In / Sign Up)
+document.querySelectorAll('.sub-tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.sub-tab').forEach(t => t.classList.remove('active'));
+    tab.classList.add('active');
+    
+    const mode = tab.dataset.mode;
+    if (mode === 'signin') {
+      document.getElementById('signin-form').style.display = 'block';
+      document.getElementById('signup-form').style.display = 'none';
+    } else {
+      document.getElementById('signin-form').style.display = 'none';
+      document.getElementById('signup-form').style.display = 'block';
+    }
+  });
+});
+
+// Helper functions
+function showError(msg, elementId = 'email-msg') {
+  const el = document.getElementById(elementId);
+  el.textContent = msg;
+  el.className = 'msg error';
 }
 
-/* ── Sign In ─────────────────────────────────────────────────── */
-async function doSignIn() {
-  clearMsg('si-msg');
-  var email = document.getElementById('si-email').value.trim();
-  var pw    = document.getElementById('si-pw').value;
-  if (!email || !pw) { msg('si-msg','Please enter email and password.','err'); return; }
+function showSuccess(msg, elementId = 'email-msg') {
+  const el = document.getElementById(elementId);
+  el.textContent = msg;
+  el.className = 'msg success';
+}
 
-  setLoading('si-btn','si-lbl','si-spin', true);
+function hideMsg(elementId = 'email-msg') {
+  document.getElementById(elementId).style.display = 'none';
+}
+
+function getDeviceFingerprint() {
+  const raw = JSON.stringify({
+    ua: navigator.userAgent,
+    lang: navigator.language,
+    tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
+    res: `${screen.width}x${screen.height}`,
+    cd: screen.colorDepth,
+  });
+  let h = 0;
+  for (let i = 0; i < raw.length; i++) {
+    h = Math.imul(31, h) + raw.charCodeAt(i) | 0;
+  }
+  return 'fp_' + Math.abs(h).toString(36);
+}
+
+// Sign In
+document.getElementById('signin-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  hideMsg();
+  
+  const btn = e.target.querySelector('.btn');
+  const email = document.getElementById('signin-email').value;
+  const password = document.getElementById('signin-password').value;
+  
+  btn.disabled = true;
+  btn.classList.add('loading');
+  
   try {
-    var data = await window.APP.login(email, pw);
-    msg('si-msg', 'Signed in! Redirecting…', 'ok');
-    var next = new URLSearchParams(window.location.search).get('next');
-    setTimeout(function() {
-      window.location.replace(data.onboardingCompleted ? (next || '/dashboard.html') : '/dashboard.html?onboarding=1');
-    }, 500);
-  } catch(e) {
-    msg('si-msg', e.message || 'Sign in failed. Check your credentials.', 'err');
-    setLoading('si-btn','si-lbl','si-spin', false);
+    const { data, error } = await sb.auth.signInWithPassword({ email, password });
+    
+    if (error) throw error;
+    
+    console.log('✅ Sign in successful:', data.user.email);
+
+    // ADMIN BYPASS: skip onboarding check, go straight to dashboard
+    const _adminEmails = ['amitbhawik@gmail.com', 'amitbhawik@hotmail.com'];
+    if (_adminEmails.includes(data.user.email.toLowerCase())) {
+      console.log('✅ Admin — redirecting directly to dashboard');
+      window.location.href = '/dashboard.html';
+      return;
+    }
+    
+    // Check if onboarding completed (regular users only)
+    const { data: profile } = await sb
+      .from('user_profiles')
+      .select('onboarding_completed')
+      .eq('id', data.user.id)
+      .single();
+    
+    if (!profile || !profile.onboarding_completed) {
+      document.getElementById('onboarding-modal').classList.add('active');
+    } else {
+      window.location.href = '/dashboard.html';
+    }
+    
+  } catch (err) {
+    console.error('Sign in error:', err);
+    showError(err.message || 'Failed to sign in. Please check your credentials.');
+    btn.disabled = false;
+    btn.classList.remove('loading');
+  }
+});
+
+// Sign Up
+document.getElementById('signup-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  hideMsg();
+  
+  const btn = e.target.querySelector('.btn');
+  const email = document.getElementById('signup-email').value;
+  const password = document.getElementById('signup-password').value;
+  const confirmPassword = document.getElementById('confirm-password').value;
+  const termsAccepted = document.getElementById('terms-checkbox').checked;
+  const marketingConsent = document.getElementById('marketing-checkbox').checked;
+  
+  // Validation
+  if (password !== confirmPassword) {
+    showError('Passwords do not match');
+    return;
+  }
+  
+  if (password.length < 8) {
+    showError('Password must be at least 8 characters');
+    return;
+  }
+  
+  if (!termsAccepted) {
+    showError('You must accept the Terms of Service');
+    return;
+  }
+  
+  btn.disabled = true;
+  btn.classList.add('loading');
+  
+  try {
+    // Sign up with Supabase
+    const { data, error } = await sb.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          terms_accepted: termsAccepted,
+          marketing_consent: marketingConsent,
+          device_id: getDeviceFingerprint()
+        }
+      }
+    });
+    
+    if (error) throw error;
+    
+    console.log('✅ Sign up successful:', data.user.email);
+    
+    // Create user profile and organization
+    await createUserProfile(data.user, { termsAccepted, marketingConsent });
+    
+    // Show onboarding
+    document.getElementById('onboarding-modal').classList.add('active');
+    
+  } catch (err) {
+    console.error('Sign up error:', err);
+    showError(err.message || 'Failed to create account. Please try again.');
+    btn.disabled = false;
+    btn.classList.remove('loading');
+  }
+});
+
+// Create user profile
+async function createUserProfile(user, options) {
+  // ADMIN BYPASS: admin users skip profile creation entirely
+  const adminEmails = ['amitbhawik@gmail.com', 'amitbhawik@hotmail.com'];
+  if (adminEmails.includes(user.email.toLowerCase())) {
+    console.log('✅ Admin user — skipping profile creation');
+    return;
+  }
+
+  const deviceId = getDeviceFingerprint();
+
+  try {
+    // ── Step 1: Get or create organization ──────────────────────────
+    // Use upsert on owner_id so re-runs don't throw 500 on duplicate
+    let orgId = null;
+
+    // First check if org already exists for this user
+    const { data: existingOrg } = await sb
+      .from('organizations')
+      .select('id')
+      .eq('owner_id', user.id)
+      .maybeSingle();
+
+    if (existingOrg) {
+      orgId = existingOrg.id;
+      console.log('✅ Existing org found:', orgId);
+    } else {
+      const { data: newOrg, error: orgError } = await sb
+        .from('organizations')
+        .insert({
+          name: `${user.email}'s Organization`,
+          plan_tier: 'free_trial',
+          owner_id: user.id,
+        })
+        .select('id')
+        .single();
+
+      if (orgError) {
+        // 23505 = unique_violation — org already exists, fetch it
+        if (orgError.code === '23505' || orgError.message?.includes('duplicate') || orgError.message?.includes('unique')) {
+          const { data: retryOrg } = await sb
+            .from('organizations')
+            .select('id')
+            .eq('owner_id', user.id)
+            .maybeSingle();
+          orgId = retryOrg?.id || null;
+        } else {
+          console.warn('Org insert error (non-fatal):', orgError.message);
+          // Continue without org — profile can still be created
+        }
+      } else {
+        orgId = newOrg?.id || null;
+      }
+    }
+
+    // ── Step 2: Upsert user_profiles ────────────────────────────────
+    // upsert handles both first-time and repeat calls safely
+    const { error: profileError } = await sb
+      .from('user_profiles')
+      .upsert({
+        id:                   user.id,
+        email:                user.email,
+        organization_id:      orgId,
+        plan:                 'free_trial',
+        tc_accepted:          options.termsAccepted    || false,
+        marketing_consent:    options.marketingConsent || false,
+        device_id:            deviceId,
+        onboarding_completed: false,
+        created_at:           new Date().toISOString(),
+      }, { onConflict: 'id' });
+
+    if (profileError) {
+      console.warn('Profile upsert error (non-fatal):', profileError.message);
+      // Don't throw — authenticated user should still proceed
+    }
+
+    // ── Step 3: Upsert organization membership ───────────────────────
+    if (orgId) {
+      await sb
+        .from('organization_members')
+        .upsert({
+          organization_id: orgId,
+          user_id:         user.id,
+          role:            'owner',
+        }, { onConflict: 'organization_id,user_id' });
+    }
+
+    console.log('✅ User profile created/updated');
+
+  } catch (error) {
+    // Non-fatal: log but never block authenticated users from proceeding
+    console.warn('createUserProfile warning (non-fatal):', error.message);
   }
 }
 
-/* ── Sign Up ─────────────────────────────────────────────────── */
-async function doSignUp() {
-  clearMsg('su-msg');
-  var email   = document.getElementById('su-email').value.trim();
-  var pw      = document.getElementById('su-pw').value;
-  var terms   = document.getElementById('cb-terms').checked;
-  var consent = document.getElementById('cb-consent').checked;
-  var mkt     = document.getElementById('cb-mkt').checked;
-
-  if (!email || !pw)   { msg('su-msg','Please enter email and password.','err'); return; }
-  if (pw.length < 8)   { msg('su-msg','Password must be at least 8 characters.','err'); return; }
-  if (!terms)          { msg('su-msg','You must accept the Terms of Service to continue.','err'); return; }
-  if (!consent)        { msg('su-msg','You must consent to data processing to continue.','err'); return; }
-
-  setLoading('su-btn','su-lbl','su-spin', true);
+// Google OAuth
+document.getElementById('google-btn').addEventListener('click', async (e) => {
+  e.preventDefault();
+  hideMsg('google-msg');
+  
+  const btn = e.currentTarget;
+  btn.disabled = true;
+  btn.classList.add('loading');
+  
   try {
-    await window.APP.signup(email, pw, terms, mkt);
-    msg('su-msg', 'Account created! Setting up your workspace…', 'ok');
-    setTimeout(function() { document.getElementById('ob-modal').classList.add('open'); }, 800);
-  } catch(e) {
-    msg('su-msg', e.message || 'Signup failed. Please try again.', 'err');
-    setLoading('su-btn','su-lbl','su-spin', false);
+    const { data, error } = await sb.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${PRODUCTION_URL}/dashboard.html`,
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent'
+        }
+      }
+    });
+    
+    if (error) throw error;
+    
+    console.log('✅ Redirecting to Google...');
+    
+  } catch (err) {
+    console.error('Google OAuth error:', err);
+    showError(err.message || 'Failed to sign in with Google', 'google-msg');
+    btn.disabled = false;
+    btn.classList.remove('loading');
   }
-}
+});
 
-/* ── Google OAuth ────────────────────────────────────────────── */
-async function doGoogle() {
-  // Calls Supabase OAuth redirect — handled server-side via auth-callback.html
+// Magic Link
+document.getElementById('magic-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  hideMsg('magic-msg');
+  
+  const btn = e.target.querySelector('.btn');
+  const email = document.getElementById('magic-email').value;
+  
+  btn.disabled = true;
+  btn.classList.add('loading');
+  
   try {
-    var res = await fetch('/api/auth-url?provider=google');
-    var data = await res.json();
-    if (data.url) { window.location.replace(data.url); return; }
-  } catch(_) {}
-  msg('si-msg', 'Google sign-in requires OAuth configuration in Supabase. See README.', 'err');
-}
-
-/* ── Onboarding ──────────────────────────────────────────────── */
-async function doOnboard() {
-  setLoading('ob-btn','ob-lbl','ob-spin', true);
-  try {
-    await window.APP.api('/api/session', null, 'GET'); // verify still authenticated
-    // Save onboarding data via API
-    await window.APP.api('/api/onboard', {
-      full_name:    document.getElementById('ob-name').value,
-      company_name: document.getElementById('ob-company').value,
-      job_title:    document.getElementById('ob-title').value,
-      department:   document.getElementById('ob-dept').value,
-      company_size: document.getElementById('ob-size').value,
-      geography:    document.getElementById('ob-geo').value,
-    }).catch(function() {}); // non-fatal — redirect regardless
-    window.location.replace('/dashboard.html');
-  } catch(_) {
-    window.location.replace('/dashboard.html');
+    const { error } = await sb.auth.signInWithOtp({
+      email,
+      options: {
+        emailRedirectTo: `${PRODUCTION_URL}/dashboard.html`
+      }
+    });
+    
+    if (error) throw error;
+    
+    showSuccess('Magic link sent! Check your email.', 'magic-msg');
+    
+  } catch (err) {
+    console.error('Magic link error:', err);
+    showError(err.message || 'Failed to send magic link', 'magic-msg');
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove('loading');
   }
-}
+});
 
-/* ── URL error params ────────────────────────────────────────── */
-(function() {
-  var p = new URLSearchParams(window.location.search);
-  if (p.get('error') === 'unauthorized') msg('si-msg','Your session expired. Please sign in again.','err');
-  if (p.get('error') === 'oauth_failed')  msg('si-msg','Google sign-in failed. Please try again.','err');
-  if (p.get('signup') === '1') switchTab('up');
+// Onboarding
+document.getElementById('onboarding-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+
+  const btn = e.target.querySelector('.btn');
+  btn.disabled = true;
+  btn.classList.add('loading');
+
+  try {
+    const { data: { user } } = await sb.auth.getUser();
+
+    // ADMIN BYPASS: admin users skip onboarding DB write and go straight to dashboard
+    const adminEmails = ['amitbhawik@gmail.com', 'amitbhawik@hotmail.com'];
+    if (user && adminEmails.includes(user.email.toLowerCase())) {
+      console.log('✅ Admin user — bypassing onboarding, redirecting to dashboard');
+      window.location.href = '/dashboard.html';
+      return;
+    }
+
+    const onboardingData = {
+      full_name:            document.getElementById('full-name').value,
+      company_name:         document.getElementById('company-name').value,
+      job_title:            document.getElementById('job-title').value,
+      department:           document.getElementById('department').value,
+      company_size:         document.getElementById('company-size').value,
+      geography:            document.getElementById('geography').value,
+      onboarding_completed: true,
+      updated_at:           new Date().toISOString(),
+    };
+
+    // Use upsert so this works whether the profile row exists or not
+    const { error } = await sb
+      .from('user_profiles')
+      .upsert({ id: user.id, email: user.email, ...onboardingData }, { onConflict: 'id' });
+
+    if (error) {
+      // If upsert fails, try plain update as fallback
+      console.warn('Upsert failed, trying update:', error.message);
+      const { error: updateError } = await sb
+        .from('user_profiles')
+        .update(onboardingData)
+        .eq('id', user.id);
+
+      if (updateError) {
+        // If both fail, log but don't block — user is authenticated, let them in
+        console.warn('Profile update also failed (non-fatal):', updateError.message);
+      }
+    }
+
+    // Update organization name (non-fatal if it fails)
+    try {
+      const { data: profile } = await sb
+        .from('user_profiles')
+        .select('organization_id')
+        .eq('id', user.id)
+        .single();
+
+      if (profile?.organization_id) {
+        await sb
+          .from('organizations')
+          .update({ name: onboardingData.company_name })
+          .eq('id', profile.organization_id);
+      }
+    } catch (_) { /* non-fatal */ }
+
+    console.log('✅ Onboarding complete');
+    window.location.href = '/dashboard.html';
+
+  } catch (err) {
+    console.error('Onboarding error:', err);
+    // CRITICAL FIX: Never show alert + block if user is authenticated.
+    // Check if we have a session — if yes, just go to dashboard anyway.
+    const { data: { session } } = await sb.auth.getSession().catch(() => ({ data: {} }));
+    if (session) {
+      console.log('Session valid — redirecting to dashboard despite onboarding error');
+      window.location.href = '/dashboard.html';
+    } else {
+      showError('Failed to complete onboarding. Please try again.');
+      btn.disabled = false;
+      btn.classList.remove('loading');
+    }
+  }
+});
+
+// Check for OAuth callback
+(async function checkOAuthReturn() {
+  const hash = window.location.hash;
+  const params = new URLSearchParams(window.location.search);
+  
+  if (hash.includes('access_token') || params.get('code')) {
+    console.log('OAuth callback detected');
+    
+    try {
+      const { data: { session }, error } = await sb.auth.getSession();
+      
+      if (error) throw error;
+      
+      if (session) {
+        console.log('✅ OAuth session established:', session.user.email);
+        
+        // Check/create profile for OAuth user
+        const { data: profile } = await sb
+          .from('user_profiles')
+          .select('*')
+          .eq('id', session.user.id)
+          .single();
+        
+        if (!profile) {
+          console.log('New OAuth user - creating profile');
+          await createUserProfile(session.user, {
+            termsAccepted: true,
+            marketingConsent: false
+          });
+          document.getElementById('onboarding-modal').classList.add('active');
+        } else if (!profile.onboarding_completed) {
+          document.getElementById('onboarding-modal').classList.add('active');
+        } else {
+          window.location.href = '/dashboard.html';
+        }
+      }
+    } catch (err) {
+      console.error('OAuth callback error:', err);
+      showError('Authentication failed. Please try again.');
+    }
+  }
 })();
 
-/* ── Enter key ───────────────────────────────────────────────── */
-document.addEventListener('keydown', function(e) {
-  if (e.key !== 'Enter') return;
-  if (document.getElementById('panel-in').classList.contains('active')) doSignIn();
-  else doSignUp();
+// Handle URL parameters for onboarding
+const urlParams = new URLSearchParams(window.location.search);
+if (urlParams.get('show_onboarding') === 'true') {
+  document.getElementById('onboarding-modal').classList.add('active');
+}
+if (urlParams.get('error')) {
+  showError(decodeURIComponent(urlParams.get('error')));
+}
+
+// Signup link click
+document.getElementById('signup-link').addEventListener('click', (e) => {
+  e.preventDefault();
+  document.querySelector('[data-mode="signup"]').click();
 });
+
+console.log('✅ Login page initialized');
 </script>
+
 </body>
 </html>
