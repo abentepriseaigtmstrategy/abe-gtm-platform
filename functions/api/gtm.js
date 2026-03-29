@@ -24,10 +24,10 @@ export async function onRequestPost(context) {
   if (!user) return errRes(authErr || 'Unauthorized', 401, cors);
 
   const openaiKey   = env.OPENAI_API_KEY;
-  const supabaseUrl = env.SUPABASE_URL;
+  const supabaseUrl = env.SUPABASE_URL      || 'https://cwcvneluhlimhlzowabv.supabase.co';
   // Use service key if set; fall back to anon key so saves still work without the secret
-  const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY;
-  if (!supabaseKey) return errRes('Supabase not configured', 503, cors);
+  const ANON_FALLBACK = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3Y3ZuZWx1aGxpbWhsem93YWJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2MzAxMjAsImV4cCI6MjA4OTIwNjEyMH0.SZDS-svU-kFh_OkUq3AjQY64F-71MpbBsFd6Iin5DlQ';
+  const supabaseKey = env.SUPABASE_SERVICE_KEY || env.SUPABASE_ANON_KEY || ANON_FALLBACK;
   if (!openaiKey) return errRes('OpenAI not configured', 503, cors);
 
   let body;
