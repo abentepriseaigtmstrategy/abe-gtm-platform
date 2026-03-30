@@ -319,7 +319,16 @@ async function doSignUp() {
 /* ── Google OAuth ─────────────────────────────────────────────── */
 async function doGoogle() {
   hideMsg('google-msg');
-  showMsg('google-msg', 'Google OAuth requires configuration in Supabase Dashboard → Authentication → Providers → Google.', 'error');
+  hideMsg('email-msg');
+  // Constructs the Supabase Google OAuth URL directly.
+  // No API key is needed for this redirect — the project URL is public.
+  // After Google authentication, Supabase redirects to /auth-callback.html
+  // where the token is extracted and stored securely.
+  var redirectTo = encodeURIComponent(window.location.origin + '/auth-callback.html');
+  var oauthUrl   = 'https://cwcvneluhlimhlzowabv.supabase.co/auth/v1/authorize'
+                 + '?provider=google'
+                 + '&redirect_to=' + redirectTo;
+  window.location.replace(oauthUrl);
 }
 
 /* ── Magic Link ───────────────────────────────────────────────── */
