@@ -4,26 +4,13 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Sign In · ABE AI Revenue Infrastructure</title>
-
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-<!-- 
-  ⚠️ CRITICAL: Replace YOUR_ACTUAL_DOMAIN with your real Cloudflare Pages domain
-  Find it at: https://dash.cloudflare.com → Workers & Pages → abe-gtm-platform
--->
-
+<!-- NO Supabase CDN. NO keys. Auth goes through /api/login and /api/signup. -->
 <style>
 :root{
---bg:#0B0F1A;
---card:#121827;
---border:#1F2937;
---accent:#a855f7;
---accent2:#7c3aed;
---green:#22c55e;
---red:#ef4444;
---text:#E5E7EB;
---muted:#6B7280;
+--bg:#0B0F1A;--card:#121827;--border:#1F2937;
+--accent:#a855f7;--accent2:#7c3aed;
+--green:#22c55e;--red:#ef4444;--text:#E5E7EB;--muted:#6B7280;
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{height:100%}
@@ -37,52 +24,34 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;bac
 .logo-sub{font-size:9px;color:var(--muted);letter-spacing:.18em;text-transform:uppercase}
 .title{font-size:22px;font-weight:900;color:white;letter-spacing:-.5px;margin-bottom:6px}
 .subtitle{font-size:12px;color:var(--muted);margin-bottom:28px;line-height:1.6}
-
 .tabs{display:flex;gap:4px;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:10px;padding:4px;margin-bottom:24px}
 .tab{flex:1;padding:7px 4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border:none;background:none;border-radius:7px;cursor:pointer;transition:all .15s;white-space:nowrap}
 .tab.active{background:rgba(168,85,247,.15);border:1px solid rgba(168,85,247,.3);color:white}
-
 .sub-tabs{display:flex;gap:0;margin-bottom:24px;border-bottom:1px solid var(--border)}
 .sub-tab{flex:1;padding:9px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);border:none;background:none;cursor:pointer;transition:all .15s;border-bottom:2px solid transparent}
 .sub-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
-
-.panel{display:none}
-.panel.active{display:block}
-
+.panel{display:none}.panel.active{display:block}
 .label{display:block;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.18em;color:var(--muted);margin-bottom:7px}
 .input{width:100%;background:rgba(0,0,0,.4);border:1px solid var(--border);color:var(--text);font-size:13px;padding:12px 14px;border-radius:10px;font-family:'Inter',sans-serif;outline:none;transition:border-color .15s;margin-bottom:16px}
-.input:focus{border-color:var(--accent)}
-.input::placeholder{color:#4b5563}
-
+.input:focus{border-color:var(--accent)}.input::placeholder{color:#4b5563}
 .check-row{display:flex;align-items:flex-start;gap:10px;margin-bottom:14px}
 .check-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent);flex-shrink:0;margin-top:2px;cursor:pointer}
 .check-row span{font-size:11px;color:var(--muted);line-height:1.5}
-.check-row a{color:var(--accent);text-decoration:none}
-.check-row a:hover{text-decoration:underline}
-
-.btn{width:100%;padding:13px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:white;border:none;border-radius:10px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;cursor:pointer;transition:all .15s;margin-top:4px}
-.btn:hover:not(:disabled){opacity:.9;transform:translateY(-1px)}
-.btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
-.btn.loading .btn-text{display:none}
-.btn.loading .spinner{display:block}
-.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text);display:flex;align-items:center;justify-content:center;gap:10px;margin-top:10px}
+.check-row a{color:var(--accent);text-decoration:none}.check-row a:hover{text-decoration:underline}
+.btn{width:100%;padding:13px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:white;border:none;border-radius:10px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;cursor:pointer;transition:all .15s;margin-top:4px;display:flex;align-items:center;justify-content:center;gap:8px}
+.btn:hover:not(:disabled){opacity:.9;transform:translateY(-1px)}.btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
+.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text);display:flex;align-items:center;justify-content:center;gap:10px;margin-top:10px;padding:12px;border-radius:10px;cursor:pointer;font-family:'Inter',sans-serif;font-size:12px;font-weight:600;transition:all .15s}
 .btn-outline:hover{border-color:var(--accent);background:rgba(168,85,247,.06)}
-.btn-outline img{width:16px;height:16px}
-
-.spinner{display:none;width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:white;border-radius:50%;animation:spin .7s linear infinite;margin:0 auto}
+.spinner{width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:white;border-radius:50%;animation:spin .7s linear infinite;display:none}
 @keyframes spin{to{transform:rotate(360deg)}}
-
 .divider{display:flex;align-items:center;gap:12px;margin:16px 0;color:var(--muted);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em}
 .divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border)}
-
 .msg{padding:12px 14px;border-radius:8px;font-size:12px;font-weight:600;margin-top:14px;display:none}
 .msg.error{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#fca5a5;display:block}
 .msg.success{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#86efac;display:block}
-
 .footer{margin-top:24px;text-align:center;font-size:10px;color:var(--muted);line-height:1.6}
 .secure{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:16px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:#374151}
 .dot{width:6px;height:6px;border-radius:50%;background:var(--green)}
-
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(8px);z-index:999;display:none;align-items:center;justify-content:center;padding:24px}
 .modal-overlay.active{display:flex}
 .modal{background:#121827;border:1px solid rgba(168,85,247,.2);border-radius:20px;padding:40px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto}
@@ -91,19 +60,16 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;bac
 .modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
 .modal-grid .full{grid-column:1/-1}
 .modal .label{margin-top:4px}
-.modal select{width:100%;background:rgba(0,0,0,.4);border:1px solid var(--border);color:var(--text);font-size:13px;padding:12px 14px;border-radius:10px;font-family:'Inter',sans-serif;outline:none;margin-bottom:0;-webkit-appearance:none}
-.modal select:focus{border-color:var(--accent)}
-.modal select option{background:#121827}
+.modal select{width:100%;background:rgba(0,0,0,.4);border:1px solid var(--border);color:var(--text);font-size:13px;padding:12px 14px;border-radius:10px;font-family:'Inter',sans-serif;outline:none;-webkit-appearance:none}
+.modal select:focus{border-color:var(--accent)}.modal select option{background:#121827}
 .progress{display:flex;gap:6px;margin-bottom:28px}
 .progress-dot{width:8px;height:8px;border-radius:50%;background:var(--border)}
 .progress-dot.done{background:var(--accent)}
-
 .link{color:var(--accent);text-decoration:none;font-size:12px;display:inline-block;margin-top:16px}
 .link:hover{text-decoration:underline}
 </style>
 </head>
 <body>
-
 <div class="glow"></div>
 
 <div class="card">
@@ -118,665 +84,287 @@ body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;bac
   <h1 class="title">Welcome Back</h1>
   <p class="subtitle">Sign in to access your revenue intelligence dashboard</p>
 
-  <!-- Auth Method Tabs -->
   <div class="tabs">
-    <button class="tab active" data-method="email">Email</button>
-    <button class="tab" data-method="google">Google</button>
-    <button class="tab" data-method="magic">Magic Link</button>
+    <button class="tab active" id="tab-email"  onclick="switchTab('email')">Email</button>
+    <button class="tab"        id="tab-google" onclick="switchTab('google')">Google</button>
+    <button class="tab"        id="tab-magic"  onclick="switchTab('magic')">Magic Link</button>
   </div>
 
-  <!-- EMAIL Panel -->
+  <!-- EMAIL panel -->
   <div class="panel active" id="email-panel">
-    <!-- Sign In / Sign Up Sub-tabs -->
     <div class="sub-tabs">
-      <button class="sub-tab active" data-mode="signin">Sign In</button>
-      <button class="sub-tab" data-mode="signup">Sign Up</button>
+      <button class="sub-tab active" id="sub-signin" onclick="switchMode('signin')">Sign In</button>
+      <button class="sub-tab"        id="sub-signup" onclick="switchMode('signup')">Sign Up</button>
     </div>
 
-    <!-- Sign In Form -->
-    <form id="signin-form" class="auth-form" autocomplete="on">
+    <!-- Sign In -->
+    <div id="signin-form">
       <label class="label">Email Address</label>
-      <input type="email" class="input" id="signin-email" placeholder="you@company.com" required autocomplete="email" />
-
+      <input type="email"    class="input" id="si-email"    placeholder="you@company.com" autocomplete="email"/>
       <label class="label">Password</label>
-      <input type="password" class="input" id="signin-password" placeholder="Enter your password" required autocomplete="current-password" />
-
-      <button type="submit" class="btn">
-        <span class="btn-text">Sign In</span>
-        <div class="spinner"></div>
+      <input type="password" class="input" id="si-password" placeholder="Enter your password" autocomplete="current-password"/>
+      <button class="btn" id="si-btn" onclick="doSignIn()">
+        <span id="si-txt">Sign In</span>
+        <span class="spinner" id="si-spin"></span>
       </button>
+      <a href="#" class="link" onclick="switchMode('signup');return false;">Don't have an account? Sign Up</a>
+    </div>
 
-      <a href="#" class="link" id="forgot-link">Forgot password?</a>
-    </form>
-
-    <!-- Sign Up Form -->
-    <form id="signup-form" class="auth-form" style="display:none" autocomplete="on">
+    <!-- Sign Up -->
+    <div id="signup-form" style="display:none">
       <label class="label">Email Address</label>
-      <input type="email" class="input" id="signup-email" placeholder="you@company.com" required autocomplete="email" />
-
+      <input type="email"    class="input" id="su-email"    placeholder="you@company.com" autocomplete="email"/>
       <label class="label">Password</label>
-      <input type="password" class="input" id="signup-password" placeholder="Create password (8+ characters)" required autocomplete="new-password" />
-
+      <input type="password" class="input" id="su-password" placeholder="Create password (8+ characters)" autocomplete="new-password"/>
       <label class="label">Confirm Password</label>
-      <input type="password" class="input" id="confirm-password" placeholder="Confirm password" required autocomplete="new-password" />
-
+      <input type="password" class="input" id="su-confirm"  placeholder="Confirm password" autocomplete="new-password"/>
       <label class="check-row">
-        <input type="checkbox" id="terms-checkbox" required />
-        <span>I accept the <a href="/terms.html" target="_blank">Terms of Service</a> and <a href="/privacy.html" target="_blank">Privacy Policy</a></span>
+        <input type="checkbox" id="cb-terms"/>
+        <span>I accept the <a href="/terms.html" target="_blank">Terms of Service</a> and <a href="/privacy.html" target="_blank">Privacy Policy</a> <span style="color:var(--red)">*</span></span>
       </label>
-
       <label class="check-row">
-        <input type="checkbox" id="marketing-checkbox" />
-        <span>Send me product updates and marketing emails</span>
+        <input type="checkbox" id="cb-consent"/>
+        <span>I consent to ABE processing my data to provide the service <span style="color:var(--red)">*</span></span>
       </label>
-
-      <button type="submit" class="btn">
-        <span class="btn-text">Create Account</span>
-        <div class="spinner"></div>
+      <label class="check-row">
+        <input type="checkbox" id="cb-mkt"/>
+        <span>Send me product updates and marketing emails (optional)</span>
+      </label>
+      <button class="btn" id="su-btn" onclick="doSignUp()">
+        <span id="su-txt">Create Account</span>
+        <span class="spinner" id="su-spin"></span>
       </button>
-    </form>
+      <a href="#" class="link" onclick="switchMode('signin');return false;">Already have an account? Sign In</a>
+    </div>
 
     <div id="email-msg" class="msg"></div>
   </div>
 
-  <!-- GOOGLE Panel -->
+  <!-- GOOGLE panel -->
   <div class="panel" id="google-panel">
     <p class="subtitle">Sign in with your Google account for instant access</p>
-    
-    <button id="google-btn" class="btn-outline">
-      <img src="data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTgiIGhlaWdodD0iMTgiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PGcgZmlsbD0ibm9uZSIgZmlsbC1ydWxlPSJldmVub2RkIj48cGF0aCBkPSJNMTcuNiA5LjJsLS4xLTEuOEg5djMuNGg0LjhDMTMuNiAxMiAxMyAxMyAxMiAxMy42djIuMmgzYTguOCA4LjggMCAwIDAgMi42LTYuNnoiIGZpbGw9IiM0Mjg1RjQiIGZpbGwtcnVsZT0ibm9uemVybyIvPjxwYXRoIGQ9Ik05IDE4YzIuNCAwIDQuNS0uOCA2LTIuMmwtMy0yLjJhNS40IDUuNCAwIDAgMS04LTIuOUgxVjEzYTkgOSAwIDAgMCA4IDV6IiBmaWxsPSIjMzRBODUzIiBmaWxsLXJ1bGU9Im5vbnplcm8iLz48cGF0aCBkPSJNNCAxMC43YTUuNCA1LjQgMCAwIDEgMC0zLjRWNUgxYTkgOSAwIDAgMCAwIDhsMy0yLjN6IiBmaWxsPSIjRkJCQzA1IiBmaWxsLXJ1bGU9Im5vbnplcm8iLz48cGF0aCBkPSJNOSAzLjZjMS4zIDAgMi41LjQgMy40IDEuM0wxNSAyLjNBOSA5IDAgMCAwIDEgNWwzIDIuNGE1LjQgNS40IDAgMCAxIDUtMy43eiIgZmlsbD0iI0VBNDMzNSIgZmlsbC1ydWxlPSJub256ZXJvIi8+PHBhdGggZD0iTTAgMGgxOHYxOEgweiIvPjwvZz48L3N2Zz4=" alt="Google" />
-      <span class="btn-text">Continue with Google</span>
-      <div class="spinner"></div>
+    <button class="btn-outline" onclick="doGoogle()">
+      <svg width="16" height="16" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+      Continue with Google
     </button>
-
     <div id="google-msg" class="msg"></div>
   </div>
 
-  <!-- MAGIC LINK Panel -->
+  <!-- MAGIC LINK panel -->
   <div class="panel" id="magic-panel">
     <p class="subtitle">We'll send you a secure login link via email</p>
-    
-    <form id="magic-form" class="auth-form" autocomplete="on">
-      <label class="label">Email Address</label>
-      <input type="email" class="input" id="magic-email" placeholder="you@company.com" required autocomplete="email" />
-
-      <button type="submit" class="btn">
-        <span class="btn-text">Send Magic Link</span>
-        <div class="spinner"></div>
-      </button>
-    </form>
-
+    <label class="label">Email Address</label>
+    <input type="email" class="input" id="ml-email" placeholder="you@company.com" autocomplete="email"/>
+    <button class="btn" id="ml-btn" onclick="doMagicLink()">
+      <span id="ml-txt">Send Magic Link</span>
+      <span class="spinner" id="ml-spin"></span>
+    </button>
     <div id="magic-msg" class="msg"></div>
   </div>
 
   <div class="footer">
-    Don't have an account? <a href="#" class="link" id="signup-link">Sign Up</a>
-    <div class="secure">
-      <div class="dot"></div>
-      Secured by Supabase Authentication
-    </div>
+    <div class="secure"><div class="dot"></div>Secured by Supabase Authentication</div>
   </div>
 </div>
 
-<!-- Onboarding Modal -->
-<div class="modal-overlay" id="onboarding-modal">
+<!-- Onboarding Modal — shown after signup -->
+<div class="modal-overlay" id="ob-modal">
   <div class="modal">
     <div class="progress">
       <div class="progress-dot done"></div>
       <div class="progress-dot"></div>
     </div>
-    
     <h2>Complete Your Profile</h2>
-    <p>Help us personalize your experience</p>
-    
-    <form id="onboarding-form">
-      <div class="modal-grid">
-        <div class="full">
-          <label class="label">Full Name</label>
-          <input type="text" class="input" id="full-name" required />
-        </div>
-        
-        <div class="full">
-          <label class="label">Company Name</label>
-          <input type="text" class="input" id="company-name" required />
-        </div>
-        
-        <div>
-          <label class="label">Job Title</label>
-          <input type="text" class="input" id="job-title" />
-        </div>
-        
-        <div>
-          <label class="label">Department</label>
-          <select class="input" id="department">
-            <option value="">Select...</option>
-            <option value="sales">Sales</option>
-            <option value="marketing">Marketing</option>
-            <option value="revenue_ops">Revenue Ops</option>
-            <option value="executive">Executive</option>
-            <option value="other">Other</option>
-          </select>
-        </div>
-        
-        <div>
-          <label class="label">Company Size</label>
-          <select class="input" id="company-size">
-            <option value="">Select...</option>
-            <option value="1-10">1-10</option>
-            <option value="11-50">11-50</option>
-            <option value="51-200">51-200</option>
-            <option value="201-1000">201-1000</option>
-            <option value="1000+">1000+</option>
-          </select>
-        </div>
-        
-        <div>
-          <label class="label">Geography</label>
-          <select class="input" id="geography">
-            <option value="">Select...</option>
-            <option value="north_america">North America</option>
-            <option value="europe">Europe</option>
-            <option value="asia">Asia</option>
-            <option value="other">Other</option>
-          </select>
-        </div>
+    <p>Help us personalise your experience</p>
+    <div class="modal-grid">
+      <div class="full">
+        <label class="label">Full Name</label>
+        <input type="text" class="input" id="ob-name" placeholder="Jane Smith"/>
       </div>
-      
-      <button type="submit" class="btn" style="margin-top:24px">
-        <span class="btn-text">Complete Onboarding</span>
-        <div class="spinner"></div>
-      </button>
-    </form>
+      <div class="full">
+        <label class="label">Company Name</label>
+        <input type="text" class="input" id="ob-company" placeholder="Acme Corp"/>
+      </div>
+      <div>
+        <label class="label">Job Title</label>
+        <input type="text" class="input" id="ob-title" placeholder="VP Sales"/>
+      </div>
+      <div>
+        <label class="label">Department</label>
+        <select class="input" id="ob-dept">
+          <option value="">Select…</option>
+          <option value="sales">Sales</option>
+          <option value="marketing">Marketing</option>
+          <option value="revenue_ops">Revenue Ops</option>
+          <option value="executive">Executive</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+      <div>
+        <label class="label">Company Size</label>
+        <select class="input" id="ob-size">
+          <option value="">Select…</option>
+          <option value="1-10">1–10</option>
+          <option value="11-50">11–50</option>
+          <option value="51-200">51–200</option>
+          <option value="201-1000">201–1000</option>
+          <option value="1000+">1000+</option>
+        </select>
+      </div>
+      <div>
+        <label class="label">Geography</label>
+        <select class="input" id="ob-geo">
+          <option value="">Select…</option>
+          <option value="north_america">North America</option>
+          <option value="europe">Europe</option>
+          <option value="asia">Asia</option>
+          <option value="middle_east">Middle East</option>
+          <option value="other">Other</option>
+        </select>
+      </div>
+    </div>
+    <button class="btn" style="margin-top:24px" id="ob-btn" onclick="doOnboard()">
+      <span id="ob-txt">Complete Onboarding</span>
+      <span class="spinner" id="ob-spin"></span>
+    </button>
   </div>
 </div>
 
+<!-- auth-guard.js provides window.APP — must be first -->
+<script src="auth-guard.js"></script>
 <script>
-// Dynamic — works on any domain (pages.dev, custom domain, localhost)
-// No hardcoded URL needed: window.location.origin resolves to wherever the app is hosted
-const PRODUCTION_URL = window.location.origin;
+/* ── Helpers ──────────────────────────────────────────────────── */
+function showMsg(id, text, type) {
+  var el = document.getElementById(id);
+  el.textContent = text;
+  el.className = 'msg ' + type;
+}
+function hideMsg(id) {
+  var el = document.getElementById(id);
+  el.className = 'msg';
+  el.textContent = '';
+}
+function setLoad(btnId, txtId, spinId, on) {
+  document.getElementById(btnId).disabled = on;
+  document.getElementById(txtId).style.display  = on ? 'none'         : 'inline';
+  document.getElementById(spinId).style.display = on ? 'inline-block' : 'none';
+}
 
-const SUPABASE_URL = 'https://cwcvneluhlimhlzowabv.supabase.co';
-// JWT-format anon key — must match auth-guard.js and backend _middleware.js
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3Y3ZuZWx1aGxpbWhsem93YWJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2MzAxMjAsImV4cCI6MjA4OTIwNjEyMH0.SZDS-svU-kFh_OkUq3AjQY64F-71MpbBsFd6Iin5DlQ';
-
-const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-// Tab switching
-document.querySelectorAll('.tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
-    
-    tab.classList.add('active');
-    const method = tab.dataset.method;
-    document.getElementById(`${method}-panel`).classList.add('active');
+/* ── Tab switching ────────────────────────────────────────────── */
+function switchTab(t) {
+  ['email','google','magic'].forEach(function(x) {
+    document.getElementById('tab-' + x).classList.toggle('active', x === t);
+    document.getElementById(x + '-panel').classList.toggle('active', x === t);
   });
-});
-
-// Sub-tab switching (Sign In / Sign Up)
-document.querySelectorAll('.sub-tab').forEach(tab => {
-  tab.addEventListener('click', () => {
-    document.querySelectorAll('.sub-tab').forEach(t => t.classList.remove('active'));
-    tab.classList.add('active');
-    
-    const mode = tab.dataset.mode;
-    if (mode === 'signin') {
-      document.getElementById('signin-form').style.display = 'block';
-      document.getElementById('signup-form').style.display = 'none';
-    } else {
-      document.getElementById('signin-form').style.display = 'none';
-      document.getElementById('signup-form').style.display = 'block';
-    }
-  });
-});
-
-// Helper functions
-function showError(msg, elementId = 'email-msg') {
-  const el = document.getElementById(elementId);
-  el.textContent = msg;
-  el.className = 'msg error';
+  hideMsg('email-msg'); hideMsg('google-msg'); hideMsg('magic-msg');
 }
 
-function showSuccess(msg, elementId = 'email-msg') {
-  const el = document.getElementById(elementId);
-  el.textContent = msg;
-  el.className = 'msg success';
+function switchMode(m) {
+  var isSignin = m === 'signin';
+  document.getElementById('signin-form').style.display = isSignin ? 'block' : 'none';
+  document.getElementById('signup-form').style.display = isSignin ? 'none'  : 'block';
+  document.getElementById('sub-signin').classList.toggle('active', isSignin);
+  document.getElementById('sub-signup').classList.toggle('active', !isSignin);
+  hideMsg('email-msg');
 }
 
-function hideMsg(elementId = 'email-msg') {
-  document.getElementById(elementId).style.display = 'none';
-}
+/* ── Sign In ──────────────────────────────────────────────────── */
+async function doSignIn() {
+  hideMsg('email-msg');
+  var email = document.getElementById('si-email').value.trim();
+  var pw    = document.getElementById('si-password').value;
+  if (!email || !pw) { showMsg('email-msg','Please enter your email and password.','error'); return; }
 
-function getDeviceFingerprint() {
-  const raw = JSON.stringify({
-    ua: navigator.userAgent,
-    lang: navigator.language,
-    tz: Intl.DateTimeFormat().resolvedOptions().timeZone,
-    res: `${screen.width}x${screen.height}`,
-    cd: screen.colorDepth,
-  });
-  let h = 0;
-  for (let i = 0; i < raw.length; i++) {
-    h = Math.imul(31, h) + raw.charCodeAt(i) | 0;
-  }
-  return 'fp_' + Math.abs(h).toString(36);
-}
-
-// Sign In
-document.getElementById('signin-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  hideMsg();
-  
-  const btn = e.target.querySelector('.btn');
-  const email = document.getElementById('signin-email').value;
-  const password = document.getElementById('signin-password').value;
-  
-  btn.disabled = true;
-  btn.classList.add('loading');
-  
+  setLoad('si-btn','si-txt','si-spin', true);
   try {
-    const { data, error } = await sb.auth.signInWithPassword({ email, password });
-    
-    if (error) throw error;
-    
-    console.log('✅ Sign in successful:', data.user.email);
-
-    // ADMIN BYPASS: skip onboarding check, go straight to dashboard
-    const _adminEmails = ['amitbhawik@gmail.com', 'amitbhawik@hotmail.com'];
-    if (_adminEmails.includes(data.user.email.toLowerCase())) {
-      console.log('✅ Admin — redirecting directly to dashboard');
-      window.location.href = '/dashboard.html';
-      return;
-    }
-    
-    // Check if onboarding completed (regular users only)
-    const { data: profile } = await sb
-      .from('user_profiles')
-      .select('onboarding_completed')
-      .eq('id', data.user.id)
-      .single();
-    
-    if (!profile || !profile.onboarding_completed) {
-      document.getElementById('onboarding-modal').classList.add('active');
-    } else {
-      window.location.href = '/dashboard.html';
-    }
-    
-  } catch (err) {
-    console.error('Sign in error:', err);
-    showError(err.message || 'Failed to sign in. Please check your credentials.');
-    btn.disabled = false;
-    btn.classList.remove('loading');
-  }
-});
-
-// Sign Up
-document.getElementById('signup-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  hideMsg();
-  
-  const btn = e.target.querySelector('.btn');
-  const email = document.getElementById('signup-email').value;
-  const password = document.getElementById('signup-password').value;
-  const confirmPassword = document.getElementById('confirm-password').value;
-  const termsAccepted = document.getElementById('terms-checkbox').checked;
-  const marketingConsent = document.getElementById('marketing-checkbox').checked;
-  
-  // Validation
-  if (password !== confirmPassword) {
-    showError('Passwords do not match');
-    return;
-  }
-  
-  if (password.length < 8) {
-    showError('Password must be at least 8 characters');
-    return;
-  }
-  
-  if (!termsAccepted) {
-    showError('You must accept the Terms of Service');
-    return;
-  }
-  
-  btn.disabled = true;
-  btn.classList.add('loading');
-  
-  try {
-    // Sign up with Supabase
-    const { data, error } = await sb.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          terms_accepted: termsAccepted,
-          marketing_consent: marketingConsent,
-          device_id: getDeviceFingerprint()
-        }
-      }
-    });
-    
-    if (error) throw error;
-    
-    console.log('✅ Sign up successful:', data.user.email);
-    
-    // Create user profile and organization
-    await createUserProfile(data.user, { termsAccepted, marketingConsent });
-    
-    // Show onboarding
-    document.getElementById('onboarding-modal').classList.add('active');
-    
-  } catch (err) {
-    console.error('Sign up error:', err);
-    showError(err.message || 'Failed to create account. Please try again.');
-    btn.disabled = false;
-    btn.classList.remove('loading');
-  }
-});
-
-// Create user profile
-async function createUserProfile(user, options) {
-  // ADMIN BYPASS: admin users skip profile creation entirely
-  const adminEmails = ['amitbhawik@gmail.com', 'amitbhawik@hotmail.com'];
-  if (adminEmails.includes(user.email.toLowerCase())) {
-    console.log('✅ Admin user — skipping profile creation');
-    return;
-  }
-
-  const deviceId = getDeviceFingerprint();
-
-  try {
-    // ── Step 1: Get or create organization ──────────────────────────
-    // Use upsert on owner_id so re-runs don't throw 500 on duplicate
-    let orgId = null;
-
-    // First check if org already exists for this user
-    const { data: existingOrg } = await sb
-      .from('organizations')
-      .select('id')
-      .eq('owner_id', user.id)
-      .maybeSingle();
-
-    if (existingOrg) {
-      orgId = existingOrg.id;
-      console.log('✅ Existing org found:', orgId);
-    } else {
-      const { data: newOrg, error: orgError } = await sb
-        .from('organizations')
-        .insert({
-          name: `${user.email}'s Organization`,
-          plan_tier: 'free_trial',
-          owner_id: user.id,
-        })
-        .select('id')
-        .single();
-
-      if (orgError) {
-        // 23505 = unique_violation — org already exists, fetch it
-        if (orgError.code === '23505' || orgError.message?.includes('duplicate') || orgError.message?.includes('unique')) {
-          const { data: retryOrg } = await sb
-            .from('organizations')
-            .select('id')
-            .eq('owner_id', user.id)
-            .maybeSingle();
-          orgId = retryOrg?.id || null;
-        } else {
-          console.warn('Org insert error (non-fatal):', orgError.message);
-          // Continue without org — profile can still be created
-        }
-      } else {
-        orgId = newOrg?.id || null;
-      }
-    }
-
-    // ── Step 2: Upsert user_profiles ────────────────────────────────
-    // upsert handles both first-time and repeat calls safely
-    const { error: profileError } = await sb
-      .from('user_profiles')
-      .upsert({
-        id:                   user.id,
-        email:                user.email,
-        organization_id:      orgId,
-        plan:                 'free_trial',
-        tc_accepted:          options.termsAccepted    || false,
-        marketing_consent:    options.marketingConsent || false,
-        device_id:            deviceId,
-        onboarding_completed: false,
-        created_at:           new Date().toISOString(),
-      }, { onConflict: 'id' });
-
-    if (profileError) {
-      console.warn('Profile upsert error (non-fatal):', profileError.message);
-      // Don't throw — authenticated user should still proceed
-    }
-
-    // ── Step 3: Upsert organization membership ───────────────────────
-    if (orgId) {
-      await sb
-        .from('organization_members')
-        .upsert({
-          organization_id: orgId,
-          user_id:         user.id,
-          role:            'owner',
-        }, { onConflict: 'organization_id,user_id' });
-    }
-
-    console.log('✅ User profile created/updated');
-
-  } catch (error) {
-    // Non-fatal: log but never block authenticated users from proceeding
-    console.warn('createUserProfile warning (non-fatal):', error.message);
+    var data = await window.APP.login(email, pw);
+    showMsg('email-msg', 'Signed in! Redirecting…', 'success');
+    var next = new URLSearchParams(window.location.search).get('next');
+    setTimeout(function() {
+      window.location.replace(data.onboardingCompleted ? (next || '/dashboard.html') : '/dashboard.html?onboarding=1');
+    }, 600);
+  } catch(e) {
+    showMsg('email-msg', e.message || 'Sign in failed. Check your credentials.', 'error');
+    setLoad('si-btn','si-txt','si-spin', false);
   }
 }
 
-// Google OAuth
-document.getElementById('google-btn').addEventListener('click', async (e) => {
-  e.preventDefault();
+/* ── Sign Up ──────────────────────────────────────────────────── */
+async function doSignUp() {
+  hideMsg('email-msg');
+  var email   = document.getElementById('su-email').value.trim();
+  var pw      = document.getElementById('su-password').value;
+  var confirm = document.getElementById('su-confirm').value;
+  var terms   = document.getElementById('cb-terms').checked;
+  var consent = document.getElementById('cb-consent').checked;
+  var mkt     = document.getElementById('cb-mkt').checked;
+
+  if (!email || !pw)    { showMsg('email-msg','Please enter email and password.','error'); return; }
+  if (pw !== confirm)   { showMsg('email-msg','Passwords do not match.','error'); return; }
+  if (pw.length < 8)    { showMsg('email-msg','Password must be at least 8 characters.','error'); return; }
+  if (!terms)           { showMsg('email-msg','You must accept the Terms of Service.','error'); return; }
+  if (!consent)         { showMsg('email-msg','You must consent to data processing.','error'); return; }
+
+  setLoad('su-btn','su-txt','su-spin', true);
+  try {
+    await window.APP.signup(email, pw, terms, mkt);
+    showMsg('email-msg', 'Account created! Setting up your workspace…', 'success');
+    setTimeout(function() { document.getElementById('ob-modal').classList.add('active'); }, 800);
+  } catch(e) {
+    showMsg('email-msg', e.message || 'Signup failed. Please try again.', 'error');
+    setLoad('su-btn','su-txt','su-spin', false);
+  }
+}
+
+/* ── Google OAuth ─────────────────────────────────────────────── */
+async function doGoogle() {
   hideMsg('google-msg');
-  
-  const btn = e.currentTarget;
-  btn.disabled = true;
-  btn.classList.add('loading');
-  
-  try {
-    const { data, error } = await sb.auth.signInWithOAuth({
-      provider: 'google',
-      options: {
-        redirectTo: `${PRODUCTION_URL}/dashboard.html`,
-        queryParams: {
-          access_type: 'offline',
-          prompt: 'consent'
-        }
-      }
-    });
-    
-    if (error) throw error;
-    
-    console.log('✅ Redirecting to Google...');
-    
-  } catch (err) {
-    console.error('Google OAuth error:', err);
-    showError(err.message || 'Failed to sign in with Google', 'google-msg');
-    btn.disabled = false;
-    btn.classList.remove('loading');
-  }
-});
+  showMsg('google-msg', 'Google OAuth requires configuration in Supabase Dashboard → Authentication → Providers → Google.', 'error');
+}
 
-// Magic Link
-document.getElementById('magic-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
+/* ── Magic Link ───────────────────────────────────────────────── */
+async function doMagicLink() {
   hideMsg('magic-msg');
-  
-  const btn = e.target.querySelector('.btn');
-  const email = document.getElementById('magic-email').value;
-  
-  btn.disabled = true;
-  btn.classList.add('loading');
-  
+  var email = document.getElementById('ml-email').value.trim();
+  if (!email) { showMsg('magic-msg','Please enter your email address.','error'); return; }
+  showMsg('magic-msg', 'Magic link feature coming soon. Please use email/password to sign in.', 'error');
+}
+
+/* ── Onboarding ───────────────────────────────────────────────── */
+async function doOnboard() {
+  setLoad('ob-btn','ob-txt','ob-spin', true);
   try {
-    const { error } = await sb.auth.signInWithOtp({
-      email,
-      options: {
-        emailRedirectTo: `${PRODUCTION_URL}/dashboard.html`
-      }
-    });
-    
-    if (error) throw error;
-    
-    showSuccess('Magic link sent! Check your email.', 'magic-msg');
-    
-  } catch (err) {
-    console.error('Magic link error:', err);
-    showError(err.message || 'Failed to send magic link', 'magic-msg');
-  } finally {
-    btn.disabled = false;
-    btn.classList.remove('loading');
+    // Save onboarding data through the API
+    await window.APP.api('/api/onboard', {
+      full_name:    document.getElementById('ob-name').value,
+      company_name: document.getElementById('ob-company').value,
+      job_title:    document.getElementById('ob-title').value,
+      department:   document.getElementById('ob-dept').value,
+      company_size: document.getElementById('ob-size').value,
+      geography:    document.getElementById('ob-geo').value,
+    }).catch(function(){});  // non-fatal — redirect regardless
+    window.location.replace('/dashboard.html');
+  } catch(_) {
+    window.location.replace('/dashboard.html');
   }
-});
+}
 
-// Onboarding
-document.getElementById('onboarding-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-
-  const btn = e.target.querySelector('.btn');
-  btn.disabled = true;
-  btn.classList.add('loading');
-
-  try {
-    const { data: { user } } = await sb.auth.getUser();
-
-    // ADMIN BYPASS: admin users skip onboarding DB write and go straight to dashboard
-    const adminEmails = ['amitbhawik@gmail.com', 'amitbhawik@hotmail.com'];
-    if (user && adminEmails.includes(user.email.toLowerCase())) {
-      console.log('✅ Admin user — bypassing onboarding, redirecting to dashboard');
-      window.location.href = '/dashboard.html';
-      return;
-    }
-
-    const onboardingData = {
-      full_name:            document.getElementById('full-name').value,
-      company_name:         document.getElementById('company-name').value,
-      job_title:            document.getElementById('job-title').value,
-      department:           document.getElementById('department').value,
-      company_size:         document.getElementById('company-size').value,
-      geography:            document.getElementById('geography').value,
-      onboarding_completed: true,
-      updated_at:           new Date().toISOString(),
-    };
-
-    // Use upsert so this works whether the profile row exists or not
-    const { error } = await sb
-      .from('user_profiles')
-      .upsert({ id: user.id, email: user.email, ...onboardingData }, { onConflict: 'id' });
-
-    if (error) {
-      // If upsert fails, try plain update as fallback
-      console.warn('Upsert failed, trying update:', error.message);
-      const { error: updateError } = await sb
-        .from('user_profiles')
-        .update(onboardingData)
-        .eq('id', user.id);
-
-      if (updateError) {
-        // If both fail, log but don't block — user is authenticated, let them in
-        console.warn('Profile update also failed (non-fatal):', updateError.message);
-      }
-    }
-
-    // Update organization name (non-fatal if it fails)
-    try {
-      const { data: profile } = await sb
-        .from('user_profiles')
-        .select('organization_id')
-        .eq('id', user.id)
-        .single();
-
-      if (profile?.organization_id) {
-        await sb
-          .from('organizations')
-          .update({ name: onboardingData.company_name })
-          .eq('id', profile.organization_id);
-      }
-    } catch (_) { /* non-fatal */ }
-
-    console.log('✅ Onboarding complete');
-    window.location.href = '/dashboard.html';
-
-  } catch (err) {
-    console.error('Onboarding error:', err);
-    // CRITICAL FIX: Never show alert + block if user is authenticated.
-    // Check if we have a session — if yes, just go to dashboard anyway.
-    const { data: { session } } = await sb.auth.getSession().catch(() => ({ data: {} }));
-    if (session) {
-      console.log('Session valid — redirecting to dashboard despite onboarding error');
-      window.location.href = '/dashboard.html';
-    } else {
-      showError('Failed to complete onboarding. Please try again.');
-      btn.disabled = false;
-      btn.classList.remove('loading');
-    }
-  }
-});
-
-// Check for OAuth callback
-(async function checkOAuthReturn() {
-  const hash = window.location.hash;
-  const params = new URLSearchParams(window.location.search);
-  
-  if (hash.includes('access_token') || params.get('code')) {
-    console.log('OAuth callback detected');
-    
-    try {
-      const { data: { session }, error } = await sb.auth.getSession();
-      
-      if (error) throw error;
-      
-      if (session) {
-        console.log('✅ OAuth session established:', session.user.email);
-        
-        // Check/create profile for OAuth user
-        const { data: profile } = await sb
-          .from('user_profiles')
-          .select('*')
-          .eq('id', session.user.id)
-          .single();
-        
-        if (!profile) {
-          console.log('New OAuth user - creating profile');
-          await createUserProfile(session.user, {
-            termsAccepted: true,
-            marketingConsent: false
-          });
-          document.getElementById('onboarding-modal').classList.add('active');
-        } else if (!profile.onboarding_completed) {
-          document.getElementById('onboarding-modal').classList.add('active');
-        } else {
-          window.location.href = '/dashboard.html';
-        }
-      }
-    } catch (err) {
-      console.error('OAuth callback error:', err);
-      showError('Authentication failed. Please try again.');
-    }
-  }
+/* ── URL error params ─────────────────────────────────────────── */
+(function(){
+  var p = new URLSearchParams(window.location.search);
+  if (p.get('error') === 'unauthorized')   showMsg('email-msg','Your session expired. Please sign in again.','error');
+  if (p.get('error') === 'oauth_failed')   showMsg('google-msg','Google sign-in failed. Please try again.','error');
+  if (p.get('signup') === '1')             switchMode('signup');
 })();
 
-// Handle URL parameters for onboarding
-const urlParams = new URLSearchParams(window.location.search);
-if (urlParams.get('show_onboarding') === 'true') {
-  document.getElementById('onboarding-modal').classList.add('active');
-}
-if (urlParams.get('error')) {
-  showError(decodeURIComponent(urlParams.get('error')));
-}
-
-// Signup link click
-document.getElementById('signup-link').addEventListener('click', (e) => {
-  e.preventDefault();
-  document.querySelector('[data-mode="signup"]').click();
+/* ── Enter key support ────────────────────────────────────────── */
+document.addEventListener('keydown', function(e) {
+  if (e.key !== 'Enter') return;
+  var emailActive = document.getElementById('email-panel').classList.contains('active');
+  if (!emailActive) return;
+  var signupVisible = document.getElementById('signup-form').style.display !== 'none';
+  if (signupVisible) doSignUp(); else doSignIn();
 });
-
-console.log('✅ Login page initialized');
 </script>
-
 </body>
 </html>
