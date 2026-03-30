@@ -6,75 +6,119 @@
 <title>ABE · Signing you in…</title>
 <style>
 *{margin:0;padding:0;box-sizing:border-box}
-html,body{
-  height:100%;background:#07070A;color:#F4F4F5;
+html,body{height:100%;background:#050508;color:#EDEDF0;
   font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
   display:flex;align-items:center;justify-content:center}
-.wrap{text-align:center;padding:40px 24px;max-width:380px}
-.logo{
-  width:52px;height:52px;
-  background:linear-gradient(135deg,#7C3AED,#4F46E5);
+.wrap{text-align:center;padding:40px 24px;max-width:400px;width:100%}
+.logo{width:52px;height:52px;background:linear-gradient(135deg,#7B5EA7,#4F46E5);
   border-radius:14px;display:flex;align-items:center;justify-content:center;
-  margin:0 auto 24px;font-family:'Courier New',monospace;
-  font-size:15px;font-weight:700;color:white}
-.spinner{
-  width:36px;height:36px;
-  border:3px solid rgba(124,58,237,.2);
-  border-top-color:#7C3AED;border-radius:50%;
-  animation:spin .7s linear infinite;margin:0 auto 20px}
-@keyframes spin{to{transform:rotate(360deg)}}
+  margin:0 auto 24px}
+.logo svg{width:24px;height:24px;fill:white}
+.spin{width:36px;height:36px;border:3px solid rgba(123,94,167,.2);
+  border-top-color:#7B5EA7;border-radius:50%;
+  animation:sp .7s linear infinite;margin:0 auto 20px}
+@keyframes sp{to{transform:rotate(360deg)}}
 .title{font-size:18px;font-weight:700;color:white;margin-bottom:8px}
-.sub{font-size:13px;color:#71717A;line-height:1.6}
-.error-box{
-  background:rgba(244,63,94,.08);
-  border:1px solid rgba(244,63,94,.25);
-  border-radius:10px;padding:14px 18px;
-  color:#FDA4AF;font-size:13px;line-height:1.6;
-  margin-top:20px;display:none;text-align:left}
-.error-box.show{display:block}
-.back-btn{
-  margin-top:20px;padding:10px 24px;
-  background:rgba(124,58,237,.15);border:1px solid rgba(124,58,237,.3);
-  color:#A78BFA;border-radius:8px;cursor:pointer;
-  font-size:13px;font-weight:600;font-family:inherit;
+.sub{font-size:13px;color:#71717A;line-height:1.65}
+.err-box{background:rgba(232,69,90,.08);border:1px solid rgba(232,69,90,.22);
+  border-radius:10px;padding:14px 18px;color:#FCA5A5;
+  font-size:13px;line-height:1.6;margin-top:20px;display:none;text-align:left}
+.err-box.on{display:block}
+.back{margin-top:16px;padding:10px 24px;background:rgba(123,94,167,.15);
+  border:1px solid rgba(123,94,167,.3);color:#C4B5FD;border-radius:8px;
+  cursor:pointer;font-size:13px;font-weight:600;font-family:inherit;
   transition:all .15s;display:none}
-.back-btn.show{display:inline-block}
-.back-btn:hover{background:rgba(124,58,237,.25)}
+.back.on{display:inline-block}
+.back:hover{background:rgba(123,94,167,.25)}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <div class="logo">ABE</div>
-  <div class="spinner" id="spinner"></div>
+  <div class="logo"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+  <div class="spin"  id="spin"></div>
   <div class="title" id="title">Signing you in…</div>
-  <div class="sub"  id="sub">Verifying your session, please wait.</div>
-  <div class="error-box" id="err"></div>
-  <button class="back-btn" id="back-btn"
-    onclick="window.location.replace('/login')">
-    Return to Login
-  </button>
+  <div class="sub"   id="sub">Verifying your session, please wait.</div>
+  <div class="err-box" id="err"></div>
+  <button class="back" id="back" onclick="window.location.replace('/login')">Return to Login</button>
 </div>
 
-<!-- auth-guard provides window.APP and window.authGuard -->
 <script src="auth-guard.js"></script>
 <script>
 (async function () {
-  try {
-    // Hands off entirely to auth-guard.
-    // auth-guard extracts the token from the URL hash,
-    // stores it in sessionStorage, validates via /api/session,
-    // then redirects to dashboard.
-    await window.authGuard.handleOAuthCallback();
-  } catch (e) {
-    // Show error — never crash silently
-    document.getElementById('spinner').style.display  = 'none';
-    document.getElementById('title').textContent      = 'Authentication Failed';
-    document.getElementById('sub').textContent        = 'Something went wrong signing you in.';
+  function showError(msg) {
+    document.getElementById('spin').style.display  = 'none';
+    document.getElementById('title').textContent   = 'Authentication Failed';
+    document.getElementById('sub').textContent     = 'Something went wrong. Please try again.';
+    var e = document.getElementById('err');
+    e.textContent = msg;
+    e.classList.add('on');
+    document.getElementById('back').classList.add('on');
+  }
 
-    var errEl = document.getElementById('err');
-    errEl.textContent = e.message || 'Unexpected error — please try again.';
-    errEl.classList.add('show');
-    document.getElementById('back-btn').classList.add('show');
+  try {
+    // Extract access_token from URL hash (set by Supabase after OAuth)
+    var hash  = window.location.hash.substring(1);
+    var token = new URLSearchParams(hash).get('access_token');
+
+    if (!token) {
+      // Could be a magic link via query params
+      var qp = new URLSearchParams(window.location.search);
+      token  = qp.get('access_token');
+    }
+
+    if (!token) {
+      showError('No authentication token found. Please sign in again.');
+      return;
+    }
+
+    // Store token in sessionStorage
+    sessionStorage.setItem('abe_token', token);
+
+    // Verify token with backend — returns user + profile
+    var session = await window.APP.getSession();
+
+    if (!session) {
+      sessionStorage.removeItem('abe_token');
+      showError('Session could not be verified. Please sign in again.');
+      return;
+    }
+
+    // ── Existing user — go to dashboard ──────────────────────────
+    if (session.profile) {
+      window.location.replace(
+        session.onboardingCompleted ? '/dashboard.html' : '/dashboard.html?onboarding=1'
+      );
+      return;
+    }
+
+    // ── New OAuth user — create their profile on the backend ──────
+    // Read consent choices stored by login.html before OAuth redirect
+    var termsAccepted    = sessionStorage.getItem('g_terms')   === '1';
+    var consentGiven     = sessionStorage.getItem('g_consent')  === '1';
+    var marketingConsent = sessionStorage.getItem('g_mkt')      === '1';
+
+    // Clean up
+    ['g_terms','g_consent','g_mkt'].forEach(function(k){ sessionStorage.removeItem(k); });
+
+    document.getElementById('sub').textContent = 'Creating your account…';
+
+    // Call backend to create profile + org + membership
+    try {
+      await window.APP.api('/api/complete-oauth', {
+        terms_accepted:    termsAccepted,
+        marketing_consent: marketingConsent,
+      });
+    } catch (profileErr) {
+      // Non-fatal — if profile creation fails, user can still proceed
+      // (they'll be prompted to complete onboarding on dashboard)
+      console.warn('Profile creation warning:', profileErr.message);
+    }
+
+    // Redirect to dashboard with onboarding flag
+    window.location.replace('/dashboard.html?onboarding=1');
+
+  } catch (e) {
+    showError(e.message || 'Unexpected error — please try again.');
   }
 })();
 </script>
