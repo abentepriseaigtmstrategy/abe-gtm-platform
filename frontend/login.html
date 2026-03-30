@@ -1,378 +1,735 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>Sign In · ABE AI Revenue Infrastructure</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
-<!-- NO Supabase CDN. NO keys. Auth goes through /api/login and /api/signup. -->
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>ABE · AI Revenue Infrastructure</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet"/>
+<!-- NO Supabase CDN. NO API keys. All auth goes through /api/* backend. -->
 <style>
-:root{
---bg:#0B0F1A;--card:#121827;--border:#1F2937;
---accent:#a855f7;--accent2:#7c3aed;
---green:#22c55e;--red:#ef4444;--text:#E5E7EB;--muted:#6B7280;
-}
+/* ── Reset ───────────────────────────────────────────────────── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-html,body{height:100%}
-body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);display:flex;align-items:center;justify-content:center;min-height:100vh;overflow-x:hidden}
-body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;background-image:linear-gradient(rgba(168,85,247,.03) 1px,transparent 1px),linear-gradient(90deg,rgba(168,85,247,.03) 1px,transparent 1px);background-size:48px 48px}
-.glow{position:fixed;top:50%;left:50%;transform:translate(-50%,-60%);width:800px;height:800px;pointer-events:none;z-index:0;background:radial-gradient(ellipse,rgba(124,58,237,.1) 0%,transparent 65%)}
-.card{position:relative;z-index:1;width:100%;max-width:440px;margin:24px;background:rgba(18,24,39,.85);backdrop-filter:blur(24px);border:1px solid rgba(31,41,55,.8);border-radius:24px;padding:44px 40px}
-.logo-row{display:flex;align-items:center;gap:12px;margin-bottom:32px}
-.logo-mark{width:40px;height:40px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-size:13px;font-weight:700;color:white;flex-shrink:0}
-.logo-name{font-size:13px;font-weight:800;color:white;line-height:1.2}
-.logo-sub{font-size:9px;color:var(--muted);letter-spacing:.18em;text-transform:uppercase}
-.title{font-size:22px;font-weight:900;color:white;letter-spacing:-.5px;margin-bottom:6px}
-.subtitle{font-size:12px;color:var(--muted);margin-bottom:28px;line-height:1.6}
-.tabs{display:flex;gap:4px;background:rgba(0,0,0,.3);border:1px solid var(--border);border-radius:10px;padding:4px;margin-bottom:24px}
-.tab{flex:1;padding:7px 4px;font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);border:none;background:none;border-radius:7px;cursor:pointer;transition:all .15s;white-space:nowrap}
-.tab.active{background:rgba(168,85,247,.15);border:1px solid rgba(168,85,247,.3);color:white}
-.sub-tabs{display:flex;gap:0;margin-bottom:24px;border-bottom:1px solid var(--border)}
-.sub-tab{flex:1;padding:9px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);border:none;background:none;cursor:pointer;transition:all .15s;border-bottom:2px solid transparent}
-.sub-tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+:root{
+  --bg:       #050508;
+  --surface:  #0C0C12;
+  --card:     #111118;
+  --border:   rgba(255,255,255,.06);
+  --border-hi:rgba(255,255,255,.11);
+  --ink:      #EDEDF0;
+  --ink-2:    #9898A8;
+  --ink-3:    #4A4A5A;
+  --violet:   #7B5EA7;
+  --violet-hi:#9B7EC7;
+  --violet-lo:rgba(123,94,167,.12);
+  --gold:     #E8A020;
+  --gold-lo:  rgba(232,160,32,.10);
+  --green:    #2EB87A;
+  --red:      #E8455A;
+  --cyan:     #2BA8C5;
+}
+html,body{height:100%;font-family:'Sora',sans-serif;background:var(--bg);color:var(--ink)}
+
+/* ── Background atmosphere ───────────────────────────────────── */
+.atm{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden}
+.atm-orb{position:absolute;border-radius:50%;filter:blur(100px)}
+.atm-1{width:800px;height:800px;top:-300px;left:-200px;background:radial-gradient(circle,rgba(123,94,167,.18),transparent 70%)}
+.atm-2{width:600px;height:600px;bottom:-150px;right:-100px;background:radial-gradient(circle,rgba(43,168,197,.12),transparent 70%)}
+.atm-3{width:400px;height:400px;top:35%;left:38%;background:radial-gradient(circle,rgba(232,160,32,.06),transparent 70%)}
+.atm-grid{position:absolute;inset:0;
+  background-image:linear-gradient(rgba(255,255,255,.018) 1px,transparent 1px),
+  linear-gradient(90deg,rgba(255,255,255,.018) 1px,transparent 1px);
+  background-size:52px 52px}
+
+/* ── Layout ──────────────────────────────────────────────────── */
+.shell{position:relative;z-index:1;display:grid;grid-template-columns:1fr 460px;min-height:100vh}
+@media(max-width:980px){.shell{grid-template-columns:1fr}.pricing-panel{display:none}}
+
+/* ════════════════════════════════════════════════════════════════
+   LEFT — PRICING PANEL
+════════════════════════════════════════════════════════════════ */
+.pricing-panel{
+  border-right:1px solid var(--border);
+  padding:52px 56px;
+  display:flex;flex-direction:column;overflow-y:auto;
+  background:rgba(255,255,255,.012)}
+
+.brand{display:flex;align-items:center;gap:13px;margin-bottom:52px}
+.brand-mark{
+  width:38px;height:38px;border-radius:10px;flex-shrink:0;
+  background:linear-gradient(135deg,var(--violet),#4F46E5);
+  display:flex;align-items:center;justify-content:center}
+.brand-mark svg{width:20px;height:20px;fill:white}
+.brand-label .name{font-size:15px;font-weight:700;color:var(--ink);letter-spacing:-.02em}
+.brand-label .tag{font-size:10px;color:var(--ink-3);letter-spacing:.1em;text-transform:uppercase;margin-top:1px}
+
+.p-badge{
+  display:inline-flex;align-items:center;gap:7px;margin-bottom:18px;
+  background:var(--gold-lo);border:1px solid rgba(232,160,32,.22);
+  color:var(--gold);font-size:11px;font-weight:600;
+  padding:5px 13px;border-radius:20px;letter-spacing:.02em}
+.p-badge-dot{width:5px;height:5px;border-radius:50%;background:var(--gold);animation:glow 2s infinite}
+@keyframes glow{0%,100%{opacity:1;box-shadow:0 0 0 0 var(--gold)}50%{opacity:.4;box-shadow:0 0 6px 2px var(--gold)}}
+
+.p-headline{
+  font-size:38px;font-weight:700;line-height:1.12;
+  letter-spacing:-.03em;color:var(--ink);margin-bottom:12px}
+.p-headline span{color:var(--ink-2);font-weight:300}
+.p-sub{font-size:14px;color:var(--ink-2);line-height:1.75;margin-bottom:36px;max-width:460px}
+
+/* Tier cards */
+.tiers{display:flex;flex-direction:column;gap:9px;flex:1}
+.tier{
+  border:1px solid var(--border);border-radius:13px;
+  padding:17px 20px;background:rgba(255,255,255,.018);
+  transition:border-color .2s,background .2s,transform .18s;position:relative;cursor:default}
+.tier:hover{border-color:var(--border-hi);background:rgba(255,255,255,.03);transform:translateX(4px)}
+.tier.pop{
+  border-color:rgba(232,160,32,.3);
+  background:linear-gradient(135deg,rgba(232,160,32,.05),rgba(123,94,167,.05))}
+.tier.pop::after{
+  content:'MOST POPULAR';position:absolute;top:-9px;right:14px;
+  background:var(--gold);color:var(--bg);
+  font-family:'JetBrains Mono',monospace;font-size:8px;font-weight:700;
+  padding:3px 9px;border-radius:20px;letter-spacing:.1em}
+.t-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:11px}
+.t-name{font-size:14px;font-weight:700;color:var(--ink)}
+.t-price .amt{
+  font-family:'JetBrains Mono',monospace;
+  font-size:22px;font-weight:700;color:var(--ink);line-height:1}
+.t-price .amt.free{color:var(--green);font-size:18px}
+.t-price .amt.custom{font-size:15px;font-family:'Sora',sans-serif;font-weight:600}
+.t-price .per{font-size:10px;color:var(--ink-3);margin-top:2px;text-align:right}
+.t-feats{display:flex;flex-wrap:wrap;gap:5px}
+.feat{
+  font-size:11px;color:var(--ink-2);
+  padding:3px 9px;border-radius:20px;
+  background:rgba(255,255,255,.04);border:1px solid var(--border)}
+.tier.pop .feat{border-color:rgba(232,160,32,.15);background:rgba(232,160,32,.05);color:var(--ink-2)}
+
+.p-note{
+  margin-top:24px;padding:14px 18px;
+  border:1px dashed rgba(255,255,255,.07);border-radius:10px;
+  font-size:12px;color:var(--ink-3);line-height:1.65}
+.p-note strong{color:var(--ink-2)}
+
+/* ════════════════════════════════════════════════════════════════
+   RIGHT — AUTH PANEL
+════════════════════════════════════════════════════════════════ */
+.auth-panel{
+  display:flex;align-items:center;justify-content:center;
+  padding:40px 28px;background:rgba(0,0,0,.15)}
+
+.auth-card{
+  width:100%;max-width:400px;
+  background:var(--card);
+  border:1px solid var(--border-hi);border-radius:20px;padding:36px 32px;
+  box-shadow:0 0 0 1px rgba(0,0,0,.6),0 24px 56px rgba(0,0,0,.5)}
+
+/* Mobile brand */
+.mob-brand{display:none;align-items:center;gap:10px;margin-bottom:24px}
+@media(max-width:980px){.mob-brand{display:flex}}
+.mob-mark{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--violet),#4F46E5);display:flex;align-items:center;justify-content:center}
+.mob-mark svg{width:16px;height:16px;fill:white}
+.mob-name{font-size:14px;font-weight:700;color:var(--ink)}
+
+.a-head{font-size:22px;font-weight:700;color:var(--ink);letter-spacing:-.03em;margin-bottom:4px}
+.a-sub{font-size:13px;color:var(--ink-2);margin-bottom:22px;line-height:1.65}
+
+/* Main tabs: Sign In / Sign Up / Google / Magic */
+.tabs{display:grid;grid-template-columns:1fr 1fr;gap:3px;
+  background:rgba(0,0,0,.4);border:1px solid var(--border);
+  border-radius:10px;padding:3px;margin-bottom:20px}
+.tab{
+  padding:8px 6px;font-size:10px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.07em;color:var(--ink-3);
+  border:none;background:none;border-radius:7px;
+  cursor:pointer;transition:all .15s;font-family:'Sora',sans-serif;
+  white-space:nowrap}
+.tab.active{background:var(--violet-lo);border:1px solid rgba(123,94,167,.3);color:var(--ink)}
+
+/* Panels */
 .panel{display:none}.panel.active{display:block}
-.label{display:block;font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.18em;color:var(--muted);margin-bottom:7px}
-.input{width:100%;background:rgba(0,0,0,.4);border:1px solid var(--border);color:var(--text);font-size:13px;padding:12px 14px;border-radius:10px;font-family:'Inter',sans-serif;outline:none;transition:border-color .15s;margin-bottom:16px}
-.input:focus{border-color:var(--accent)}.input::placeholder{color:#4b5563}
-.check-row{display:flex;align-items:flex-start;gap:10px;margin-bottom:14px}
-.check-row input[type=checkbox]{width:16px;height:16px;accent-color:var(--accent);flex-shrink:0;margin-top:2px;cursor:pointer}
-.check-row span{font-size:11px;color:var(--muted);line-height:1.5}
-.check-row a{color:var(--accent);text-decoration:none}.check-row a:hover{text-decoration:underline}
-.btn{width:100%;padding:13px;background:linear-gradient(135deg,var(--accent),var(--accent2));color:white;border:none;border-radius:10px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;cursor:pointer;transition:all .15s;margin-top:4px;display:flex;align-items:center;justify-content:center;gap:8px}
-.btn:hover:not(:disabled){opacity:.9;transform:translateY(-1px)}.btn:disabled{opacity:.5;cursor:not-allowed;transform:none}
-.btn-outline{background:transparent;border:1px solid var(--border);color:var(--text);display:flex;align-items:center;justify-content:center;gap:10px;margin-top:10px;padding:12px;border-radius:10px;cursor:pointer;font-family:'Inter',sans-serif;font-size:12px;font-weight:600;transition:all .15s}
-.btn-outline:hover{border-color:var(--accent);background:rgba(168,85,247,.06)}
-.spinner{width:14px;height:14px;border:2px solid rgba(255,255,255,.3);border-top-color:white;border-radius:50%;animation:spin .7s linear infinite;display:none}
-@keyframes spin{to{transform:rotate(360deg)}}
-.divider{display:flex;align-items:center;gap:12px;margin:16px 0;color:var(--muted);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.1em}
+
+/* Fields */
+.field{margin-bottom:13px}
+.f-label{display:block;font-size:9px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.14em;color:var(--ink-3);margin-bottom:6px}
+.f-input{
+  width:100%;background:rgba(0,0,0,.5);
+  border:1px solid var(--border);color:var(--ink);
+  font-size:13px;padding:11px 13px;border-radius:8px;
+  font-family:'Sora',sans-serif;outline:none;
+  transition:border-color .15s,box-shadow .15s}
+.f-input:focus{border-color:var(--violet);box-shadow:0 0 0 3px rgba(123,94,167,.14)}
+.f-input::placeholder{color:var(--ink-3)}
+
+/* Consent block — appears in ALL signup methods */
+.consent{
+  background:rgba(123,94,167,.06);border:1px solid rgba(123,94,167,.15);
+  border-radius:9px;padding:13px 14px;margin-bottom:14px}
+.consent-title{font-size:9px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.12em;color:var(--violet-hi);margin-bottom:10px}
+.c-row{display:flex;align-items:flex-start;gap:9px;margin-bottom:8px}
+.c-row:last-child{margin-bottom:0}
+.c-row input[type=checkbox]{
+  width:15px;height:15px;flex-shrink:0;margin-top:2px;
+  accent-color:var(--violet);cursor:pointer}
+.c-row span{font-size:11px;color:var(--ink-2);line-height:1.55}
+.c-row a{color:var(--violet-hi);text-decoration:none}
+.c-row a:hover{text-decoration:underline}
+.c-row .req{color:var(--red)}
+
+/* Buttons */
+.btn-main{
+  width:100%;padding:12px;
+  background:linear-gradient(135deg,var(--violet),#4F46E5);
+  color:white;border:none;border-radius:9px;
+  font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
+  cursor:pointer;transition:all .15s;font-family:'Sora',sans-serif;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  position:relative;overflow:hidden;margin-top:4px}
+.btn-main:hover:not(:disabled){transform:translateY(-1px);box-shadow:0 6px 20px rgba(123,94,167,.4)}
+.btn-main:disabled{opacity:.4;cursor:not-allowed;transform:none}
+
+.btn-google{
+  width:100%;padding:11px;
+  background:rgba(255,255,255,.04);
+  border:1px solid var(--border-hi);color:var(--ink);border-radius:9px;
+  font-size:12px;font-weight:600;cursor:pointer;
+  font-family:'Sora',sans-serif;
+  display:flex;align-items:center;justify-content:center;gap:9px;
+  transition:all .15s}
+.btn-google:hover{background:rgba(255,255,255,.07);border-color:rgba(255,255,255,.18)}
+
+.divider{
+  display:flex;align-items:center;gap:10px;margin:14px 0;
+  font-size:10px;font-weight:600;color:var(--ink-3);
+  text-transform:uppercase;letter-spacing:.08em}
 .divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border)}
-.msg{padding:12px 14px;border-radius:8px;font-size:12px;font-weight:600;margin-top:14px;display:none}
-.msg.error{background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);color:#fca5a5;display:block}
-.msg.success{background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.3);color:#86efac;display:block}
-.footer{margin-top:24px;text-align:center;font-size:10px;color:var(--muted);line-height:1.6}
-.secure{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:16px;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:#374151}
-.dot{width:6px;height:6px;border-radius:50%;background:var(--green)}
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.8);backdrop-filter:blur(8px);z-index:999;display:none;align-items:center;justify-content:center;padding:24px}
-.modal-overlay.active{display:flex}
-.modal{background:#121827;border:1px solid rgba(168,85,247,.2);border-radius:20px;padding:40px;width:100%;max-width:520px;max-height:90vh;overflow-y:auto}
-.modal h2{font-size:20px;font-weight:900;color:white;margin-bottom:6px}
-.modal p{font-size:12px;color:var(--muted);margin-bottom:28px;line-height:1.6}
-.modal-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.modal-grid .full{grid-column:1/-1}
-.modal .label{margin-top:4px}
-.modal select{width:100%;background:rgba(0,0,0,.4);border:1px solid var(--border);color:var(--text);font-size:13px;padding:12px 14px;border-radius:10px;font-family:'Inter',sans-serif;outline:none;-webkit-appearance:none}
-.modal select:focus{border-color:var(--accent)}.modal select option{background:#121827}
-.progress{display:flex;gap:6px;margin-bottom:28px}
-.progress-dot{width:8px;height:8px;border-radius:50%;background:var(--border)}
-.progress-dot.done{background:var(--accent)}
-.link{color:var(--accent);text-decoration:none;font-size:12px;display:inline-block;margin-top:16px}
-.link:hover{text-decoration:underline}
+
+/* Spinner */
+.spin{width:13px;height:13px;border-radius:50%;
+  border:2px solid rgba(255,255,255,.25);border-top-color:white;
+  animation:sp .6s linear infinite;display:none}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* Message */
+.msg{padding:10px 13px;border-radius:8px;font-size:12px;
+  line-height:1.5;margin-bottom:12px;display:none}
+.msg.err{background:rgba(232,69,90,.08);border:1px solid rgba(232,69,90,.22);color:#FCA5A5;display:block}
+.msg.ok{background:rgba(46,184,122,.08);border:1px solid rgba(46,184,122,.22);color:#6EE7B7;display:block}
+
+/* Footer */
+.a-footer{margin-top:18px;text-align:center;font-size:11px;color:var(--ink-3)}
+.a-footer a{color:var(--ink-2);text-decoration:none}
+.secure{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:10px}
+.s-dot{width:5px;height:5px;border-radius:50%;background:var(--green)}
+.s-txt{font-size:10px;color:var(--ink-3)}
+
+/* Onboarding modal */
+.ob-wrap{
+  position:fixed;inset:0;background:rgba(0,0,0,.8);
+  backdrop-filter:blur(14px);z-index:100;
+  display:none;align-items:center;justify-content:center;padding:20px}
+.ob-wrap.open{display:flex}
+.ob-modal{
+  background:var(--card);border:1px solid var(--border-hi);
+  border-radius:20px;padding:36px;
+  width:100%;max-width:500px;max-height:90vh;overflow-y:auto}
+.ob-steps{display:flex;gap:5px;margin-bottom:22px}
+.ob-step{height:3px;flex:1;border-radius:3px;background:var(--border)}
+.ob-step.done{background:var(--violet)}
+.ob-modal h2{font-size:20px;font-weight:700;color:var(--ink);letter-spacing:-.02em;margin-bottom:6px}
+.ob-modal p{font-size:13px;color:var(--ink-2);margin-bottom:22px;line-height:1.65}
+.ob-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+.ob-grid .span2{grid-column:1/-1}
+.ob-modal select{
+  width:100%;background:rgba(0,0,0,.5);border:1px solid var(--border);
+  color:var(--ink);font-size:13px;padding:11px 13px;border-radius:8px;
+  font-family:'Sora',sans-serif;outline:none;appearance:none;
+  transition:border-color .15s}
+.ob-modal select:focus{border-color:var(--violet)}
 </style>
 </head>
 <body>
-<div class="glow"></div>
 
-<div class="card">
-  <div class="logo-row">
-    <div class="logo-mark">ABE</div>
-    <div>
-      <div class="logo-name">ABE GTM PLATFORM</div>
-      <div class="logo-sub">Revenue Intelligence Operating System</div>
+<div class="atm">
+  <div class="atm-orb atm-1"></div>
+  <div class="atm-orb atm-2"></div>
+  <div class="atm-orb atm-3"></div>
+  <div class="atm-grid"></div>
+</div>
+
+<div class="shell">
+
+  <!-- ══════════════════════════════════════════
+       LEFT — PRICING
+  ══════════════════════════════════════════ -->
+  <div class="pricing-panel">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+      </div>
+      <div class="brand-label">
+        <div class="name">ABE AI</div>
+        <div class="tag">Revenue Infrastructure</div>
+      </div>
+    </div>
+
+    <div class="p-badge">
+      <span class="p-badge-dot"></span>
+      Upgrade anytime · No lock-in · Cancel anytime
+    </div>
+
+    <div class="p-headline">Pipeline intelligence<br/><span>for modern GTM teams</span></div>
+    <div class="p-sub">ICP scoring, signal analysis, and AI-powered strategy — all in one platform. Start free, scale as you grow.</div>
+
+    <div class="tiers">
+
+      <div class="tier">
+        <div class="t-row">
+          <div class="t-name">Free Trial</div>
+          <div class="t-price">
+            <div class="amt free">Free</div>
+            <div class="per">14 days</div>
+          </div>
+        </div>
+        <div class="t-feats">
+          <span class="feat">5 signal scores</span>
+          <span class="feat">1 GTM strategy</span>
+          <span class="feat">Basic ICP analysis</span>
+        </div>
+      </div>
+
+      <div class="tier">
+        <div class="t-row">
+          <div class="t-name">Starter</div>
+          <div class="t-price">
+            <div class="amt">$49</div>
+            <div class="per">per month</div>
+          </div>
+        </div>
+        <div class="t-feats">
+          <span class="feat">100 signal scores</span>
+          <span class="feat">5 strategies</span>
+          <span class="feat">Full ICP engine</span>
+          <span class="feat">CSV export</span>
+        </div>
+      </div>
+
+      <div class="tier pop">
+        <div class="t-row">
+          <div class="t-name">Professional</div>
+          <div class="t-price">
+            <div class="amt">$149</div>
+            <div class="per">per month</div>
+          </div>
+        </div>
+        <div class="t-feats">
+          <span class="feat">1,000 signal scores</span>
+          <span class="feat">Unlimited strategies</span>
+          <span class="feat">AI enrichment</span>
+          <span class="feat">PDF + CSV export</span>
+          <span class="feat">Priority support</span>
+        </div>
+      </div>
+
+      <div class="tier">
+        <div class="t-row">
+          <div class="t-name">Team</div>
+          <div class="t-price">
+            <div class="amt">$399</div>
+            <div class="per">per month</div>
+          </div>
+        </div>
+        <div class="t-feats">
+          <span class="feat">5,000 signal scores</span>
+          <span class="feat">10 seats</span>
+          <span class="feat">Shared vault</span>
+          <span class="feat">Admin panel</span>
+          <span class="feat">API access</span>
+        </div>
+      </div>
+
+      <div class="tier">
+        <div class="t-row">
+          <div class="t-name">Enterprise</div>
+          <div class="t-price">
+            <div class="amt custom">Custom</div>
+          </div>
+        </div>
+        <div class="t-feats">
+          <span class="feat">Unlimited everything</span>
+          <span class="feat">SSO / SAML</span>
+          <span class="feat">Dedicated SLA</span>
+          <span class="feat">Custom integrations</span>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="p-note">
+      <strong>Start free, no credit card needed.</strong> All paid plans include a 7-day money-back guarantee. You can upgrade, downgrade, or cancel at any time from your account settings.
     </div>
   </div>
 
-  <h1 class="title">Welcome Back</h1>
-  <p class="subtitle">Sign in to access your revenue intelligence dashboard</p>
+  <!-- ══════════════════════════════════════════
+       RIGHT — AUTH
+  ══════════════════════════════════════════ -->
+  <div class="auth-panel">
+    <div class="auth-card">
 
-  <div class="tabs">
-    <button class="tab active" id="tab-email"  onclick="switchTab('email')">Email</button>
-    <button class="tab"        id="tab-google" onclick="switchTab('google')">Google</button>
-    <button class="tab"        id="tab-magic"  onclick="switchTab('magic')">Magic Link</button>
+      <div class="mob-brand">
+        <div class="mob-mark"><svg viewBox="0 0 24 24"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+        <div class="mob-name">ABE AI</div>
+      </div>
+
+      <div class="a-head">Welcome</div>
+      <div class="a-sub">Sign in or create your account to get started.</div>
+
+      <!-- 4 tabs: Sign In | Sign Up | Google | Magic -->
+      <div class="tabs">
+        <button class="tab active" id="t-in"     onclick="sw('in')">Sign In</button>
+        <button class="tab"        id="t-up"     onclick="sw('up')">Sign Up</button>
+        <button class="tab"        id="t-google" onclick="sw('google')">Google</button>
+        <button class="tab"        id="t-magic"  onclick="sw('magic')">Magic Link</button>
+      </div>
+
+      <!-- ── SIGN IN ── -->
+      <div class="panel active" id="p-in">
+        <div class="msg" id="si-msg"></div>
+        <div class="field">
+          <label class="f-label">Email</label>
+          <input class="f-input" id="si-email" type="email" placeholder="you@company.com" autocomplete="email"/>
+        </div>
+        <div class="field">
+          <label class="f-label">Password</label>
+          <input class="f-input" id="si-pw" type="password" placeholder="••••••••" autocomplete="current-password"/>
+        </div>
+        <button class="btn-main" id="si-btn" onclick="doSignIn()">
+          <span id="si-lbl">Sign In</span><span class="spin" id="si-sp"></span>
+        </button>
+      </div>
+
+      <!-- ── SIGN UP ── -->
+      <div class="panel" id="p-up">
+        <div class="msg" id="su-msg"></div>
+        <div class="field">
+          <label class="f-label">Email</label>
+          <input class="f-input" id="su-email" type="email" placeholder="you@company.com" autocomplete="email"/>
+        </div>
+        <div class="field">
+          <label class="f-label">Password <span style="color:var(--ink-3);font-weight:400;text-transform:none;letter-spacing:0;font-size:9px">(min 8 chars)</span></label>
+          <input class="f-input" id="su-pw" type="password" placeholder="••••••••" autocomplete="new-password"/>
+        </div>
+        <div class="field">
+          <label class="f-label">Confirm Password</label>
+          <input class="f-input" id="su-pw2" type="password" placeholder="••••••••" autocomplete="new-password"/>
+        </div>
+        <div class="consent">
+          <div class="consent-title">Required consents</div>
+          <div class="c-row">
+            <input type="checkbox" id="su-terms"/>
+            <span>I accept the <a href="/terms.html" target="_blank">Terms of Service</a> and <a href="/privacy.html" target="_blank">Privacy Policy</a> <span class="req">*</span></span>
+          </div>
+          <div class="c-row">
+            <input type="checkbox" id="su-consent"/>
+            <span>I consent to ABE processing my data to provide the service <span class="req">*</span></span>
+          </div>
+          <div class="c-row">
+            <input type="checkbox" id="su-mkt"/>
+            <span>Send me product updates and tips (optional)</span>
+          </div>
+        </div>
+        <button class="btn-main" id="su-btn" onclick="doSignUp()">
+          <span id="su-lbl">Create Account</span><span class="spin" id="su-sp"></span>
+        </button>
+      </div>
+
+      <!-- ── GOOGLE ── -->
+      <div class="panel" id="p-google">
+        <div class="msg" id="g-msg"></div>
+        <p style="font-size:13px;color:var(--ink-2);line-height:1.65;margin-bottom:16px">
+          Sign in or sign up instantly with your Google account.
+        </p>
+        <!-- Consent required before Google OAuth -->
+        <div class="consent" id="g-consent-block">
+          <div class="consent-title">Required before continuing</div>
+          <div class="c-row">
+            <input type="checkbox" id="g-terms"/>
+            <span>I accept the <a href="/terms.html" target="_blank">Terms of Service</a> and <a href="/privacy.html" target="_blank">Privacy Policy</a> <span class="req">*</span></span>
+          </div>
+          <div class="c-row">
+            <input type="checkbox" id="g-consent"/>
+            <span>I consent to ABE processing my data to provide the service <span class="req">*</span></span>
+          </div>
+          <div class="c-row">
+            <input type="checkbox" id="g-mkt"/>
+            <span>Send me product updates and tips (optional)</span>
+          </div>
+        </div>
+        <button class="btn-google" onclick="doGoogle()">
+          <svg width="16" height="16" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
+          Continue with Google
+        </button>
+        <p style="font-size:10px;color:var(--ink-3);margin-top:10px;text-align:center;line-height:1.5">
+          Existing users: checking the boxes is not required to sign back in.<br/>
+          New users: consent is required to create your account.
+        </p>
+      </div>
+
+      <!-- ── MAGIC LINK ── -->
+      <div class="panel" id="p-magic">
+        <div class="msg" id="ml-msg"></div>
+        <p style="font-size:13px;color:var(--ink-2);line-height:1.65;margin-bottom:14px">
+          We'll send a one-click secure login link to your email.
+        </p>
+        <div class="field">
+          <label class="f-label">Email</label>
+          <input class="f-input" id="ml-email" type="email" placeholder="you@company.com" autocomplete="email"/>
+        </div>
+        <!-- Consent for magic link signup -->
+        <div class="consent">
+          <div class="consent-title">Required for new accounts</div>
+          <div class="c-row">
+            <input type="checkbox" id="ml-terms"/>
+            <span>I accept the <a href="/terms.html" target="_blank">Terms of Service</a> and <a href="/privacy.html" target="_blank">Privacy Policy</a> <span class="req">*</span></span>
+          </div>
+          <div class="c-row">
+            <input type="checkbox" id="ml-consent"/>
+            <span>I consent to ABE processing my data to provide the service <span class="req">*</span></span>
+          </div>
+          <div class="c-row">
+            <input type="checkbox" id="ml-mkt"/>
+            <span>Send me product updates and tips (optional)</span>
+          </div>
+        </div>
+        <button class="btn-main" id="ml-btn" onclick="doMagic()">
+          <span id="ml-lbl">Send Magic Link</span><span class="spin" id="ml-sp"></span>
+        </button>
+        <p style="font-size:10px;color:var(--ink-3);margin-top:10px;text-align:center;line-height:1.5">
+          Existing users: uncheck all boxes if you just want to sign in.
+        </p>
+      </div>
+
+      <div class="a-footer">
+        <div class="secure"><div class="s-dot"></div><div class="s-txt">Enterprise-grade security · Data encrypted at rest</div></div>
+      </div>
+    </div>
   </div>
 
-  <!-- EMAIL panel -->
-  <div class="panel active" id="email-panel">
-    <div class="sub-tabs">
-      <button class="sub-tab active" id="sub-signin" onclick="switchMode('signin')">Sign In</button>
-      <button class="sub-tab"        id="sub-signup" onclick="switchMode('signup')">Sign Up</button>
+</div><!-- /shell -->
+
+<!-- Onboarding modal -->
+<div class="ob-wrap" id="ob-modal">
+  <div class="ob-modal">
+    <div class="ob-steps">
+      <div class="ob-step done"></div>
+      <div class="ob-step"></div>
     </div>
-
-    <!-- Sign In -->
-    <div id="signin-form">
-      <label class="label">Email Address</label>
-      <input type="email"    class="input" id="si-email"    placeholder="you@company.com" autocomplete="email"/>
-      <label class="label">Password</label>
-      <input type="password" class="input" id="si-password" placeholder="Enter your password" autocomplete="current-password"/>
-      <button class="btn" id="si-btn" onclick="doSignIn()">
-        <span id="si-txt">Sign In</span>
-        <span class="spinner" id="si-spin"></span>
-      </button>
-      <a href="#" class="link" onclick="switchMode('signup');return false;">Don't have an account? Sign Up</a>
+    <h2>Complete your profile</h2>
+    <p>Help us personalise your experience — takes 30 seconds.</p>
+    <div class="ob-grid">
+      <div class="span2">
+        <div class="field"><label class="f-label">Full Name</label><input class="f-input" id="ob-name" placeholder="Jane Smith"/></div>
+      </div>
+      <div class="span2">
+        <div class="field"><label class="f-label">Company Name</label><input class="f-input" id="ob-co" placeholder="Acme Corp"/></div>
+      </div>
+      <div>
+        <div class="field"><label class="f-label">Job Title</label><input class="f-input" id="ob-title" placeholder="VP Sales"/></div>
+      </div>
+      <div>
+        <div class="field">
+          <label class="f-label">Department</label>
+          <select class="f-input" id="ob-dept">
+            <option value="">Select…</option>
+            <option value="sales">Sales</option>
+            <option value="marketing">Marketing</option>
+            <option value="revenue_ops">Revenue Ops</option>
+            <option value="executive">Executive</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <div class="field">
+          <label class="f-label">Company Size</label>
+          <select class="f-input" id="ob-size">
+            <option value="">Select…</option>
+            <option value="1-10">1–10</option>
+            <option value="11-50">11–50</option>
+            <option value="51-200">51–200</option>
+            <option value="201-1000">201–1000</option>
+            <option value="1000+">1000+</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <div class="field">
+          <label class="f-label">Geography</label>
+          <select class="f-input" id="ob-geo">
+            <option value="">Select…</option>
+            <option value="north_america">North America</option>
+            <option value="europe">Europe</option>
+            <option value="asia">Asia / Pacific</option>
+            <option value="middle_east">Middle East</option>
+            <option value="other">Other</option>
+          </select>
+        </div>
+      </div>
     </div>
-
-    <!-- Sign Up -->
-    <div id="signup-form" style="display:none">
-      <label class="label">Email Address</label>
-      <input type="email"    class="input" id="su-email"    placeholder="you@company.com" autocomplete="email"/>
-      <label class="label">Password</label>
-      <input type="password" class="input" id="su-password" placeholder="Create password (8+ characters)" autocomplete="new-password"/>
-      <label class="label">Confirm Password</label>
-      <input type="password" class="input" id="su-confirm"  placeholder="Confirm password" autocomplete="new-password"/>
-      <label class="check-row">
-        <input type="checkbox" id="cb-terms"/>
-        <span>I accept the <a href="/terms.html" target="_blank">Terms of Service</a> and <a href="/privacy.html" target="_blank">Privacy Policy</a> <span style="color:var(--red)">*</span></span>
-      </label>
-      <label class="check-row">
-        <input type="checkbox" id="cb-consent"/>
-        <span>I consent to ABE processing my data to provide the service <span style="color:var(--red)">*</span></span>
-      </label>
-      <label class="check-row">
-        <input type="checkbox" id="cb-mkt"/>
-        <span>Send me product updates and marketing emails (optional)</span>
-      </label>
-      <button class="btn" id="su-btn" onclick="doSignUp()">
-        <span id="su-txt">Create Account</span>
-        <span class="spinner" id="su-spin"></span>
-      </button>
-      <a href="#" class="link" onclick="switchMode('signin');return false;">Already have an account? Sign In</a>
-    </div>
-
-    <div id="email-msg" class="msg"></div>
-  </div>
-
-  <!-- GOOGLE panel -->
-  <div class="panel" id="google-panel">
-    <p class="subtitle">Sign in with your Google account for instant access</p>
-    <button class="btn-outline" onclick="doGoogle()">
-      <svg width="16" height="16" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05"/><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/></svg>
-      Continue with Google
+    <button class="btn-main" style="margin-top:18px" id="ob-btn" onclick="doOnboard()">
+      <span id="ob-lbl">Complete Setup</span><span class="spin" id="ob-sp"></span>
     </button>
-    <div id="google-msg" class="msg"></div>
-  </div>
-
-  <!-- MAGIC LINK panel -->
-  <div class="panel" id="magic-panel">
-    <p class="subtitle">We'll send you a secure login link via email</p>
-    <label class="label">Email Address</label>
-    <input type="email" class="input" id="ml-email" placeholder="you@company.com" autocomplete="email"/>
-    <button class="btn" id="ml-btn" onclick="doMagicLink()">
-      <span id="ml-txt">Send Magic Link</span>
-      <span class="spinner" id="ml-spin"></span>
-    </button>
-    <div id="magic-msg" class="msg"></div>
-  </div>
-
-  <div class="footer">
-    <div class="secure"><div class="dot"></div>Secured by Supabase Authentication</div>
   </div>
 </div>
 
-<!-- Onboarding Modal — shown after signup -->
-<div class="modal-overlay" id="ob-modal">
-  <div class="modal">
-    <div class="progress">
-      <div class="progress-dot done"></div>
-      <div class="progress-dot"></div>
-    </div>
-    <h2>Complete Your Profile</h2>
-    <p>Help us personalise your experience</p>
-    <div class="modal-grid">
-      <div class="full">
-        <label class="label">Full Name</label>
-        <input type="text" class="input" id="ob-name" placeholder="Jane Smith"/>
-      </div>
-      <div class="full">
-        <label class="label">Company Name</label>
-        <input type="text" class="input" id="ob-company" placeholder="Acme Corp"/>
-      </div>
-      <div>
-        <label class="label">Job Title</label>
-        <input type="text" class="input" id="ob-title" placeholder="VP Sales"/>
-      </div>
-      <div>
-        <label class="label">Department</label>
-        <select class="input" id="ob-dept">
-          <option value="">Select…</option>
-          <option value="sales">Sales</option>
-          <option value="marketing">Marketing</option>
-          <option value="revenue_ops">Revenue Ops</option>
-          <option value="executive">Executive</option>
-          <option value="other">Other</option>
-        </select>
-      </div>
-      <div>
-        <label class="label">Company Size</label>
-        <select class="input" id="ob-size">
-          <option value="">Select…</option>
-          <option value="1-10">1–10</option>
-          <option value="11-50">11–50</option>
-          <option value="51-200">51–200</option>
-          <option value="201-1000">201–1000</option>
-          <option value="1000+">1000+</option>
-        </select>
-      </div>
-      <div>
-        <label class="label">Geography</label>
-        <select class="input" id="ob-geo">
-          <option value="">Select…</option>
-          <option value="north_america">North America</option>
-          <option value="europe">Europe</option>
-          <option value="asia">Asia</option>
-          <option value="middle_east">Middle East</option>
-          <option value="other">Other</option>
-        </select>
-      </div>
-    </div>
-    <button class="btn" style="margin-top:24px" id="ob-btn" onclick="doOnboard()">
-      <span id="ob-txt">Complete Onboarding</span>
-      <span class="spinner" id="ob-spin"></span>
-    </button>
-  </div>
-</div>
-
-<!-- auth-guard.js provides window.APP — must be first -->
+<!-- auth-guard.js — must load first, provides window.APP -->
 <script src="auth-guard.js"></script>
 <script>
-/* ── Helpers ──────────────────────────────────────────────────── */
-function showMsg(id, text, type) {
-  var el = document.getElementById(id);
-  el.textContent = text;
-  el.className = 'msg ' + type;
+/* ── Helpers ──────────────────────────────────────────────── */
+function msg(id,text,type){var e=document.getElementById(id);e.textContent=text;e.className='msg '+type;}
+function clr(id){var e=document.getElementById(id);e.className='msg';e.textContent='';}
+function load(b,l,s,on){
+  document.getElementById(b).disabled=on;
+  document.getElementById(l).style.display=on?'none':'inline';
+  document.getElementById(s).style.display=on?'inline-block':'none';
 }
-function hideMsg(id) {
-  var el = document.getElementById(id);
-  el.className = 'msg';
-  el.textContent = '';
-}
-function setLoad(btnId, txtId, spinId, on) {
-  document.getElementById(btnId).disabled = on;
-  document.getElementById(txtId).style.display  = on ? 'none'         : 'inline';
-  document.getElementById(spinId).style.display = on ? 'inline-block' : 'none';
-}
-
-/* ── Tab switching ────────────────────────────────────────────── */
-function switchTab(t) {
-  ['email','google','magic'].forEach(function(x) {
-    document.getElementById('tab-' + x).classList.toggle('active', x === t);
-    document.getElementById(x + '-panel').classList.toggle('active', x === t);
+var TABS=['in','up','google','magic'];
+function sw(t){
+  TABS.forEach(function(x){
+    document.getElementById('t-'+x).classList.toggle('active',x===t);
+    document.getElementById('p-'+(x==='google'?'google':x==='magic'?'magic':x)).classList.toggle('active',x===t);
   });
-  hideMsg('email-msg'); hideMsg('google-msg'); hideMsg('magic-msg');
+  // clear all messages
+  ['si-msg','su-msg','g-msg','ml-msg'].forEach(clr);
 }
 
-function switchMode(m) {
-  var isSignin = m === 'signin';
-  document.getElementById('signin-form').style.display = isSignin ? 'block' : 'none';
-  document.getElementById('signup-form').style.display = isSignin ? 'none'  : 'block';
-  document.getElementById('sub-signin').classList.toggle('active', isSignin);
-  document.getElementById('sub-signup').classList.toggle('active', !isSignin);
-  hideMsg('email-msg');
-}
-
-/* ── Sign In ──────────────────────────────────────────────────── */
-async function doSignIn() {
-  hideMsg('email-msg');
-  var email = document.getElementById('si-email').value.trim();
-  var pw    = document.getElementById('si-password').value;
-  if (!email || !pw) { showMsg('email-msg','Please enter your email and password.','error'); return; }
-
-  setLoad('si-btn','si-txt','si-spin', true);
-  try {
-    var data = await window.APP.login(email, pw);
-    showMsg('email-msg', 'Signed in! Redirecting…', 'success');
-    var next = new URLSearchParams(window.location.search).get('next');
-    setTimeout(function() {
-      window.location.replace(data.onboardingCompleted ? (next || '/dashboard.html') : '/dashboard.html?onboarding=1');
-    }, 600);
-  } catch(e) {
-    showMsg('email-msg', e.message || 'Sign in failed. Check your credentials.', 'error');
-    setLoad('si-btn','si-txt','si-spin', false);
+/* ── Sign In ──────────────────────────────────────────────── */
+async function doSignIn(){
+  clr('si-msg');
+  var e=document.getElementById('si-email').value.trim();
+  var p=document.getElementById('si-pw').value;
+  if(!e||!p){msg('si-msg','Please enter email and password.','err');return;}
+  load('si-btn','si-lbl','si-sp',true);
+  try{
+    var d=await window.APP.login(e,p);
+    msg('si-msg','Signed in! Redirecting…','ok');
+    var nx=new URLSearchParams(window.location.search).get('next');
+    setTimeout(function(){window.location.replace(d.onboardingCompleted?(nx||'/dashboard.html'):'/dashboard.html?onboarding=1');},500);
+  }catch(err){
+    msg('si-msg',err.message||'Sign in failed. Check your credentials.','err');
+    load('si-btn','si-lbl','si-sp',false);
   }
 }
 
-/* ── Sign Up ──────────────────────────────────────────────────── */
-async function doSignUp() {
-  hideMsg('email-msg');
-  var email   = document.getElementById('su-email').value.trim();
-  var pw      = document.getElementById('su-password').value;
-  var confirm = document.getElementById('su-confirm').value;
-  var terms   = document.getElementById('cb-terms').checked;
-  var consent = document.getElementById('cb-consent').checked;
-  var mkt     = document.getElementById('cb-mkt').checked;
-
-  if (!email || !pw)    { showMsg('email-msg','Please enter email and password.','error'); return; }
-  if (pw !== confirm)   { showMsg('email-msg','Passwords do not match.','error'); return; }
-  if (pw.length < 8)    { showMsg('email-msg','Password must be at least 8 characters.','error'); return; }
-  if (!terms)           { showMsg('email-msg','You must accept the Terms of Service.','error'); return; }
-  if (!consent)         { showMsg('email-msg','You must consent to data processing.','error'); return; }
-
-  setLoad('su-btn','su-txt','su-spin', true);
-  try {
-    await window.APP.signup(email, pw, terms, mkt);
-    showMsg('email-msg', 'Account created! Setting up your workspace…', 'success');
-    setTimeout(function() { document.getElementById('ob-modal').classList.add('active'); }, 800);
-  } catch(e) {
-    showMsg('email-msg', e.message || 'Signup failed. Please try again.', 'error');
-    setLoad('su-btn','su-txt','su-spin', false);
+/* ── Sign Up ──────────────────────────────────────────────── */
+async function doSignUp(){
+  clr('su-msg');
+  var e=document.getElementById('su-email').value.trim();
+  var p=document.getElementById('su-pw').value;
+  var p2=document.getElementById('su-pw2').value;
+  var t=document.getElementById('su-terms').checked;
+  var c=document.getElementById('su-consent').checked;
+  var m=document.getElementById('su-mkt').checked;
+  if(!e||!p){msg('su-msg','Please enter email and password.','err');return;}
+  if(p!==p2){msg('su-msg','Passwords do not match.','err');return;}
+  if(p.length<8){msg('su-msg','Password must be at least 8 characters.','err');return;}
+  if(!t){msg('su-msg','You must accept the Terms of Service.','err');return;}
+  if(!c){msg('su-msg','You must consent to data processing.','err');return;}
+  load('su-btn','su-lbl','su-sp',true);
+  try{
+    await window.APP.signup(e,p,t,m);
+    msg('su-msg','Account created! Setting up your workspace…','ok');
+    setTimeout(function(){document.getElementById('ob-modal').classList.add('open');},700);
+  }catch(err){
+    msg('su-msg',err.message||'Signup failed. Please try again.','err');
+    load('su-btn','su-lbl','su-sp',false);
   }
 }
 
-/* ── Google OAuth ─────────────────────────────────────────────── */
-async function doGoogle() {
-  hideMsg('google-msg');
-  hideMsg('email-msg');
-  // Constructs the Supabase Google OAuth URL directly.
-  // No API key is needed for this redirect — the project URL is public.
-  // After Google authentication, Supabase redirects to /auth-callback.html
-  // where the token is extracted and stored securely.
-  var redirectTo = encodeURIComponent(window.location.origin + '/auth-callback.html');
-  var oauthUrl   = 'https://cwcvneluhlimhlzowabv.supabase.co/auth/v1/authorize'
-                 + '?provider=google'
-                 + '&redirect_to=' + redirectTo;
-  window.location.replace(oauthUrl);
+/* ── Google OAuth ─────────────────────────────────────────── */
+async function doGoogle(){
+  clr('g-msg');
+  var t=document.getElementById('g-terms').checked;
+  var c=document.getElementById('g-consent').checked;
+  // For new users, consent is required.
+  // Existing users can proceed without checking (session will confirm they exist).
+  // We store consent intent in sessionStorage so auth-callback.html can use it.
+  sessionStorage.setItem('g_terms',t?'1':'0');
+  sessionStorage.setItem('g_consent',c?'1':'0');
+  sessionStorage.setItem('g_mkt',document.getElementById('g-mkt').checked?'1':'0');
+  // Redirect to Supabase Google OAuth — no API key needed, project URL is public
+  var redirectTo=encodeURIComponent(window.location.origin+'/auth-callback.html');
+  window.location.replace(
+    'https://cwcvneluhlimhlzowabv.supabase.co/auth/v1/authorize'
+    +'?provider=google&redirect_to='+redirectTo
+  );
 }
 
-/* ── Magic Link ───────────────────────────────────────────────── */
-async function doMagicLink() {
-  hideMsg('magic-msg');
-  var email = document.getElementById('ml-email').value.trim();
-  if (!email) { showMsg('magic-msg','Please enter your email address.','error'); return; }
-  showMsg('magic-msg', 'Magic link feature coming soon. Please use email/password to sign in.', 'error');
+/* ── Magic Link ───────────────────────────────────────────── */
+async function doMagic(){
+  clr('ml-msg');
+  var e=document.getElementById('ml-email').value.trim();
+  var t=document.getElementById('ml-terms').checked;
+  var c=document.getElementById('ml-consent').checked;
+  if(!e){msg('ml-msg','Please enter your email address.','err');return;}
+  // Store consent for after the magic link lands
+  sessionStorage.setItem('ml_terms',t?'1':'0');
+  sessionStorage.setItem('ml_consent',c?'1':'0');
+  sessionStorage.setItem('ml_mkt',document.getElementById('ml-mkt').checked?'1':'0');
+  load('ml-btn','ml-lbl','ml-sp',true);
+  // Magic link uses Supabase OTP — triggers an email from Supabase
+  // After user clicks the link in email, they land on auth-callback.html
+  try{
+    var res=await fetch('/api/magic-link',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email:e,redirect_to:window.location.origin+'/auth-callback.html'})
+    });
+    var d=await res.json();
+    if(!res.ok) throw new Error(d.error||'Failed to send');
+    msg('ml-msg','Check your inbox! Magic link sent to '+e,'ok');
+  }catch(err){
+    msg('ml-msg',err.message||'Failed to send magic link. Please try again.','err');
+  }finally{
+    load('ml-btn','ml-lbl','ml-sp',false);
+  }
 }
 
-/* ── Onboarding ───────────────────────────────────────────────── */
-async function doOnboard() {
-  setLoad('ob-btn','ob-txt','ob-spin', true);
-  try {
-    // Save onboarding data through the API
-    await window.APP.api('/api/onboard', {
-      full_name:    document.getElementById('ob-name').value,
-      company_name: document.getElementById('ob-company').value,
-      job_title:    document.getElementById('ob-title').value,
-      department:   document.getElementById('ob-dept').value,
-      company_size: document.getElementById('ob-size').value,
-      geography:    document.getElementById('ob-geo').value,
-    }).catch(function(){});  // non-fatal — redirect regardless
+/* ── Onboarding ───────────────────────────────────────────── */
+async function doOnboard(){
+  load('ob-btn','ob-lbl','ob-sp',true);
+  try{
+    await window.APP.api('/api/onboard',{
+      full_name:document.getElementById('ob-name').value,
+      company_name:document.getElementById('ob-co').value,
+      job_title:document.getElementById('ob-title').value,
+      department:document.getElementById('ob-dept').value,
+      company_size:document.getElementById('ob-size').value,
+      geography:document.getElementById('ob-geo').value,
+    }).catch(function(){});
     window.location.replace('/dashboard.html');
-  } catch(_) {
-    window.location.replace('/dashboard.html');
-  }
+  }catch(_){window.location.replace('/dashboard.html');}
 }
 
-/* ── URL error params ─────────────────────────────────────────── */
+/* ── URL params ───────────────────────────────────────────── */
 (function(){
-  var p = new URLSearchParams(window.location.search);
-  if (p.get('error') === 'unauthorized')   showMsg('email-msg','Your session expired. Please sign in again.','error');
-  if (p.get('error') === 'oauth_failed')   showMsg('google-msg','Google sign-in failed. Please try again.','error');
-  if (p.get('signup') === '1')             switchMode('signup');
+  var p=new URLSearchParams(window.location.search);
+  if(p.get('error')==='unauthorized') msg('si-msg','Your session expired. Please sign in again.','err');
+  if(p.get('error')==='oauth_failed')  msg('g-msg','Google sign-in failed. Please try again.','err'),sw('google');
+  if(p.get('signup')==='1')            sw('up');
 })();
 
-/* ── Enter key support ────────────────────────────────────────── */
-document.addEventListener('keydown', function(e) {
-  if (e.key !== 'Enter') return;
-  var emailActive = document.getElementById('email-panel').classList.contains('active');
-  if (!emailActive) return;
-  var signupVisible = document.getElementById('signup-form').style.display !== 'none';
-  if (signupVisible) doSignUp(); else doSignIn();
+/* ── Enter key ────────────────────────────────────────────── */
+document.addEventListener('keydown',function(e){
+  if(e.key!=='Enter')return;
+  if(document.getElementById('p-in').classList.contains('active'))doSignIn();
+  else if(document.getElementById('p-up').classList.contains('active'))doSignUp();
+  else if(document.getElementById('p-magic').classList.contains('active'))doMagic();
 });
 </script>
 </body>
