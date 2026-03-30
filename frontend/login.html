@@ -656,13 +656,15 @@ async function doGoogle(){
   clr('g-msg');
   var t=document.getElementById('g-terms').checked;
   var c=document.getElementById('g-consent').checked;
-  // For new users, consent is required.
-  // Existing users can proceed without checking (session will confirm they exist).
-  // We store consent intent in sessionStorage so auth-callback.html can use it.
-  sessionStorage.setItem('g_terms',t?'1':'0');
-  sessionStorage.setItem('g_consent',c?'1':'0');
-  sessionStorage.setItem('g_mkt',document.getElementById('g-mkt').checked?'1':'0');
-  // Redirect to Supabase Google OAuth — no API key needed, project URL is public
+  var m=document.getElementById('g-mkt').checked;
+  // Hard block — no bypass, no exceptions
+  if(!t){msg('g-msg','You must accept the Terms of Service to continue.','err');return;}
+  if(!c){msg('g-msg','You must consent to data processing to continue.','err');return;}
+  // Store consent — auth-callback.html reads this for new users
+  sessionStorage.setItem('g_terms','1');
+  sessionStorage.setItem('g_consent','1');
+  sessionStorage.setItem('g_mkt',m?'1':'0');
+  // redirect — For existing users: terms already accepted at signup
   var redirectTo=encodeURIComponent(window.location.origin+'/auth-callback.html');
   window.location.replace(
     'https://cwcvneluhlimhlzowabv.supabase.co/auth/v1/authorize'
@@ -670,35 +672,38 @@ async function doGoogle(){
   );
 }
 
+
 /* ── Magic Link ───────────────────────────────────────────── */
 async function doMagic(){
   clr('ml-msg');
   var e=document.getElementById('ml-email').value.trim();
   var t=document.getElementById('ml-terms').checked;
   var c=document.getElementById('ml-consent').checked;
+  var m=document.getElementById('ml-mkt').checked;
   if(!e){msg('ml-msg','Please enter your email address.','err');return;}
-  // Store consent for after the magic link lands
-  sessionStorage.setItem('ml_terms',t?'1':'0');
-  sessionStorage.setItem('ml_consent',c?'1':'0');
-  sessionStorage.setItem('ml_mkt',document.getElementById('ml-mkt').checked?'1':'0');
+  // Hard block — no bypass
+  if(!t){msg('ml-msg','You must accept the Terms of Service to continue.','err');return;}
+  if(!c){msg('ml-msg','You must consent to data processing to continue.','err');return;}
+  sessionStorage.setItem('ml_terms','1');
+  sessionStorage.setItem('ml_consent','1');
+  sessionStorage.setItem('ml_mkt',m?'1':'0');
   load('ml-btn','ml-lbl','ml-sp',true);
-  // Magic link uses Supabase OTP — triggers an email from Supabase
-  // After user clicks the link in email, they land on auth-callback.html
   try{
     var res=await fetch('/api/magic-link',{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({email:e,redirect_to:window.location.origin+'/auth-callback.html'})
+      body:JSON.stringify({email:e})
     });
-    var d=await res.json();
-    if(!res.ok) throw new Error(d.error||'Failed to send');
-    msg('ml-msg','Check your inbox! Magic link sent to '+e,'ok');
+    var d=await res.json().catch(function(){return{};});
+    if(!res.ok) throw new Error(d.error||'Failed to send magic link');
+    msg('ml-msg','Magic link sent to '+e+' — check your inbox!','ok');
   }catch(err){
     msg('ml-msg',err.message||'Failed to send magic link. Please try again.','err');
   }finally{
     load('ml-btn','ml-lbl','ml-sp',false);
   }
 }
+
 
 /* ── Onboarding ───────────────────────────────────────────── */
 async function doOnboard(){
