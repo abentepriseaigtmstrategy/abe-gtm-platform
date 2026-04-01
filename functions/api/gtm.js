@@ -11,7 +11,7 @@ import { verifyAuth, corsHeaders, validate, rateLimit, sanitise, errRes, okRes, 
 
 const COST_PER_TOKEN   = 0.0000002;
 const HOURLY_TOKEN_LIMIT = 200_000;
-const STEP_MAX_TOKENS = { 1:1500, 2:1500, 3:1500, 4:1500, 5:1500, 6:2500 };
+const STEP_MAX_TOKENS = { 1:1500, 2:1500, 3:1500, 4:1500, 5:2000, 6:2500 };
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -25,9 +25,8 @@ export async function onRequestPost(context) {
 
   const openaiKey   = env.OPENAI_API_KEY;
   const supabaseUrl = env.SUPABASE_URL      || 'https://cwcvneluhlimhlzowabv.supabase.co';
-  // Use service key if set; fall back to anon key so saves still work without the secret
-  const ANON_FALLBACK = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3Y3ZuZWx1aGxpbWhsem93YWJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2MzAxMjAsImV4cCI6MjA4OTIwNjEyMH0.SZDS-svU-kFh_OkUq3AjQY64F-71MpbBsFd6Iin5DlQ';
-  const supabaseKey = env.SUPABASE_SERVICE_KEY || env.SUPABASE_ANON_KEY || ANON_FALLBACK;
+  // Service role key from Cloudflare env secrets
+  const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY;
   if (!openaiKey) return errRes('OpenAI not configured', 503, cors);
 
   let body;
@@ -507,9 +506,31 @@ const SCHEMAS = {
 
 async function parseWithRetry(rawText, step, originalPrompt, openaiKey) {
   const parse = text => {
+    if (!text) return null;
+    // Remove markdown fences
     const clean = text.replace(/```json|```/g,'').trim();
-    const m     = clean.match(/\{[\s\S]*\}/);
-    try { return JSON.parse(m ? m[0] : clean); } catch { return null; }
+    // Try direct parse first
+    try { return JSON.parse(clean); } catch {}
+    // Extract largest JSON object
+    const m = clean.match(/\{[\s\S]*\}/);
+    if (!m) return null;
+    try { return JSON.parse(m[0]); } catch {}
+    // Handle truncated JSON: try to close unclosed structure
+    let s = m[0];
+    const opens = (s.match(/\{/g)||[]).length;
+    const closes = (s.match(/\}/g)||[]).length;
+    if (opens > closes) {
+      s = s + '}'.repeat(opens - closes);
+      try { return JSON.parse(s); } catch {}
+    }
+    // Last resort: extract field by field
+    const result = {};
+    const fieldPattern = /"(\w+)"\s*:\s*("(?:[^"\\]|\\.)*"|\[[^\]]*\]|\{[^}]*\}|[^,}]+)/g;
+    let match;
+    while ((match = fieldPattern.exec(s)) !== null) {
+      try { result[match[1]] = JSON.parse(match[2]); } catch { result[match[1]] = match[2].replace(/^"|"$/g,''); }
+    }
+    return Object.keys(result).length > 0 ? result : null;
   };
 
   let parsed = parse(rawText);

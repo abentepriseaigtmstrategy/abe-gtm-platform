@@ -84,7 +84,7 @@ export async function onRequestPost(context) {
 
   // ── 7. Check Supabase cache (skip OpenAI if cached) ───────────
   const supabaseUrl = env.SUPABASE_URL;
-  const supabaseKey = env.SUPABASE_SERVICE_KEY;
+  const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY;
   if (!safePrompt && supabaseUrl && supabaseKey) {
     const cached = await getCachedAnalysis(safeLead.name, safeLead.company, supabaseUrl, supabaseKey);
     if (cached) {

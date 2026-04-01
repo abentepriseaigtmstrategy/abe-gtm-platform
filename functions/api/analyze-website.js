@@ -44,7 +44,7 @@ export async function onRequestPost(context) {
 
   const openaiKey   = env.OPENAI_API_KEY;
   const supabaseUrl = env.SUPABASE_URL;
-  const supabaseKey = env.SUPABASE_SERVICE_KEY;
+  const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY;
   if (!openaiKey) return errRes('OpenAI not configured', 503, cors);
 
   let body;

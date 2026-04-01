@@ -21,7 +21,7 @@ export async function onRequestPost(context) {
   if (!user) return errRes(authErr || 'Unauthorized', 401, cors);
 
   const supabaseUrl = env.SUPABASE_URL;
-  const supabaseKey = env.SUPABASE_SERVICE_KEY;
+  const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY;
   if (!supabaseUrl || !supabaseKey) return errRes('Database not configured', 503, cors);
 
   let body;
