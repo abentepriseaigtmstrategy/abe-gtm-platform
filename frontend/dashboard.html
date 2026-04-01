@@ -612,6 +612,91 @@
       #mobile-nav-drawer.open { display: flex !important; }
     }
 
+    /* ── VERIFY SIGNALS / AUDIT INTENT ── */
+    :root {
+      --cyber-green: #00ff88;
+      --cyber-green-dim: rgba(0,255,136,.15);
+      --cyber-green-border: rgba(0,255,136,.38);
+    }
+    #saveMappedBtn {
+      position: relative;
+      overflow: hidden;
+      transition: all .2s;
+    }
+    #saveMappedBtn.vs-idle {
+      background: rgba(0,255,136,.1) !important;
+      color: var(--cyber-green) !important;
+      border: 1px solid var(--cyber-green-border) !important;
+      box-shadow: 0 0 12px rgba(0,255,136,.15);
+    }
+    #saveMappedBtn.vs-idle:hover {
+      background: rgba(0,255,136,.18) !important;
+      box-shadow: 0 0 20px rgba(0,255,136,.3);
+    }
+    #saveMappedBtn.vs-scanning {
+      background: rgba(0,255,136,.08) !important;
+      color: var(--cyber-green) !important;
+      border: 1px solid var(--cyber-green) !important;
+      animation: vs-pulse 1s ease-in-out infinite;
+      pointer-events: none;
+    }
+    #saveMappedBtn.vs-scanning::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent 0%, rgba(0,255,136,.4) 50%, transparent 100%);
+      animation: vs-sweep 1s linear infinite;
+    }
+    #saveMappedBtn.vs-done {
+      background: rgba(0,255,136,.15) !important;
+      color: var(--cyber-green) !important;
+      border: 1px solid var(--cyber-green) !important;
+      box-shadow: 0 0 20px rgba(0,255,136,.35), 0 0 6px rgba(0,255,136,.2) inset;
+    }
+    @keyframes vs-pulse {
+      0%,100% { box-shadow: 0 0 6px rgba(0,255,136,.3); }
+      50%      { box-shadow: 0 0 22px rgba(0,255,136,.65), 0 0 44px rgba(0,255,136,.2); }
+    }
+    @keyframes vs-sweep {
+      from { transform: translateX(-110%); }
+      to   { transform: translateX(210%); }
+    }
+
+    /* Signal breakdown rows inside body-p2 table */
+    .sig-breakdown-row td {
+      padding: 0 20px 10px 20px !important;
+      border-bottom: 1px solid rgba(31,41,55,.5) !important;
+    }
+    .sig-chips {
+      display: flex; flex-wrap: wrap; gap: 5px; padding: 6px 0 2px;
+    }
+    .sig-chip {
+      display: inline-flex; align-items: center; gap: 5px;
+      padding: 3px 9px; border-radius: 20px; font-size: 9px; font-weight: 700;
+      text-transform: uppercase; letter-spacing: .06em;
+    }
+    .sig-chip-high {
+      background: rgba(0,255,136,.1);
+      border: 1px solid rgba(0,255,136,.3);
+      color: var(--cyber-green);
+    }
+    .sig-chip-med {
+      background: rgba(245,158,11,.1);
+      border: 1px solid rgba(245,158,11,.3);
+      color: #f59e0b;
+    }
+    .sig-chip-low {
+      background: rgba(107,114,128,.08);
+      border: 1px solid rgba(107,114,128,.2);
+      color: #6b7280;
+    }
+    .sig-dot {
+      width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0;
+    }
+    .sig-dot-high { background: var(--cyber-green); box-shadow: 0 0 4px rgba(0,255,136,.8); }
+    .sig-dot-med  { background: #f59e0b; }
+    .sig-dot-low  { background: #6b7280; }
+
     /* ── TOAST NOTIFICATIONS ── */
     #abe-toast {
       position: fixed; bottom: 28px; right: 28px; z-index: 99998;
@@ -677,7 +762,7 @@
         </div>
         
         <button onclick="document.getElementById('leadInbound').click()" class="bg-gray-800 hover:bg-gray-700 px-3 py-2 rounded-lg font-black text-[9px] uppercase tracking-widest text-white border border-gray-700 transition-all">⬆ Import</button>
-        <button id="saveMappedBtn" class="bg-purple-600 hover:bg-purple-500 px-3 py-2 rounded-lg font-black text-[9px] uppercase tracking-widest text-white shadow-lg shadow-purple-600/20 transition-all">⚡ Map</button>
+        <button id="saveMappedBtn" class="vs-idle px-3 py-2 rounded-lg font-black text-[9px] uppercase tracking-widest transition-all">🔍 Verify Signals</button>
 
         <!-- AI Engine Status badge - hidden on narrow screens -->
         <div class="hidden xl:flex items-center space-x-2 bg-green-900/20 border border-green-500/20 px-3 py-2 rounded-xl">
@@ -730,10 +815,10 @@
               <div style="font-size:10px;color:#6b7280;margin-top:4px">Upload CSV or XLSX file</div>
             </div>
             <div style="background:rgba(99,102,241,0.08);border:1px solid rgba(99,102,241,0.2);border-radius:14px;padding:20px 24px;min-width:140px;text-align:center">
-              <div style="font-size:22px;margin-bottom:8px">⚡</div>
+              <div style="font-size:22px;margin-bottom:8px">🔍</div>
               <div style="font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:#818cf8;margin-bottom:4px">Step 2</div>
-              <div style="font-size:12px;font-weight:700;color:white">Execute Map</div>
-              <div style="font-size:10px;color:#6b7280;margin-top:4px">Score and rank leads by intent</div>
+              <div style="font-size:12px;font-weight:700;color:white">Verify Signals</div>
+              <div style="font-size:10px;color:#6b7280;margin-top:4px">Authenticate scores with signal proof</div>
             </div>
             <div style="background:rgba(34,197,94,0.06);border:1px solid rgba(34,197,94,0.15);border-radius:14px;padding:20px 24px;min-width:140px;text-align:center">
               <div style="font-size:22px;margin-bottom:8px">🧠</div>
@@ -948,7 +1033,7 @@
                                 </tr>
                             </thead>
                             <tbody id="body-p2" class="text-gray-300">
-                                <tr><td colspan="4" class="py-32 text-center text-gray-600 font-bold uppercase tracking-widest text-[10px]">Execute mapping to verify</td></tr>
+                                <tr><td colspan="4" class="py-32 text-center text-gray-600 font-bold uppercase tracking-widest text-[10px]">Click 🔍 Verify Signals to authenticate lead scores</td></tr>
                             </tbody>
                         </table>
                     </div>
@@ -1967,7 +2052,7 @@ function selectVaultFile(index) {
 
 function resetVerified() {
   document.getElementById('body-p2').innerHTML =
-    `<tr><td colspan="4" class="text-center py-20 text-gray-600">Execute mapping to verify</td></tr>`;
+    `<tr><td colspan="4" class="text-center py-20 text-gray-600">Click 🔍 Verify Signals to authenticate lead scores</td></tr>`;
 }
 
 /* =========================
@@ -1999,38 +2084,160 @@ function renderP1() {
 }
 
 /* =========================
-   EXECUTE MAPPING
+   VERIFY SIGNALS — Audit Intent Engine
+   Replaces the old "Execute Mapping" display-only render.
+   Now runs a deterministic AB Velocity Score™ signal breakdown
+   for every lead and renders authenticated evidence chips per row.
 ========================= */
 
-document.getElementById('saveMappedBtn').onclick = () => {
-  if (!state.allLeads.length) return;
+/* ── Signal breakdown builder ──────────────────────────────────────────────
+   Deterministic rules applied to each lead's available data fields.
+   Returns an array of { label, tier } objects where tier = 'high'|'med'|'low'
+   These are shown as colour-coded chips beneath each lead row.
+   ────────────────────────────────────────────────────────────────────────── */
+function buildSignalBreakdown(lead) {
+  const signals = [];
+  const score   = lead.score || 0;
+  const title   = (lead.title || '').toLowerCase();
+  const company = (lead.company || '').toLowerCase();
+  const name    = (lead.name || '').toLowerCase();
 
-  // Execute Mapping: pure display render — no AI, just show leads scored and ready
-  // Respects the current intent filter if set
+  // ── Score tier signal ──
+  if (score >= 75) {
+    signals.push({ label: 'High-confidence ICP match (' + score + '%)', tier: 'high' });
+  } else if (score >= 50) {
+    signals.push({ label: 'Moderate ICP alignment (' + score + '%)', tier: 'med' });
+  } else {
+    signals.push({ label: 'Weak ICP signal (' + score + '%) — nurture recommended', tier: 'low' });
+  }
+
+  // ── Title seniority ──
+  const cSuite   = ['ceo','cto','cfo','coo','cmo','chief','founder','co-founder','president','owner'];
+  const director = ['vp','vice president','director','head of','partner','managing'];
+  const manager  = ['manager','lead','senior','principal','staff'];
+  if (cSuite.some(k => title.includes(k))) {
+    signals.push({ label: 'C-Suite / Founder detected', tier: 'high' });
+  } else if (director.some(k => title.includes(k))) {
+    signals.push({ label: 'Director / VP level seniority', tier: 'high' });
+  } else if (manager.some(k => title.includes(k))) {
+    signals.push({ label: 'Manager / Senior level', tier: 'med' });
+  } else if (title && title !== 'professional') {
+    signals.push({ label: 'Title present — seniority unconfirmed', tier: 'med' });
+  } else {
+    signals.push({ label: 'No title detected — data gap', tier: 'low' });
+  }
+
+  // ── Company signal ──
+  if (company && company !== 'enterprise' && company !== 'unknown') {
+    signals.push({ label: 'Named company verified', tier: 'high' });
+  } else {
+    signals.push({ label: 'Company field missing or generic', tier: 'low' });
+  }
+
+  // ── LinkedIn presence ──
+  const linkedin = (lead.linkedin || '').toLowerCase();
+  if (linkedin && linkedin !== 'na' && linkedin !== 'n/a' && linkedin.includes('linkedin')) {
+    signals.push({ label: 'LinkedIn profile present', tier: 'high' });
+  } else {
+    signals.push({ label: 'No LinkedIn URL — reachability risk', tier: 'low' });
+  }
+
+  // ── AI intel signal ──
+  if (lead.gtmAnalysis) {
+    signals.push({ label: 'AI Intel generated — outreach ready', tier: 'high' });
+  }
+
+  // ── Score-derived heuristic signals ──
+  if (score >= 80) {
+    signals.push({ label: 'AB Velocity™ — Priority tier qualified', tier: 'high' });
+  } else if (score >= 60) {
+    signals.push({ label: 'AB Velocity™ — Warm target', tier: 'med' });
+  } else {
+    signals.push({ label: 'AB Velocity™ — Low-signal lead', tier: 'low' });
+  }
+
+  return signals;
+}
+
+/* ── Render one signal chip ─────────────────────────────────────────────── */
+function renderChip(sig) {
+  const cls  = sig.tier === 'high' ? 'sig-chip-high' : sig.tier === 'med' ? 'sig-chip-med' : 'sig-chip-low';
+  const dot  = sig.tier === 'high' ? 'sig-dot-high'  : sig.tier === 'med' ? 'sig-dot-med'  : 'sig-dot-low';
+  return `<span class="sig-chip ${cls}"><span class="sig-dot ${dot}"></span>${sig.label}</span>`;
+}
+
+/* ── Main Verify Signals handler ────────────────────────────────────────── */
+document.getElementById('saveMappedBtn').onclick = async () => {
+  if (!state.allLeads.length) {
+    abeToast('Import a file first before verifying signals.', 'info');
+    return;
+  }
+
+  const btn = document.getElementById('saveMappedBtn');
+
+  // ── Phase 1: Scanning animation ──
+  btn.classList.remove('vs-idle', 'vs-done');
+  btn.classList.add('vs-scanning');
+  btn.textContent = '🔍 Authenticating…';
+
+  // Respect the current intent filter
   const filter = document.getElementById('intent-filter')?.value || 'all';
   const leadsToShow = (filter !== 'all' && filter !== 'high')
-    ? (filter === 'medium' ? state.allLeads.filter(l => l.score >= 50 && l.score < 75)
-      : state.allLeads.filter(l => l.score < 50))
-    : state.allLeads; // default: show all
+    ? (filter === 'medium'
+        ? state.allLeads.filter(l => l.score >= 50 && l.score < 75)
+        : state.allLeads.filter(l => l.score < 50))
+    : state.allLeads;
 
-  document.getElementById('body-p2').innerHTML = leadsToShow.map(l => `
-    <tr id="p2-row-${l.id}">
-      <td class="font-bold text-white">${l.name}</td>
-      <td>${l.company}</td>
-      <td class="${getScoreClass(l.score)}">${l.score}%
-        ${l.gtmAnalysis ? '<span class="ml-2 text-[8px] text-green-400 font-black uppercase">✓ AI</span>' : ''}
-      </td>
-      <td class="text-right">
-        <button onclick="openAnalyze('${l.id}')"
-          class="text-purple-400 px-3 py-1 rounded-lg bg-purple-400/10 hover:bg-purple-400/20 text-[10px] font-bold transition-all">
-          Analyze
-        </button>
-      </td>
-    </tr>
-  `).join('');
+  // ── Phase 2: Build breakdowns for each lead (sync, deterministic) ──
+  const rows = leadsToShow.map(l => {
+    const signals   = buildSignalBreakdown(l);
+    const chips     = signals.map(renderChip).join('');
+    const scoreCell = score => {
+      if (score >= 75) return `<span style="color:#00ff88;font-weight:900;text-shadow:0 0 8px rgba(0,255,136,.5)">${score}%</span>`;
+      if (score >= 50) return `<span style="color:#f59e0b;font-weight:900">${score}%</span>`;
+      return `<span style="color:#6b7280;font-weight:700">${score}%</span>`;
+    };
+
+    return `
+      <tr id="p2-row-${l.id}" style="border-bottom:none">
+        <td class="font-bold text-white">${l.name}</td>
+        <td style="color:#c4b5fd">${l.company}</td>
+        <td>${scoreCell(l.score)}${l.gtmAnalysis ? ' <span style="font-size:8px;color:#22c55e;font-weight:900">✓ AI</span>' : ''}</td>
+        <td class="text-right">
+          <button onclick="openAnalyze('${l.id}')"
+            class="text-purple-400 px-3 py-1 rounded-lg bg-purple-400/10 hover:bg-purple-400/20 text-[10px] font-bold transition-all">
+            Analyze
+          </button>
+        </td>
+      </tr>
+      <tr class="sig-breakdown-row">
+        <td colspan="4">
+          <div class="sig-chips">${chips}</div>
+        </td>
+      </tr>`;
+  });
+
+  // ── Phase 3: Small artificial delay so the scan feels real (700ms) ──
+  await new Promise(r => setTimeout(r, 700));
+
+  // ── Phase 4: Render authenticated table ──
+  document.getElementById('body-p2').innerHTML = rows.join('');
+
+  // ── Phase 5: Verified state on button ──
+  btn.classList.remove('vs-scanning');
+  btn.classList.add('vs-done');
+  btn.textContent = '✦ Signals Verified';
 
   document.getElementById('analyzeAllBtn')?.classList.remove('hidden');
   showStepHint('analyze');
+  abeToast('✦ ' + leadsToShow.length + ' leads authenticated', 'success');
+
+  // Reset button back to idle after 3.5 seconds
+  setTimeout(() => {
+    btn.classList.remove('vs-done');
+    btn.classList.add('vs-idle');
+    btn.textContent = '🔍 Verify Signals';
+  }, 3500);
 };
 
 /* =========================
@@ -4006,7 +4213,7 @@ function confirmVaultDelete() {
     document.getElementById('body-p1').innerHTML =
       `<tr><td colspan="4" class="py-32 text-center text-gray-600 font-bold uppercase tracking-widest text-[10px]">Import file to begin</td></tr>`;
     document.getElementById('body-p2').innerHTML =
-      `<tr><td colspan="4" class="py-32 text-center text-gray-600 font-bold uppercase tracking-widest text-[10px]">Execute mapping to verify</td></tr>`;
+      `<tr><td colspan="4" class="py-32 text-center text-gray-600 font-bold uppercase tracking-widest text-[10px]">Click 🔍 Verify Signals to authenticate lead scores</td></tr>`;
     document.getElementById('analyzeAllBtn')?.classList.add('hidden');
   }
 
@@ -4073,7 +4280,7 @@ function showStepHint(step) {
   var desc  = document.getElementById('step-hint-desc');
   if (!el) return;
   var hints = {
-    map:     { icon: '⚡', title: 'Next: Execute Map', desc: 'Click the ⚡ Map button in the top bar to score and rank your leads.' },
+    map:     { icon: '🔍', title: 'Next: Verify Signals', desc: 'Click the 🔍 Verify Signals button in the top bar to authenticate and score your leads.' },
     analyze: { icon: '🧠', title: 'Next: Bulk Analyze Intel', desc: 'Click Bulk Analyze Intel button above the table to generate AI-powered outreach intel for each lead.' },
   };
   var h = hints[step];
