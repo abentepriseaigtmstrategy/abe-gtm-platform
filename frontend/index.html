@@ -1,26 +1,26 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>ABE · Enterprise AI Revenue Infrastructure</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ABE · AI Revenue Infrastructure</title>
   <style>
-    body{background:#0B0F1A;color:#E5E7EB;font-family:Inter,sans-serif;
-      display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
-    a{color:#a855f7}
+    body{background:#050508;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
+    .spin{width:32px;height:32px;border:3px solid rgba(123,94,167,.2);border-top-color:#7B5EA7;
+      border-radius:50%;animation:sp .7s linear infinite}
+    @keyframes sp{to{transform:rotate(360deg)}}
   </style>
 </head>
 <body>
-  <p>Loading…</p>
+  <div class="spin"></div>
+  <!-- auth-guard checks session via /api/session and redirects accordingly -->
+  <script src="auth-guard.js"></script>
   <script>
-    const SUPABASE_URL      = 'https://cwcvneluhlimhlzowabv.supabase.co';
-    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3Y3ZuZWx1aGxpbWhsem93YWJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2MzAxMjAsImV4cCI6MjA4OTIwNjEyMH0.SZDS-svU-kFh_OkUq3AjQY64F-71MpbBsFd6Iin5DlQ';
-    const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-    (async () => {
-      const { data: { session } } = await sb.auth.getSession();
-      window.location.replace(session ? 'dashboard.html' : 'login.html');
-    })();
+    window.APP.getSession().then(function(s) {
+      window.location.replace(s ? '/dashboard.html' : '/login');
+    }).catch(function() {
+      window.location.replace('/login');
+    });
   </script>
 </body>
 </html>

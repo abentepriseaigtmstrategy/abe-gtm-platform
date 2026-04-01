@@ -2053,17 +2053,23 @@ async function callAPI(step, prompt, attempt = 0) {
       addLog('OK', step, `Received ${tokens.toLocaleString()} tokens`);
 
     } else {
-      // Proxy mode
-      const lead = { name: 'GTM', title: 'Strategy', company: state.company };
+      // Proxy mode — routes through /api/gtm (server-side OpenAI call)
       const token = await getAuthToken();
-      const res  = await fetch('/api/analyze', {
+      const res  = await fetch('/api/gtm', {
         method: 'POST',
         signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
-        body: JSON.stringify({ lead, customPrompt: prompt }),
+        body: JSON.stringify({
+          action:          'run_step',
+          step:            step,
+          company:         state.company,
+          industry:        state.industry || '',
+          prior_steps:     state.steps || {},
+          company_profile: state.companyProfile || null,
+        }),
       });
 
       if (!res.ok) {
@@ -2072,9 +2078,10 @@ async function callAPI(step, prompt, attempt = 0) {
       }
 
       const proxyData = await res.json();
-      rawText = JSON.stringify(proxyData);
-      tokens  = 1800; // proxy doesn't return token count
-      addLog('OK', step, `Proxy response received (~${tokens} tokens est.)`);
+      // /api/gtm returns { data: {...}, tokens: N, step: N }
+      rawText = JSON.stringify(proxyData.data || proxyData);
+      tokens  = proxyData.tokens || 1500;
+      addLog('OK', step, `Step ${step} complete (${tokens} tokens)`);
     }
 
     // ── Strict JSON parsing (Fix #1) ──
