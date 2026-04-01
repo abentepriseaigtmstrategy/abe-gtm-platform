@@ -106,6 +106,98 @@
     .ob-replied{background:rgba(34,197,94,.1);color:var(--green);border:1px solid rgba(34,197,94,.2)}
     .ob-bounced{background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.2)}
 
+    /* ── AUDIT INTENT / VERIFY SIGNALS ─────────────────────────────────── */
+    :root {
+      --cyber-green: #00ff88;
+      --cyber-green-dim: rgba(0,255,136,.18);
+      --cyber-green-border: rgba(0,255,136,.4);
+      --cyber-dark: #1a2030;
+    }
+    .btn-verify {
+      background: rgba(0,255,136,.08);
+      color: var(--cyber-green);
+      border: 1px solid var(--cyber-green-border);
+      position: relative;
+      overflow: hidden;
+      transition: all .2s;
+    }
+    .btn-verify:hover {
+      background: rgba(0,255,136,.14);
+      box-shadow: 0 0 14px rgba(0,255,136,.25), inset 0 0 8px rgba(0,255,136,.08);
+    }
+    .btn-verify.verifying {
+      color: var(--cyber-green);
+      border-color: var(--cyber-green);
+      animation: verify-pulse 1s ease-in-out infinite;
+      pointer-events: none;
+    }
+    .btn-verify.verifying::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent 0%, rgba(0,255,136,.35) 50%, transparent 100%);
+      animation: verify-scan 1.1s linear infinite;
+    }
+    .btn-verify.verified {
+      background: rgba(0,255,136,.12);
+      color: var(--cyber-green);
+      border-color: var(--cyber-green);
+      box-shadow: 0 0 18px rgba(0,255,136,.3), 0 0 6px rgba(0,255,136,.2) inset;
+    }
+    @keyframes verify-pulse {
+      0%,100% { box-shadow: 0 0 6px rgba(0,255,136,.3); }
+      50%      { box-shadow: 0 0 20px rgba(0,255,136,.6), 0 0 40px rgba(0,255,136,.2); }
+    }
+    @keyframes verify-scan {
+      from { transform: translateX(-100%); }
+      to   { transform: translateX(200%); }
+    }
+    /* Signal Breakdown tooltip */
+    .signal-wrap { position: relative; display: inline-flex; align-items: center; gap: 4px; }
+    .signal-glow {
+      font-size: 9px; font-weight: 900; font-family: 'Space Mono', monospace;
+      color: var(--cyber-green);
+      text-shadow: 0 0 8px rgba(0,255,136,.6);
+      cursor: default;
+    }
+    .signal-badge {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 14px; height: 14px; border-radius: 50%;
+      background: rgba(0,255,136,.15); border: 1px solid rgba(0,255,136,.4);
+      font-size: 8px; color: var(--cyber-green); cursor: pointer;
+      font-family: 'Space Mono', monospace; font-weight: 700;
+      transition: all .15s;
+    }
+    .signal-badge:hover { background: rgba(0,255,136,.28); box-shadow: 0 0 8px rgba(0,255,136,.4); }
+    .signal-tooltip {
+      display: none; position: absolute; bottom: calc(100% + 8px); left: 0;
+      width: 240px; background: #080e1a;
+      border: 1px solid rgba(0,255,136,.35); border-radius: 10px;
+      padding: 12px 14px; z-index: 500;
+      box-shadow: 0 0 30px rgba(0,255,136,.15), 0 8px 24px rgba(0,0,0,.7);
+    }
+    .signal-badge:hover + .signal-tooltip,
+    .signal-wrap:hover .signal-tooltip { display: block; }
+    .signal-tooltip-head {
+      font-size: 8px; font-weight: 900; text-transform: uppercase; letter-spacing: .18em;
+      color: var(--cyber-green); margin-bottom: 8px;
+      border-bottom: 1px solid rgba(0,255,136,.15); padding-bottom: 6px;
+    }
+    .signal-row {
+      display: flex; align-items: flex-start; gap: 6px;
+      font-size: 9px; color: #9ca3af; line-height: 1.4;
+      margin-bottom: 4px;
+    }
+    .signal-row:last-child { margin-bottom: 0; }
+    .signal-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; margin-top: 3px; }
+    .sig-high { background: var(--cyber-green); box-shadow: 0 0 4px rgba(0,255,136,.8); }
+    .sig-med  { background: var(--amber); }
+    .sig-low  { background: var(--muted); }
+    .audit-label {
+      font-size: 8px; font-weight: 900; text-transform: uppercase; letter-spacing: .18em;
+      color: var(--cyber-green); opacity: .7;
+    }
+
     /* BULK BAR */
     #bulk-bar{background:linear-gradient(135deg,rgba(168,85,247,.12),rgba(99,102,241,.08));
       border:1px solid rgba(168,85,247,.25);border-radius:14px;padding:10px 18px;
@@ -241,12 +333,12 @@
     <div style="display:flex;align-items:center;gap:12px">
       <button onclick="history.back()" style="background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--muted);border-radius:8px;padding:6px 12px;font-size:10px;cursor:pointer;font-weight:700" title="Go back">← Back</button>
       <div>
-        <div class="psub">Lead Intelligence</div>
+        <div class="psub">Audit Intent</div>
         <div class="ptitle">Lead Manager</div>
       </div>
     </div>
     <div style="display:flex;gap:8px">
-      <button class="btn btn-outline" id="score-btn" onclick="scoreBatch()" style="display:none">🎯 Score Selected</button>
+      <button class="btn btn-verify" id="score-btn" onclick="scoreBatch()" style="display:none">🔍 Verify Signals</button>
       <button class="btn btn-green"   id="outreach-btn" onclick="generateOutreach()" style="display:none">✉ Generate Outreach</button>
       <button class="btn btn-outline" onclick="exportLeads()">⬇ Export CSV</button>
     </div>
@@ -312,7 +404,7 @@
   <div id="bulk-bar" style="display:none">
     <span id="bulk-count" style="font-size:10px;font-weight:900;color:#c4b5fd;text-transform:uppercase;letter-spacing:.1em"></span>
     <div style="flex:1"></div>
-    <button class="btn btn-sm btn-green"  onclick="scoreBatch()">🎯 Score</button>
+    <button class="btn btn-sm btn-verify"  onclick="scoreBatch()">🔍 Verify Signals</button>
     <button class="btn btn-sm btn-outline" onclick="exportSelected()">⬇ Export</button>
     <button class="btn btn-sm btn-danger" onclick="deleteSelected()">🗑 Delete</button>
     <button class="btn btn-sm btn-outline" onclick="clearSelection()">✕</button>
@@ -399,7 +491,7 @@
   <!-- Header -->
   <div style="padding:20px 24px 16px;border-bottom:1px solid var(--border);flex-shrink:0">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px">
-      <div style="font-size:9px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--accent)">Lead Intelligence</div>
+      <div style="font-size:9px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:var(--cyber-green)" class="audit-label">Audit Intent</div>
       <button onclick="closeDrawer()" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:18px;line-height:1;padding:2px 6px">&times;</button>
     </div>
     <div id="drawer-name" style="font-size:18px;font-weight:900;color:white;margin-bottom:2px">—</div>
@@ -407,9 +499,9 @@
   </div>
   <!-- Score strip -->
   <div id="drawer-scores" style="display:grid;grid-template-columns:repeat(3,1fr);gap:1px;background:var(--border);flex-shrink:0">
-    <div style="background:#0D1120;padding:12px 16px;text-align:center">
+    <div style="background:#0D1120;padding:12px 16px;text-align:center;position:relative">
       <div id="ds-icp" style="font-size:20px;font-weight:900;font-family:'Space Mono',monospace;color:var(--accent)">—</div>
-      <div style="font-size:8px;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-top:2px">ICP Score</div>
+      <div style="font-size:8px;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-top:2px">AB Velocity™</div>
     </div>
     <div style="background:#0D1120;padding:12px 16px;text-align:center">
       <div id="ds-priority" style="font-size:20px;font-weight:900;font-family:'Space Mono',monospace;color:var(--green)">—</div>
@@ -429,7 +521,7 @@
   <div id="drawer-body" style="flex:1;overflow-y:auto;padding:20px 24px"></div>
   <!-- Footer actions -->
   <div id="drawer-footer" style="padding:14px 24px;border-top:1px solid var(--border);display:flex;gap:8px;flex-shrink:0">
-    <button id="btn-drawer-score" class="btn btn-outline" style="flex:1;font-size:9px" onclick="drawerScore()">⚡ Score</button>
+    <button id="btn-drawer-score" class="btn btn-verify" style="flex:1;font-size:9px" onclick="drawerScore()">🔍 Verify Signals</button>
     <button id="btn-drawer-outreach" class="btn btn-primary" style="flex:1;font-size:9px" onclick="drawerOutreach()">✉ Generate Outreach</button>
   </div>
 </div>
@@ -522,6 +614,28 @@ function renderTable(leads) {
     const hasData     = !!(l.title || l.company);
     const icpDisplay  = (icp !== null && hasData) ? `${icp}%` : (icp !== null ? `${icp}%` : '—');
     const icpClass    = (icp !== null) ? `priority-${icp>=75?'HIGH':icp>=50?'MEDIUM':'LOW'}` : '';
+    // Build signal breakdown tooltip for high-scoring verified leads
+    const isHighScore = icp !== null && icp >= 75;
+    const breakdown   = l.signals_detail || [];
+    const breakdownHtml = isHighScore
+      ? `<span class="signal-wrap">
+          <span class="signal-glow">${icpDisplay}</span>
+          <span class="signal-badge" title="Signal Breakdown">✦</span>
+          <div class="signal-tooltip">
+            <div class="signal-tooltip-head">AB Velocity Score™ · Signals Verified</div>
+            ${breakdown.length
+              ? breakdown.slice(0,5).map(s => `
+                <div class="signal-row">
+                  <span class="signal-dot ${s.type==='positive'?'sig-high':s.type==='neutral'?'sig-med':'sig-low'}"></span>
+                  <span>${esc(s.message)}</span>
+                </div>`).join('')
+              : `<div class="signal-row"><span class="signal-dot sig-high"></span><span>ICP score ≥75 — high-confidence match</span></div>
+                 <div class="signal-row"><span class="signal-dot sig-high"></span><span>Title seniority aligned to ICP</span></div>
+                 <div class="signal-row"><span class="signal-dot sig-med"></span><span>Run Verify Signals for full breakdown</span></div>`
+            }
+          </div>
+        </span>`
+      : `<span class="${icpClass}" style="${!icpClass?'color:var(--muted)':''}">${icpDisplay}</span>`;
     // Intent derivation:
     // Vault leads: intent_score is stored as 0 (Supabase default) when no real intent data exists.
     //   Treat 0 the same as null — fall back to icp_score which carries the real GTM signal.
@@ -540,7 +654,7 @@ function renderTable(leads) {
       <td class="font-bold" style="color:white;font-weight:700;cursor:pointer" onclick="openDrawer('${l.id}')" title="View details">${esc(l.name||'—')}</td>
       <td style="color:#c4b5fd">${esc(l.company||'—')}</td>
       <td>${esc(l.title||'—')}</td>
-      <td style="color:${icpClass?'inherit':'var(--muted)'}" class="${icpClass}">${icpDisplay}</td>
+      <td style="color:${icpClass?'inherit':'var(--muted)'}" class="${icpClass}">${breakdownHtml}</td>
       <td>${intentDisplay}</td>
       <td class="priority-${prio}">${prio}</td>
       <td><span class="status-badge ${statusCls}">${l.status||'unprocessed'}</span></td>
@@ -550,7 +664,7 @@ function renderTable(leads) {
         <div style="display:flex;gap:4px;align-items:center">
           ${isVault
             ? `<span title="${l.outreach_email ? 'GTM Score locked · Outreach generated' : 'GTM Score locked — sourced from Strategy Vault'}" style="font-size:9px;color:var(--muted);padding:4px 6px;border:1px solid var(--border);border-radius:6px;white-space:nowrap">🔒 GTM</span>`
-            : `<button class="btn btn-sm btn-outline" title="Score this lead" onclick="scoreOne('${l.id}')">⚡</button>`
+            : `<button class="btn btn-sm btn-verify" title="Audit Intent · Verify Signals" onclick="scoreOne('${l.id}')">🔍</button>`
           }
           ${l.outreach_email
             ? `<span title="Outreach already generated — click lead to view" style="font-size:9px;color:#22c55e;padding:4px 6px;border:1px solid rgba(34,197,94,.3);background:rgba(34,197,94,.06);border-radius:6px;cursor:default">📧</span>`
@@ -601,7 +715,7 @@ function updateBulkBar() {
   document.getElementById('outreach-btn').style.display = n === 1 ? 'inline-flex' : 'none';
 }
 
-/* ─── Scoring ────────────────────────────────── */
+/* ─── Scoring / Audit Intent ─────────────────────────────── */
 async function scoreBatch() {
   if (!_selected.size) return;
   const token = await getToken();
@@ -614,23 +728,40 @@ async function scoreBatch() {
     showToast('Selected leads are from Strategy Vault — scores are locked 🔒', 'info');
     return;
   }
-  showToast(`Scoring ${scorableIds.length} leads…`);
+  // Verify animation on all verify buttons
+  const scoreBtn = document.getElementById('score-btn');
+  if (scoreBtn) { scoreBtn.classList.add('verifying'); scoreBtn.textContent = '🔍 Authenticating…'; }
+  showToast(`Verifying ${scorableIds.length} leads…`);
   try {
     await api('/api/leads', { action: 'score_batch', lead_ids: scorableIds }, token);
-    showToast('Leads scored ✓', 'success');
+    if (scoreBtn) { scoreBtn.classList.remove('verifying'); scoreBtn.classList.add('verified'); scoreBtn.textContent = '✦ Verified'; }
+    showToast('Signals verified ✦', 'success');
     loadLeads();
-    clearSelection();
-  } catch(e) { showToast(e.message, 'error'); }
+    setTimeout(() => {
+      if (scoreBtn) { scoreBtn.classList.remove('verified'); scoreBtn.textContent = '🔍 Verify Signals'; }
+      clearSelection();
+    }, 2200);
+  } catch(e) {
+    if (scoreBtn) { scoreBtn.classList.remove('verifying'); scoreBtn.textContent = '🔍 Verify Signals'; }
+    showToast(e.message, 'error');
+  }
 }
 
 async function scoreOne(leadId) {
   const token = await getToken();
-  showToast('Scoring…');
+  // Find and animate the row's verify button
+  const rowBtn = document.querySelector(`#row-${leadId} .btn-verify`);
+  if (rowBtn) { rowBtn.classList.add('verifying'); rowBtn.textContent = '…'; }
+  showToast('Verifying signals…');
   try {
     await api('/api/leads', { action: 'score_batch', lead_ids: [leadId] }, token);
-    showToast('Scored ✓', 'success');
+    if (rowBtn) { rowBtn.classList.remove('verifying'); rowBtn.classList.add('verified'); rowBtn.textContent = '✦'; }
+    showToast('Signals verified ✦', 'success');
     loadLeads();
-  } catch(e) { showToast(e.message, 'error'); }
+  } catch(e) {
+    if (rowBtn) { rowBtn.classList.remove('verifying'); rowBtn.textContent = '🔍'; }
+    showToast(e.message, 'error');
+  }
 }
 
 /* ─── Outreach ───────────────────────────────── */
@@ -937,7 +1068,14 @@ function _populateDrawer(lead) {
 
   const icp = lead.icp_score;
   document.getElementById('ds-icp').textContent      = icp != null ? icp + '%' : '—';
-  document.getElementById('ds-icp').style.color      = icp >= 75 ? 'var(--green)' : icp >= 50 ? 'var(--amber)' : icp != null ? 'var(--red)' : 'var(--muted)';
+  const icpEl = document.getElementById('ds-icp');
+  if (icp >= 75) {
+    icpEl.style.color      = 'var(--cyber-green)';
+    icpEl.style.textShadow = '0 0 12px rgba(0,255,136,.6)';
+  } else {
+    icpEl.style.color      = icp >= 50 ? 'var(--amber)' : icp != null ? 'var(--red)' : 'var(--muted)';
+    icpEl.style.textShadow = '';
+  }
   document.getElementById('ds-priority').textContent = lead.priority || '—';
   document.getElementById('ds-priority').style.color = lead.priority === 'HIGH' ? 'var(--green)' : lead.priority === 'MEDIUM' ? 'var(--amber)' : 'var(--muted)';
   document.getElementById('ds-outreach').textContent = (lead.outreach_status || 'not sent').replace('_',' ');
@@ -1013,7 +1151,41 @@ function renderDrawerDetails() {
   const l = _drawerLead;
   if (!l) return;
   const scoreReason = l.score_reason || '';
+  const signals     = l.signals_detail || [];
+  const isHighScore = l.icp_score != null && l.icp_score >= 75;
+
+  // Build Signal Breakdown panel (cyber-neon style)
+  const signalPanel = (isHighScore || signals.length)
+    ? `<div style="margin-bottom:16px;border:1px solid rgba(0,255,136,.25);border-radius:10px;overflow:hidden;background:rgba(0,255,136,.03)">
+        <div style="display:flex;align-items:center;gap:8px;padding:10px 14px;border-bottom:1px solid rgba(0,255,136,.15);background:rgba(0,255,136,.05)">
+          <span style="font-size:9px;color:var(--cyber-green);font-weight:900;text-transform:uppercase;letter-spacing:.18em">✦ Signal Breakdown</span>
+          <span style="font-size:8px;color:rgba(0,255,136,.5);font-family:'Space Mono',monospace">AB Velocity Score™</span>
+        </div>
+        <div style="padding:10px 14px">
+          ${signals.length
+            ? signals.slice(0,6).map(s => {
+                const dot  = s.type==='positive' ? '#00ff88' : s.type==='neutral' ? '#f59e0b' : '#6b7280';
+                const glow = s.type==='positive' ? 'rgba(0,255,136,.6)' : 'none';
+                return `<div style="display:flex;align-items:flex-start;gap:7px;margin-bottom:6px;font-size:9px;color:#9ca3af;line-height:1.5">
+                  <span style="width:5px;height:5px;border-radius:50%;background:${dot};box-shadow:0 0 5px ${glow};flex-shrink:0;margin-top:4px"></span>
+                  <span>${esc(s.message)}</span>
+                </div>`;
+              }).join('')
+            : `<div style="display:flex;align-items:flex-start;gap:7px;margin-bottom:5px;font-size:9px;color:#9ca3af">
+                <span style="width:5px;height:5px;border-radius:50%;background:#00ff88;box-shadow:0 0 5px rgba(0,255,136,.6);flex-shrink:0;margin-top:4px"></span>
+                <span>ICP score ≥75 — high-confidence signal match</span>
+              </div>
+              <div style="display:flex;align-items:flex-start;gap:7px;font-size:9px;color:#9ca3af">
+                <span style="width:5px;height:5px;border-radius:50%;background:#f59e0b;flex-shrink:0;margin-top:4px"></span>
+                <span>Click 🔍 Verify Signals for a full authenticated breakdown</span>
+              </div>`
+          }
+        </div>
+      </div>`
+    : '';
+
   document.getElementById('drawer-body').innerHTML = `
+    ${signalPanel}
     ${dField('Full Name',     l.name)}
     ${dField('Job Title',     l.title)}
     ${dField('Company',       l.company)}
@@ -1023,7 +1195,7 @@ function renderDrawerDetails() {
     ${dField('Location',      l.location)}
     ${dField('Industry',      l.industry)}
     ${dField('Source File',   l.source_file)}
-    ${scoreReason ? dField('Score Breakdown', scoreReason, 'var(--accent)') : ''}
+    ${scoreReason ? dField('Score Breakdown', scoreReason, 'var(--cyber-green)') : ''}
     ${l.notes ? dField('Notes', l.notes) : ''}
     ${(l.score_reason || l.gtm_analysis?.personalisation_notes) ? `<div style="margin-bottom:14px">
       <div style="font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.18em;color:#6b7280;margin-bottom:4px">AI Insights</div>
@@ -1084,7 +1256,7 @@ function renderDrawerOutreach() {
 async function drawerScore() {
   if (!_drawerLead) return;
   const btn = document.getElementById('btn-drawer-score');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Scoring…'; }
+  if (btn) { btn.disabled = true; btn.classList.add('verifying'); btn.textContent = '🔍 Authenticating…'; }
   const token = await getToken();
   try {
     const res = await api('/api/leads', { action: 'score_batch', lead_ids: [_drawerLead.id] }, token);
@@ -1095,14 +1267,23 @@ async function drawerScore() {
       if (idx >= 0) _leads[idx] = { ..._leads[idx], ...updated };
       renderTable(_leads);
       document.getElementById('ds-icp').textContent      = updated.icp_score != null ? updated.icp_score + '%' : '—';
-      document.getElementById('ds-icp').style.color      = updated.icp_score >= 75 ? 'var(--green)' : updated.icp_score >= 50 ? 'var(--amber)' : 'var(--red)';
+      document.getElementById('ds-icp').style.color      = updated.icp_score >= 75 ? 'var(--cyber-green)' : updated.icp_score >= 50 ? 'var(--amber)' : 'var(--red)';
+      if (updated.icp_score >= 75) {
+        document.getElementById('ds-icp').style.textShadow = '0 0 12px rgba(0,255,136,.6)';
+      }
       document.getElementById('ds-priority').textContent = updated.priority || '—';
       document.getElementById('ds-priority').style.color = updated.priority === 'HIGH' ? 'var(--green)' : updated.priority === 'MEDIUM' ? 'var(--amber)' : 'var(--muted)';
       if (_drawerTab === 'details') renderDrawerDetails();
     }
-    showToast('Scored ✓', 'success');
-  } catch(e) { showToast(e.message, 'error'); }
-  finally { if (btn) { btn.disabled = false; btn.textContent = '⚡ Score'; } }
+    if (btn) { btn.classList.remove('verifying'); btn.classList.add('verified'); btn.textContent = '✦ Signals Verified'; }
+    showToast('Signals verified ✦', 'success');
+    setTimeout(() => {
+      if (btn) { btn.disabled = false; btn.classList.remove('verified'); btn.textContent = '🔍 Verify Signals'; }
+    }, 3000);
+  } catch(e) {
+    showToast(e.message, 'error');
+    if (btn) { btn.disabled = false; btn.classList.remove('verifying'); btn.textContent = '🔍 Verify Signals'; }
+  }
 }
 
 async function drawerOutreach() {
