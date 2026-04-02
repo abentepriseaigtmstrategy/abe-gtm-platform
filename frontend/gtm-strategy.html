@@ -1949,17 +1949,39 @@ Return this exact JSON structure:
 
     6: `${baseInstruction}
 
-Create hyper-personalised outreach messaging for targeting "${co}"${ind} and similar companies.
+You are generating outreach emails that will be used in CRM systems like HubSpot and Outreach.
+
+Create hyper-personalised outreach messaging for targeting companies in the "${co}" space${ind}.
 Use ALL context from previous steps to make this deeply relevant.
 
-CRITICAL PERSONALIZATION RULES:
-1. Use {prospect_name} for recipient's first name placeholder
-2. Use {prospect_title} for recipient's job title
-3. Use {prospect_company} for recipient's company name
-4. Use {sender_name} for sender name placeholder
-5. Replace all hardcoded company references with {prospect_company}
-6. Do NOT mention your client's company name - this is outreach TO prospects
-7. Make emails conversational, benefit-driven, and specific to their industry/role
+═══════════════════════════════════════════════════════════════════════════════
+🚨 CRITICAL - TOKEN FORMAT RULES (DO NOT IGNORE):
+═══════════════════════════════════════════════════════════════════════════════
+
+YOU MUST USE CURLY BRACES { } FOR ALL PERSONALIZATION TOKENS.
+
+✅ CORRECT FORMAT (REQUIRED):
+- {prospect_name} = recipient's first name
+- {prospect_company} = recipient's company name
+- {prospect_title} = recipient's job title
+- {sender_name} = sender's name
+
+❌ WRONG FORMAT (FORBIDDEN):
+- [Name] - DO NOT USE
+- [Company] - DO NOT USE
+- [Your Name] - DO NOT USE
+- [recipient's name] - DO NOT USE
+- [Recipient's Industry] - DO NOT USE
+Any square brackets [ ] are WRONG. Use curly braces { } instead.
+
+EXAMPLE EMAIL BODY (CORRECT):
+"Hi {prospect_name}, I noticed {prospect_company} is expanding. As a {prospect_title}, you're likely... Best, {sender_name}"
+
+EXAMPLE EMAIL BODY (WRONG):
+"Hi [Name], I noticed [Company] is expanding. As a [Title]... Best, [Your Name]"
+The WRONG example above should NEVER appear in your output.
+
+═══════════════════════════════════════════════════════════════════════════════
 
 Context from ALL Steps 1-5:
 ${ctx}
@@ -1968,24 +1990,32 @@ Return this exact JSON structure:
 {
   "email_1": {
     "angle": "Pain-led angle name",
-    "subject": "Email subject line (under 50 chars) - NO personalization tokens",
-    "body": "Full email body using {prospect_name}, {prospect_title}, {prospect_company} tokens. 3-4 short paragraphs, conversational, no buzzwords. Start with specific pain point.",
+    "subject": "Email subject line (under 50 chars) - NO tokens in subject",
+    "body": "Full email body. MUST USE TOKENS: Start with 'Hi {prospect_name},' then mention {prospect_company} and {prospect_title}. 3-4 short paragraphs, conversational, no buzzwords. Specific pain point. End with 'Best, {sender_name}'",
     "cta": "Clear, specific CTA focused on value"
   },
   "email_2": {
     "angle": "ROI/outcome-led angle name",
-    "subject": "Different subject line - NO personalization tokens",
-    "body": "Full email body with different angle, using {prospect_name}, {prospect_title}, {prospect_company} tokens. Focus on business outcome/ROI.",
+    "subject": "Different subject line - NO tokens in subject",
+    "body": "Full email body. MUST USE TOKENS: Start with 'Hi {prospect_name},' then focus on ROI for {prospect_company}. Mention {prospect_title}. 3-4 short paragraphs. End with 'Best, {sender_name}'",
     "cta": "Different CTA - ask for specific meeting/call"
   },
   "email_3": {
     "angle": "Social proof / FOMO angle",
-    "subject": "Third subject line - NO personalization tokens",
-    "body": "Full email body using {prospect_name}, {prospect_title}, {prospect_company} tokens. Include social proof, case study hint, or urgency.",
+    "subject": "Third subject line - NO tokens in subject",
+    "body": "Full email body. MUST USE TOKENS: Start with 'Hi {prospect_name},' reference {prospect_company}, mention {prospect_title}. Include social proof, case study hint, or urgency. 3-4 short paragraphs. End with 'Best, {sender_name}'",
     "cta": "CTA with proof point or limited-time element"
   },
-  "follow_up_sequence": "Day 3: Resend original email. Day 7: New angle (problem they may face). Day 14: Case study reference. Day 21: Final value-add before pause."
-}`,
+  "follow_up_sequence": "Day 3: Resend original email. Day 7: New angle email. Day 14: Case study reference. Day 21: Final value-add."
+}
+
+CRITICAL REMINDERS:
+- Every email body MUST include {prospect_name}, {prospect_company}, {prospect_title}, and {sender_name}
+- NEVER use square brackets [ ]
+- ALWAYS use curly braces { }
+- Subjects should NOT have tokens (just write the subject line)
+- Email bodies MUST have tokens
+- This is for CRM integration - tokens MUST be in curly braces`,
   };
 
   return prompts[step];
