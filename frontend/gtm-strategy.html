@@ -1952,6 +1952,15 @@ Return this exact JSON structure:
 Create hyper-personalised outreach messaging for targeting "${co}"${ind} and similar companies.
 Use ALL context from previous steps to make this deeply relevant.
 
+CRITICAL PERSONALIZATION RULES:
+1. Use {prospect_name} for recipient's first name placeholder
+2. Use {prospect_title} for recipient's job title
+3. Use {prospect_company} for recipient's company name
+4. Use {sender_name} for sender name placeholder
+5. Replace all hardcoded company references with {prospect_company}
+6. Do NOT mention your client's company name - this is outreach TO prospects
+7. Make emails conversational, benefit-driven, and specific to their industry/role
+
 Context from ALL Steps 1-5:
 ${ctx}
 
@@ -1959,23 +1968,23 @@ Return this exact JSON structure:
 {
   "email_1": {
     "angle": "Pain-led angle name",
-    "subject": "Email subject line (under 50 chars)",
-    "body": "Full email body (3-4 short paragraphs, conversational, no buzzwords)",
-    "cta": "Clear, specific CTA"
+    "subject": "Email subject line (under 50 chars) - NO personalization tokens",
+    "body": "Full email body using {prospect_name}, {prospect_title}, {prospect_company} tokens. 3-4 short paragraphs, conversational, no buzzwords. Start with specific pain point.",
+    "cta": "Clear, specific CTA focused on value"
   },
   "email_2": {
     "angle": "ROI/outcome-led angle name",
-    "subject": "Different subject line",
-    "body": "Full email body with different angle",
-    "cta": "Different CTA"
+    "subject": "Different subject line - NO personalization tokens",
+    "body": "Full email body with different angle, using {prospect_name}, {prospect_title}, {prospect_company} tokens. Focus on business outcome/ROI.",
+    "cta": "Different CTA - ask for specific meeting/call"
   },
   "email_3": {
     "angle": "Social proof / FOMO angle",
-    "subject": "Third subject line",
-    "body": "Full email body",
-    "cta": "CTA focused on urgency or proof"
+    "subject": "Third subject line - NO personalization tokens",
+    "body": "Full email body using {prospect_name}, {prospect_title}, {prospect_company} tokens. Include social proof, case study hint, or urgency.",
+    "cta": "CTA with proof point or limited-time element"
   },
-  "follow_up_sequence": "Day 3: [action]. Day 7: [action]. Day 14: [action]. Day 21: [action]."
+  "follow_up_sequence": "Day 3: Resend original email. Day 7: New angle (problem they may face). Day 14: Case study reference. Day 21: Final value-add before pause."
 }`,
   };
 
@@ -2351,6 +2360,29 @@ function renderStep6(d) {
     { key: 'email_3', label: 'Email Variant C', colorClass: 'tag-blue' },
   ];
 
+  // Add personalization guide
+  const guide = document.createElement('div');
+  guide.className = 'email-guide';
+  guide.style.cssText = `
+    background: linear-gradient(135deg, var(--accent-light) 0%, rgba(255,255,255,0.5) 100%);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 16px;
+    font-size: 12px;
+    line-height: 1.5;
+  `;
+  guide.innerHTML = `
+    <div style="font-weight:600;margin-bottom:8px;color:var(--text);">📝 Personalization Tokens (Replace in your CRM/mail tool):</div>
+    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;color:var(--muted);">
+      <div><code style="background:var(--bg-secondary);padding:2px 6px;border-radius:3px;">{prospect_name}</code> = Prospect's first name</div>
+      <div><code style="background:var(--bg-secondary);padding:2px 6px;border-radius:3px;">{prospect_title}</code> = Their job title</div>
+      <div><code style="background:var(--bg-secondary);padding:2px 6px;border-radius:3px;">{prospect_company}</code> = Their company name</div>
+      <div><code style="background:var(--bg-secondary);padding:2px 6px;border-radius:3px;">{sender_name}</code> = Your name</div>
+    </div>
+  `;
+  container.appendChild(guide);
+
   emails.forEach(({ key, label, colorClass }) => {
     const email = d[key];
     if (!email) return;
@@ -2365,7 +2397,7 @@ function renderStep6(d) {
         <button class="btn btn-outline btn-sm" onclick="copyEmail(this)" style="font-size:8px;padding:4px 10px;">Copy</button>
       </div>
       <div class="email-subject">Subject: ${escHtml(email.subject || '—')}</div>
-      <div class="email-body">${escHtml(email.body || '—')}</div>
+      <div class="email-body">${escHtml(email.body || '—').replace(/\{prospect_name\}/g, '<span style="background:var(--accent-light);padding:2px 4px;border-radius:2px;font-weight:600;">{prospect_name}</span>').replace(/\{prospect_title\}/g, '<span style="background:var(--accent-light);padding:2px 4px;border-radius:2px;font-weight:600;">{prospect_title}</span>').replace(/\{prospect_company\}/g, '<span style="background:var(--accent-light);padding:2px 4px;border-radius:2px;font-weight:600;">{prospect_company}</span>').replace(/\{sender_name\}/g, '<span style="background:var(--accent-light);padding:2px 4px;border-radius:2px;font-weight:600;">{sender_name}</span>')}</div>
       <div class="email-cta">→ CTA: ${escHtml(email.cta || '—')}</div>
     `;
     container.appendChild(block);
