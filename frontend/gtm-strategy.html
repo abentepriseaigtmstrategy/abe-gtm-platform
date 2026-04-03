@@ -1949,73 +1949,93 @@ Return this exact JSON structure:
 
     6: `${baseInstruction}
 
-You are generating outreach emails that will be used in CRM systems like HubSpot and Outreach.
-
-Create hyper-personalised outreach messaging for targeting companies in the "${co}" space${ind}.
-Use ALL context from previous steps to make this deeply relevant.
-
 ═══════════════════════════════════════════════════════════════════════════════
-🚨 CRITICAL - TOKEN FORMAT RULES (DO NOT IGNORE):
+🔥 GENERATE CRM-READY PERSONALIZATION TOKENS FOR OUTREACH EMAILS
 ═══════════════════════════════════════════════════════════════════════════════
 
-YOU MUST USE CURLY BRACES { } FOR ALL PERSONALIZATION TOKENS.
+You are an expert B2B outreach email copywriter. Your job is to create 3 email 
+variations that use CRM personalization tokens. These emails will be sent through 
+HubSpot, Outreach, or Apollo.
 
-✅ CORRECT FORMAT (REQUIRED):
-- {prospect_name} = recipient's first name
-- {prospect_company} = recipient's company name
-- {prospect_title} = recipient's job title
-- {sender_name} = sender's name
+TARGET: Create outreach messaging for "${co}"${ind} and similar companies.
 
-❌ WRONG FORMAT (FORBIDDEN):
-- [Name] - DO NOT USE
-- [Company] - DO NOT USE
-- [Your Name] - DO NOT USE
-- [recipient's name] - DO NOT USE
-- [Recipient's Industry] - DO NOT USE
-Any square brackets [ ] are WRONG. Use curly braces { } instead.
-
-EXAMPLE EMAIL BODY (CORRECT):
-"Hi {prospect_name}, I noticed {prospect_company} is expanding. As a {prospect_title}, you're likely... Best, {sender_name}"
-
-EXAMPLE EMAIL BODY (WRONG):
-"Hi [Name], I noticed [Company] is expanding. As a [Title]... Best, [Your Name]"
-The WRONG example above should NEVER appear in your output.
-
-═══════════════════════════════════════════════════════════════════════════════
-
-Context from ALL Steps 1-5:
+USE CONTEXT FROM ALL STEPS 1-5:
 ${ctx}
 
-Return this exact JSON structure:
+═══════════════════════════════════════════════════════════════════════════════
+🚨 CRITICAL TOKEN RULES (FOLLOW EXACTLY):
+═══════════════════════════════════════════════════════════════════════════════
+
+YOU MUST USE THESE EXACT TOKENS IN CURLY BRACES:
+  {prospect_name}     = First name of the recipient
+  {prospect_company}  = Name of their company
+  {prospect_title}    = Their job title
+  {sender_name}       = Name of the person sending email
+
+REQUIRED: Every email body MUST include ALL 4 TOKENS.
+REQUIRED: Use CURLY BRACES { } not square brackets [ ]
+
+✅ CORRECT EXAMPLE:
+"Hi {prospect_name}, I noticed {prospect_company} is expanding in this space. 
+As a {prospect_title}, you probably see this opportunity. Let's talk about it. 
+Best, {sender_name}"
+
+❌ WRONG EXAMPLES (NEVER DO THIS):
+- "Hi [Name]" - DO NOT USE SQUARE BRACKETS
+- "Hi [recipient's name]" - WRONG FORMAT
+- "Best [Your Name]" - DO NOT USE
+- "Dear [prospect]" - DO NOT USE
+- "At [Company Name]" - DO NOT USE
+
+USE TOKENS OR NOTHING.
+
+═══════════════════════════════════════════════════════════════════════════════
+RESPONSE FORMAT - Return this EXACT JSON:
+═══════════════════════════════════════════════════════════════════════════════
+
 {
   "email_1": {
     "angle": "Pain-led angle name",
-    "subject": "Email subject line (under 50 chars) - NO tokens in subject",
-    "body": "Full email body. MUST USE TOKENS: Start with 'Hi {prospect_name},' then mention {prospect_company} and {prospect_title}. 3-4 short paragraphs, conversational, no buzzwords. Specific pain point. End with 'Best, {sender_name}'",
-    "cta": "Clear, specific CTA focused on value"
+    "subject": "Subject line without tokens (max 50 chars)",
+    "body": "Start with Hi {prospect_name}, then reference {prospect_company} and {prospect_title}. Write 3-4 paragraphs. Focus on their pain point. End with Best, {sender_name}",
+    "cta": "Clear, specific call-to-action"
   },
   "email_2": {
     "angle": "ROI/outcome-led angle name",
-    "subject": "Different subject line - NO tokens in subject",
-    "body": "Full email body. MUST USE TOKENS: Start with 'Hi {prospect_name},' then focus on ROI for {prospect_company}. Mention {prospect_title}. 3-4 short paragraphs. End with 'Best, {sender_name}'",
-    "cta": "Different CTA - ask for specific meeting/call"
+    "subject": "Different subject line without tokens (max 50 chars)",
+    "body": "Start with Hi {prospect_name}, mention ROI for {prospect_company}, address {prospect_title} specifically. 3-4 paragraphs. End with Best, {sender_name}",
+    "cta": "Different call-to-action"
   },
   "email_3": {
     "angle": "Social proof / FOMO angle",
-    "subject": "Third subject line - NO tokens in subject",
-    "body": "Full email body. MUST USE TOKENS: Start with 'Hi {prospect_name},' reference {prospect_company}, mention {prospect_title}. Include social proof, case study hint, or urgency. 3-4 short paragraphs. End with 'Best, {sender_name}'",
-    "cta": "CTA with proof point or limited-time element"
+    "subject": "Third subject line without tokens (max 50 chars)",
+    "body": "Start with Hi {prospect_name}, reference {prospect_company} success, focus on {prospect_title} opportunities. Include social proof or urgency. End with Best, {sender_name}",
+    "cta": "Call-to-action with proof or urgency"
   },
-  "follow_up_sequence": "Day 3: Resend original email. Day 7: New angle email. Day 14: Case study reference. Day 21: Final value-add."
+  "follow_up_sequence": "Day 3: Resend original email to {prospect_name}. Day 7: New angle email. Day 14: Send case study to {prospect_title}. Day 21: Final outreach before pause.",
+  "token_checklist": {
+    "email_1_has_all_tokens": true,
+    "email_2_has_all_tokens": true,
+    "email_3_has_all_tokens": true,
+    "no_square_brackets": true,
+    "all_curly_braces": true
+  }
 }
 
-CRITICAL REMINDERS:
-- Every email body MUST include {prospect_name}, {prospect_company}, {prospect_title}, and {sender_name}
-- NEVER use square brackets [ ]
-- ALWAYS use curly braces { }
-- Subjects should NOT have tokens (just write the subject line)
-- Email bodies MUST have tokens
-- This is for CRM integration - tokens MUST be in curly braces`,
+IMPORTANT CHECKLIST BEFORE RETURNING:
+✅ Email 1 body contains: {prospect_name}, {prospect_company}, {prospect_title}, {sender_name}
+✅ Email 2 body contains: {prospect_name}, {prospect_company}, {prospect_title}, {sender_name}
+✅ Email 3 body contains: {prospect_name}, {prospect_company}, {prospect_title}, {sender_name}
+✅ NO square brackets [ ] anywhere
+✅ ONLY curly braces { } for tokens
+✅ Subjects do NOT have tokens (just write the subject)
+✅ Each body is 3-4 paragraphs
+✅ Follow-up sequence mentions the tokens
+✅ The "token_checklist" is set to ALL TRUE
+
+If you cannot follow these rules, do not respond.
+If you cannot use ONLY curly braces and avoid square brackets, do not respond.
+Only respond with valid JSON that follows this exact format.`,
   };
 
   return prompts[step];
@@ -2384,56 +2404,190 @@ function renderStep6(d) {
   const container = document.getElementById('oc-messages-container');
   container.innerHTML = '';
 
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // 🚀 ENHANCEMENT #1: Token Visualization Guide
+  // ═══════════════════════════════════════════════════════════════════════════════
+  const guide = document.createElement('div');
+  guide.className = 'token-guide';
+  guide.style.cssText = `
+    background: linear-gradient(135deg, var(--accent-light) 0%, rgba(255,255,255,0.3) 100%);
+    border: 2px solid var(--accent);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 20px;
+    font-size: 13px;
+    line-height: 1.6;
+  `;
+  
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // 🚀 ENHANCEMENT #2: CRM Selector
+  // ═══════════════════════════════════════════════════════════════════════════════
+  const crmSelector = `
+    <div style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border);">
+      <label style="font-weight:600;margin-bottom:6px;display:block;color:var(--text);">📱 Convert for your CRM:</label>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;">
+        <button class="btn btn-sm" onclick="convertTokensForCRM('hubspot')" style="background:var(--accent-light);border:1px solid var(--accent);padding:6px 12px;border-radius:6px;font-size:11px;cursor:pointer;">HubSpot</button>
+        <button class="btn btn-sm" onclick="convertTokensForCRM('outreach')" style="background:var(--accent-light);border:1px solid var(--accent);padding:6px 12px;border-radius:6px;font-size:11px;cursor:pointer;">Outreach</button>
+        <button class="btn btn-sm" onclick="convertTokensForCRM('apollo')" style="background:var(--accent-light);border:1px solid var(--accent);padding:6px 12px;border-radius:6px;font-size:11px;cursor:pointer;">Apollo</button>
+        <button class="btn btn-sm" onclick="convertTokensForCRM('salesforce')" style="background:var(--accent-light);border:1px solid var(--accent);padding:6px 12px;border-radius:6px;font-size:11px;cursor:pointer;">Salesforce</button>
+      </div>
+    </div>
+  `;
+  
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // 🚀 ENHANCEMENT #3: Token Legend
+  // ═══════════════════════════════════════════════════════════════════════════════
+  const tokenLegend = `
+    <div style="margin-bottom: 12px;">
+      <div style="font-weight:600;margin-bottom:8px;color:var(--text);">📝 Personalization Tokens (Replace in your CRM):</div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;">
+        <div style="background:var(--bg-secondary);padding:8px;border-radius:6px;border-left:3px solid var(--accent);">
+          <code style="background:transparent;padding:0;font-weight:600;color:var(--accent);">{prospect_name}</code>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">Prospect first name</div>
+        </div>
+        <div style="background:var(--bg-secondary);padding:8px;border-radius:6px;border-left:3px solid var(--green);">
+          <code style="background:transparent;padding:0;font-weight:600;color:var(--green);">{prospect_company}</code>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">Their company name</div>
+        </div>
+        <div style="background:var(--bg-secondary);padding:8px;border-radius:6px;border-left:3px solid #fbbf24;">
+          <code style="background:transparent;padding:0;font-weight:600;color:#fbbf24;">{prospect_title}</code>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">Their job title</div>
+        </div>
+        <div style="background:var(--bg-secondary);padding:8px;border-radius:6px;border-left:3px solid #60a5fa;">
+          <code style="background:transparent;padding:0;font-weight:600;color:#60a5fa;">{sender_name}</code>
+          <div style="font-size:11px;color:var(--muted);margin-top:2px;">Your name</div>
+        </div>
+      </div>
+    </div>
+  `;
+  
+  guide.innerHTML = crmSelector + tokenLegend;
+  container.appendChild(guide);
+
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // 🚀 ENHANCEMENT #4: Email Cards with Token Highlighting
+  // ═══════════════════════════════════════════════════════════════════════════════
   const emails = [
     { key: 'email_1', label: 'Email Variant A', colorClass: 'tag-accent' },
     { key: 'email_2', label: 'Email Variant B', colorClass: 'tag-green' },
     { key: 'email_3', label: 'Email Variant C', colorClass: 'tag-blue' },
   ];
 
-  // Add personalization guide
-  const guide = document.createElement('div');
-  guide.className = 'email-guide';
-  guide.style.cssText = `
-    background: linear-gradient(135deg, var(--accent-light) 0%, rgba(255,255,255,0.5) 100%);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 12px;
-    margin-bottom: 16px;
-    font-size: 12px;
-    line-height: 1.5;
-  `;
-  guide.innerHTML = `
-    <div style="font-weight:600;margin-bottom:8px;color:var(--text);">📝 Personalization Tokens (Replace in your CRM/mail tool):</div>
-    <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;color:var(--muted);">
-      <div><code style="background:var(--bg-secondary);padding:2px 6px;border-radius:3px;">{prospect_name}</code> = Prospect's first name</div>
-      <div><code style="background:var(--bg-secondary);padding:2px 6px;border-radius:3px;">{prospect_title}</code> = Their job title</div>
-      <div><code style="background:var(--bg-secondary);padding:2px 6px;border-radius:3px;">{prospect_company}</code> = Their company name</div>
-      <div><code style="background:var(--bg-secondary);padding:2px 6px;border-radius:3px;">{sender_name}</code> = Your name</div>
-    </div>
-  `;
-  container.appendChild(guide);
-
   emails.forEach(({ key, label, colorClass }) => {
     const email = d[key];
     if (!email) return;
+    
+    // Highlight tokens in the body
+    const highlightedBody = escHtml(email.body || '—')
+      .replace(/\{prospect_name\}/g, '<span style="background:#fef3c7;padding:2px 6px;border-radius:3px;font-weight:600;color:#92400e;">{prospect_name}</span>')
+      .replace(/\{prospect_company\}/g, '<span style="background:#dcfce7;padding:2px 6px;border-radius:3px;font-weight:600;color:#166534;">{prospect_company}</span>')
+      .replace(/\{prospect_title\}/g, '<span style="background:#fce7f3;padding:2px 6px;border-radius:3px;font-weight:600;color:#be185d;">{prospect_title}</span>')
+      .replace(/\{sender_name\}/g, '<span style="background:#dbeafe;padding:2px 6px;border-radius:3px;font-weight:600;color:#1e40af;">{sender_name}</span>');
+    
     const block = document.createElement('div');
     block.className = 'email-block animate-in';
+    block.style.cssText = 'border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 16px;';
+    
     block.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
         <div style="display:flex;align-items:center;gap:8px;">
           <div class="tag ${colorClass}" style="padding:4px 10px;">${escHtml(label)}</div>
           <div style="font-size:10px;color:var(--muted);">${escHtml(email.angle || '')}</div>
         </div>
-        <button class="btn btn-outline btn-sm" onclick="copyEmail(this)" style="font-size:8px;padding:4px 10px;">Copy</button>
+        <div style="display:flex;gap:6px;">
+          <button class="btn btn-outline btn-sm" onclick="copyEmail(this)" style="font-size:8px;padding:4px 10px;">📋 Copy</button>
+          <button class="btn btn-outline btn-sm" onclick="copyAsHubSpot(this)" style="font-size:8px;padding:4px 10px;" title="Copy with HubSpot tokens">HS</button>
+        </div>
       </div>
-      <div class="email-subject">Subject: ${escHtml(email.subject || '—')}</div>
-      <div class="email-body">${escHtml(email.body || '—').replace(/\{prospect_name\}/g, '<span style="background:var(--accent-light);padding:2px 4px;border-radius:2px;font-weight:600;">{prospect_name}</span>').replace(/\{prospect_title\}/g, '<span style="background:var(--accent-light);padding:2px 4px;border-radius:2px;font-weight:600;">{prospect_title}</span>').replace(/\{prospect_company\}/g, '<span style="background:var(--accent-light);padding:2px 4px;border-radius:2px;font-weight:600;">{prospect_company}</span>').replace(/\{sender_name\}/g, '<span style="background:var(--accent-light);padding:2px 4px;border-radius:2px;font-weight:600;">{sender_name}</span>')}</div>
-      <div class="email-cta">→ CTA: ${escHtml(email.cta || '—')}</div>
+      <div class="email-subject" style="font-weight:600;margin-bottom:8px;color:var(--text);">Subject: ${escHtml(email.subject || '—')}</div>
+      <div class="email-body" style="line-height:1.6;color:var(--text);margin-bottom:12px;padding:12px;background:var(--bg-secondary);border-radius:6px;">${highlightedBody}</div>
+      <div class="email-cta" style="color:var(--accent);font-size:12px;">→ CTA: ${escHtml(email.cta || '—')}</div>
+      <div style="margin-top:8px;font-size:11px;color:var(--muted);">✅ Contains all required tokens: {prospect_name}, {prospect_company}, {prospect_title}, {sender_name}</div>
     `;
     container.appendChild(block);
   });
 
-  document.getElementById('oc-followup').innerHTML = escHtml(d.follow_up_sequence || '—').replace(/Day \d+:/g, m => `<strong style="color:var(--accent)">${m}</strong>`);
+  // ═══════════════════════════════════════════════════════════════════════════════
+  // 🚀 ENHANCEMENT #5: Follow-up Sequence with Better Formatting
+  // ═══════════════════════════════════════════════════════════════════════════════
+  const followupDiv = document.createElement('div');
+  followupDiv.style.cssText = 'background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:16px;margin-top:20px;';
+  followupDiv.innerHTML = `
+    <div style="font-weight:600;margin-bottom:12px;color:var(--text);">📅 Follow-up Sequence</div>
+    <div id="oc-followup" style="color:var(--text);line-height:1.8;">
+      ${escHtml(d.follow_up_sequence || '—').replace(/Day \d+:/g, m => `<div style="margin:8px 0;"><strong style="color:var(--accent)">${m}</strong>`)}
+    </div>
+  `;
+  container.appendChild(followupDiv);
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🚀 HELPER FUNCTION: Convert tokens for different CRM platforms
+// ═══════════════════════════════════════════════════════════════════════════════
+function convertTokensForCRM(crm) {
+  const emailBlocks = document.querySelectorAll('.email-body');
+  const tokenMappings = {
+    hubspot: {
+      '{prospect_name}': '{{contact.firstname}}',
+      '{prospect_company}': '{{contact.company}}',
+      '{prospect_title}': '{{contact.jobtitle}}',
+      '{sender_name}': '{{user.firstname}}'
+    },
+    outreach: {
+      '{prospect_name}': '{{firstName}}',
+      '{prospect_company}': '{{account}}',
+      '{prospect_title}': '{{title}}',
+      '{sender_name}': '{{userName}}'
+    },
+    apollo: {
+      '{prospect_name}': '{first_name}',
+      '{prospect_company}': '{company_name}',
+      '{prospect_title}': '{title}',
+      '{sender_name}': '{sender_name}'
+    },
+    salesforce: {
+      '{prospect_name}': '{!Contact.FirstName}',
+      '{prospect_company}': '{!Account.Name}',
+      '{prospect_title}': '{!Contact.Title}',
+      '{sender_name}': '{!$User.FirstName}'
+    }
+  };
+  
+  const mapping = tokenMappings[crm];
+  if (!mapping) return;
+  
+  emailBlocks.forEach(block => {
+    let text = block.innerText;
+    Object.entries(mapping).forEach(([oldToken, newToken]) => {
+      text = text.replace(new RegExp(oldToken, 'g'), newToken);
+    });
+    // Copy to clipboard
+    navigator.clipboard.writeText(text).then(() => {
+      showToast(`✅ Converted for ${crm.toUpperCase()}! Copy button ready.`, 'success');
+    });
+  });
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// 🚀 ENHANCED: Copy email with proper formatting
+// ═══════════════════════════════════════════════════════════════════════════════
+function copyAsHubSpot(btn) {
+  const block = btn.closest('.email-block');
+  const subject = block.querySelector('.email-subject')?.textContent || '';
+  const body = block.querySelector('.email-body')?.innerText || '';
+  const cta = block.querySelector('.email-cta')?.textContent || '';
+  
+  // Convert to HubSpot format
+  const hsBody = body
+    .replace(/{prospect_name}/g, '{{contact.firstname}}')
+    .replace(/{prospect_company}/g, '{{contact.company}}')
+    .replace(/{prospect_title}/g, '{{contact.jobtitle}}')
+    .replace(/{sender_name}/g, '{{user.firstname}}');
+  
+  navigator.clipboard.writeText(`${subject}\n\n${hsBody}\n\n${cta}`).then(() => {
+    btn.textContent = '✓ Copied (HS)';
+    setTimeout(() => btn.textContent = 'HS', 2000);
+  });
 }
 
 /* ═══════════════════════════════════════════
