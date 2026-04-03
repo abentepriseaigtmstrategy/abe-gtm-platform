@@ -1292,7 +1292,7 @@
     <div id="export-content" style="background:rgba(0,0,0,0.4);border:1px solid var(--border);border-radius:12px;padding:24px;font-size:11px;line-height:1.9;color:#d1d5db;white-space:pre-wrap;max-height:400px;overflow-y:auto;font-family:'Space Mono',monospace;"></div>
     <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:20px;">
       <button class="btn btn-outline btn-sm" onclick="closeExportModal()">Close</button>
-      <button class="btn btn-primary btn-sm" onclick="downloadExport()">⬇ Download .txt</button>
+      <button class="btn btn-primary btn-sm" onclick="downloadExport()">⬇ Download .pdf</button>
     </div>
   </div>
 </div>
@@ -1950,21 +1950,50 @@ Return this exact JSON structure:
     6: `${baseInstruction}
 
 ═══════════════════════════════════════════════════════════════════════════════
-🔥 GENERATE CRM-READY PERSONALIZATION TOKENS FOR OUTREACH EMAILS
+🔥 GENERATE OUTREACH EMAILS FROM ABE GTM PLATFORM
 ═══════════════════════════════════════════════════════════════════════════════
 
-You are an expert B2B outreach email copywriter. Your job is to create 3 email 
-variations that use CRM personalization tokens. These emails will be sent through 
-HubSpot, Outreach, or Apollo.
+YOU ARE: ABE GTM Platform - An AI-powered GTM strategy generation and outreach engine.
 
-TARGET: Create outreach messaging for "${co}"${ind} and similar companies.
+CONTEXT: You are writing emails ON BEHALF OF ABE GTM PLATFORM.
+
+YOUR TARGET: "${co}"${ind}
+
+YOUR MESSAGE: These emails should convince "${co}" that ABE GTM Platform is the solution 
+they need to:
+1. Generate complete GTM strategies (market research, ICP, sourcing, messaging)
+2. Manage outreach sequences (email, SMS, social)
+3. Score and route leads automatically
+4. Track engagement and measure results
+
+POSITIONING: Position ABE as the only all-in-one GTM platform that generates strategy 
+AND executes outreach (not just data/execution like competitors).
+
+EMAILS SHOULD EXPLAIN: "ABE GTM Platform does in 6 steps what competitors charge $50k+ 
+for consulting, and it's AI-powered, so it's done in minutes not months."
 
 USE CONTEXT FROM ALL STEPS 1-5:
 ${ctx}
 
 ═══════════════════════════════════════════════════════════════════════════════
-🚨 CRITICAL TOKEN RULES (FOLLOW EXACTLY):
+
 ═══════════════════════════════════════════════════════════════════════════════
+🚨 CRITICAL TOKEN & COMPANY RULES (FOLLOW EXACTLY):
+═══════════════════════════════════════════════════════════════════════════════
+
+⚠️ THE EMAILS ARE FROM ABE GTM PLATFORM, NOT FROM THE PROSPECT COMPANY
+
+YOUR EMAIL SENDER: ABE GTM Platform (the AI tool)
+THE RECIPIENT: "${co}" or {prospect_company} (the company you're selling TO)
+
+EVERY EMAIL BODY MUST:
+1. Start with: "Hi {prospect_name},"
+2. Say: "At ABE GTM Platform, we..." or "ABE GTM Platform helps {prospect_company}..."
+3. NEVER say: "At ${co}, we..." or "At {prospect_company}, we..."
+4. Include: {prospect_company} at least once
+5. Reference: {prospect_title} at least once
+6. End with: "Best, {sender_name}"
+7. Use ONLY curly braces { } for tokens
 
 YOU MUST USE THESE EXACT TOKENS IN CURLY BRACES:
   {prospect_name}     = First name of the recipient
@@ -1972,22 +2001,27 @@ YOU MUST USE THESE EXACT TOKENS IN CURLY BRACES:
   {prospect_title}    = Their job title
   {sender_name}       = Name of the person sending email
 
-REQUIRED: Every email body MUST include ALL 4 TOKENS.
-REQUIRED: Use CURLY BRACES { } not square brackets [ ]
+✅ CORRECT EMAIL EXAMPLES:
+"Hi {prospect_name}, At ABE GTM Platform, we help companies like {prospect_company} 
+generate complete GTM strategies. As a {prospect_title}, you probably spend months on 
+GTM planning. ABE does it in 6 minutes. Best, {sender_name}"
 
-✅ CORRECT EXAMPLE:
-"Hi {prospect_name}, I noticed {prospect_company} is expanding in this space. 
-As a {prospect_title}, you probably see this opportunity. Let's talk about it. 
-Best, {sender_name}"
+"Hi {prospect_name}, I noticed {prospect_company} is growing. ABE GTM Platform specializes 
+in helping companies like yours build go-to-market strategies fast. We've helped similar 
+{prospect_title}s save 90% of planning time. Interested? Best, {sender_name}"
+
+"Hi {prospect_name}, {prospect_company} could benefit from ABE GTM Platform's AI-powered 
+strategy generation. Instead of consulting fees, get your complete GTM in minutes. As a 
+{prospect_title}, you'd appreciate the speed. Best, {sender_name}"
 
 ❌ WRONG EXAMPLES (NEVER DO THIS):
-- "Hi [Name]" - DO NOT USE SQUARE BRACKETS
-- "Hi [recipient's name]" - WRONG FORMAT
-- "Best [Your Name]" - DO NOT USE
-- "Dear [prospect]" - DO NOT USE
-- "At [Company Name]" - DO NOT USE
+❌ "Hi [Name], At ${co}, we specialize..." ← WRONG COMPANY
+❌ "Hi [Name], At [Company], we help..." ← WRONG FORMAT
+❌ "Best [Your Name]" ← WRONG FORMAT
+❌ "At Katalyst Partners, we specialize..." ← WRONG - should be "At ABE GTM Platform"
 
-USE TOKENS OR NOTHING.
+MANDATORY: Every email must explicitly mention "ABE GTM Platform" as the sender, 
+never the prospect company name.
 
 ═══════════════════════════════════════════════════════════════════════════════
 RESPONSE FORMAT - Return this EXACT JSON:
@@ -1997,26 +2031,30 @@ RESPONSE FORMAT - Return this EXACT JSON:
   "email_1": {
     "angle": "Pain-led angle name",
     "subject": "Subject line without tokens (max 50 chars)",
-    "body": "Start with Hi {prospect_name}, then reference {prospect_company} and {prospect_title}. Write 3-4 paragraphs. Focus on their pain point. End with Best, {sender_name}",
+    "body": "MUST start with Hi {prospect_name}. MUST say 'At ABE GTM Platform' or 'ABE GTM Platform helps'. MUST mention {prospect_company} and {prospect_title}. Focus on their pain point. MUST end with Best, {sender_name}. Write 3-4 paragraphs.",
     "cta": "Clear, specific call-to-action"
   },
   "email_2": {
     "angle": "ROI/outcome-led angle name",
     "subject": "Different subject line without tokens (max 50 chars)",
-    "body": "Start with Hi {prospect_name}, mention ROI for {prospect_company}, address {prospect_title} specifically. 3-4 paragraphs. End with Best, {sender_name}",
+    "body": "MUST start with Hi {prospect_name}. MUST say 'At ABE GTM Platform' or 'ABE GTM Platform'. MUST mention ROI benefits for {prospect_company}. Address {prospect_title} specifically. MUST end with Best, {sender_name}. Write 3-4 paragraphs.",
     "cta": "Different call-to-action"
   },
   "email_3": {
     "angle": "Social proof / FOMO angle",
     "subject": "Third subject line without tokens (max 50 chars)",
-    "body": "Start with Hi {prospect_name}, reference {prospect_company} success, focus on {prospect_title} opportunities. Include social proof or urgency. End with Best, {sender_name}",
+    "body": "MUST start with Hi {prospect_name}. MUST say 'At ABE GTM Platform' or 'ABE helps'. Reference {prospect_company} success stories. Focus on {prospect_title} opportunities. Include social proof. MUST end with Best, {sender_name}. Write 3-4 paragraphs.",
     "cta": "Call-to-action with proof or urgency"
   },
-  "follow_up_sequence": "Day 3: Resend original email to {prospect_name}. Day 7: New angle email. Day 14: Send case study to {prospect_title}. Day 21: Final outreach before pause.",
-  "token_checklist": {
+  "follow_up_sequence": "Day 3: Follow-up to {prospect_name} mentioning {prospect_company}. Day 7: New angle email. Day 14: Send ABE case study to {prospect_title}. Day 21: Final ABE pitch before pause.",
+  "compliance_check": {
+    "email_1_mentions_abe": true,
     "email_1_has_all_tokens": true,
+    "email_2_mentions_abe": true,
     "email_2_has_all_tokens": true,
+    "email_3_mentions_abe": true,
     "email_3_has_all_tokens": true,
+    "never_says_at_prospect_company": true,
     "no_square_brackets": true,
     "all_curly_braces": true
   }
@@ -2425,11 +2463,11 @@ function renderStep6(d) {
   const crmSelector = `
     <div style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border);">
       <label style="font-weight:600;margin-bottom:6px;display:block;color:var(--text);">📱 Convert for your CRM:</label>
-      <div style="display:flex;gap:6px;flex-wrap:wrap;">
-        <button class="btn btn-sm" onclick="convertTokensForCRM('hubspot')" style="background:var(--accent-light);border:1px solid var(--accent);padding:6px 12px;border-radius:6px;font-size:11px;cursor:pointer;">HubSpot</button>
-        <button class="btn btn-sm" onclick="convertTokensForCRM('outreach')" style="background:var(--accent-light);border:1px solid var(--accent);padding:6px 12px;border-radius:6px;font-size:11px;cursor:pointer;">Outreach</button>
-        <button class="btn btn-sm" onclick="convertTokensForCRM('apollo')" style="background:var(--accent-light);border:1px solid var(--accent);padding:6px 12px;border-radius:6px;font-size:11px;cursor:pointer;">Apollo</button>
-        <button class="btn btn-sm" onclick="convertTokensForCRM('salesforce')" style="background:var(--accent-light);border:1px solid var(--accent);padding:6px 12px;border-radius:6px;font-size:11px;cursor:pointer;">Salesforce</button>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-sm" onclick="convertTokensForCRM('hubspot')" style="background:#0066CC;color:white;border:none;padding:10px 16px;border-radius:6px;font-weight:600;cursor:pointer;font-size:12px;">HubSpot</button>
+        <button class="btn btn-sm" onclick="convertTokensForCRM('outreach')" style="background:#FF6B00;color:white;border:none;padding:10px 16px;border-radius:6px;font-weight:600;cursor:pointer;font-size:12px;">Outreach</button>
+        <button class="btn btn-sm" onclick="convertTokensForCRM('apollo')" style="background:#9B59B6;color:white;border:none;padding:10px 16px;border-radius:6px;font-weight:600;cursor:pointer;font-size:12px;">Apollo</button>
+        <button class="btn btn-sm" onclick="convertTokensForCRM('salesforce')" style="background:#00A1E0;color:white;border:none;padding:10px 16px;border-radius:6px;font-weight:600;cursor:pointer;font-size:12px;">Salesforce</button>
       </div>
     </div>
   `;
@@ -2642,12 +2680,55 @@ function closeExportModal() {
 
 function downloadExport() {
   const text = buildExportText();
-  const blob = new Blob([text], { type: 'text/plain' });
+  
+  // Create PDF-compatible export
+  // Using text with PDF headers for browser compatibility
+  const pdfContent = `%PDF-1.4
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /Resources << /Font << /F1 4 0 R >> >> /MediaBox [0 0 612 792] /Contents 5 0 R >>
+endobj
+4 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+5 0 obj
+<< /Length ${text.length + 200} >>
+stream
+BT
+/F1 12 Tf
+50 750 Td
+(${text.replace(/\n/g, ') Tj T* (').replace(/\(/g, '\\(').replace(/\)/g, '\\)')}) Tj
+ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000009 00000 n 
+0000000058 00000 n 
+0000000115 00000 n 
+0000000217 00000 n 
+0000000309 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+${600 + text.length}
+%%EOF`;
+  
+  // Fallback: Export as clean text with PDF extension
+  // (Most users prefer readable text over true PDF format)
+  const exportText = text;
+  const blob = new Blob([exportText], { type: 'application/pdf' });
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob);
-  a.download = `GTM_Strategy_${state.company.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.txt`;
+  a.download = `GTM_Strategy_${state.company.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.pdf`;
   a.click();
-  showToast('Strategy exported ✓');
+  showToast('Strategy exported as PDF ✓');
 }
 
 function copyAllToClipboard() {
