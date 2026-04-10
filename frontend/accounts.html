@@ -697,59 +697,12 @@ return;
   }
 }
 
-// ── SCAN SIGNALS — scans ALL monitored companies for buying signals ──
+// ── SCAN SIGNALS — DISABLED FOR DEMO ──
 async function runSignalScan() {
-  const withDomain = _accounts.filter(function(a){ return a.domain; });
-  const noDomain   = _accounts.filter(function(a){ return !a.domain; });
-
-  if (!_accounts.length) {
-    showToast('No companies to scan. Add companies first.', 'error');
-    return;
-  }
-  if (!withDomain.length) {
-    showToast('No companies have a domain set. Click ✎ Edit on each company to add their domain.', 'error');
-    return;
-  }
-
-  const scanBtn = document.querySelector('[onclick="runSignalScan()"]');
-  if (scanBtn) { scanBtn.disabled = true; scanBtn.textContent = '⏳ Scanning…'; }
-  showToast('⚡ Scanning ' + withDomain.length + ' companies for buying signals…');
-
-  const token = await getToken();
-  let totalSignals = 0;
-  const results = [];
-
-  for (const a of withDomain) {
-    try {
-      const res = await fetch('/api/analyze-website', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-        body: JSON.stringify({
-          company_id:   a.company_id,
-          website_url:  'https://' + a.domain,
-          company_name: a.company_name,
-        }),
-      });
-      const data = await res.json();
-      const sigs = data.signals_detected || 0;
-      totalSignals += sigs;
-      results.push({ name: a.company_name, signals: sigs, ok: res.ok });
-    } catch(e) {
-      results.push({ name: a.company_name, signals: 0, ok: false, err: e.message });
-    }
-  }
-
-  if (scanBtn) { scanBtn.disabled = false; scanBtn.textContent = '⚡ Scan Signals'; }
-
-  // Show summary
-  const detected  = results.filter(function(r){ return r.signals > 0; });
-  const noSignals = results.filter(function(r){ return r.signals === 0 && r.ok; });
-  const failed    = results.filter(function(r){ return !r.ok; });
-
-  var msg = '⚡ Scan complete — ' + totalSignals + ' signal' + (totalSignals !== 1 ? 's' : '') + ' across ' + withDomain.length + ' companies';
-  if (detected.length) msg += ' · ' + detected.length + ' with signals';
-  if (noDomain.length) msg += ' · ' + noDomain.length + ' skipped (no domain)';
-  showToast(msg, totalSignals > 0 ? 'success' : '');
+  showToast('Bulk signal scan disabled for demo', 'error');
+  return;
+}
+  
 
   // Auto-run learning cycle to update scores
   if (totalSignals > 0) {
