@@ -30,8 +30,11 @@ const TECH_KEYWORDS = [
 export async function onRequestPost(context) {
   const { request, env } = context;
   const cors = corsHeaders(env);
-
+  
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+
+  // 🚨 DEMO MODE: Disable website scanning to prevent token drain
+return errRes('Website analysis temporarily disabled for demo', 503, cors);
 
   // ── Auth ────────────────────────────────────────────────────────
   const { user, error: authErr } = await verifyAuth(request, env);
