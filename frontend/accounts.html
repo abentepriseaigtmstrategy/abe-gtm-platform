@@ -704,32 +704,14 @@ async function runSignalScan() {
 } 
   
 
-  // Auto-run learning cycle to update scores
-  if (totalSignals > 0) {
-    setTimeout(async function() {
-      showToast('🧠 Updating intent scores…');
-      try {
-        const r2 = await fetch('/api/intent-engine', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-          body: JSON.stringify({ action: 'score_all' }),
-        });
-        const d2 = await r2.json();
-        const hot    = (d2.summary || []).filter(function(s){ return s.tier === 'HOT'; }).length;
-        const warm   = (d2.summary || []).filter(function(s){ return s.tier === 'WARM'; }).length;
-        const changed = d2.tiers_changed || 0;
-        var scoreMsg = '✓ Scores updated — ' + hot + ' HOT · ' + warm + ' WARM';
-        if (changed > 0) scoreMsg += ' · ' + changed + ' tier' + (changed>1?'s':'') + ' changed';
-        showToast(scoreMsg, 'success');
-        setTimeout(loadAccounts, 500);
-      } catch(e) {
-        showToast('Score update failed: ' + e.message, 'error');
-      }
-    }, 1500);
-  } else {
-    setTimeout(loadAccounts, 800);
-  }
+ // ── SCAN SIGNALS — DISABLED FOR DEMO ──
+async function runSignalScan() {
+  showToast('Bulk signal scan disabled for demo', 'error');
+  return;
 }
+
+// ── RUN LEARNING CYCLE — recalculates intent scores for ALL companies ──
+async function runLearningCycle() {
 
 // ── RUN LEARNING CYCLE — recalculates intent scores for ALL companies ──
 async function runLearningCycle() {
