@@ -253,7 +253,7 @@
     <a href="leads.html"        class="nav-tab">Lead Manager</a>
   </div>
   <div style="display:flex;align-items:center;gap:10px;">
-    <button class="btn btn-outline btn-sm" onclick="runSignalScan()">⚡ Scan Signals</button>
+    <button class="btn btn-outline btn-sm" disabled>⚡ Scan Signals (Disabled)</button>
     <button class="btn btn-outline btn-sm" onclick="handleSignOut()">Sign Out</button>
   </div>
 
@@ -642,7 +642,12 @@ function renderDrawer(g) {
 /* ═══════════════════════════════════
    ACTIONS
 ═══════════════════════════════════ */
+
 async function scanCompany(companyId, domain) {
+ 
+showToast('Signal scan disabled for demo', 'error');
+return;
+  
   if (!domain) {
     showToast('No domain set — click ✎ Edit to add this company\'s domain first.', 'error');
     return;
