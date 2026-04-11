@@ -236,7 +236,6 @@
 </head>
 <body>
 
-<!-- AUTH GUARD -->
 <script src="auth-guard.js"></script>
   <script src="tour.js"></script>
 
@@ -285,7 +284,6 @@
     </div>
   </div>
 
-  <!-- Stats -->
   <div class="stats">
     <div class="sc"><div class="sv" id="stat-hot">—</div><div class="sl">Hot Accounts</div></div>
     <div class="sc"><div class="sv" id="stat-signals" style="color:var(--accent)">—</div><div class="sl">Signals (7 days)</div></div>
@@ -293,7 +291,6 @@
     <div class="sc"><div class="sv" id="stat-meetings" style="color:var(--amber)">—</div><div class="sl">Meetings Booked</div></div>
   </div>
 
-  <!-- Toolbar -->
   <div class="toolbar">
     <div class="sw">
       <span class="si-icon">🔍</span>
@@ -313,9 +310,7 @@
     <button class="btn btn-outline btn-sm" onclick="refreshAccounts()">↺</button>
   </div>
 
-  <!-- Accounts Grid -->
   <div id="accounts-container">
-    <!-- FIX Bug 6: Template literals ${} don't work in .html files — replaced with static HTML -->
     <div class="ag" id="skeleton-grid">
       <div class="skeleton"><div class="sk-line" style="width:55%"></div><div class="sk-line" style="width:35%;margin-bottom:14px"></div><div class="sk-line"></div><div class="sk-line" style="width:75%"></div><div class="sk-line" style="width:50%"></div></div>
       <div class="skeleton"><div class="sk-line" style="width:60%"></div><div class="sk-line" style="width:40%;margin-bottom:14px"></div><div class="sk-line"></div><div class="sk-line" style="width:80%"></div><div class="sk-line" style="width:45%"></div></div>
@@ -334,7 +329,6 @@
   </div>
 </div>
 
-<!-- ACCOUNT DRAWER -->
 <div class="doverlay" id="doverlay" onclick="closeDrawer()"></div>
 <div id="drawer">
   <button class="dclose" onclick="closeDrawer()">×</button>
@@ -593,7 +587,6 @@ function renderDrawer(g) {
   const field = (label, val) => val ? `<div style="margin-bottom:10px"><div style="font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.18em;color:var(--muted);margin-bottom:4px">${esc(label)}</div><div style="font-size:11px;color:#d1d5db;line-height:1.6;background:rgba(0,0,0,.3);border-radius:8px;padding:9px 11px">${esc(String(val))}</div></div>` : '';
 
   document.getElementById('d-body').innerHTML = `
-    <!-- Score summary -->
     <div class="score-grid">
       <div class="score-box"><div class="score-val" style="color:${intColor}">${intel.intent_score||0}</div><div class="score-lab">Intent Score</div></div>
       <div class="score-box"><div class="score-val">${intel.avg_icp_score||'—'}</div><div class="score-lab">Avg ICP Score</div></div>
@@ -605,14 +598,12 @@ function renderDrawer(g) {
       <div class="score-box"><div class="score-val" style="color:var(--green)">${intel.response_rate||'0.0%'}</div><div class="score-lab">Response Rate</div></div>
     </div>
 
-    <!-- Technologies -->
     ${(g.technologies||[]).length ? `
     <div class="dsec">
       <div class="dstitle">Technology Stack</div>
       <div class="tech-chips">${(g.technologies||[]).map(t=>`<span class="tech-chip">${esc(t)}</span>`).join('')}</div>
     </div>` : ''}
 
-    <!-- Signals -->
     ${(g.signals||[]).length ? `
     <div class="dsec">
       <div class="dstitle">Intent Signals</div>
@@ -623,14 +614,12 @@ function renderDrawer(g) {
       }).join('')}
     </div>` : '<div style="font-size:11px;color:var(--muted);margin-bottom:20px">No signals detected yet. Click Scan Signals to analyse this company\'s website.</div>'}
 
-    <!-- Recommendations -->
     ${(g.recommendations||[]).length ? `
     <div class="dsec">
       <div class="dstitle">Recommended Actions</div>
       ${g.recommendations.map(r=>`<div class="rec-row"><span class="rec-priority rec-${r.priority}">${r.priority}</span><div class="rec-text">${esc(r.action)}</div></div>`).join('')}
     </div>` : ''}
 
-    <!-- Timeline -->
     ${(g.timeline||[]).length ? `
     <div class="dsec">
       <div class="dstitle">Activity Timeline</div>
@@ -644,57 +633,8 @@ function renderDrawer(g) {
 ═══════════════════════════════════ */
 
 async function scanCompany(companyId, domain) {
- 
-showToast('Signal scan disabled for demo', 'error');
-return;
-  
-  if (!domain) {
-    showToast('No domain set — click ✎ Edit to add this company\'s domain first.', 'error');
-    return;
-  }
-  const btn = document.getElementById('scan-btn-drawer');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Scanning…'; }
-  showToast('🔍 Scanning ' + domain + ' for buying signals…');
-
-  try {
-    const token = await getToken();
-    const a = _accounts.find(a => a.company_id === companyId);
-    const res = await fetch('/api/analyze-website', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-      body: JSON.stringify({
-        company_id:   companyId,
-        website_url:  'https://' + domain,
-        company_name: a ? a.company_name : '',
-      }),
-    });
-    const data = await res.json();
-
-    if (!res.ok) {
-      showToast('Scan failed: ' + (data.error || 'HTTP ' + res.status), 'error');
-      if (btn) { btn.disabled = false; btn.textContent = '🔍 Scan Signals'; }
-      return;
-    }
-
-    const sigCount = data.signals_detected || 0;
-    const sigs     = (data.signals || []).map(function(s){ return s.type.replace(/_/g,' '); });
-
-    if (sigCount === 0) {
-      showToast('Scan complete — no buying signals detected on ' + domain, '');
-    } else {
-      showToast('✓ ' + sigCount + ' signal' + (sigCount>1?'s':'') + ' detected: ' + sigs.join(', '), 'success');
-    }
-
-    // Refresh accounts list and reopen drawer with updated score
-    await loadAccounts();
-    setTimeout(function() {
-      if (_openCompanyId) openDrawer(_openCompanyId);
-    }, 600);
-
-  } catch(e) {
-    showToast('Scan error: ' + e.message, 'error');
-    if (btn) { btn.disabled = false; btn.textContent = '🔍 Scan Signals'; }
-  }
+  showToast('Signal scan disabled for demo', 'error');
+  return;
 }
 
 // ── SCAN SIGNALS — DISABLED FOR DEMO ──
@@ -705,6 +645,23 @@ async function runSignalScan() {
 
 // ── RUN LEARNING CYCLE — recalculates intent scores for ALL companies ──
 async function runLearningCycle() {
+  if (!_accounts.length) {
+    showToast('No companies to score.', 'error');
+    return;
+  }
+  const btn = document.querySelector('[onclick="runLearningCycle()"]');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Scoring…'; }
+  showToast('🧠 Recalculating intent scores…');
+
+  // Use setTimeout to prevent UI blocking
+  setTimeout(async function() {
+    try {
+      const token = await getToken();
+      const r = await fetch('/api/intent-engine', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ action: 'score_all' }),
+      });
       const d = await r.json();
       if (!r.ok) {
         showToast('Score update failed: ' + (d.error || 'HTTP ' + r.status), 'error');
