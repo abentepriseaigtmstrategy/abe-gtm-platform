@@ -701,37 +701,10 @@ return;
 async function runSignalScan() {
   showToast('Bulk signal scan disabled for demo', 'error');
   return;
-} 
-  
-
- // ── SCAN SIGNALS — DISABLED FOR DEMO ──
-async function runSignalScan() {
-  showToast('Bulk signal scan disabled for demo', 'error');
-  return;
 }
 
 // ── RUN LEARNING CYCLE — recalculates intent scores for ALL companies ──
 async function runLearningCycle() {
-
-// ── RUN LEARNING CYCLE — recalculates intent scores for ALL companies ──
-async function runLearningCycle() {
-  if (!_accounts.length) {
-    showToast('No companies to score.', 'error');
-    return;
-  }
-  const btn = document.querySelector('[onclick="runLearningCycle()"]');
-  if (btn) { btn.disabled = true; btn.textContent = '⏳ Scoring…'; }
-  showToast('🧠 Recalculating intent scores…');
-
-  // Use setTimeout to prevent UI blocking
-  setTimeout(async function() {
-    try {
-      const token = await getToken();
-      const r = await fetch('/api/intent-engine', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-        body: JSON.stringify({ action: 'score_all' }),
-      });
       const d = await r.json();
       if (!r.ok) {
         showToast('Score update failed: ' + (d.error || 'HTTP ' + r.status), 'error');
