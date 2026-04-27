@@ -21,6 +21,7 @@ create table if not exists public.strategies (
   step_4_sourcing  jsonb,
   step_5_keywords  jsonb,
   step_6_messaging jsonb,
+  step_7_intelligence jsonb,              -- Step 7: Revenue Intelligence Enhancement (optional)
   steps_completed  integer default 0,
   total_tokens     integer default 0,
   status           text default 'in_progress' check (status in ('in_progress','complete','archived')),
@@ -52,7 +53,11 @@ select
   s.updated_at,
   (s.step_1_market->>'gtm_relevance_score')::int   as gtm_score,
   s.step_2_tam->>'tam_size_estimate'               as tam_size,
-  s.step_3_icp->>'primary_icp'                     as primary_icp
+  s.step_3_icp->>'primary_icp'                     as primary_icp,
+  -- Step 7 intelligence fields (null when not yet generated)
+  s.step_7_intelligence->>'executive_brief'                              as intelligence_brief,
+  s.step_7_intelligence->'go_no_go'->>'recommendation'                  as go_no_go,
+  (s.step_7_intelligence->>'confidence_score')::int                      as confidence_score
 from public.strategies s;
 
 -- ── icp_profiles ────────────────────────────────────────────────
@@ -179,3 +184,66 @@ create index if not exists leads_user_id           on public.leads(user_id);
 create index if not exists leads_company           on public.leads(user_id, company);
 create index if not exists analysis_runs_user      on public.analysis_runs(user_id, created_at desc);
 
+
+-- ══════════════════════════════════════════════════════════════
+-- MIGRATION: Add Step 7 Revenue Intelligence Enhancement
+-- Run this in Supabase SQL editor for existing deployments.
+-- Safe to run multiple times (uses IF NOT EXISTS / OR REPLACE).
+-- ══════════════════════════════════════════════════════════════
+
+-- 1. Add step_7_intelligence column (safe — does nothing if exists)
+alter table public.strategies
+  add column if not exists step_7_intelligence jsonb;
+
+-- 2. Refresh the strategy_summary view
+create or replace view public.strategy_summary as
+select
+  s.id,
+  s.user_id,
+  s.company_name,
+  s.industry,
+  s.steps_completed,
+  s.status,
+  s.total_tokens,
+  s.cache_key,
+  s.created_at,
+  s.updated_at,
+  (s.step_1_market->>('gtm_relevance_score'))::int   as gtm_score,
+  s.step_2_tam->>'tam_size_estimate'               as tam_size,
+  s.step_3_icp->>'primary_icp'                     as primary_icp,
+  s.step_7_intelligence->>'executive_brief'                                           as intelligence_brief,
+  s.step_7_intelligence->'go_no_go'->>'recommendation'                        as go_no_go,
+  (s.step_7_intelligence->>'confidence_score')::int                                   as confidence_score
+from public.strategies s;
+
+
+-- ══════════════════════════════════════════════════════════════
+-- MIGRATION: Add Step 7 Revenue Intelligence Enhancement
+-- Run this in Supabase SQL editor for EXISTING deployments.
+-- Safe to run multiple times (uses IF NOT EXISTS / OR REPLACE).
+-- ══════════════════════════════════════════════════════════════
+
+-- 1. Add the column (no-op if it already exists from fresh install)
+alter table public.strategies
+  add column if not exists step_7_intelligence jsonb;
+
+-- 2. Refresh the summary view with step 7 fields
+create or replace view public.strategy_summary as
+select
+  s.id,
+  s.user_id,
+  s.company_name,
+  s.industry,
+  s.steps_completed,
+  s.status,
+  s.total_tokens,
+  s.cache_key,
+  s.created_at,
+  s.updated_at,
+  (s.step_1_market->>'gtm_relevance_score')::int        as gtm_score,
+  s.step_2_tam->>'tam_size_estimate'                    as tam_size,
+  s.step_3_icp->>'primary_icp'                         as primary_icp,
+  s.step_7_intelligence->>'executive_brief'             as intelligence_brief,
+  s.step_7_intelligence->'go_no_go'->>'recommendation'  as go_no_go,
+  (s.step_7_intelligence->>'confidence_score')::int     as confidence_score
+from public.strategies s;
