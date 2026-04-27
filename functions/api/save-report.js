@@ -54,7 +54,8 @@ export async function onRequestPost(context) {
     company_url:           strategy.company_url         || null,
     scraped_profile:       strategy.scraped_profile     || null,
     full_report:           strategy.full_report         || null,
-    step_7_intelligence:   strategy.step_7_intelligence || null,
+    step_7_intelligence:   strategy.step_7_intelligence   || null,
+    step7_decision_engine: strategy.step7_decision_engine || null,
   };
 
   try {

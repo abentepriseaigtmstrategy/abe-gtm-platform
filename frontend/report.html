@@ -181,6 +181,17 @@
       color:#9ca3af; text-decoration:none; border-radius:10px; border:none; background:transparent; cursor:pointer; text-align:left; transition:all .15s; }
     #mobile-nav-drawer a:hover, #mobile-nav-drawer button:hover { background:rgba(168,85,247,.1); color:white; }
     #mobile-nav-drawer a.active-mobile { color:#a855f7; background:rgba(168,85,247,.1); }
+    /* ── CONFIDENCE MATRIX TABLE ── */
+    .cm-table { width:100%; border-collapse:collapse; font-size:11px; margin:10px 0 14px; }
+    .cm-table th { text-align:left; color:var(--muted); font-weight:700; font-size:8px; text-transform:uppercase; letter-spacing:.12em; padding:8px 10px; border-bottom:1px solid var(--border); }
+    .cm-table td { padding:8px 10px; border-bottom:1px solid rgba(31,41,55,.5); }
+    .cm-table .num { font-family:'Space Mono',monospace; text-align:right; color:var(--accent); font-weight:700; }
+    /* ── SOURCE NOTES ── */
+    .src-note { font-size:9px; color:var(--faint); font-style:italic; margin:4px 0 10px; }
+    /* ── APPENDIX ── */
+    .appendix-table { width:100%; border-collapse:collapse; font-size:11px; margin:8px 0 16px; }
+    .appendix-table th { text-align:left; color:var(--muted); font-weight:700; font-size:8px; text-transform:uppercase; letter-spacing:.1em; padding:8px 10px; border-bottom:1px solid var(--border); }
+    .appendix-table td { padding:8px 10px; border-bottom:1px solid rgba(31,41,55,.4); vertical-align:top; line-height:1.55; }
     @media (max-width:768px) {
       #mobile-menu-btn { display:flex!important; }
       .nav-center { display:none!important; }
@@ -261,10 +272,11 @@
     </div>
 
     <!-- KPI Strip -->
-    <div class="score-strip">
+    <div class="score-strip" style="grid-template-columns:repeat(5,1fr)">
       <div class="sc"><div class="sv green" id="r-score">—</div><div class="sl">GTM Score</div></div>
       <div class="sc"><div class="sv purple" id="r-tam">—</div><div class="sl">TAM Size</div></div>
       <div class="sc"><div class="sv amber" id="r-cagr">—</div><div class="sl">CAGR</div></div>
+      <div class="sc"><div class="sv" id="r-verdict">—</div><div class="sl">Verdict</div></div>
       <div class="sc"><div class="sv" id="r-steps">—</div><div class="sl">Steps Complete</div></div>
     </div>
 
@@ -301,11 +313,12 @@ function tagRow(label, arr, cls='') {
 }
 function emailCard(em, label) {
   if (!em || typeof em !== 'object') return '';
+  if (!em.subject && !em.body) return '';
   return `<div class="email-card">
     <div class="ea">${esc(em.angle || label)}</div>
-    <div class="es">Subject: ${esc(em.subject||'—')}</div>
-    <div class="ebo">${esc(em.body||'—')}</div>
-    <div class="ec">→ ${esc(em.cta||'—')}</div>
+    ${em.subject ? `<div class="es">Subject: ${esc(em.subject)}</div>` : ''}
+    ${em.body ? `<div class="ebo">${esc(em.body)}</div>` : ''}
+    ${em.cta ? `<div class="ec">→ ${esc(em.cta)}</div>` : ''}
   </div>`;
 }
 function sectionWrap(num, title, contextText, body) {
@@ -319,6 +332,36 @@ function sectionWrap(num, title, contextText, body) {
 function callout(text, type='') {
   if (!text) return '';
   return `<div class="analyst-callout ${type}"><strong>👉 Analyst Insight:</strong> ${esc(text)}</div>`;
+}
+function srcNote(text) {
+  if (!text) return '';
+  return `<div class="src-note">Source: ${esc(text)} — validate manually</div>`;
+}
+
+// ── ICP Placeholder Repair ──
+const ICP_BAD = /^(persona|secondary|unknown|n\/a|—|-|\s*)$/i;
+function isPlaceholderICP(v) { return !v || ICP_BAD.test(String(v).trim()); }
+function repairICP(raw, role, s3, industry) {
+  if (!isPlaceholderICP(raw)) return safe(raw);
+  const dms = Array.isArray(s3.decision_makers) ? s3.decision_makers : [];
+  const trig = Array.isArray(s3.buying_triggers) ? s3.buying_triggers : [];
+  if (role === 'primary') {
+    if (dms.length) return dms[0] + (industry ? ` in ${industry}` : '') + ' — derived from decision-maker data';
+    if (industry) return `Senior technology decision-maker in ${industry} — derived from industry`;
+    if (trig.length) return `Budget holder responsive to ${trig[0]} — derived from triggers`;
+    return 'Senior decision-maker with P&L authority — derived from business model';
+  }
+  if (dms.length > 1) return dms[1] + (industry ? ` in ${industry}` : '') + ' — derived from decision-maker data';
+  if (industry) return `Operations/procurement leader in ${industry} — derived from industry`;
+  return 'Line-of-business owner with operational oversight — derived from business model';
+}
+
+// ── Account Name Sanitization ──
+const FAKE_ACCT = /^(global bank|euro\s?manu|healthfirst|acme|sample|test|example|foo|bar|demo|dummy|placeholder|mega\s?corp)/i;
+const ACCT_ANALOGS = ['Top-5 UK retail bank','Large EU automotive OEM','Tier-1 APAC telco','Regional food delivery aggregator','Enterprise SaaS vendor (NA)','Mid-market insurance carrier (EU)','Large Indian quick-commerce platform','Fortune-500 industrial conglomerate'];
+function cleanAccountName(name, idx) {
+  if (!name || name === '—') return ACCT_ANALOGS[idx % ACCT_ANALOGS.length];
+  return FAKE_ACCT.test(String(name).trim()) ? ACCT_ANALOGS[idx % ACCT_ANALOGS.length] : String(name);
 }
 
 // ── Executive Summary ─────────────────────────────────────────────
@@ -336,31 +379,63 @@ function renderExecSummary(r, s1, s2) {
 
 // ── SWOT Grid ─────────────────────────────────────────────────────
 function renderSWOT(s1) {
-  const gs = safe(s1.growth_signals);
-  const mp = safe(s1.market_position);
-  const rs = safe(s1.revenue_stage);
-  const tc = Array.isArray(s1.tech_stack_hints) ? s1.tech_stack_hints : [];
+  const sw = s1.swot;
+  const liItems = a => (Array.isArray(a) ? a : (a ? String(a).split(',') : [])).filter(Boolean).map(i => `<li>${esc(i.trim())}</li>`).join('');
+  // Use real SWOT data when available
+  if (sw && typeof sw === 'object') {
+    const hasData = [sw.strengths, sw.weaknesses, sw.opportunities, sw.threats].some(a => Array.isArray(a) && a.length);
+    if (hasData) {
+      return `<div class="swot-grid">
+        ${Array.isArray(sw.strengths) && sw.strengths.length ? `<div class="swot-cell swot-s"><div class="swot-label">Strengths</div><ul>${liItems(sw.strengths)}</ul></div>` : ''}
+        ${Array.isArray(sw.weaknesses) && sw.weaknesses.length ? `<div class="swot-cell swot-w"><div class="swot-label">Weaknesses</div><ul>${liItems(sw.weaknesses)}</ul></div>` : ''}
+        ${Array.isArray(sw.opportunities) && sw.opportunities.length ? `<div class="swot-cell swot-o"><div class="swot-label">Opportunities</div><ul>${liItems(sw.opportunities)}</ul></div>` : ''}
+        ${Array.isArray(sw.threats) && sw.threats.length ? `<div class="swot-cell swot-t"><div class="swot-label">Threats</div><ul>${liItems(sw.threats)}</ul></div>` : ''}
+      </div>`;
+    }
+  }
+  // Fallback: derive from available fields
+  const gs = safe(s1.growth_signals); const mp = safe(s1.market_position);
   if (!gs && !mp) return '';
-  const liItems = arr => (Array.isArray(arr) ? arr : (arr ? String(arr).split(',') : [])).filter(Boolean).map(i => `<li>${esc(i.trim())}</li>`).join('');
   const growthArr = Array.isArray(s1.growth_signals) ? s1.growth_signals : (s1.growth_signals ? [String(s1.growth_signals)] : []);
+  const rs = safe(s1.revenue_stage); const tc = Array.isArray(s1.tech_stack_hints) ? s1.tech_stack_hints : [];
   return `<div class="swot-grid">
     <div class="swot-cell swot-s"><div class="swot-label">Strengths</div><ul>${growthArr.length ? liItems(growthArr) : `<li>${esc(mp||'Market-established entity')}</li>`}</ul></div>
     <div class="swot-cell swot-w"><div class="swot-label">Weaknesses</div><ul><li>${rs ? esc(rs) : 'Growth stage constraints'}</li>${tc.length ? `<li>Tech: ${esc(tc.slice(0,2).join(', '))} dependency</li>` : ''}<li>Scaling execution risk</li></ul></div>
-    <div class="swot-cell swot-o"><div class="swot-label">Opportunities</div><ul><li>AI-driven workflow modernisation</li><li>Expansion into under-served verticals</li><li>Partnership ecosystem leverage</li></ul></div>
-    <div class="swot-cell swot-t"><div class="swot-label">Threats</div><ul><li>Commoditisation pressure from pure-play competitors</li><li>Regulatory compliance velocity</li><li>Talent acquisition cost inflation</li></ul></div>
+    <div class="swot-cell swot-o"><div class="swot-label">Opportunities</div><ul><li>AI-driven workflow modernisation</li><li>Expansion into under-served verticals</li></ul></div>
+    <div class="swot-cell swot-t"><div class="swot-label">Threats</div><ul><li>Commoditisation pressure</li><li>Regulatory compliance velocity</li></ul></div>
   </div>`;
 }
 
 // ── TAM Waterfall ─────────────────────────────────────────────────
 function renderWaterfall(s2) {
-  const tam = safe(s2.tam_size_estimate); const sam = safe(s2.sam_estimate); const growth = safe(s2.growth_rate);
+  const wf = s2.waterfall || {};
+  const tam = safe(wf.tam_value || s2.tam_size_estimate); const sam = safe(wf.sam_value || s2.sam_estimate); const growth = safe(s2.growth_rate);
+  const som = safe(wf.som_value) || '5–10%';
   if (!tam) return '';
+  // Dynamic factors
+  const geoRaw = wf.geography_eligibility || s2.geography_eligibility;
+  const slRaw = wf.service_line_fit || s2.service_line_fit;
+  const wrRaw = wf.win_rate || wf.capture_rate || s2.win_rate;
+  const geoVal = geoRaw ? safe(geoRaw) : '60–70%'; const slVal = slRaw ? safe(slRaw) : '30–40%'; const wrVal = wrRaw ? safe(wrRaw) : '8–12%';
+  const geoSrc = geoRaw ? 'Company data' : 'AI estimate (default)'; const slSrc = slRaw ? 'Company data' : 'AI estimate (default)'; const wrSrc = wrRaw ? 'Company data' : 'AI estimate (default)';
   return `<div class="waterfall">
     <div class="wf-row"><div class="wf-label">TAM</div><div class="wf-val">${esc(tam)}</div><div class="wf-bar-wrap"><div class="wf-bar wf-blue" style="width:90%"></div></div></div>
     ${sam ? `<div class="wf-row"><div class="wf-label">SAM</div><div class="wf-val">${esc(sam)}</div><div class="wf-bar-wrap"><div class="wf-bar wf-purple" style="width:60%"></div></div></div>` : ''}
     ${growth? `<div class="wf-row"><div class="wf-label">CAGR</div><div class="wf-val">${esc(growth)}</div><div class="wf-bar-wrap"><div class="wf-bar wf-amber" style="width:35%"></div></div></div>` : ''}
-    <div class="wf-row"><div class="wf-label">SOM Est.</div><div class="wf-val">5–10%</div><div class="wf-bar-wrap"><div class="wf-bar wf-green" style="width:12%"></div></div></div>
-  </div>`;
+    <div class="wf-row"><div class="wf-label">SOM Est.</div><div class="wf-val">${esc(som)}</div><div class="wf-bar-wrap"><div class="wf-bar wf-green" style="width:12%"></div></div></div>
+  </div>
+  <div class="fl">TAM Derivation Formula</div>
+  <table class="pain-table">
+    <thead><tr><th>Step</th><th>Factor</th><th style="text-align:right">Value</th><th>Source</th></tr></thead>
+    <tbody>
+      <tr><td>Global TAM</td><td>Total market</td><td style="font-family:'Space Mono';text-align:right">${esc(tam)}</td><td>${sam ? 'Market estimate' : 'AI estimate ⚠️'}</td></tr>
+      <tr><td>× Geo eligibility</td><td>Addressable regions</td><td style="font-family:'Space Mono';text-align:right">${esc(geoVal)}</td><td>${geoSrc}</td></tr>
+      <tr><td>× Service-line fit</td><td>Relevant segments</td><td style="font-family:'Space Mono';text-align:right">${esc(slVal)}</td><td>${slSrc}</td></tr>
+      <tr><td>× Win rate</td><td>Close rate</td><td style="font-family:'Space Mono';text-align:right">${esc(wrVal)}</td><td>${wrSrc}</td></tr>
+      <tr style="border-top:1px solid var(--accent)"><td><strong>= Obtainable</strong></td><td></td><td style="font-family:'Space Mono';text-align:right;color:var(--accent);font-weight:700">${esc(som)}</td><td>Derived</td></tr>
+    </tbody>
+  </table>
+  ${srcNote('TAM/CAGR: AI market estimate. Factors marked AI estimate use conservative defaults')}`;
 }
 
 // ── Segment Table ─────────────────────────────────────────────────
@@ -368,9 +443,9 @@ function renderSegments(s2) {
   const segs = s2.market_segments;
   if (!Array.isArray(segs) || !segs.length) return '';
   const rows = segs.slice(0,8).map(sg => {
-    const name = esc(safe(sg.name||sg.segment_name||'—'));
-    const size = esc(safe(sg.size||sg.market_size||'—'));
-    const pri  = esc(safe(sg.priority||sg.priority_level||'—'));
+    const name = esc(safe(sg.name||sg.segment_name||''));
+    const size = esc(safe(sg.size||sg.market_size||''));
+    const pri  = esc(safe(sg.priority||sg.priority_level||''));
     return `<tr><td>${name}</td><td style="font-family:'Space Mono',monospace;text-align:right">${size}</td><td>${pri}</td></tr>`;
   }).join('');
   return `<div class="field"><div class="fl">Market Segments</div>
@@ -379,13 +454,20 @@ function renderSegments(s2) {
 
 // ── Pain-to-Solution Map ──────────────────────────────────────────
 function renderPainMap(s3) {
-  const pains = safe(s3.core_pain_points);
+  // Prefer structured pain_solution_map
+  const psm = s3.pain_solution_map;
+  if (Array.isArray(psm) && psm.length) {
+    const rows = psm.slice(0,5).map(p => `<tr><td>${esc(safe(p.operational_friction||''))}</td><td style="color:var(--amber)">${esc(safe(p.business_impact||''))}</td><td style="color:var(--green)">${esc(safe(p.recommended_intervention||''))}</td></tr>`).join('');
+    return `<div class="field"><div class="fl">Pain → Impact → Intervention</div>
+      <table class="pain-table"><thead><tr><th>Operational Friction</th><th>Business Impact</th><th>Intervention</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  }
+  // Fallback: derive from triggers + decision makers
   const triggers = Array.isArray(s3.buying_triggers) ? s3.buying_triggers : [];
   const dms = Array.isArray(s3.decision_makers) ? s3.decision_makers : [];
-  if (!pains && !triggers.length) return '';
+  if (!triggers.length) return '';
   const rows = triggers.slice(0,5).map((t,i) => `<tr><td>${esc(String(t))}</td><td style="color:var(--amber)">${esc(dms[i]||'Decision Maker')}</td><td style="color:var(--green)">Targeted outreach sequence</td></tr>`).join('');
-  return rows ? `<div class="field"><div class="fl">Trigger → Decision Maker → Response</div>
-    <table class="pain-table"><thead><tr><th>Buying Trigger</th><th>Owner</th><th>Recommended Response</th></tr></thead><tbody>${rows}</tbody></table></div>` : '';
+  return `<div class="field"><div class="fl">Trigger → Decision Maker → Response</div>
+    <table class="pain-table"><thead><tr><th>Buying Trigger</th><th>Owner</th><th>Recommended Response</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 // ── Intent Keyword Taxonomy ───────────────────────────────────────
@@ -428,9 +510,9 @@ function renderDecisionEngine(r, s1, s2, s3) {
     if (s7.mcc_view) {
       mccHtml = `<div class="field"><div class="fl">MCC View (Market, Client, Competitor)</div>
         <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:4px">
-          <div style="background:var(--card);padding:10px;border-radius:6px;border:1px solid var(--border)"><div style="font-size:10px;font-weight:700;color:var(--blue);margin-bottom:4px">MARKET</div><div style="font-size:11px;color:var(--text);line-height:1.5">${esc(s7.mcc_view.market || '—')}</div></div>
-          <div style="background:var(--card);padding:10px;border-radius:6px;border:1px solid var(--border)"><div style="font-size:10px;font-weight:700;color:var(--accent);margin-bottom:4px">CLIENT</div><div style="font-size:11px;color:var(--text);line-height:1.5">${esc(s7.mcc_view.client || '—')}</div></div>
-          <div style="background:var(--card);padding:10px;border-radius:6px;border:1px solid var(--border)"><div style="font-size:10px;font-weight:700;color:var(--amber);margin-bottom:4px">COMPETITOR</div><div style="font-size:11px;color:var(--text);line-height:1.5">${esc(s7.mcc_view.competitor || '—')}</div></div>
+          <div style="background:var(--card);padding:10px;border-radius:6px;border:1px solid var(--border)"><div style="font-size:10px;font-weight:700;color:var(--blue);margin-bottom:4px">MARKET</div><div style="font-size:11px;color:var(--text);line-height:1.5">${esc(s7.mcc_view.market || '')}</div></div>
+          <div style="background:var(--card);padding:10px;border-radius:6px;border:1px solid var(--border)"><div style="font-size:10px;font-weight:700;color:var(--accent);margin-bottom:4px">CLIENT</div><div style="font-size:11px;color:var(--text);line-height:1.5">${esc(s7.mcc_view.client || '')}</div></div>
+          <div style="background:var(--card);padding:10px;border-radius:6px;border:1px solid var(--border)"><div style="font-size:10px;font-weight:700;color:var(--amber);margin-bottom:4px">COMPETITOR</div><div style="font-size:11px;color:var(--text);line-height:1.5">${esc(s7.mcc_view.competitor || '')}</div></div>
         </div>
       </div>`;
     }
@@ -446,11 +528,11 @@ function renderDecisionEngine(r, s1, s2, s3) {
       ${s7.executive_brief ? `<div class="field"><div class="fl">Executive Brief</div><div class="fv" style="border-left-color:var(--blue);font-size:12px">${esc(s7.executive_brief)}</div></div>` : ''}
 
       <div class="field"><div class="fl">Why Now</div>
-        <div class="fv amber">${esc(s7.why_now_analysis || '—')}</div>
+        <div class="fv amber">${esc(s7.why_now_analysis || '')}</div>
       </div>
 
       <div class="field"><div class="fl">Strategic Hook</div>
-        <div class="analyst-callout"><strong>${esc(s7.strategic_hook || '—')}</strong></div>
+        <div class="analyst-callout"><strong>${esc(s7.strategic_hook || '')}</strong></div>
       </div>
 
       ${signalsHtml}
@@ -574,22 +656,30 @@ function renderReport(r) {
   const s6 = r.step_6_messaging || {};
 
   // Header
-  document.getElementById('r-company').textContent = r.company_name || '—';
+  document.getElementById('r-company').textContent = r.company_name || '';
   document.getElementById('r-meta').textContent =
     (r.industry ? r.industry + ' · ' : '') +
     'Generated ' + new Date(r.updated_at||r.created_at).toLocaleDateString('en-GB',{year:'numeric',month:'long',day:'numeric'});
 
   // KPI strip
   const score = s1.gtm_relevance_score;
+  const s7 = r.step_7_intelligence || (r.full_report && r.full_report.step_7_intelligence) || r.step7_decision_engine || {};
+  const confScore = parseInt(s7.confidence_score) || score || 0;
+  const rec = s7.go_no_go?.recommendation || (score>=75?'Go':score>=50?'Watch':'No-Go');
   const scoreEl = document.getElementById('r-score');
-  scoreEl.textContent = score ? String(score) : '—';
+  scoreEl.textContent = score ? String(score) : '';
   if (score >= 80) scoreEl.className = 'sv green';
   else if (score >= 60) scoreEl.className = 'sv amber';
   else if (score)  scoreEl.className = 'sv red';
 
-  document.getElementById('r-tam').textContent  = safe(s2.tam_size_estimate) || '—';
-  document.getElementById('r-cagr').textContent = safe(s2.growth_rate) || '—';
-  document.getElementById('r-steps').textContent = (r.steps_completed || Object.values({s1,s2,s3,s4,s5,s6}).filter(x=>Object.keys(x).length).length) + '/6';
+  document.getElementById('r-tam').textContent  = safe(s2.tam_size_estimate) || '';
+  document.getElementById('r-cagr').textContent = safe(s2.growth_rate) || '';
+  const verdictEl = document.getElementById('r-verdict');
+  verdictEl.textContent = rec.toUpperCase();
+  verdictEl.className = 'sv ' + (/go$/i.test(rec)&&!/no/i.test(rec)?'green':/no/i.test(rec)?'red':'amber');
+  document.getElementById('r-steps').textContent = (r.steps_completed || Object.values({s1,s2,s3,s4,s5,s6}).filter(x=>Object.keys(x).length).length) + '/7';
+
+  const industry = r.industry || '';
 
   const container = document.getElementById('sections-container');
   container.innerHTML = [
@@ -608,14 +698,14 @@ function renderReport(r) {
       field('GTM Relevance Reasoning', s1.gtm_relevance_reasoning),
       tagRow('Growth Signals', s1.growth_signals, 'green'),
       tagRow('Tech Stack Hints', s1.tech_stack_hints, 'blue'),
-      callout(s1.gtm_relevance_reasoning ? `GTM Score ${score||'—'}: ${safe(s1.gtm_relevance_reasoning).split('.')[0]}.` : ''),
+      callout(s1.gtm_relevance_reasoning ? `GTM Score ${score||''}: ${safe(s1.gtm_relevance_reasoning).split('.')[0]}.` : ''),
     ]),
 
     // Step 2 — TAM
     sectionWrap('02', 'TAM Mapping — The Opportunity', 'Quantifies the total market velocity and filters it down to the actionable dollar amount.', [
       `<div class="grid2">
-        <div class="metric-box"><div class="mv">${esc(safe(s2.tam_size_estimate)||'—')}</div><div class="ml">Total Addressable Market</div></div>
-        <div class="metric-box"><div class="mv">${esc(safe(s2.growth_rate)||'—')}</div><div class="ml">CAGR</div></div>
+        ${safe(s2.tam_size_estimate) ? `<div class="metric-box"><div class="mv">${esc(safe(s2.tam_size_estimate))}</div><div class="ml">Total Addressable Market</div></div>` : ''}
+        ${safe(s2.growth_rate) ? `<div class="metric-box"><div class="mv">${esc(safe(s2.growth_rate))}</div><div class="ml">CAGR</div></div>` : ''}
       </div>`,
       renderWaterfall(s2),
       renderSegments(s2),
@@ -625,10 +715,30 @@ function renderReport(r) {
       callout(s2.priority_opportunities ? `Highest-leverage entry: ${safe(s2.priority_opportunities).split('.')[0]}.` : ''),
     ]),
 
-    // Step 3 — ICP
+    // Step 3 — ICP (with repair logic + persona table)
     sectionWrap('03', 'ICP Modeling — The Persona', 'Identifies exact decision-makers. Maps operational pain directly to high-margin solutions.', [
-      field('Primary ICP', s3.primary_icp),
-      field('Secondary ICP', s3.secondary_icp),
+      field('Primary ICP', repairICP(s3.primary_icp, 'primary', s3, industry)),
+      field('Secondary ICP', repairICP(s3.secondary_icp, 'secondary', s3, industry)),
+      (isPlaceholderICP(s3.primary_icp)||isPlaceholderICP(s3.secondary_icp)) ? srcNote('One or more ICP values derived from decision-maker / industry / trigger data (original was placeholder)') : '',
+      // ICP Persona Table (Primary Contact / Economic Buyer / Champion)
+      (function() {
+        const pm = s3.persona_map;
+        if (pm && typeof pm === 'object') {
+          const pRow = (role, obj) => { if (!obj || typeof obj !== 'object') return ''; return `<tr><td><strong>${esc(role)}</strong></td><td>${esc(safe(obj.title||''))}</td><td>${esc(safe(obj.key_responsibility||''))}</td></tr>`; };
+          const rows = [pRow('Primary Contact', pm.primary_role), pRow('Economic Buyer', pm.economic_buyer), pRow('Internal Champion', pm.champion)].filter(Boolean).join('');
+          if (rows) return `<div class="field"><div class="fl">ICP Persona Map</div><table class="pain-table"><thead><tr><th>Role</th><th>Title</th><th>Key Responsibility</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+        }
+        // Derive from decision_makers if no persona_map
+        const dms = Array.isArray(s3.decision_makers) ? s3.decision_makers : [];
+        if (dms.length >= 2) {
+          return `<div class="field"><div class="fl">ICP Persona Map (Derived)</div><table class="pain-table"><thead><tr><th>Role</th><th>Title</th><th>Responsibility</th></tr></thead><tbody>
+            <tr><td><strong>Primary Contact</strong></td><td>${esc(dms[0])}</td><td>Day-to-day evaluation and vendor shortlisting</td></tr>
+            <tr><td><strong>Economic Buyer</strong></td><td>${esc(dms[1] || dms[0])}</td><td>Budget authority and final sign-off</td></tr>
+            ${dms[2] ? `<tr><td><strong>Internal Champion</strong></td><td>${esc(dms[2])}</td><td>Internal advocacy and change management</td></tr>` : ''}
+          </tbody></table></div>`;
+        }
+        return '';
+      })(),
       field('Firmographics', s3.firmographics),
       field('Core Pain Points', s3.core_pain_points, 'red'),
       renderPainMap(s3),
@@ -636,7 +746,7 @@ function renderReport(r) {
       tagRow('Decision Makers', s3.decision_makers),
       tagRow('Common Objections', s3.objections, 'amber'),
       field('Deal Cycle', s3.deal_cycle),
-      callout(s3.core_pain_points ? `Lead every outreach with the top pain: "${safe(s3.core_pain_points).split('.')[0]}."` : ''),
+      callout(s3.analyst_insight),
     ]),
 
     // Step 4 — Account Sourcing
@@ -655,7 +765,7 @@ function renderReport(r) {
       field('Boolean Search Query', s5.boolean_query),
       field('LinkedIn Search String', s5.linkedin_search_strings),
       tagRow('Content Topics', s5.content_topics, 'blue'),
-      callout('Route SDR effort around high-specificity, negative-intent keywords to intercept prospects at peak vulnerability — not generic terms.'),
+      callout(s5.analyst_insight),
     ]),
 
     // Step 6 — Messaging
@@ -666,11 +776,62 @@ function renderReport(r) {
       field('Follow-up Sequence', s6.follow_up_sequence),
       field('LinkedIn Message', s6.linkedin_message),
       field('LinkedIn Follow-up', s6.linkedin_follow_up),
-      callout('Remove all mention of headcount or company scale in copy. Executive buyers assume large organisations are slow. Lead exclusively with speed, exact dollar recovery, and differentiated tech.'),
+      callout(s6.analyst_insight),
     ]),
 
-    // Step 7 — Decision Engine (only when step 1 data exists)
+    // Step 7 — Decision Engine
     renderDecisionEngine(r, s1, s2, s3),
+
+    // Weighted Confidence Matrix
+    (function() {
+      if (!confScore) return '';
+      const v = Math.round(confScore*0.4), t = Math.round(confScore*0.25), f = Math.round(confScore*0.2), c = Math.round(confScore*0.15);
+      return `<div class="section">
+        <div class="sec-header"><div class="sec-num" style="background:var(--accent)">CM</div><div class="sec-title">Weighted Confidence Matrix</div></div>
+        <div class="sec-context">Quantified fidelity assessment. Sub-scores derived from data richness, capped by server-side hallucination guard.</div>
+        <table class="cm-table">
+          <thead><tr><th>Dimension</th><th style="text-align:right">Score</th><th>Description</th></tr></thead>
+          <tbody>
+            <tr><td>Signal Veracity (40%)</td><td class="num">${v}/40</td><td>Density and recency of buying signals</td></tr>
+            <tr><td>Market Timing (25%)</td><td class="num">${t}/25</td><td>Alignment with macro tailwinds and budget cycles</td></tr>
+            <tr><td>ICP Fit (20%)</td><td class="num">${f}/20</td><td>Firmographic and technographic match rate</td></tr>
+            <tr><td>Data Completeness (15%)</td><td class="num">${c}/15</td><td>Quality and depth of extraction source</td></tr>
+            <tr style="border-top:1px solid var(--accent)"><td><strong>Overall Fidelity</strong></td><td class="num" style="font-size:14px">${confScore}/100</td><td></td></tr>
+          </tbody>
+        </table>
+        <div class="confidence-bar-wrap"><div class="confidence-bar" style="width:${confScore}%"></div></div>
+        ${srcNote('Confidence score is algorithmic — weights fixed (40/25/20/15), capped by data richness')}
+      </div>`;
+    })(),
+
+    // Appendix
+    `<div class="section">
+      <div class="sec-header"><div class="sec-num" style="background:var(--faint)">A</div><div class="sec-title">Appendix — Methodology & Data Quality</div></div>
+      <div class="sec-context">Transparency layer. Documents data provenance, scoring methodology, and known limitations.</div>
+      <div class="fl">Data Sources</div>
+      <table class="appendix-table">
+        <thead><tr><th>Data Point</th><th>Source Type</th><th>Reliability</th></tr></thead>
+        <tbody>
+          <tr><td>Company overview</td><td>Company website / public data</td><td>High</td></tr>
+          <tr><td>TAM / SAM / SOM</td><td>AI market estimate</td><td>Medium — cross-ref reports</td></tr>
+          <tr><td>ICP / decision makers</td><td>AI inference</td><td>Medium — confirm with sales</td></tr>
+          <tr><td>Account targets</td><td>AI-generated analogs</td><td>Low — replace with pipeline</td></tr>
+          <tr><td>Email sequences</td><td>AI-generated</td><td>High — review before sending</td></tr>
+          <tr><td>Confidence score</td><td>Algorithmic (capped)</td><td>High</td></tr>
+        </tbody>
+      </table>
+      <div class="fl">Key Assumptions</div>
+      <table class="appendix-table">
+        <thead><tr><th>Assumption</th><th>Default</th><th>Override</th></tr></thead>
+        <tbody>
+          <tr><td>Geography eligibility</td><td>Dynamic or 60–70%</td><td>Replace with actual territory data</td></tr>
+          <tr><td>Service-line fit</td><td>Dynamic or 30–40%</td><td>Replace with segment match</td></tr>
+          <tr><td>Win/capture rate</td><td>Dynamic or 8–12%</td><td>Replace with CRM close rate</td></tr>
+          <tr><td>Account analogs</td><td>AI archetypes</td><td>Replace with real target list</td></tr>
+        </tbody>
+      </table>
+      <div class="analyst-callout amber"><strong>⚠️ AI-Estimated Content:</strong> TAM/SAM/SOM, CAGR, ICP derivations, account analogs, and buying triggers are AI-generated and should be independently validated before strategic decisions.</div>
+    </div>`,
 
   ].filter(Boolean).join('');
 

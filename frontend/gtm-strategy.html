@@ -3016,7 +3016,40 @@ function closeExportModal() {
 }
 
 function downloadExport() {
-  generateProfessionalPDF();
+  exportViaBackend();
+}async function exportViaBackend() {
+  showToast('Generating Enterprise Report via backend...', 'info');
+  closeExportModal();
+
+  const strategy = {
+    company_name:        state.company,
+    industry:            state.industry || '',
+    steps_completed:     Object.values(state.steps).filter(s => s.status === 'complete').length,
+    step_1_market:       state.steps[1]?.data || null,
+    step_2_tam:          state.steps[2]?.data || null,
+    step_3_icp:          state.steps[3]?.data || null,
+    step_4_sourcing:     state.steps[4]?.data || null,
+    step_5_keywords:     state.steps[5]?.data || null,
+    step_6_messaging:    state.steps[6]?.data || null,
+    step_7_intelligence: state.step7 || null,
+    total_tokens:        state.totalTokens || 0,
+  };
+
+  try {
+    const token = await window.APP.token();
+    const res = await fetch('/api/export-pdf', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ strategy }),
+    });
+    const data = await res.json();
+    if (!res.ok || !data.html) throw new Error(data.error || 'Export failed');
+    await renderBackendHtmlToPdf(data.html, data.filename || ('GTM_Enterprise_' + state.company.replace(/[^a-zA-Z0-9]/g,'_') + '_' + new Date().toISOString().slice(0,10) + '.pdf'));
+    showToast('Enterprise Report Downloaded', 'success');
+  } catch (err) {
+    console.error('Backend PDF export failed:', err);
+    showToast('PDF export failed: ' + err.message, 'error');
+  }
 }
 
 function copyAllToClipboard() {
@@ -3030,7 +3063,7 @@ function copyAllToClipboard() {
    colours, and all 6 steps + optional Step 7 intelligence.
 ═══════════════════════════════════════════════════════════════ */
 async function generateProfessionalPDF() {
-  showToast('Generating Tier-1 Enterprise PDF…', 'info');
+  showToast('Generating Universal Enterprise Report...', 'info');
 
   if (!window.jspdf) {
     await new Promise((resolve) => {
@@ -3047,7 +3080,7 @@ async function generateProfessionalPDF() {
     });
   }
 
-  // Define the massive Tier-1 HTML template
+  // Define data references
   const s1 = state.steps[1]?.data || {};
   const s2 = state.steps[2]?.data || {};
   const s3 = state.steps[3]?.data || {};
@@ -3058,293 +3091,353 @@ async function generateProfessionalPDF() {
 
   const safe = (v) => v ? v : '—';
   const esc = (s) => (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  
-  // 1. Source Attribution Logic
-  const src = (val, type) => val ? `${esc(val)} <span style="font-size:9px;color:var(--muted);font-weight:400">(Source: ${type === 'market' ? 'IDC/Gartner Q1' : 'AI estimate — validate manually'})</span>` : '— <span style="font-size:9px;color:var(--red)">(Data missing)</span>';
+  const arr = (val) => Array.isArray(val) ? val : (val ? [val] : []);
+  const dateStr = new Date().toLocaleDateString('en-GB',{year:'numeric',month:'long',day:'numeric'});
 
-  // 2. TAM Waterfall Math
-  const tamVal = safe(s2.tam_size_estimate);
-  const samVal = safe(s2.sam_estimate);
-  const waterfallMath = tamVal !== '—' ? `
-    <div style="background:rgba(0,0,0,0.3);padding:14px;border-radius:8px;border:1px solid var(--border);margin-top:10px;">
-      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-bottom:8px;font-weight:700">Waterfall Calculation</div>
-      <div style="font-family:'Space Mono',monospace;font-size:12px;color:var(--text);line-height:1.6">
-        <div>TAM: ${esc(tamVal)}</div>
-        <div style="color:var(--muted)">× Geography eligibility approx 50%</div>
-        <div style="color:var(--muted)">× Service-line fit approx 50%</div>
-        <div style="color:var(--muted)">× Realistic win/capture rate 20%</div>
-        <div style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--border);color:var(--accent);font-weight:700">
-          = Obtainable opportunity: ${esc(samVal)}
-        </div>
-      </div>
-    </div>
-  ` : '';
-
-  // 4. Confidence Matrix Breakdown
   let confScore = parseInt(s7.confidence_score) || parseInt(s1.gtm_relevance_score) || 75;
   const veracity = Math.round(confScore * 0.4);
   const timing = Math.round(confScore * 0.25);
   const icpFit = Math.round(confScore * 0.20);
   const completeness = Math.round(confScore * 0.15);
-
-  const confidenceBreakdown = `
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;">
-      <div style="background:var(--card);padding:10px;border-radius:6px;border:1px solid var(--border)"><div style="font-size:9px;color:var(--muted);text-transform:uppercase">Signal Veracity (40%)</div><div style="font-weight:700;color:var(--white)">${veracity}/40</div></div>
-      <div style="background:var(--card);padding:10px;border-radius:6px;border:1px solid var(--border)"><div style="font-size:9px;color:var(--muted);text-transform:uppercase">Market Timing (25%)</div><div style="font-weight:700;color:var(--white)">${timing}/25</div></div>
-      <div style="background:var(--card);padding:10px;border-radius:6px;border:1px solid var(--border)"><div style="font-size:9px;color:var(--muted);text-transform:uppercase">ICP Fit (20%)</div><div style="font-weight:700;color:var(--white)">${icpFit}/20</div></div>
-      <div style="background:var(--card);padding:10px;border-radius:6px;border:1px solid var(--border)"><div style="font-size:9px;color:var(--muted);text-transform:uppercase">Data Completeness (15%)</div><div style="font-weight:700;color:var(--white)">${completeness}/15</div></div>
-    </div>
-  `;
-
-  // 3. Sample Accounts (Anonymized)
-  let sampleAccounts = 'Top-5 UK Retail Bank, Large EU Automotive Manufacturer, Tier-1 APAC Telco';
+  const recommendation = esc(s7.go_no_go?.recommendation || 'WATCH');
   
-  const signalsHtml = s7.signal_summary && s7.signal_summary.length > 0 
-    ? `<div class="field"><div class="fl">Buying Signals</div><ul class="risk-list" style="background:rgba(59,130,246,0.05);border-left-color:var(--blue)">` + 
-      s7.signal_summary.map(sig => `<li><strong style="color:var(--blue);text-transform:uppercase;font-size:10px;margin-right:6px">[${esc(sig.signal_type || 'SIGNAL')}]</strong> ${esc(sig.signal_description)}</li>`).join('') +
-      `</ul></div>`
-    : '';
+  const tamVal = safe(s2.tam_size_estimate);
+  const samVal = safe(s2.sam_estimate);
+  const somVal = safe(s2.som_estimate);
+  const companyName = esc(state.company || 'Company');
 
-  const mccHtml = s7.mcc_view 
-    ? `<div class="field"><div class="fl">MCC View (Market, Client, Competitor)</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:4px">
-          <div style="background:var(--card);padding:10px;border-radius:6px;border:1px solid var(--border)"><div style="font-size:10px;font-weight:700;color:var(--blue);margin-bottom:4px">MARKET</div><div style="font-size:11px;color:var(--text);line-height:1.5">${esc(s7.mcc_view.market || '—')}</div></div>
-          <div style="background:var(--card);padding:10px;border-radius:6px;border:1px solid var(--border)"><div style="font-size:10px;font-weight:700;color:var(--accent);margin-bottom:4px">CLIENT</div><div style="font-size:11px;color:var(--text);line-height:1.5">${esc(s7.mcc_view.client || '—')}</div></div>
-          <div style="background:var(--card);padding:10px;border-radius:6px;border:1px solid var(--border)"><div style="font-size:10px;font-weight:700;color:var(--amber);margin-bottom:4px">COMPETITOR</div><div style="font-size:11px;color:var(--text);line-height:1.5">${esc(s7.mcc_view.competitor || '—')}</div></div>
-        </div>
-      </div>`
-    : '';
-
-  const dateStr = new Date().toLocaleDateString('en-GB',{year:'numeric',month:'long',day:'numeric'});
-
-  // Building the massive HTML string (reusing report.html CSS)
-  const html = `
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <meta charset="utf-8">
-      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
-      <style>
-        :root {
-          --bg:#0B0F1A; --bg-alt:#0D1120; --card:#121827; --border:#1F2937;
-          --accent:#a855f7; --accent2:#7c3aed;
-          --green:#22c55e; --amber:#f59e0b; --red:#ef4444; --blue:#3b82f6;
-          --text:#E5E7EB; --muted:#6B7280; --faint:#374151; --white:#ffffff;
-        }
-        *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
-        body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
-        body::before { content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
-          background-image:linear-gradient(rgba(168,85,247,.02) 1px,transparent 1px),
-          linear-gradient(90deg,rgba(168,85,247,.02) 1px,transparent 1px); background-size:48px 48px; }
-        .wrap { position:relative; z-index:1; max-width:1100px; margin:0 auto; padding:40px 32px; }
-        .ph { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:36px; gap:24px; }
-        .ph-left .label { font-size:10px; text-transform:uppercase; letter-spacing:.25em; color:var(--accent); font-weight:700; margin-bottom:6px; }
-        .ph-left .title { font-size:30px; font-weight:900; color:white; letter-spacing:-.8px; }
-        .ph-left .meta  { font-size:11px; color:var(--muted); margin-top:6px; }
-        .score-strip { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:32px; }
-        .sc  { background:rgba(18,24,39,.7); border:1px solid var(--border); border-radius:14px; padding:20px 22px; transition:border-color .2s; }
-        .sv  { font-size:26px; font-weight:900; font-family:'Space Mono',monospace; color:white; letter-spacing:-1px; }
-        .sl  { font-size:9px; text-transform:uppercase; letter-spacing:.18em; color:var(--muted); font-weight:700; margin-top:4px; }
-        .sv.green { color:var(--green); } .sv.amber { color:var(--amber); } .sv.purple { color:var(--accent); } .sv.red { color:var(--red); }
-        .section { background:rgba(18,24,39,.6); border:1px solid var(--border); border-radius:16px; padding:28px 32px; margin-bottom:20px; page-break-inside: avoid; }
-        .sec-header { display:flex; align-items:center; gap:12px; margin-bottom:6px; }
-        .sec-num    { width:28px; height:28px; border-radius:50%; background:var(--accent); color:white; font-size:10px; font-weight:900; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-        .sec-title  { font-size:15px; font-weight:800; color:white; }
-        .sec-context { font-size:11px; color:var(--muted); margin-bottom:20px; padding-bottom:12px; border-bottom:1px dashed var(--border); }
-        .field   { margin-bottom:14px; }
-        .fl { font-size:8px; font-weight:900; text-transform:uppercase; letter-spacing:.18em; color:var(--muted); margin-bottom:5px; }
-        .fv { font-size:12px; color:#D1D5DB; line-height:1.7; background:rgba(0,0,0,.3); border-radius:8px; padding:12px 14px; border-left:3px solid var(--accent); }
-        .fv.green { border-color:var(--green); } .fv.amber { border-color:var(--amber); } .fv.red { border-color:var(--red); }
-        .tags { display:flex; flex-wrap:wrap; gap:6px; margin-top:5px; }
-        .tag { font-size:10px; font-weight:600; padding:4px 10px; border-radius:6px; background:rgba(168,85,247,.1); color:var(--accent); border:1px solid rgba(168,85,247,.2); }
-        .tag.green { background:rgba(34,197,94,.1);  color:var(--green); border-color:rgba(34,197,94,.2); }
-        .tag.blue  { background:rgba(59,130,246,.1); color:#60a5fa;      border-color:rgba(59,130,246,.2); }
-        .tag.amber { background:rgba(245,158,11,.1); color:var(--amber); border-color:rgba(245,158,11,.2); }
-        .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:14px; }
-        .swot-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px; }
-        .swot-cell { border:1px solid var(--border); border-radius:10px; padding:14px 16px; background:rgba(0,0,0,.25); }
-        .swot-label { font-size:8px; font-weight:900; text-transform:uppercase; letter-spacing:.18em; margin-bottom:8px; }
-        .swot-s { border-top:3px solid var(--green); }  .swot-s .swot-label { color:var(--green); }
-        .swot-w { border-top:3px solid var(--red); }    .swot-w .swot-label { color:var(--red); }
-        .swot-o { border-top:3px solid var(--blue); }   .swot-o .swot-label { color:var(--blue); }
-        .swot-t { border-top:3px solid var(--amber); }  .swot-t .swot-label { color:var(--amber); }
-        .analyst-callout { background:rgba(168,85,247,.04); border:1px solid rgba(168,85,247,.2); border-left:4px solid var(--accent); border-radius:8px; padding:12px 16px; margin:14px 0; font-size:11.5px; line-height:1.7; }
-        .analyst-callout strong { color:var(--accent); }
-        .email-card { background:rgba(0,0,0,.3); border:1px solid rgba(168,85,247,.2); border-radius:10px; padding:18px 20px; margin-bottom:14px; }
-        .ea  { font-size:9px; font-weight:900; text-transform:uppercase; letter-spacing:.15em; color:var(--accent); margin-bottom:6px; }
-        .es  { font-size:12px; font-weight:800; color:white; margin-bottom:8px; }
-        .ebo { font-size:11px; color:#D1D5DB; line-height:1.7; white-space:pre-wrap; }
-        .decision-badge { display:inline-flex; align-items:center; gap:12px; background:rgba(0,0,0,.3); border-radius:12px; padding:20px 24px; border:1px solid var(--border); margin-bottom:14px; width:100%; }
-        .decision-badge .verdict { font-size:36px; font-weight:900; font-family:'Space Mono',monospace; min-width:80px; }
-        .decision-badge .reason  { font-size:12px; color:var(--text); line-height:1.65; }
-        .decision-go { color:var(--green); } .decision-watch { color:var(--amber); } .decision-nogo { color:var(--red); }
-        .risk-list { list-style:none; padding:0; margin:0; }
-        .risk-list li { padding:12px 14px; border-left:3px solid var(--blue); background:rgba(59,130,246,.05); border-radius:0 8px 8px 0; margin-bottom:10px; font-size:12px; line-height:1.65; }
-        .risk-list li strong { color:var(--blue); display:block; margin-bottom:2px; font-size:11px; text-transform:uppercase; letter-spacing:.08em; }
-        .risk-list.rl-red li { border-left-color:var(--red); background:rgba(239,68,68,.04); }
-        .risk-list.rl-red li strong { color:var(--red); }
-        .page-break { page-break-before: always; }
-      </style>
-    </head>
-    <body>
-      <div class="wrap">
-        <div class="ph">
-          <div class="ph-left">
-            <div class="label">Enterprise GTM Strategy</div>
-            <div class="title">${esc(state.company || 'Company')}</div>
-            <div class="meta">${esc(state.industry || 'General')} · Generated ${dateStr}</div>
-          </div>
-        </div>
-        
-        <div class="score-strip">
-          <div class="sc"><div class="sv ${confScore>=75?'green':confScore>=50?'amber':'red'}">${confScore}</div><div class="sl">GTM Score</div></div>
-          <div class="sc"><div class="sv">${esc(safe(s2.tam_size_estimate))}</div><div class="sl">Est. TAM</div></div>
-          <div class="sc"><div class="sv">${esc(safe(s2.growth_rate))}</div><div class="sl">CAGR</div></div>
-          <div class="sc"><div class="sv">6/6</div><div class="sl">Steps</div></div>
-        </div>
-
-        <div class="section" style="border-color:rgba(168,85,247,.25)">
-          <div class="sec-header"><div class="sec-num">📋</div><div class="sec-title">Executive Summary</div></div>
-          <div class="sec-context">Macro-opportunity assessment and strategic positioning rationale.</div>
-          <div class="field"><div class="fl">Company Overview</div><div class="fv">${esc(s1.company_overview)}</div></div>
-          <div class="field"><div class="fl">Market Position</div><div class="fv">${esc(s1.market_position)}</div></div>
-          <div class="analyst-callout"><strong>Analyst Insight:</strong> ${esc(s1.gtm_relevance_reasoning)} <span style="font-size:9px;color:var(--muted)">(Evidence-based assumption derived from signal velocity)</span></div>
-        </div>
-
-        <div class="section">
-          <div class="sec-header"><div class="sec-num">01</div><div class="sec-title">Market Intelligence</div></div>
-          <div class="sec-context">Evaluating market forces, growth signals, and competitive dynamics.</div>
-          <div class="field"><div class="fl">Growth Signals</div><div class="tags">${(Array.isArray(s1.growth_signals)?s1.growth_signals:[s1.growth_signals]).filter(Boolean).map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div></div>
-          <div class="field"><div class="fl">Key Value Propositions</div><div class="tags">${(Array.isArray(s1.products_services)?s1.products_services:[s1.products_services]).filter(Boolean).map(s=>`<span class="tag blue">${esc(s)}</span>`).join('')}</div></div>
-          <div class="grid2">
-            <div class="field"><div class="fl">Revenue Stage</div><div class="fv">${esc(s1.revenue_stage)}</div></div>
-            <div class="field"><div class="fl">Employee Count</div><div class="fv">${esc(s1.employee_count)}</div></div>
-          </div>
-        </div>
-
-        <div class="section">
-          <div class="sec-header"><div class="sec-num">02</div><div class="sec-title">TAM & Opportunity Mapping</div></div>
-          <div class="sec-context">Total Addressable Market sizing and segment prioritisation.</div>
-          <div class="grid2">
-            <div class="field"><div class="fl">Market Maturity</div><div class="fv">${esc(s2.market_maturity)}</div></div>
-            <div class="field"><div class="fl">Growth Rate (CAGR)</div><div class="fv">${src(s2.growth_rate, 'market')}</div></div>
-          </div>
-          <div class="field"><div class="fl">TAM Size Estimate</div><div class="fv">${src(s2.tam_size_estimate, 'market')}</div></div>
-          ${waterfallMath}
-          <div class="field" style="margin-top:14px;"><div class="fl">Growth Drivers</div><div class="tags">${(Array.isArray(s2.growth_drivers)?s2.growth_drivers:[s2.growth_drivers]).filter(Boolean).map(s=>`<span class="tag green">${esc(s)}</span>`).join('')}</div></div>
-        </div>
-
-        <div class="section">
-          <div class="sec-header"><div class="sec-num">03</div><div class="sec-title">Ideal Customer Profile (ICP)</div></div>
-          <div class="sec-context">Target buyer attributes, pain points, and triggers.</div>
-          <div class="grid2">
-            <div class="field"><div class="fl">Primary ICP</div><div class="fv">${esc(s3.primary_icp)}</div></div>
-            <div class="field"><div class="fl">Decision Makers</div><div class="fv">${(Array.isArray(s3.decision_makers)?s3.decision_makers:[s3.decision_makers]).filter(Boolean).join(', ')}</div></div>
-          </div>
-          <div class="field"><div class="fl">Firmographics</div><div class="fv">${esc(safe(s3.firmographics))}</div></div>
-          <div class="field"><div class="fl">Buying Triggers</div><div class="tags">${(Array.isArray(s3.buying_triggers)?s3.buying_triggers:[s3.buying_triggers]).filter(Boolean).map(s=>`<span class="tag amber">${esc(s)}</span>`).join('')}</div></div>
-          <div class="field"><div class="fl">Core Pain Points</div><div class="fv">${(Array.isArray(s3.core_pain_points)?s3.core_pain_points:[s3.core_pain_points]).filter(Boolean).map(s=>'• '+esc(s)).join('<br>')}</div></div>
-        </div>
-
-        <div class="section page-break">
-          <div class="sec-header"><div class="sec-num">04</div><div class="sec-title">Account Sourcing</div></div>
-          <div class="sec-context">Where to find accounts and how to filter the database.</div>
-          <div class="field"><div class="fl">Recommended Databases</div><div class="tags">${(Array.isArray(s4.recommended_databases)?s4.recommended_databases:[s4.recommended_databases]).filter(Boolean).map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div></div>
-          <div class="field"><div class="fl">Filter Criteria</div><div class="fv">${esc(safe(s4.filter_criteria))}</div></div>
-          <div class="field"><div class="fl">Sourcing Playbook</div><div class="fv">${esc(s4.sourcing_playbook)}</div></div>
-          <div class="field"><div class="fl">Estimated Universe</div><div class="fv">${src(s4.estimated_universe, 'ai')}</div></div>
-          <div class="field"><div class="fl">Anonymized Analog Accounts</div><div class="fv">${sampleAccounts}</div></div>
-        </div>
-
-        <div class="section">
-          <div class="sec-header"><div class="sec-num">05</div><div class="sec-title">Intent & Keyword Strategy</div></div>
-          <div class="sec-context">Signals that indicate active buying cycles.</div>
-          <div class="grid2">
-            <div class="field"><div class="fl">Primary Keywords</div><div class="tags">${(Array.isArray(s5.primary_keywords)?s5.primary_keywords:[s5.primary_keywords]).filter(Boolean).map(s=>`<span class="tag blue">${esc(s)}</span>`).join('')}</div></div>
-            <div class="field"><div class="fl">Secondary Keywords</div><div class="tags">${(Array.isArray(s5.secondary_keywords)?s5.secondary_keywords:[s5.secondary_keywords]).filter(Boolean).map(s=>`<span class="tag green">${esc(s)}</span>`).join('')}</div></div>
-          </div>
-          <div class="field"><div class="fl">Intent Signals</div><div class="tags">${(Array.isArray(s5.intent_signals)?s5.intent_signals:[s5.intent_signals]).filter(Boolean).map(s=>`<span class="tag amber">${esc(s)}</span>`).join('')}</div></div>
-          <div class="field"><div class="fl">Boolean Query</div><div class="fv">${esc(s5.boolean_query)}</div></div>
-        </div>
-
-        <div class="section page-break">
-          <div class="sec-header"><div class="sec-num">06</div><div class="sec-title">Enterprise SDR Messaging</div></div>
-          <div class="sec-context">High-converting sequences tailored to the ICP.</div>
-          ${['email_1','email_2','email_3'].map((k,i) => s6[k] ? `
-            <div class="email-card">
-              <div class="ea">Email ${i+1} · ${esc(s6[k].angle||'')}</div>
-              <div class="es">Subject: ${esc(s6[k].subject)}</div>
-              <div class="ebo">${esc(s6[k].body)}</div>
-              <div class="ec">${esc(s6[k].cta)}</div>
-            </div>
-          ` : '').join('')}
-        </div>
-
-        <div class="section page-break" style="border:1px solid rgba(168,85,247,.3);background:rgba(168,85,247,.03)">
-          <div class="sec-header"><div class="sec-num" style="background:var(--amber);">07</div><div class="sec-title">Revenue Intelligence — Decision Engine</div></div>
-          <div class="sec-context">Boardroom-grade decision layer. Actionable verdict derived from enterprise intelligence.</div>
-          ${s7.executive_brief ? `<div class="field"><div class="fl">Executive Brief</div><div class="fv" style="border-left-color:var(--blue)">${esc(s7.executive_brief)}</div></div>` : ''}
-          <div class="field"><div class="fl">Why Now</div><div class="fv amber">${esc(s7.why_now_analysis || '—')}</div></div>
-          <div class="field"><div class="fl">Strategic Hook</div><div class="analyst-callout"><strong>${esc(s7.strategic_hook || (Array.isArray(s3.buying_triggers)?s3.buying_triggers[0]:'') || '—')}</strong></div></div>
-          
-          ${signalsHtml}
-          ${mccHtml}
-
-          <div class="field"><div class="fl">Risk & Constraint Analysis</div>
-            <ul class="risk-list rl-red">
-              <li><strong>Decision Cycle Velocity</strong>Expect extended multi-stakeholder approval cycles. Map all decision nodes before deal entry.</li>
-              <li><strong>Vendor Lock-in Inertia</strong>Entrenched incumbent relationships reduce switching probability. Lead with differentiated outcome data.</li>
-            </ul>
-          </div>
-          
-          <div class="field"><div class="fl">Decision</div>
-            <div class="decision-badge">
-              <div class="verdict ${s7.go_no_go?.recommendation === 'Go' ? 'decision-go' : s7.go_no_go?.recommendation === 'No-Go' ? 'decision-nogo' : 'decision-watch'}">${esc(s7.go_no_go?.recommendation || 'Watch')}</div>
-              <div class="reason"><strong>Verdict:</strong> ${esc(s7.go_no_go?.reason || 'Market signals present but require validation.')}</div>
-            </div>
-          </div>
-          
-          <div class="field"><div class="fl">Confidence Matrix Breakdown</div>
-            ${confidenceBreakdown}
-          </div>
-        </div>
-
-        <div class="section" style="border:1px dashed var(--border);background:transparent">
-          <div class="sec-header"><div class="sec-num" style="background:var(--faint);">AP</div><div class="sec-title">Appendix & Methodology</div></div>
-          <div class="sec-context">Source validation, calculation math, and definitions.</div>
-          
-          <div class="field"><div class="fl">Data Sources</div>
-            <div class="fv">
-              • <strong>Market Sizing:</strong> Industry analysts (Gartner, Forrester, IDC) where attributed. Else, predictive AI estimates.<br>
-              • <strong>Intent Signals:</strong> Aggregated from public domain job postings, press releases, and executive movements.<br>
-              • <strong>Firmographics:</strong> Public databases and LinkedIn corpus.
-            </div>
-          </div>
-          
-          <div class="field"><div class="fl">Confidence Scoring Methodology</div>
-            <div class="fv">
-              Score (0-100) is a weighted calculation of:<br>
-              • <strong>Signal Veracity (40%):</strong> Density and recency of explicit buying signals.<br>
-              • <strong>Market Timing (25%):</strong> Alignment with budget cycles and macro tailwinds.<br>
-              • <strong>ICP Fit (20%):</strong> Firmographic and technographic match rate.<br>
-              • <strong>Data Completeness (15%):</strong> Quality of the extraction source.
-            </div>
-          </div>
-
-          <div class="field"><div class="fl">Disclaimer</div>
-            <div class="fv" style="color:var(--muted);font-size:10px;border-left-color:var(--muted)">
-              This Tier-1 Consulting Report contains AI-generated predictive insights. While all efforts are made to ensure source accuracy, all estimates labeled "AI estimate" must be manually validated before boardroom presentation. Unattributed figures are approx. models.
-            </div>
-          </div>
-        </div>
-
+  // Emails
+  const emailsHtml = ['email_1','email_2','email_3'].map((k, i) => {
+    const em = s6[k];
+    if(!em) return '';
+    return `
+      <div class="card">
+        <div class="block-label">Email ${i+1} — ${esc(em.angle||'')}</div>
+        <p><strong>Subject:</strong> ${esc(em.subject)}</p>
+        <p style="white-space:pre-wrap; font-size:10.5px;">${esc(em.body)}</p>
+        <p><span class="tag green" style="margin-top:2mm;">CTA: ${esc(em.cta)}</span></p>
       </div>
-    </body>
-    </html>
+    `;
+  }).join('');
+
+  const html = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg:       #0B0F1A;
+      --bg-alt:   #0D1120;
+      --card:     #121827;
+      --border:   #1F2937;
+      --accent:   #a855f7;
+      --accent2:  #7c3aed;
+      --green:    #22c55e;
+      --amber:    #f59e0b;
+      --red:      #ef4444;
+      --blue:     #3b82f6;
+      --text:     #E5E7EB;
+      --muted:    #6B7280;
+      --faint:    #374151;
+      --white:    #ffffff;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text);
+      font-size: 11.5px; line-height: 1.65;
+      -webkit-print-color-adjust: exact; print-color-adjust: exact;
+    }
+    .page {
+      width: 210mm; height: 297mm; overflow: hidden; /* Ensures strict boundary */
+      margin: 0; background: var(--bg);
+      padding: 15mm 18mm; position: relative;
+      page-break-after: always;
+    }
+    .page-header {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 8mm; border-bottom: 1px solid var(--border); padding-bottom: 4mm;
+    }
+    .abe-mark {
+      width: 32px; height: 32px; background: linear-gradient(135deg, var(--accent), var(--accent2));
+      border-radius: 8px; display: flex; align-items: center; justify-content: center;
+      font-family: 'Space Mono', monospace; font-size: 11px; font-weight: 700; color: white;
+    }
+    .abe-brand { display: flex; align-items: center; gap: 10px; }
+    .abe-brand-name { font-size: 12px; font-weight: 800; color: white; }
+    .abe-brand-sub { font-family: 'Space Mono', monospace; font-size: 8px; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; }
+    .conf-badge { background: rgba(168,85,247,0.08); border: 1px solid rgba(168,85,247,0.25); border-radius: 20px; padding: 4px 14px; font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+    h1 { font-size: 36px; font-weight: 900; color: white; letter-spacing: -0.5px; }
+    h2 { font-size: 18px; font-weight: 700; color: white; margin-bottom: 4mm; display: flex; align-items: center; gap: 8px; }
+    h3 { font-size: 14px; font-weight: 600; color: var(--text); margin-top: 5mm; margin-bottom: 3mm; }
+    p { margin-bottom: 3mm; }
+    .section-context { font-size: 13px; color: var(--muted); margin-bottom: 6mm; border-bottom: 1px dashed var(--border); padding-bottom: 3mm; }
+    .section-accent { display: inline-block; width: 28px; height: 28px; background: rgba(168,85,247,0.1); border: 1px solid rgba(168,85,247,0.3); border-radius: 8px; text-align: center; line-height: 26px; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 5mm 6mm; margin-bottom: 5mm; }
+    .block-label { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.15em; color: var(--muted); margin-bottom: 2mm; }
+    .data-table { width: 100%; border-collapse: collapse; margin-top: 2mm; font-size: 10px; margin-bottom: 4mm; }
+    .data-table th { text-align: left; color: var(--muted); font-weight: 600; padding: 2mm 3mm; border-bottom: 1px solid var(--border); }
+    .data-table td { padding: 2mm 3mm; border-bottom: 1px solid rgba(31,41,55,0.5); vertical-align: top; }
+    .num { font-family: 'Space Mono', monospace; text-align: right; }
+    .highlight-accent { color: var(--accent); font-weight: 700; }
+    .highlight-green { color: var(--green); font-weight: 700; }
+    .highlight-amber { color: var(--amber); font-weight: 700; }
+    .metric-number { font-size: 32px; font-weight: 900; font-family: 'Space Mono', monospace; color: var(--accent); }
+    .analyst-callout {
+      background: rgba(168,85,247,0.04); border: 1px solid rgba(168,85,247,0.2);
+      border-left: 4px solid var(--accent); border-radius: 8px;
+      padding: 4mm 5mm; margin: 4mm 0; font-size: 11px;
+    }
+    .analyst-callout strong { color: var(--accent); }
+    .analyst-callout.amber { border-left-color: var(--amber); background: rgba(245,158,11,0.04); border-color: rgba(245,158,11,0.2); }
+    .analyst-callout.amber strong { color: var(--amber); }
+    .analyst-callout.green { border-left-color: var(--green); background: rgba(34,197,94,0.04); border-color: rgba(34,197,94,0.2); }
+    .analyst-callout.green strong { color: var(--green); }
+    .analyst-callout.red { border-left-color: var(--red); background: rgba(239,68,68,0.04); border-color: rgba(239,68,68,0.2); }
+    .analyst-callout.red strong { color: var(--red); }
+    .waterfall { margin: 3mm 0; }
+    .waterfall-bar { display: flex; align-items: center; margin-bottom: 2.5mm; }
+    .waterfall-value { width: 140px; font-family: 'Space Mono', monospace; font-size: 10px; text-align: right; padding-right: 3mm; }
+    .waterfall-fill { height: 12px; border-radius: 6px; }
+    .wf-blue { background: var(--blue); } .wf-accent { background: var(--accent); } .wf-green { background: var(--green); } .wf-amber { background: var(--amber); }
+    .tag { display: inline-block; background: rgba(168,85,247,0.08); border: 1px solid rgba(168,85,247,0.2); border-radius: 6px; padding: 1.5mm 4mm; font-size: 9px; font-weight: 600; color: #c4b5fd; margin: 1mm 2mm 1mm 0; }
+    .tag.green { background: rgba(34,197,94,0.08); border-color: rgba(34,197,94,0.2); color: #86efac; }
+    .tag.amber { background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.2); color: #fcd34d; }
+    .tag.blue  { background: rgba(59,130,246,0.08); border-color: rgba(59,130,246,0.2); color: #93c5fd; }
+    .tag.red   { background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.2); color: #fca5a5; }
+    .swot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm; margin-top: 2mm; margin-bottom: 4mm; }
+    .swot-cell { border: 1px solid var(--border); border-radius: 8px; padding: 3mm 4mm; }
+    .swot-label { font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 1.5mm; }
+    .page-footer { position: absolute; bottom: 12mm; left: 18mm; right: 18mm; font-size: 8px; color: var(--faint); display: flex; justify-content: space-between; border-top: 1px solid var(--border); padding-top: 4mm; }
+    ul { padding-left: 5mm; } li { margin-bottom: 1.5mm; }
+  </style>
+</head>
+<body>
+
+<!-- COVER -->
+<div class="page" style="display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center;">
+  <div>
+    <div class="abe-mark" style="width:56px; height:56px; font-size:18px; margin:0 auto 8mm;">ABE</div>
+    <h1>${companyName}<br>GTM Intelligence Report</h1>
+    <p style="font-size:15px; color:var(--muted); margin-top:6mm;">Confidential · Senior Strategy Brief</p>
+    <p style="font-size:12px; color:var(--muted); margin-top:4mm;">Prepared by ABE AI Revenue Infrastructure<br>${dateStr}</p>
+  </div>
+  <div style="position:absolute; bottom:15mm; font-size:9px; color:var(--faint);">Classification: CONFIDENTIAL — Not for External Distribution</div>
+</div>
+
+<!-- EXECUTIVE SUMMARY -->
+<div class="page">
+  <div class="page-header"><div class="abe-brand"><div class="abe-mark">ABE</div><div><div class="abe-brand-name">AI Revenue Infrastructure</div><div class="abe-brand-sub">Enterprise GTM Platform</div></div></div><div class="conf-badge">Confidential</div></div>
+  <h2><span class="section-accent">📋</span> Executive Summary</h2>
+  
+  <div class="section-context">
+    Establishes the macro-opportunity and win-probability. Provides the highest-leverage vector for outbound strategy.
+  </div>
+
+  <div class="card">
+    <p style="font-size:13px; line-height:1.9;">
+      ${esc(s7.executive_brief || s1.company_overview || 'Strategic evaluation of market conditions and buyer readiness.')}
+    </p>
+  </div>
+  
+  <div style="display:flex; gap:4mm; margin-bottom:5mm;">
+    <div class="card" style="flex:1; text-align:center;"><div class="metric-number" style="font-size:24px;">${esc(tamVal)}</div><div class="block-label">TAM</div></div>
+    <div class="card" style="flex:1; text-align:center;"><div class="metric-number" style="color:var(--green);font-size:24px;">${esc(s2.growth_rate || 'N/A')}</div><div class="block-label">CAGR</div></div>
+    <div class="card" style="flex:1; text-align:center;"><div class="metric-number" style="color:var(--amber);font-size:24px;">${confScore}/100</div><div class="block-label">Relevance</div></div>
+    <div class="card" style="flex:1; text-align:center;"><div class="metric-number" style="color:var(--green);font-size:24px;">${recommendation}</div><div class="block-label">Verdict</div></div>
+  </div>
+  
+  <div class="analyst-callout">
+    <strong>👉 Analyst Insight:</strong> ${esc(s1.gtm_relevance_reasoning || 'Market conditions remain favorable. Execute targeted outreach immediately.')}
+  </div>
+  
+  <div style="display:flex; flex-wrap:wrap; gap:3mm; margin-top:5mm;">
+    <span class="tag green">01 Market Research</span><span class="tag green">02 TAM Mapping</span><span class="tag green">03 ICP Modeling</span><span class="tag green">04 Account Sourcing</span><span class="tag green">05 Keywords</span><span class="tag green">06 Messaging</span><span class="tag amber">07 Revenue Intel</span>
+  </div>
+  <div class="page-footer"><span>ABE · ${companyName} GTM Intelligence Report</span><span>1</span></div>
+</div>
+
+<!-- STEP 1: MARKET RESEARCH -->
+<div class="page">
+  <div class="page-header"><div class="abe-brand"><div class="abe-mark">ABE</div><div><div class="abe-brand-name">AI Revenue Infrastructure</div><div class="abe-brand-sub">Enterprise GTM Platform</div></div></div><div class="conf-badge">Confidential</div></div>
+  <h2><span class="section-accent">01</span> Market Research — The Context</h2>
+  
+  <div class="section-context">Deconstructs market positioning and isolates specific macro-triggers.</div>
+
+  <h3>1.1 · Market Position & Stage</h3>
+  <table class="data-table">
+    <tr><th>Category</th><th>Details</th></tr>
+    <tr><td><strong>Market Position</strong></td><td>${esc(s1.market_position || '—')}</td></tr>
+    <tr><td><strong>Revenue Stage</strong></td><td>${esc(s1.revenue_stage || '—')}</td></tr>
+    <tr><td><strong>Employee Count</strong></td><td>${esc(s1.employee_count || '—')}</td></tr>
+  </table>
+
+  <h3>1.2 · Strategic Growth Signals</h3>
+  <table class="data-table">
+    <tr><th>#</th><th>Signal Observed</th></tr>
+    ${arr(s1.growth_signals).map((s,i) => `<tr><td style="width:20px;">${i+1}</td><td>${esc(s)}</td></tr>`).join('')}
+  </table>
+
+  <h3>1.3 · Core Value Propositions</h3>
+  <table class="data-table">
+    <tr><th>#</th><th>Product / Service Line</th></tr>
+    ${arr(s1.products_services).map((s,i) => `<tr><td style="width:20px;">${i+1}</td><td>${esc(s)}</td></tr>`).join('')}
+  </table>
+
+  <div class="analyst-callout">
+    <strong>👉 Analyst Insight:</strong> Focus on the most unique differentiators observed in the growth signals to bypass standard procurement filters.
+  </div>
+  <div class="page-footer"><span>ABE · Market Research</span><span>2</span></div>
+</div>
+
+<!-- STEP 2: TAM MAPPING -->
+<div class="page">
+  <div class="page-header"><div class="abe-brand"><div class="abe-mark">ABE</div><div><div class="abe-brand-name">AI Revenue Infrastructure</div><div class="abe-brand-sub">Enterprise GTM Platform</div></div></div><div class="conf-badge">Confidential</div></div>
+  <h2><span class="section-accent">02</span> TAM Mapping — The Opportunity</h2>
+  
+  <div class="section-context">Quantifies the total market velocity and filters it down to the exact actionable dollar amount.</div>
+
+  <h3>2.1 · Market Maturity</h3>
+  <div class="card"><p>${esc(s2.market_maturity || '—')}</p></div>
+
+  <h3>2.2 · Waterfall Logic: TAM → SAM → SOM</h3>
+  <div class="waterfall">
+    <div class="waterfall-bar"><div class="waterfall-value">${esc(tamVal)}</div><div class="waterfall-fill wf-blue" style="width:80%;"></div><span style="margin-left:2mm;">TAM (Total Addressable)</span></div>
+    <div class="waterfall-bar"><div class="waterfall-value">${esc(samVal)}</div><div class="waterfall-fill wf-accent" style="width:50%;"></div><span style="margin-left:2mm;">SAM (Serviceable Addressable)</span></div>
+    <div class="waterfall-bar"><div class="waterfall-value">${esc(somVal)}</div><div class="waterfall-fill wf-amber" style="width:20%;"></div><span style="margin-left:2mm;">SOM (Serviceable Obtainable)</span></div>
+  </div>
+
+  <h3>2.3 · Growth Drivers</h3>
+  <div style="margin-top:4mm;">
+    ${arr(s2.growth_drivers).map(s => `<span class="tag green">${esc(s)}</span>`).join('')}
+  </div>
+
+  <div class="analyst-callout amber">
+    <strong>👉 Analyst Insight:</strong> Ensure execution is tightly aligned to the defined SOM to prevent resource bleed into non-ideal segments.
+  </div>
+  <div class="page-footer"><span>ABE · TAM Analysis</span><span>3</span></div>
+</div>
+
+<!-- STEP 3: ICP MODELING -->
+<div class="page">
+  <div class="page-header"><div class="abe-brand"><div class="abe-mark">ABE</div><div><div class="abe-brand-name">AI Revenue Infrastructure</div><div class="abe-brand-sub">Enterprise GTM Platform</div></div></div><div class="conf-badge">Confidential</div></div>
+  <h2><span class="section-accent">03</span> ICP Modeling — The Persona</h2>
+  
+  <div class="section-context">Identifies decision-makers and maps their operational pain directly to solutions.</div>
+
+  <h3>3.1 · Primary Persona & Firmographics</h3>
+  <table class="data-table">
+    <tr><th>Primary ICP</th><td>${esc(s3.primary_icp || '—')}</td></tr>
+    <tr><th>Decision Makers</th><td>${arr(s3.decision_makers).join(', ') || '—'}</td></tr>
+    <tr><th>Firmographics</th><td>${esc(s3.firmographics || '—')}</td></tr>
+  </table>
+
+  <h3>3.2 · Core Pain Points</h3>
+  <table class="data-table">
+    <tr><th>#</th><th>Identified Operational Pain</th></tr>
+    ${arr(s3.core_pain_points).map((s,i) => `<tr><td style="width:20px;">${i+1}</td><td>${esc(s)}</td></tr>`).join('')}
+  </table>
+
+  <h3>3.3 · Buying Triggers (Why buy now?)</h3>
+  <div style="margin-top:4mm;">
+    ${arr(s3.buying_triggers).map(s => `<span class="tag amber">${esc(s)}</span>`).join('')}
+  </div>
+
+  <div class="page-footer"><span>ABE · ICP Modeling</span><span>4</span></div>
+</div>
+
+<!-- STEP 4 & 5: SOURCING AND INTENT -->
+<div class="page">
+  <div class="page-header"><div class="abe-brand"><div class="abe-mark">ABE</div><div><div class="abe-brand-name">AI Revenue Infrastructure</div><div class="abe-brand-sub">Enterprise GTM Platform</div></div></div><div class="conf-badge">Confidential</div></div>
+  <h2><span class="section-accent">04</span> Account Sourcing & Intent</h2>
+  
+  <div class="section-context">Translates theoretical persona into actionable technographic logic and decodes semantic intent.</div>
+
+  <h3>4.1 · Boolean Sourcing Query</h3>
+  <div class="card"><code style="font-family:'Space Mono',monospace; font-size:10px; color:#c4b5fd; word-break:break-all;">${esc(s5.boolean_query || 'N/A')}</code></div>
+
+  <h3>4.2 · Sourcing Playbook</h3>
+  <table class="data-table">
+    <tr><th>Recommended Databases</th><td>${arr(s4.recommended_databases).join(', ') || '—'}</td></tr>
+    <tr><th>Filter Criteria</th><td>${esc(s4.filter_criteria || '—')}</td></tr>
+    <tr><th>Estimated Universe</th><td>${esc(s4.estimated_universe || '—')}</td></tr>
+    <tr><th>Execution Strategy</th><td>${esc(s4.sourcing_playbook || '—')}</td></tr>
+  </table>
+
+  <h3>5.1 · Intent & Signal Taxonomy</h3>
+  <div style="margin-bottom:3mm;"><strong>Primary Keywords:</strong><br>${arr(s5.primary_keywords).map(s => `<span class="tag blue">${esc(s)}</span>`).join('')}</div>
+  <div style="margin-bottom:3mm;"><strong>Secondary Keywords:</strong><br>${arr(s5.secondary_keywords).map(s => `<span class="tag">${esc(s)}</span>`).join('')}</div>
+  <div style="margin-bottom:3mm;"><strong>Intent Signals (Social / Event):</strong><br>${arr(s5.intent_signals).map(s => `<span class="tag amber">${esc(s)}</span>`).join('')}</div>
+
+  <div class="analyst-callout">
+    <strong>👉 Analyst Insight:</strong> Do not bid on generic terms. Syndicate outbound effort around highly specific, negative-intent keywords to intercept prospects at peak vulnerability.
+  </div>
+  <div class="page-footer"><span>ABE · Sourcing & Intent</span><span>5</span></div>
+</div>
+
+<!-- STEP 6: MESSAGING -->
+<div class="page">
+  <div class="page-header"><div class="abe-brand"><div class="abe-mark">ABE</div><div><div class="abe-brand-name">AI Revenue Infrastructure</div><div class="abe-brand-sub">Enterprise GTM Platform</div></div></div><div class="conf-badge">Confidential</div></div>
+  <h2><span class="section-accent">06</span> Messaging Playbook</h2>
+  
+  <div class="section-context">Replaces generic pitch cadences with hyper-targeted, symptom-based outreach.</div>
+
+  <h3>6.1 · 3-Touch Triggered Sequence</h3>
+  ${emailsHtml || '<p style="color:var(--muted)">No email sequence generated.</p>'}
+
+  <h3>6.2 · The Executive LinkedIn Hook</h3>
+  <div class="card"><p style="font-size:12px;"><strong>Direct Message:</strong><br>"${esc(s6.linkedin_approach || 'Hi {prospect_name}, noticed your recent activity. Let us connect.')}"</p></div>
+
+  <div class="page-footer"><span>ABE · Engagement Playbook</span><span>6</span></div>
+</div>
+
+<!-- STEP 7: REVENUE INTELLIGENCE -->
+<div class="page">
+  <div class="page-header"><div class="abe-brand"><div class="abe-mark">ABE</div><div><div class="abe-brand-name">AI Revenue Infrastructure</div><div class="abe-brand-sub">Enterprise GTM Platform</div></div></div><div class="conf-badge">Confidential</div></div>
+  <h2><span class="section-accent" style="background:rgba(251,191,36,0.1); border-color:rgba(251,191,36,0.3);">07</span> Revenue Intelligence — The Verdict</h2>
+
+  <div class="section-context">Final strategic audit. Validates the viability of execution and dictates immediate next steps.</div>
+
+  <h3>7.1 · Go / No-Go Validation</h3>
+  <div class="card">
+    <div style="display:flex; align-items:center; gap:5mm;">
+      <span class="metric-number" style="color:var(--${recommendation==='GO'?'green':recommendation==='NO-GO'?'red':'amber'});">${recommendation}</span>
+      <div><strong>Verdict Rationale:</strong><br>${esc(s7.go_no_go?.reason || 'Execute with targeted precision based on timing signals.')}</div>
+    </div>
+  </div>
+
+  <h3>7.2 · Risk Audit</h3>
+  <div class="analyst-callout red">
+    <strong>🚩 Identified Constraints:</strong><br>
+    ${arr(s7.risk_audit).map(s => `• ${esc(s)}<br>`).join('') || 'Standard execution risk.'}
+  </div>
+
+  <h3>7.3 · The "Why Now" Trigger</h3>
+  <div class="card">
+    <p><strong>The Convergence of Need and Timing:</strong></p>
+    <p style="font-size:13px; margin-top:2mm;">${esc(s7.why_now_analysis || 'Immediate engagement is recommended to preempt competitive lock-in.')}</p>
+  </div>
+
+  <h3>7.4 · Confidence Matrix Analysis</h3>
+  <table class="data-table">
+    <tr><td>Signal Veracity (40%)</td><td class="num">${veracity}/40</td><td>Evaluated density and recency of explicit buying signals.</td></tr>
+    <tr><td>Market Timing (25%)</td><td class="num">${timing}/25</td><td>Alignment with macro tailwinds.</td></tr>
+    <tr><td>ICP Fit (20%)</td><td class="num">${icpFit}/20</td><td>Firmographic and technographic match rate.</td></tr>
+    <tr><td>Data Completeness (15%)</td><td class="num">${completeness}/15</td><td>Quality of the extraction source.</td></tr>
+    <tr style="border-top:1px solid var(--accent)"><td><strong>Overall Fidelity</strong></td><td class="num highlight-accent">${confScore}/100</td><td></td></tr>
+  </table>
+
+  <div class="methodology-note" style="margin-top:5mm; font-size:9px; color:var(--muted);"><strong>Methodology:</strong> This report synthesizes data from aggregated market signals, AI predictive estimates, and public company filings. Manual validation of exact revenue figures is recommended prior to boardroom presentation.</div>
+  <div class="page-footer"><span>ABE · Executive Intelligence</span><span>7</span></div>
+</div>
+
+</body>
+</html>
   `;
 
   const iframe = document.createElement('iframe');
-  iframe.style.cssText = 'position:fixed;top:0;left:-9999px;width:794px;border:none;opacity:0;pointer-events:none';
+  iframe.style.cssText = 'position:fixed;top:0;left:-9999px;width:210mm;border:none;opacity:0;pointer-events:none;';
   document.body.appendChild(iframe);
   iframe.srcdoc = html;
   
@@ -3355,39 +3448,32 @@ async function generateProfessionalPDF() {
 
   const iDoc = iframe.contentDocument || iframe.contentWindow.document;
   
-  // Quick wait for fonts
-  await new Promise(r => setTimeout(r, 1000));
-
-  const fullHeight = Math.max(iDoc.body.scrollHeight, iDoc.documentElement.scrollHeight, 1123);
-  iframe.style.height = fullHeight + 'px';
+  // Wait for fonts to load
+  await new Promise(r => setTimeout(r, 1500));
 
   try {
-    const canvas = await window.html2canvas(iDoc.documentElement, {
-      scale: 2, useCORS: true, backgroundColor: '#0B0F1A',
-      width: 794, windowWidth: 794, height: fullHeight, windowHeight: fullHeight
-    });
-    
     const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait', compress: true });
+    const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true });
     
-    const imgData = canvas.toDataURL('image/jpeg', 0.95);
-    const pdfWidth = pdf.internal.pageSize.getWidth();
-    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-    
-    let heightLeft = pdfHeight;
-    let position = 0;
-    
-    pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, pdfHeight);
-    heightLeft -= pdf.internal.pageSize.getHeight();
-    
-    while (heightLeft >= 0) {
-      position = heightLeft - pdfHeight;
-      pdf.addPage();
-      pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, pdfHeight);
-      heightLeft -= pdf.internal.pageSize.getHeight();
+    const pages = iDoc.querySelectorAll('.page');
+    for (let i = 0; i < pages.length; i++) {
+      if (i > 0) pdf.addPage();
+      
+      const canvas = await window.html2canvas(pages[i], {
+        scale: 2, 
+        useCORS: true, 
+        backgroundColor: '#0B0F1A',
+        width: pages[i].offsetWidth,
+        height: pages[i].offsetHeight
+      });
+      
+      const imgData = canvas.toDataURL('image/jpeg', 0.95);
+      
+      // Calculate exact dimensions for A4 (210x297mm)
+      pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
     }
     
-    const filename = `GTM_Tier1_${(state.company || 'Report').replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0,10)}.pdf`;
+    const filename = `GTM_Enterprise_${companyName.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0,10)}.pdf`;
     pdf.save(filename);
     showToast(`✅ Enterprise Report Downloaded: ${filename}`, 'success');
   } catch(err) {
