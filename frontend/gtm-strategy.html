@@ -2196,224 +2196,191 @@ function getPrompt(step) {
   const prompts = {
     1: `${baseInstruction}
 
-Perform deep market research on "${co}"${ind}.
+Perform deep, insight-driven market research on "${co}"${ind}.
+
+QUALITY RULES — STRICTLY ENFORCE:
+- Every field must answer "So what?" — no generic descriptions
+- Forbidden phrases: "competitive landscape", "digital transformation", "market is growing", "solid reputation", "diverse clientele"
+- growth_signals must be specific observable facts WITH business implication (e.g. "Hiring 3 senior engineers → scaling delivery capacity → trigger for tooling/support vendors")
+- market_position must name actual competitors and a real differentiator — not just "strong position"
+- gtm_relevance_reasoning must explain WHO benefits from selling TO this company and WHY NOW
+- revenue_stage must map to a recognisable funding/ARR band: Bootstrapped / Pre-Seed / Seed / Series A / Series B / Series C+ / PE-backed / Enterprise / Public
+- tech_stack_hints must list actual technologies, not categories
 
 Return this exact JSON structure:
 {
-  "company_overview": "2-3 sentence description of what they do, founded when, HQ, size",
-  "market_position": "Their competitive position, key differentiators, main competitors",
-  "products_services": "Their main products/services with brief descriptions",
-  "gtm_relevance_score": 85,
-  "gtm_relevance_reasoning": "Why this company is (or isn't) a good GTM target",
-  "growth_signals": ["signal1", "signal2", "signal3", "signal4", "signal5"],
-  "revenue_stage": "e.g. Series B / $50M+ ARR / Enterprise",
-  "employee_count": "approximate range",
-  "tech_stack_hints": ["hint1", "hint2", "hint3"]
+  "company_overview": "2-3 sentence factual description: what they build, who they serve, approximate scale. Include founding year and HQ if known.",
+  "market_position": "Their actual standing vs named competitors. What makes them win deals or lose them. One specific differentiator.",
+  "products_services": "Bulleted list of their core offerings. Each item: product/service name + one-line description of what it solves.",
+  "gtm_relevance_score": 0,
+  "gtm_relevance_reasoning": "Who should sell TO this company, why this company is a buyer, and what pain state makes them receptive now.",
+  "growth_signals": ["Signal: observable fact → Implication: what this means for a seller approaching them"],
+  "revenue_stage": "Stage label + estimated ARR band",
+  "employee_count": "Number or range",
+  "tech_stack_hints": ["Specific technology 1", "Specific technology 2", "Specific technology 3"]
 }`,
 
     2: `${baseInstruction}
 
-You are doing TAM mapping for a company that wants to sell TO or partner with "${co}"${ind}.
+Map the Total Addressable Market for companies that sell TO or partner with "${co}"${ind}.
+
+QUALITY RULES — STRICTLY ENFORCE:
+- tam_overview must explain market dynamics, NOT just say "market is growing" — name the force driving growth
+- All size estimates must have a unit ($B / $M) and a year or CAGR range
+- Each market_segment must have a real name, a realistic size, and a priority rationale — not just "High/Medium/Low"
+- priority_opportunities must name a specific strategic action with a reason (e.g. "Target Series B SaaS companies in the ICP segment — they have budget, headcount growth, and active tooling evaluations")
+- market_maturity must be one of: Nascent / Early / Growth / Consolidating / Mature / Declining — with a one-line reason
 
 Context from Step 1:
 ${ctx}
 
 Return this exact JSON structure:
 {
-  "tam_overview": "Total addressable market description and estimated size",
-  "tam_size_estimate": "e.g. $4.2B TAM",
-  "sam_estimate": "Serviceable addressable market",
-  "growth_rate": "e.g. 23% CAGR 2024-2027",
-  "growth_drivers": "Key drivers of market growth",
+  "tam_overview": "What is this market, what force is driving it, and what is the consequence for buyers/sellers operating in it.",
+  "tam_size_estimate": "$XB (YYYY estimate)",
+  "sam_estimate": "$XM — segment that is realistically addressable given ICP fit",
+  "growth_rate": "X% CAGR YYYY–YYYY — driven by [specific driver]",
+  "growth_drivers": "2-3 specific named drivers with a one-line causal explanation each.",
   "market_segments": [
-    {"name": "Segment 1", "size": "$Xm", "priority": "High"},
-    {"name": "Segment 2", "size": "$Xm", "priority": "Medium"},
-    {"name": "Segment 3", "size": "$Xm", "priority": "Low"}
+    {"name": "Specific segment name", "size": "$Xm", "priority": "High — reason why"},
+    {"name": "Specific segment name", "size": "$Xm", "priority": "Medium — reason why"},
+    {"name": "Specific segment name", "size": "$Xm", "priority": "Low — reason why"}
   ],
-  "priority_opportunities": "Top 2-3 opportunity areas with strategic rationale",
-  "market_maturity": "Early / Growth / Mature / Declining"
+  "priority_opportunities": "Top 2-3 opportunity areas with a specific action and the commercial rationale behind it.",
+  "market_maturity": "Stage label — one sentence on what this stage means for go-to-market timing.",
+  "market_risks": "2-3 specific risks a seller faces in this market — regulatory, competitive displacement, or buyer behaviour shift."
 }`,
 
     3: `${baseInstruction}
 
-Build an Ideal Customer Profile (ICP) for companies that sell TO or partner with "${co}"${ind}.
+Build a precise Ideal Customer Profile (ICP) for vendors that sell TO or partner with "${co}"${ind}.
+
+QUALITY RULES — STRICTLY ENFORCE:
+- primary_icp and secondary_icp must name a SPECIFIC persona title + seniority + department, NOT just "CTO" — explain why that person feels the pain
+- firmographics MUST be returned as a flat STRING — not an object or nested JSON. Format: "Size: X–Y employees | ARR: $X–$Y | Industry: [vertical] | Geography: [region] | Tech maturity: [descriptor]"
+- buying_triggers must be specific, observable events — not "need for digital transformation" — e.g. "Hiring engineering manager role → building internal capability → window for external tooling"
+- core_pain_points must be business-consequential pains — not just feature gaps. Format: "Pain → Business consequence if unsolved"
+- objections must reflect REAL blockers, not generic pushback — include the underlying fear driving each objection
+- deal_cycle must include typical steps in the buying process, not just a timeframe
 
 Context from Steps 1-2:
 ${ctx}
 
 Return this exact JSON structure:
 {
-  "primary_icp": "Detailed description of the primary target buyer persona - role, seniority, department",
-  "secondary_icp": "Secondary persona description",
-  "firmographics": "Company size, ARR range, industry vertical, geography, tech maturity",
-  "buying_triggers": ["trigger1", "trigger2", "trigger3", "trigger4"],
-  "core_pain_points": "The 3 most critical pain points these buyers face that our solution could address",
-  "decision_makers": ["Title 1", "Title 2", "Title 3"],
-  "deal_cycle": "Typical deal length and process",
-  "objections": ["Common objection 1", "Common objection 2", "Common objection 3"]
+  "primary_icp": "Title + seniority + why they feel the problem acutely. One sentence on what outcome they are accountable for.",
+  "secondary_icp": "Title + role context + how they influence the buying decision.",
+  "firmographics": "Size: X–Y employees | ARR: $X–$Y | Industry: [specific vertical] | Geography: [region] | Tech maturity: [descriptor]",
+  "buying_triggers": ["Observable event → what this means for a seller (the window it opens)"],
+  "core_pain_points": "Pain 1 → consequence. Pain 2 → consequence. Pain 3 → consequence.",
+  "decision_makers": ["Primary decision-maker title", "Budget holder title", "Technical evaluator title"],
+  "deal_cycle": "Typical length + key stages: awareness → evaluation → pilot → procurement → close.",
+  "objections": ["Objection stated as buyer would say it → underlying fear → how to reframe"]
 }`,
 
     4: `${baseInstruction}
 
-Create an account sourcing strategy for finding companies like "${co}"${ind} and their decision-makers.
+Build a precise account sourcing strategy for finding and qualifying companies that buy from or partner with "${co}"${ind}.
+
+QUALITY RULES — STRICTLY ENFORCE:
+- recommended_databases must be real, named platforms with a specific reason for each (e.g. "Apollo.io — best for filtering by tech stack + headcount growth signals")
+- filter_criteria MUST be a flat STRING — not an object. Format: "Company size: X–Y | Revenue: $X–$Y | Industry: [vertical] | Tech stack includes: [tech] | Headcount growth: >X% in 12mo"
+- exclusion_criteria MUST be a flat STRING — not an object. Format: "Exclude: [specific signals that indicate wrong fit] because [reason]"
+- sourcing_playbook must be actionable steps a real SDR could follow — numbered, specific, not generic
+- estimated_universe must give a realistic range with a rationale, not just a round number
+- data_enrichment_tips must name specific data points to add and where to find them
 
 Context from Steps 1-3:
 ${ctx}
 
 Return this exact JSON structure:
 {
-  "recommended_databases": ["Apollo.io", "ZoomInfo", "LinkedIn Sales Nav", "etc - specific to this use case"],
-  "filter_criteria": "Specific filters: company size, tech stack, funding stage, headcount growth etc.",
-  "sourcing_playbook": "Step-by-step account sourcing strategy - how to find and qualify accounts",
-  "exclusion_criteria": "What to filter OUT - signs this account is wrong fit",
-  "estimated_universe": "Rough estimate of how many matching accounts exist",
-  "data_enrichment_tips": "How to enrich records once sourced"
+  "recommended_databases": ["Platform name — why it fits this specific ICP and what filter to use first"],
+  "filter_criteria": "Company size: X–Y | Annual revenue: $X–$Y | Industry: [vertical] | Tech stack: [specific tech] | Signals: [growth indicator]",
+  "sourcing_playbook": "Step 1: [specific action]. Step 2: [specific action]. Step 3: [specific action]. Step 4: [specific action]. Step 5: [qualification check before handing to AE].",
+  "exclusion_criteria": "Exclude companies that [specific red flag signals] — these indicate [wrong fit reason].",
+  "estimated_universe": "X,000–Y,000 accounts globally / in [region] — based on [size + industry filter rationale].",
+  "data_enrichment_tips": "Add: LinkedIn headcount growth (6mo), open engineering/sales roles (signal), recent funding (Crunchbase), tech stack (BuiltWith/G2). Prioritise accounts with 2+ signals active simultaneously."
 }`,
 
     5: `${baseInstruction}
 
-Generate a comprehensive keyword and search intelligence package for targeting "${co}"${ind} and similar companies.
+Generate a high-precision keyword and search intelligence package for targeting "${co}"${ind} and similar companies.
+
+QUALITY RULES — STRICTLY ENFORCE:
+- primary_keywords must reflect the BUYER's language — what they search for when in pain, not the vendor's product names
+- secondary_keywords must include job titles, tech stack terms, and competitor names — real intent signals
+- boolean_query must be a working LinkedIn/Google Boolean string with correct syntax
+- linkedin_search_strings must include title filters, seniority, company size, and at least one keyword exclusion
+- intent_signals must describe an observable buyer behaviour — not just a topic. Format: "Signal: [what you see] → Intent: [what it means they're evaluating]"
+- content_topics must be specific enough to write a real article title from, not just a subject area
 
 Context from Steps 1-4:
 ${ctx}
 
 Return this exact JSON structure:
 {
-  "primary_keywords": ["keyword1", "keyword2", "keyword3", "keyword4", "keyword5", "keyword6"],
-  "secondary_keywords": ["kw1", "kw2", "kw3", "kw4", "kw5", "kw6", "kw7", "kw8"],
-  "boolean_query": "\"keyword1\" OR \"keyword2\" AND (\"keyword3\" OR \"keyword4\") NOT \"exclusion\"",
-  "linkedin_search_strings": "Detailed LinkedIn Sales Navigator search strings with title, company size, seniority filters",
-  "intent_signals": ["signal1", "signal2", "signal3"],
-  "content_topics": ["topic for thought leadership 1", "topic 2", "topic 3"]
+  "primary_keywords": ["exact phrase buyer would search", "pain-driven keyword", "outcome-driven keyword", "job-to-be-done keyword", "trigger-event keyword", "competitor comparison keyword"],
+  "secondary_keywords": ["job title keyword", "tech stack term", "competitor name + alternative", "industry-specific term", "buying signal keyword", "problem descriptor", "solution category", "outcome metric"],
+  "boolean_query": "(\\"keyword1\\" OR \\"keyword2\\") AND (\\"pain term\\" OR \\"trigger term\\") NOT \\"exclusion term\\"",
+  "linkedin_search_strings": "Title: (CTO OR VP Engineering OR Head of Product) AND Seniority: (Director, VP, CXO) AND Company size: (51–200) AND Keywords: (\\"${co.split(' ')[0]}\\" OR \\"[industry term]\\") NOT (\\"intern\\" OR \\"student\\")",
+  "intent_signals": ["Signal: [observable action] → Intent: [what buying stage this indicates]"],
+  "content_topics": ["Specific article title that addresses a real ICP pain point", "Specific article title on a trigger event or market shift", "Comparison or alternative guide title"]
 }`,
 
     6: `${baseInstruction}
 
-═══════════════════════════════════════════════════════════════════════════════
-🔥 GENERATE OUTREACH EMAILS FROM ABE GTM PLATFORM
-═══════════════════════════════════════════════════════════════════════════════
+Write outbound email sequences FROM "${co}"${ind} TO their ideal customer prospects.
 
-YOU ARE: ABE GTM Platform - An AI-powered GTM strategy generation and outreach engine.
+CRITICAL CONTEXT: You are writing sales emails on behalf of "${co}". These emails are FROM ${co}'s sales team TO the prospect companies and personas identified in Steps 1–5.
 
-CONTEXT: You are writing emails ON BEHALF OF ABE GTM PLATFORM.
+QUALITY RULES — STRICTLY ENFORCE:
+- Every email MUST open with a specific, researched observation — not a generic hook
+- Reference at least ONE specific signal or trigger identified in the GTM research
+- Subject lines must create curiosity or name a pain — not describe the sender's product
+- Body must follow this structure: [Trigger/Observation] → [Pain consequence] → [Specific outcome ${co} delivers] → [Proof or specificity] → [Low-friction CTA]
+- CTA must be a single, specific ask — not "let's connect" or "would love to chat"
+- Avoid: "I hope this email finds you well", "At ${co} we specialize in", "our cutting-edge solutions", "we'd love to partner"
+- Every email body must start with: "Hi {prospect_name},"
+- Every email body must end with: "Best, {sender_name}"
+- Use ONLY curly brace tokens: {prospect_name}, {prospect_company}, {prospect_title}, {sender_name}
 
-YOUR TARGET: "${co}"${ind}
-
-YOUR MESSAGE: These emails should convince "${co}" that ABE GTM Platform is the solution 
-they need to:
-1. Generate complete GTM strategies (market research, ICP, sourcing, messaging)
-2. Manage outreach sequences (email, SMS, social)
-3. Score and route leads automatically
-4. Track engagement and measure results
-
-POSITIONING: Position ABE as the only all-in-one GTM platform that generates strategy 
-AND executes outreach (not just data/execution like competitors).
-
-EMAILS SHOULD EXPLAIN: "ABE GTM Platform does in 6 steps what competitors charge $50k+ 
-for consulting, and it's AI-powered, so it's done in minutes not months."
-
-USE CONTEXT FROM ALL STEPS 1-5:
+USE CONTEXT FROM ALL STEPS 1–5:
 ${ctx}
 
-═══════════════════════════════════════════════════════════════════════════════
-
-═══════════════════════════════════════════════════════════════════════════════
-🚨 CRITICAL TOKEN & COMPANY RULES (FOLLOW EXACTLY):
-═══════════════════════════════════════════════════════════════════════════════
-
-⚠️ THE EMAILS ARE FROM ABE GTM PLATFORM, NOT FROM THE PROSPECT COMPANY
-
-YOUR EMAIL SENDER: ABE GTM Platform (the AI tool)
-THE RECIPIENT: "${co}" or {prospect_company} (the company you're selling TO)
-
-EVERY EMAIL BODY MUST:
-1. Start with: "Hi {prospect_name},"
-2. Say: "At ABE GTM Platform, we..." or "ABE GTM Platform helps {prospect_company}..."
-3. NEVER say: "At ${co}, we..." or "At {prospect_company}, we..."
-4. Include: {prospect_company} at least once
-5. Reference: {prospect_title} at least once
-6. End with: "Best, {sender_name}"
-7. Use ONLY curly braces { } for tokens
-
-YOU MUST USE THESE EXACT TOKENS IN CURLY BRACES:
-  {prospect_name}     = First name of the recipient
-  {prospect_company}  = Name of their company
-  {prospect_title}    = Their job title
-  {sender_name}       = Name of the person sending email
-
-✅ CORRECT EMAIL EXAMPLES:
-"Hi {prospect_name}, At ABE GTM Platform, we help companies like {prospect_company} 
-generate complete GTM strategies. As a {prospect_title}, you probably spend months on 
-GTM planning. ABE does it in 6 minutes. Best, {sender_name}"
-
-"Hi {prospect_name}, I noticed {prospect_company} is growing. ABE GTM Platform specializes 
-in helping companies like yours build go-to-market strategies fast. We've helped similar 
-{prospect_title}s save 90% of planning time. Interested? Best, {sender_name}"
-
-"Hi {prospect_name}, {prospect_company} could benefit from ABE GTM Platform's AI-powered 
-strategy generation. Instead of consulting fees, get your complete GTM in minutes. As a 
-{prospect_title}, you'd appreciate the speed. Best, {sender_name}"
-
-❌ WRONG EXAMPLES (NEVER DO THIS):
-❌ "Hi [Name], At ${co}, we specialize..." ← WRONG COMPANY
-❌ "Hi [Name], At [Company], we help..." ← WRONG FORMAT
-❌ "Best [Your Name]" ← WRONG FORMAT
-❌ "At Katalyst Partners, we specialize..." ← WRONG - should be "At ABE GTM Platform"
-
-MANDATORY: Every email must explicitly mention "ABE GTM Platform" as the sender, 
-never the prospect company name.
-
-═══════════════════════════════════════════════════════════════════════════════
-RESPONSE FORMAT - Return this EXACT JSON:
-═══════════════════════════════════════════════════════════════════════════════
-
+Return this exact JSON structure:
 {
   "email_1": {
-    "angle": "Pain-led angle name",
-    "subject": "Subject line without tokens (max 50 chars)",
-    "body": "MUST start with Hi {prospect_name}. MUST say 'At ABE GTM Platform' or 'ABE GTM Platform helps'. MUST mention {prospect_company} and {prospect_title}. Focus on their pain point. MUST end with Best, {sender_name}. Write 3-4 paragraphs.",
-    "cta": "Clear, specific call-to-action"
+    "angle": "Pain-led — triggered by a specific signal from the research",
+    "subject": "Subject line that names the pain or trigger (max 50 chars, no tokens)",
+    "body": "Hi {prospect_name},\\n\\n[Specific observation about {prospect_company} or their situation based on research]. [Name the pain consequence — what happens if this goes unresolved]. [One sentence on what ${co} specifically does to solve this]. [Outcome or proof — specific result, not a generic claim].\\n\\n[CTA sentence].\\n\\nBest, {sender_name}",
+    "cta": "Specific, single ask — e.g. '15-minute call this week to walk through how we solved [X] for a similar [industry] company?'"
   },
   "email_2": {
-    "angle": "ROI/outcome-led angle name",
-    "subject": "Different subject line without tokens (max 50 chars)",
-    "body": "MUST start with Hi {prospect_name}. MUST say 'At ABE GTM Platform' or 'ABE GTM Platform'. MUST mention ROI benefits for {prospect_company}. Address {prospect_title} specifically. MUST end with Best, {sender_name}. Write 3-4 paragraphs.",
-    "cta": "Different call-to-action"
+    "angle": "ROI-led — built around a measurable outcome relevant to this ICP",
+    "subject": "Subject line focused on a specific outcome (max 50 chars, no tokens)",
+    "body": "Hi {prospect_name},\\n\\n[Reference a buying trigger from the research — something happening at {prospect_company} or in their market]. [Quantify the opportunity or risk]. [Connect ${co}'s specific capability to this outcome]. [Add specificity — timeframe, metric, or comparable result].\\n\\n[CTA sentence].\\n\\nBest, {sender_name}",
+    "cta": "Outcome-specific ask — e.g. 'Can I send you a one-pager on how we cut [metric] by [X] for a [size] company in [industry]?'"
   },
   "email_3": {
-    "angle": "Social proof / FOMO angle",
-    "subject": "Third subject line without tokens (max 50 chars)",
-    "body": "MUST start with Hi {prospect_name}. MUST say 'At ABE GTM Platform' or 'ABE helps'. Reference {prospect_company} success stories. Focus on {prospect_title} opportunities. Include social proof. MUST end with Best, {sender_name}. Write 3-4 paragraphs.",
-    "cta": "Call-to-action with proof or urgency"
+    "angle": "Proof-led — social proof specific to this industry or persona",
+    "subject": "Subject line with specificity or social proof signal (max 50 chars, no tokens)",
+    "body": "Hi {prospect_name},\\n\\n[Name a specific challenge {prospect_title}s in {prospect_company}'s segment face — from the ICP research]. [Reference how similar companies solved it with ${co}]. [One concrete result or proof point]. [Connect urgency to a market timing signal from the research].\\n\\n[CTA sentence].\\n\\nBest, {sender_name}",
+    "cta": "Proof-based ask — e.g. 'Worth a 20-minute call to see the case study from [similar company type]?'"
   },
-  "follow_up_sequence": "Day 3: Follow-up to {prospect_name} mentioning {prospect_company}. Day 7: New angle email. Day 14: Send ABE case study to {prospect_title}. Day 21: Final ABE pitch before pause.",
+  "follow_up_sequence": "Day 3: Reply to Email 1 — add one new data point or trigger event relevant to {prospect_name}. Day 7: Send new angle focusing on a competitor gap identified in research. Day 14: Share a specific case study or result relevant to {prospect_title} at {prospect_company}. Day 21: Final note — acknowledge timing may be off, leave a clear door open.",
   "compliance_check": {
-    "email_1_mentions_abe": true,
+    "email_1_mentions_sender_company": true,
     "email_1_has_all_tokens": true,
-    "email_2_mentions_abe": true,
+    "email_2_mentions_sender_company": true,
     "email_2_has_all_tokens": true,
-    "email_3_mentions_abe": true,
+    "email_3_mentions_sender_company": true,
     "email_3_has_all_tokens": true,
-    "never_says_at_prospect_company": true,
+    "no_generic_openers": true,
     "no_square_brackets": true,
     "all_curly_braces": true
   }
-}
-
-IMPORTANT CHECKLIST BEFORE RETURNING:
-✅ Email 1 body contains: {prospect_name}, {prospect_company}, {prospect_title}, {sender_name}
-✅ Email 2 body contains: {prospect_name}, {prospect_company}, {prospect_title}, {sender_name}
-✅ Email 3 body contains: {prospect_name}, {prospect_company}, {prospect_title}, {sender_name}
-✅ NO square brackets [ ] anywhere
-✅ ONLY curly braces { } for tokens
-✅ Subjects do NOT have tokens (just write the subject)
-✅ Each body is 3-4 paragraphs
-✅ Follow-up sequence mentions the tokens
-✅ The "token_checklist" is set to ALL TRUE
-
-If you cannot follow these rules, do not respond.
-If you cannot use ONLY curly braces and avoid square brackets, do not respond.
-Only respond with valid JSON that follows this exact format.`,
+}`,
   };
 
   return prompts[step];
@@ -3065,7 +3032,6 @@ function copyAllToClipboard() {
 async function generateProfessionalPDF() {
   showToast('Generating PDF…', 'info');
 
-  // Dynamically load jsPDF if not already present
   if (!window.jspdf) {
     await new Promise((resolve, reject) => {
       const s = document.createElement('script');
@@ -3078,323 +3044,402 @@ async function generateProfessionalPDF() {
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
 
-  // ── Design tokens ──────────────────────────────────────────────
-  const W = 210, H = 297;
-  const MARGIN = 18;
-  const COL = W - MARGIN * 2;
+  /* ── Layout constants ──────────────────────────────────────────
+     jsPDF at 8.5pt: 8.5 × (25.4/72) × 1.15 (lineHeightFactor) ≈ 3.35mm/line
+     We use 4.2mm to add breathing room without wasting vertical space.
+     All block heights are computed from these constants — never hardcoded.
+  ─────────────────────────────────────────────────────────────── */
+  const W = 210, H = 297, MARGIN = 18, COL = W - MARGIN * 2;
+  const LH   = 4.2;   // line height mm for 8.5pt body text
+  const LH8  = 4.2;   // line height mm for 8pt text (same band)
+  const LH7  = 3.8;   // line height mm for 7pt label text
+  const LPAD = 5.5;   // mm from block top to label baseline
+  const CGAP = 3.5;   // mm gap between label baseline and content baseline
+  const BPAD = 5;     // mm bottom padding inside each block
+  const GAP  = 3;     // mm gap between consecutive blocks
+
+  const blockHeight = (lineCount, lh = LH) =>
+    LPAD + CGAP + lineCount * lh + BPAD;
+
   const COLORS = {
-    bg:        [10,  14,  26],   // #0a0e1a
-    card:      [17,  24,  39],   // #111827
-    accent:    [168, 85,  247],  // purple
-    green:     [34,  197, 94],   // #22c55e
-    amber:     [251, 191, 36],   // #fbbf24
-    blue:      [59,  130, 246],  // #3b82f6
-    muted:     [107, 114, 128],  // #6b7280
-    text:      [229, 231, 235],  // #e5e7eb
-    white:     [255, 255, 255],
-    border:    [31,  41,  55],   // #1f2937
+    bg:     [10,  14,  26],
+    card:   [17,  24,  39],
+    deep:   [13,  17,  29],
+    accent: [168, 85,  247],
+    green:  [34,  197, 94],
+    amber:  [251, 191, 36],
+    blue:   [59,  130, 246],
+    pink:   [236, 72,  153],
+    teal:   [20,  184, 166],
+    orange: [249, 115, 22],
+    red:    [239, 68,  68],
+    muted:  [107, 114, 128],
+    text:   [229, 231, 235],
+    white:  [255, 255, 255],
+    border: [31,  41,  55],
   };
 
-  let y = 0; // current Y cursor
-  let page = 1;
+  let y = 0, page = 1;
+  let _stepColor  = COLORS.accent;
+  let _stepLabel  = 'GTM Strategy Report';
+  let _stepSub    = '';
 
-  // ── Helpers ────────────────────────────────────────────────────
-  const setFont = (size, style = 'normal', color = COLORS.text) => {
+  /* ── Core helpers ──────────────────────────────────────────── */
+
+  const sf = (size, style = 'normal', color = COLORS.text) => {
     doc.setFontSize(size);
     doc.setFont('helvetica', style);
     doc.setTextColor(...color);
   };
 
-  const fillRect = (x, fy, w, h, color) => {
+  const fr = (x, fy, w, h, color) => {
     doc.setFillColor(...color);
     doc.rect(x, fy, w, h, 'F');
   };
 
-  const addBorder = (x, fy, w, h, color, lw = 0.3) => {
+  const br = (x, fy, w, h, color, lw = 0.25) => {
     doc.setDrawColor(...color);
     doc.setLineWidth(lw);
     doc.rect(x, fy, w, h, 'S');
   };
 
-  const safeText = (v) => {
-    if (v === null || v === undefined) return '—';
-    if (typeof v === 'string') return v || '—';
-    if (Array.isArray(v)) return v.map(safeText).join(', ') || '—';
-    if (typeof v === 'object') return Object.entries(v)
-      .filter(([,val]) => val)
-      .map(([k,val]) => `${k.replace(/_/g,' ')}: ${Array.isArray(val) ? val.join(', ') : val}`)
-      .join(' | ') || '—';
-    return String(v);
-  };
-
-  const wrapText = (text, maxW, fontSize) => {
-    doc.setFontSize(fontSize);
+  // Always set font to normal before splitting — bold widens chars and causes wrong wraps
+  const split = (text, maxW, size = 8.5) => {
+    doc.setFontSize(size);
+    doc.setFont('helvetica', 'normal');
     return doc.splitTextToSize(String(text || '—'), maxW);
   };
 
-  const checkPage = (needed = 20) => {
-    if (y + needed > H - 20) {
-      doc.addPage();
-      page++;
-      // Dark background on every page
-      fillRect(0, 0, W, H, COLORS.bg);
-      // Header strip
-      fillRect(0, 0, W, 10, COLORS.card);
-      setFont(7, 'normal', COLORS.muted);
-      doc.text(`${state.company} — GTM Strategy Report`, MARGIN, 7);
-      doc.text(`Page ${page}`, W - MARGIN, 7, { align: 'right' });
-      // Footer
-      fillRect(0, H - 10, W, 10, COLORS.card);
-      setFont(6, 'normal', COLORS.muted);
-      doc.text('CONFIDENTIAL · Generated by ABE AI Revenue Infrastructure', W / 2, H - 4, { align: 'center' });
-      y = 18;
+  const safeStr = (v) => {
+    if (v === null || v === undefined) return '—';
+    if (typeof v === 'string')  return v.trim() || '—';
+    if (Array.isArray(v))       return v.map(safeStr).join(' · ') || '—';
+    if (typeof v === 'object')  return Object.entries(v)
+      .filter(([, x]) => x !== null && x !== undefined && x !== '')
+      .map(([k, x]) => {
+        const lbl = k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+        const val = Array.isArray(x) ? x.join(', ') : (typeof x === 'object' ? safeStr(x) : String(x));
+        return `${lbl}: ${val}`;
+      }).join(' | ') || '—';
+    return String(v);
+  };
+
+  /* ── Page management ───────────────────────────────────────── */
+
+  const stepPageHeader = () => {
+    fr(0, 0, W, H, COLORS.bg);
+    fr(0, 0, W, 13, COLORS.card);
+    doc.setFillColor(..._stepColor);
+    doc.rect(0, 0, 3, 13, 'F');
+    sf(6.5, 'bold', _stepColor);
+    doc.text(_stepLabel, MARGIN, 5.5);
+    sf(8, 'bold', COLORS.white);
+    doc.text(_stepSub, MARGIN, 10.5);
+    sf(6.5, 'normal', COLORS.muted);
+    doc.text(`${state.company}  ·  Page ${page}`, W - MARGIN, 8, { align: 'right' });
+    fr(0, H - 9, W, 9, COLORS.card);
+    sf(6, 'normal', COLORS.muted);
+    doc.text('CONFIDENTIAL · ABE AI Revenue Infrastructure', W / 2, H - 3.5, { align: 'center' });
+  };
+
+  // Check if `needed` mm still fits; if not, start a new page keeping step context
+  const ck = (needed = 20) => {
+    if (y + needed > H - 14) {
+      doc.addPage(); page++;
+      stepPageHeader();
+      y = 20;
     }
   };
 
-  const sectionHeader = (emoji, label, color = COLORS.accent) => {
-    checkPage(16);
-    fillRect(MARGIN, y, COL, 10, COLORS.card);
-    // Left accent bar
-    doc.setFillColor(...color);
-    doc.rect(MARGIN, y, 2.5, 10, 'F');
-    setFont(9, 'bold', color);
-    doc.text(`  ${emoji}  ${label.toUpperCase()}`, MARGIN + 4, y + 6.5);
-    addBorder(MARGIN, y, COL, 10, COLORS.border);
-    y += 13;
+  /* ── Block primitives ──────────────────────────────────────── */
+
+  // Single full-width labelled value block
+  const lv = (label, value, color = COLORS.deep, indent = 0) => {
+    const maxW  = COL - indent - 8;
+    const lines = split(safeStr(value), maxW, 8.5);
+    const bH    = blockHeight(lines.length);
+    ck(bH + GAP);
+    const bx = MARGIN + indent, bw = COL - indent;
+    fr(bx, y, bw, bH, color);
+    br(bx, y, bw, bH, COLORS.border);
+    sf(6.5, 'bold', COLORS.muted);
+    doc.text(label.toUpperCase(), bx + 4, y + LPAD);
+    sf(8.5, 'normal', COLORS.text);
+    doc.text(lines, bx + 4, y + LPAD + CGAP);
+    y += bH + GAP;
   };
 
-  const labelValue = (label, value, indent = 0) => {
-    const lines = wrapText(safeText(value), COL - indent - 6, 8.5);
-    const blockH = 6 + lines.length * 5 + 4;
-    checkPage(blockH);
-    fillRect(MARGIN + indent, y, COL - indent, blockH, [15, 23, 42]);
-    addBorder(MARGIN + indent, y, COL - indent, blockH, COLORS.border);
-    setFont(7, 'bold', COLORS.muted);
-    doc.text(label.toUpperCase(), MARGIN + indent + 4, y + 5);
-    setFont(8.5, 'normal', COLORS.text);
-    doc.text(lines, MARGIN + indent + 4, y + 10);
-    y += blockH + 3;
+  // Two equal-width cards side by side
+  const tc = (l1, v1, l2, v2) => {
+    const half   = (COL - 4) / 2;
+    const lines1 = split(safeStr(v1), half - 8, 8.5);
+    const lines2 = split(safeStr(v2), half - 8, 8.5);
+    const bH     = blockHeight(Math.max(lines1.length, lines2.length));
+    ck(bH + GAP);
+    // Left
+    fr(MARGIN, y, half, bH, COLORS.deep);
+    br(MARGIN, y, half, bH, COLORS.border);
+    sf(6.5, 'bold', COLORS.muted);
+    doc.text(l1.toUpperCase(), MARGIN + 4, y + LPAD);
+    sf(8.5, 'normal', COLORS.text);
+    doc.text(lines1, MARGIN + 4, y + LPAD + CGAP);
+    // Right
+    const rx = MARGIN + half + 4;
+    fr(rx, y, half, bH, COLORS.deep);
+    br(rx, y, half, bH, COLORS.border);
+    sf(6.5, 'bold', COLORS.muted);
+    doc.text(l2.toUpperCase(), rx + 4, y + LPAD);
+    sf(8.5, 'normal', COLORS.text);
+    doc.text(lines2, rx + 4, y + LPAD + CGAP);
+    y += bH + GAP;
   };
 
-  const twoCol = (l1, v1, l2, v2) => {
-    const half = (COL - 4) / 2;
-    const lines1 = wrapText(safeText(v1), half - 6, 8.5);
-    const lines2 = wrapText(safeText(v2), half - 6, 8.5);
-    const blockH = 6 + Math.max(lines1.length, lines2.length) * 5 + 4;
-    checkPage(blockH);
-    // Left card
-    fillRect(MARGIN, y, half, blockH, [15, 23, 42]);
-    addBorder(MARGIN, y, half, blockH, COLORS.border);
-    setFont(7, 'bold', COLORS.muted);
-    doc.text(l1.toUpperCase(), MARGIN + 4, y + 5);
-    setFont(8.5, 'normal', COLORS.text);
-    doc.text(lines1, MARGIN + 4, y + 10);
-    // Right card
-    fillRect(MARGIN + half + 4, y, half, blockH, [15, 23, 42]);
-    addBorder(MARGIN + half + 4, y, half, blockH, COLORS.border);
-    setFont(7, 'bold', COLORS.muted);
-    doc.text(l2.toUpperCase(), MARGIN + half + 8, y + 5);
-    setFont(8.5, 'normal', COLORS.text);
-    doc.text(lines2, MARGIN + half + 8, y + 10);
-    y += blockH + 3;
+  // Three equal-width cards — FIX: compute ALL heights first, use max
+  const threeCol = (items) => {
+    // items: [{label, value, color}]
+    const third = (COL - 8) / 3;
+    const allLines = items.map(it => split(safeStr(it.value), third - 8, 8));
+    const maxLines = Math.max(...allLines.map(l => l.length));
+    const bH = blockHeight(maxLines, LH8);
+    ck(bH + GAP + 8);
+    items.forEach(({ label, value, color }, i) => {
+      const bx = MARGIN + i * (third + 4);
+      fr(bx, y, third, bH, COLORS.deep);
+      doc.setFillColor(...color);
+      doc.rect(bx, y, 2, bH, 'F');
+      br(bx, y, third, bH, COLORS.border);
+      sf(6.5, 'bold', color);
+      doc.text(label.toUpperCase(), bx + 5, y + LPAD);
+      sf(8, 'normal', COLORS.text);
+      doc.text(allLines[i], bx + 5, y + LPAD + CGAP);
+    });
+    y += bH + GAP;
   };
 
-  const tagRow = (label, items) => {
-    const arr = Array.isArray(items) ? items : [safeText(items)];
+  // Tag row — FIX: render label first, then advance y cleanly before tags
+  const tags = (label, items, tagColor = COLORS.accent) => {
+    const arr = Array.isArray(items)
+      ? items.map(safeStr).filter(Boolean)
+      : [safeStr(items)].filter(s => s && s !== '—');
     if (!arr.length) return;
-    checkPage(16);
-    setFont(7, 'bold', COLORS.muted);
-    doc.text(label.toUpperCase(), MARGIN, y + 4);
-    y += 7;
+    ck(16);
+    // Label line
+    sf(6.5, 'bold', COLORS.muted);
+    doc.text(label.toUpperCase(), MARGIN, y + LH7);
+    y += LH7 + 3;  // advance past label before drawing tags
+    // Tag pills
     let tx = MARGIN;
     arr.forEach(tag => {
-      const t = safeText(tag);
-      const tw = doc.getTextWidth(t) + 6;
-      if (tx + tw > W - MARGIN) { y += 8; tx = MARGIN; checkPage(10); }
-      fillRect(tx, y - 4, tw, 6.5, [31, 41, 55]);
-      addBorder(tx, y - 4, tw, 6.5, COLORS.border, 0.2);
-      setFont(7.5, 'normal', COLORS.accent);
-      doc.text(t, tx + 3, y + 0.5);
+      sf(7.5, 'normal', tagColor);
+      const tw = doc.getTextWidth(tag) + 7;
+      if (tx + tw > W - MARGIN + 2) {
+        y += 8; tx = MARGIN;
+        ck(10);
+      }
+      fr(tx, y - 3.5, tw, 6.5, COLORS.card);
+      br(tx, y - 3.5, tw, 6.5, COLORS.border, 0.2);
+      doc.setTextColor(...tagColor);
+      doc.text(tag, tx + 3.5, y + 1);
       tx += tw + 3;
     });
-    y += 10;
+    y += 9;  // advance past tag row
   };
 
-  const divider = (color = COLORS.border) => {
-    checkPage(6);
-    doc.setDrawColor(...color);
-    doc.setLineWidth(0.2);
-    doc.line(MARGIN, y, W - MARGIN, y);
-    y += 6;
-  };
+  /* ── Cover page ────────────────────────────────────────────── */
+  fr(0, 0, W, H, COLORS.bg);
+  fr(0, 0, W, 72, COLORS.card);
+  // Purple top bar
+  fr(0, 0, W, 3, COLORS.accent);
 
-  // ══════════════════════════════════════════
-  // PAGE 1 — COVER PAGE
-  // ══════════════════════════════════════════
-  fillRect(0, 0, W, H, COLORS.bg);
+  sf(9, 'bold', COLORS.muted);
+  doc.text('ABE  ·  AI REVENUE INFRASTRUCTURE', MARGIN, 19);
+  sf(7, 'normal', COLORS.muted);
+  doc.text('ENTERPRISE GTM PLATFORM  ·  CONFIDENTIAL', MARGIN, 26);
 
-  // Top gradient band
-  fillRect(0, 0, W, 70, COLORS.card);
-  doc.setFillColor(168, 85, 247, 0.3);
-  doc.rect(0, 0, W, 3, 'F');
-
-  // ABE logo area
-  setFont(9, 'bold', COLORS.muted);
-  doc.text('ABE  ·  AI REVENUE INFRASTRUCTURE', MARGIN, 20);
-  setFont(7, 'normal', COLORS.muted);
-  doc.text('ENTERPRISE GTM PLATFORM  ·  CONFIDENTIAL', MARGIN, 27);
-
-  // Horizontal rule
   doc.setDrawColor(...COLORS.accent);
-  doc.setLineWidth(0.5);
-  doc.line(MARGIN, 32, W - MARGIN, 32);
+  doc.setLineWidth(0.4);
+  doc.line(MARGIN, 31, W - MARGIN, 31);
 
-  // Company name
-  setFont(26, 'bold', COLORS.white);
-  const compLines = doc.splitTextToSize(state.company || 'Company', COL);
-  doc.text(compLines, MARGIN, 48);
+  const compNameLines = doc.splitTextToSize(state.company || 'Company', COL);
+  sf(compNameLines.length > 1 ? 20 : 28, 'bold', COLORS.white);
+  doc.text(compNameLines, MARGIN, 47);
+  sf(11, 'normal', COLORS.accent);
+  doc.text('Go-To-Market Strategy Report', MARGIN, 64);
 
-  setFont(12, 'normal', COLORS.accent);
-  doc.text('Go-To-Market Strategy Report', MARGIN, 62);
-
-  // Meta row
+  // Meta cards row
   y = 80;
   const metaItems = [
-    ['Generated', new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })],
-    ['Total Tokens', state.totalTokens.toLocaleString()],
+    ['Generated',       new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'long', year:'numeric' })],
+    ['Total Tokens',    state.totalTokens.toLocaleString()],
     ['Steps Completed', '6 / 6'],
-    ['Industry', state.industry || 'General'],
+    ['Industry',        state.industry || 'General'],
   ];
-  metaItems.forEach(([label, value], i) => {
-    const x = MARGIN + i * 45;
-    fillRect(x, y, 43, 18, COLORS.card);
-    addBorder(x, y, 43, 18, COLORS.border);
-    setFont(6.5, 'bold', COLORS.muted);
-    doc.text(label.toUpperCase(), x + 3, y + 6);
-    setFont(9, 'bold', COLORS.white);
-    doc.text(String(value), x + 3, y + 14);
+  metaItems.forEach(([lbl, val], i) => {
+    const mx = MARGIN + i * 45;
+    fr(mx, y, 43, 20, COLORS.card);
+    br(mx, y, 43, 20, COLORS.border);
+    sf(6, 'bold', COLORS.muted);
+    doc.text(lbl.toUpperCase(), mx + 4, y + 7);
+    sf(val.length > 10 ? 7.5 : 9, 'bold', COLORS.white);
+    const valLines = doc.splitTextToSize(String(val), 37);
+    doc.text(valLines[0], mx + 4, y + 15);
   });
   y += 28;
 
   // Table of contents
-  fillRect(MARGIN, y, COL, 8, COLORS.card);
-  setFont(8, 'bold', COLORS.accent);
-  doc.text('CONTENTS', MARGIN + 4, y + 5.5);
-  y += 11;
+  fr(MARGIN, y, COL, 9, COLORS.card);
+  doc.setFillColor(...COLORS.accent);
+  doc.rect(MARGIN, y, 2, 9, 'F');
+  sf(8, 'bold', COLORS.accent);
+  doc.text('TABLE OF CONTENTS', MARGIN + 6, y + 6);
+  y += 12;
 
   const tocItems = [
-    ['01', 'Market Research',        'Deep Market Intelligence'],
-    ['02', 'TAM Mapping',            'Total Addressable Market Analysis'],
-    ['03', 'ICP Modeling',           'Ideal Customer Profile'],
-    ['04', 'Account Sourcing',       'Lead Database Strategy'],
-    ['05', 'Keyword Generation',     'Search Intelligence Engine'],
-    ['06', 'Messaging Creation',     'Outbound Messaging Playbook'],
-    ...(state.step7 ? [['07', 'Revenue Intelligence', 'Executive Enhancement Layer']] : []),
+    ['01', 'Market Research',     'Deep Market Intelligence',          COLORS.blue],
+    ['02', 'TAM Mapping',         'Total Addressable Market Analysis', COLORS.green],
+    ['03', 'ICP Modeling',        'Ideal Customer Profile',            COLORS.accent],
+    ['04', 'Account Sourcing',    'Lead Database Strategy',            COLORS.orange],
+    ['05', 'Keyword Generation',  'Search Intelligence Engine',        COLORS.teal],
+    ['06', 'Messaging Creation',  'Outbound Messaging Playbook',       COLORS.pink],
+    ...(state.step7 ? [['07', 'Revenue Intelligence', 'Executive Enhancement Layer', COLORS.amber]] : []),
   ];
 
-  tocItems.forEach(([num, title, sub], i) => {
-    const even = i % 2 === 0;
-    fillRect(MARGIN, y, COL, 9, even ? [13, 17, 29] : COLORS.card);
-    doc.setFillColor(...COLORS.accent);
-    doc.rect(MARGIN, y, 1.5, 9, 'F');
-    setFont(7, 'bold', COLORS.accent);
-    doc.text(num, MARGIN + 4, y + 6);
-    setFont(8, 'bold', COLORS.white);
-    doc.text(title, MARGIN + 12, y + 6);
-    setFont(7, 'normal', COLORS.muted);
-    doc.text(sub, MARGIN + 12, y + 12.5);
-    y += 10;
+  tocItems.forEach(([num, title, sub, col], i) => {
+    const ROW = 13;  // row height — tall enough for two lines + padding
+    fr(MARGIN, y, COL, ROW, i % 2 === 0 ? [13, 17, 29] : COLORS.card);
+    doc.setFillColor(...col);
+    doc.rect(MARGIN, y, 2, ROW, 'F');
+    sf(7.5, 'bold', col);
+    doc.text(num, MARGIN + 5, y + 5.5);
+    sf(8.5, 'bold', COLORS.white);
+    doc.text(title, MARGIN + 14, y + 5.5);
+    sf(7, 'normal', COLORS.muted);
+    doc.text(sub, MARGIN + 14, y + 10.5);
+    y += ROW + 1;
   });
 
-  // Footer
-  fillRect(0, H - 14, W, 14, COLORS.card);
-  setFont(6.5, 'normal', COLORS.muted);
-  doc.text('This document is confidential and prepared exclusively for the recipient. Generated by ABE AI Revenue Infrastructure.', W / 2, H - 5, { align: 'center' });
+  // Cover footer
+  fr(0, H - 13, W, 13, COLORS.card);
+  sf(6, 'normal', COLORS.muted);
+  doc.text(
+    'This document is confidential and prepared exclusively for the recipient. Generated by ABE AI Revenue Infrastructure.',
+    W / 2, H - 4.5, { align: 'center' }
+  );
 
-  // ══════════════════════════════════════════
-  // STEP PAGES
-  // ══════════════════════════════════════════
+  /* ── Step pages ────────────────────────────────────────────── */
   const stepConfigs = [
     {
-      n: 1, emoji: '🔍', label: 'STEP 01 — MARKET RESEARCH', sub: 'Deep Market Intelligence',
-      color: COLORS.blue,
+      n: 1, color: COLORS.blue,
+      label: 'STEP 01 — MARKET RESEARCH', sub: 'Deep Market Intelligence',
       render: (d) => {
-        twoCol('Company Overview', d.company_overview, 'Market Position', d.market_position);
-        twoCol('GTM Relevance Score', d.gtm_relevance_score, 'Revenue Stage', d.revenue_stage);
-        tagRow('Growth Signals', d.growth_signals);
-        labelValue('Products & Services', d.products_services);
-        labelValue('Technology Stack Hints', d.tech_stack_hints);
-        labelValue('GTM Fit Narrative', d.gtm_fit_narrative);
+        tc('Company Overview', d.company_overview, 'Market Position', d.market_position);
+        tc('GTM Relevance Score', String(d.gtm_relevance_score ?? '—'), 'Revenue Stage', d.revenue_stage);
+        tags('Growth Signals', d.growth_signals, COLORS.blue);
+        lv('Products & Services', d.products_services);
+        lv('GTM Relevance Reasoning', d.gtm_relevance_reasoning);
+        tc('Employee Count', d.employee_count, 'Technology Stack', Array.isArray(d.tech_stack_hints) ? d.tech_stack_hints.join(', ') : d.tech_stack_hints);
       },
     },
     {
-      n: 2, emoji: '📊', label: 'STEP 02 — TAM MAPPING', sub: 'Total Addressable Market Analysis',
-      color: COLORS.green,
+      n: 2, color: COLORS.green,
+      label: 'STEP 02 — TAM MAPPING', sub: 'Total Addressable Market Analysis',
       render: (d) => {
-        twoCol('TAM Size Estimate', d.tam_size_estimate, 'Growth Rate', d.growth_rate);
-        twoCol('SAM Estimate', d.sam_estimate, 'Market Maturity', d.market_maturity);
-        labelValue('TAM Overview', d.tam_overview || d.tam_description);
-        tagRow('Market Segments', (d.market_segments||[]).map(s => typeof s === 'string' ? s : `${s.name || ''} · ${s.size || ''}`));
-        labelValue('Priority Opportunities', d.priority_opportunities);
-        labelValue('Market Risks', d.market_risks);
+        tc('TAM Size Estimate', d.tam_size_estimate, 'Growth Rate', d.growth_rate);
+        tc('SAM Estimate', d.sam_estimate, 'Market Maturity', d.market_maturity);
+        lv('TAM Overview', d.tam_overview || d.tam_description);
+        lv('Growth Drivers', d.growth_drivers);
+        tags('Market Segments', (d.market_segments || []).map(s => typeof s === 'string' ? s : `${s.name || ''}${s.size ? ' · ' + s.size : ''}${s.priority ? ' — ' + s.priority : ''}`), COLORS.green);
+        lv('Priority Opportunities', d.priority_opportunities);
+        lv('Market Risks', d.market_risks);
       },
     },
     {
-      n: 3, emoji: '👤', label: 'STEP 03 — ICP MODELING', sub: 'Ideal Customer Profile',
-      color: COLORS.accent,
+      n: 3, color: COLORS.accent,
+      label: 'STEP 03 — ICP MODELING', sub: 'Ideal Customer Profile',
       render: (d) => {
-        twoCol('Primary ICP', d.primary_icp, 'Secondary ICP', d.secondary_icp);
-        labelValue('Firmographics', safeText(d.firmographics));
-        labelValue('Deal Cycle', d.deal_cycle);
-        tagRow('Buying Triggers', d.buying_triggers);
-        labelValue('Core Pain Points', d.core_pain_points);
-        tagRow('Decision Makers', d.decision_makers);
-        tagRow('Key Objections', d.objections);
+        tc('Primary ICP', d.primary_icp, 'Secondary ICP', d.secondary_icp);
+        lv('Firmographics', safeStr(d.firmographics));
+        tc('Deal Cycle', d.deal_cycle, 'Decision Makers', Array.isArray(d.decision_makers) ? d.decision_makers.join(' · ') : d.decision_makers);
+        tags('Buying Triggers', d.buying_triggers, COLORS.accent);
+        lv('Core Pain Points', d.core_pain_points);
+        tags('Key Objections', d.objections, COLORS.red);
       },
     },
     {
-      n: 4, emoji: '🗄️', label: 'STEP 04 — ACCOUNT SOURCING', sub: 'Lead Database Strategy',
-      color: [249, 115, 22],
+      n: 4, color: COLORS.orange,
+      label: 'STEP 04 — ACCOUNT SOURCING', sub: 'Lead Database Strategy',
       render: (d) => {
-        tagRow('Recommended Databases', d.recommended_databases);
-        labelValue('Filter Criteria', safeText(d.filter_criteria));
-        labelValue('Exclusion Criteria', safeText(d.exclusion_criteria));
-        labelValue('Sourcing Playbook', d.sourcing_playbook);
-        labelValue('Estimated Universe', d.estimated_universe);
-        labelValue('Data Enrichment Tips', d.data_enrichment_tips);
+        tags('Recommended Databases', d.recommended_databases, COLORS.orange);
+        lv('Filter Criteria', safeStr(d.filter_criteria));
+        lv('Exclusion Criteria', safeStr(d.exclusion_criteria));
+        lv('Sourcing Playbook', d.sourcing_playbook);
+        tc('Estimated Universe', d.estimated_universe, 'Data Enrichment Tips', d.data_enrichment_tips);
       },
     },
     {
-      n: 5, emoji: '🔑', label: 'STEP 05 — KEYWORD GENERATION', sub: 'Search Intelligence Engine',
-      color: [20, 184, 166],
+      n: 5, color: COLORS.teal,
+      label: 'STEP 05 — KEYWORD GENERATION', sub: 'Search Intelligence Engine',
       render: (d) => {
-        tagRow('Primary Keywords', d.primary_keywords);
-        tagRow('Secondary Keywords', d.secondary_keywords);
-        labelValue('Boolean Query', d.boolean_query);
-        labelValue('LinkedIn Search Strings', Array.isArray(d.linkedin_search_strings) ? d.linkedin_search_strings.join('\n') : d.linkedin_search_strings);
-        tagRow('Intent Signals', d.intent_signals);
-        tagRow('Content Topics', d.content_topics);
+        tags('Primary Keywords', d.primary_keywords, COLORS.teal);
+        tags('Secondary Keywords', d.secondary_keywords, COLORS.blue);
+        lv('Boolean Query', d.boolean_query, [11, 20, 35]);
+        lv('LinkedIn Search Strings', Array.isArray(d.linkedin_search_strings) ? d.linkedin_search_strings.join('\n') : d.linkedin_search_strings);
+        tags('Intent Signals', d.intent_signals, COLORS.amber);
+        tags('Content Topics', d.content_topics, COLORS.muted);
       },
     },
     {
-      n: 6, emoji: '✉️', label: 'STEP 06 — MESSAGING CREATION', sub: 'Outbound Messaging Playbook',
-      color: [236, 72, 153],
+      n: 6, color: COLORS.pink,
+      label: 'STEP 06 — MESSAGING CREATION', sub: 'Outbound Messaging Playbook',
       render: (d) => {
-        ['email_1','email_2','email_3'].forEach((key, i) => {
+        ['email_1', 'email_2', 'email_3'].forEach((key, i) => {
           const e = d[key];
           if (!e) return;
-          checkPage(40);
-          const angle = e.angle || `Email ${i+1}`;
-          fillRect(MARGIN, y, COL, 7, COLORS.card);
-          setFont(8, 'bold', COLORS.accent);
-          doc.text(`EMAIL ${i+1}  ·  ${angle.toUpperCase()}`, MARGIN + 4, y + 5);
-          y += 10;
-          labelValue('Subject', e.subject);
-          labelValue('Body', e.body);
-          labelValue('CTA', e.cta);
-          y += 2;
+
+          // Pre-calculate this email's total height to check if it fits on current page
+          const subjLines = split(safeStr(e.subject), COL - 8, 8.5);
+          const bodyLines = split(safeStr(e.body), COL - 8, 8.5);
+          const ctaLines  = split(safeStr(e.cta),  COL - 8, 8.5);
+          const emailH = 10 + blockHeight(subjLines.length) + blockHeight(bodyLines.length) + blockHeight(ctaLines.length) + GAP * 4;
+          ck(Math.min(emailH, 60));  // ensure at least the header + subject fit together
+
+          // Email header bar
+          fr(MARGIN, y, COL, 9, COLORS.card);
+          doc.setFillColor(...COLORS.pink);
+          doc.rect(MARGIN, y, 2, 9, 'F');
+          sf(7, 'bold', COLORS.pink);
+          doc.text(`EMAIL ${i + 1}`, MARGIN + 5, y + 3.5);
+          sf(8, 'bold', COLORS.white);
+          doc.text((e.angle || `Email ${i + 1}`).toUpperCase(), MARGIN + 5, y + 7.5);
+          y += 12;
+
+          lv('Subject Line', e.subject, COLORS.deep);
+          lv('Email Body', e.body, COLORS.deep);
+          lv('Call To Action', e.cta, COLORS.deep);
+          y += 4;
         });
-        if (d.linkedin_message) labelValue('LinkedIn Message', d.linkedin_message);
+
+        if (d.linkedin_message) {
+          ck(10);
+          fr(MARGIN, y, COL, 9, COLORS.card);
+          doc.setFillColor(...COLORS.blue);
+          doc.rect(MARGIN, y, 2, 9, 'F');
+          sf(8, 'bold', COLORS.white);
+          doc.text('LINKEDIN MESSAGE', MARGIN + 5, y + 6);
+          y += 12;
+          lv('Message', d.linkedin_message, COLORS.deep);
+        }
+
+        if (d.follow_up_sequence) {
+          ck(10);
+          fr(MARGIN, y, COL, 9, COLORS.card);
+          doc.setFillColor(...COLORS.amber);
+          doc.rect(MARGIN, y, 2, 9, 'F');
+          sf(8, 'bold', COLORS.white);
+          doc.text('FOLLOW-UP SEQUENCE', MARGIN + 5, y + 6);
+          y += 12;
+          lv('Sequence', d.follow_up_sequence, COLORS.deep);
+        }
       },
     },
   ];
@@ -3403,157 +3448,139 @@ async function generateProfessionalPDF() {
     const d = state.steps[cfg.n]?.data;
     if (!d) continue;
 
-    doc.addPage();
-    page++;
-    fillRect(0, 0, W, H, COLORS.bg);
-
-    // Page header
-    fillRect(0, 0, W, 14, COLORS.card);
-    doc.setFillColor(...cfg.color);
-    doc.rect(0, 0, 3, 14, 'F');
-    setFont(7, 'bold', cfg.color);
-    doc.text(cfg.label, MARGIN, 6);
-    setFont(8.5, 'bold', COLORS.white);
-    doc.text(cfg.sub, MARGIN, 11);
-    setFont(7, 'normal', COLORS.muted);
-    doc.text(`${state.company}  ·  Page ${page}`, W - MARGIN, 9, { align: 'right' });
-
-    // Footer
-    fillRect(0, H - 10, W, 10, COLORS.card);
-    setFont(6, 'normal', COLORS.muted);
-    doc.text('CONFIDENTIAL · ABE AI Revenue Infrastructure', W / 2, H - 4, { align: 'center' });
-
-    y = 22;
+    doc.addPage(); page++;
+    _stepColor = cfg.color;
+    _stepLabel = cfg.label;
+    _stepSub   = cfg.sub;
+    stepPageHeader();
+    y = 20;
     cfg.render(d);
   }
 
-  // ══════════════════════════════════════════
-  // STEP 7 — REVENUE INTELLIGENCE (if generated)
-  // ══════════════════════════════════════════
+  /* ── Step 7 — Revenue Intelligence ────────────────────────── */
   if (state.step7) {
     const s7 = state.step7;
     doc.addPage(); page++;
-    fillRect(0, 0, W, H, COLORS.bg);
+    _stepColor = COLORS.amber;
+    _stepLabel = 'STEP 07 — REVENUE INTELLIGENCE ENHANCEMENT  ·  OPTIONAL LAYER';
+    _stepSub   = 'Executive Signal Analysis & Go/No-Go Recommendation';
+    stepPageHeader();
+    y = 20;
 
-    // Header with amber accent
-    fillRect(0, 0, W, 14, COLORS.card);
-    doc.setFillColor(...COLORS.amber);
-    doc.rect(0, 0, 3, 14, 'F');
-    setFont(7, 'bold', COLORS.amber);
-    doc.text('STEP 07 — REVENUE INTELLIGENCE ENHANCEMENT  ·  OPTIONAL LAYER', MARGIN, 6);
-    setFont(8.5, 'bold', COLORS.white);
-    doc.text('Executive Signal Analysis & Go/No-Go Recommendation', MARGIN, 11);
-    setFont(7, 'normal', COLORS.muted);
-    doc.text(`${state.company}  ·  Page ${page}`, W - MARGIN, 9, { align: 'right' });
-    fillRect(0, H - 10, W, 10, COLORS.card);
-    setFont(6, 'normal', COLORS.muted);
-    doc.text('CONFIDENTIAL · ABE AI Revenue Infrastructure', W / 2, H - 4, { align: 'center' });
+    // ── Hero row: Go/No-Go · Confidence · Reason ──────────────
+    const gng      = s7.go_no_go?.recommendation || 'Watch';
+    const gngColor = gng === 'Go' ? COLORS.green : gng === 'No-Go' ? COLORS.red : COLORS.amber;
+    const heroH    = 22;
+    ck(heroH + GAP);
 
-    y = 22;
+    // Go/No-Go card
+    fr(MARGIN, y, 38, heroH, COLORS.card);
+    br(MARGIN, y, 38, heroH, gngColor, 0.5);
+    sf(6, 'bold', COLORS.muted);
+    doc.text('GO / NO-GO', MARGIN + 4, y + 7);
+    sf(16, 'bold', gngColor);
+    doc.text(gng.toUpperCase(), MARGIN + 4, y + 17);
 
-    // Go/No-Go + Confidence Score hero row
-    checkPage(24);
-    const gng = s7.go_no_go?.recommendation || 'Watch';
-    const gngColor = gng === 'Go' ? COLORS.green : gng === 'No-Go' ? [239,68,68] : COLORS.amber;
-    fillRect(MARGIN, y, 40, 20, COLORS.card);
-    addBorder(MARGIN, y, 40, 20, gngColor, 0.5);
-    setFont(7, 'bold', COLORS.muted);
-    doc.text('GO / NO-GO', MARGIN + 4, y + 6);
-    setFont(14, 'bold', gngColor);
-    doc.text(gng.toUpperCase(), MARGIN + 4, y + 16);
+    // Confidence card
+    fr(MARGIN + 41, y, 34, heroH, COLORS.card);
+    br(MARGIN + 41, y, 34, heroH, COLORS.border);
+    sf(6, 'bold', COLORS.muted);
+    doc.text('CONFIDENCE', MARGIN + 45, y + 7);
+    sf(16, 'bold', COLORS.amber);
+    doc.text(`${s7.confidence_score ?? '—'}/100`, MARGIN + 45, y + 17);
 
-    fillRect(MARGIN + 44, y, 40, 20, COLORS.card);
-    addBorder(MARGIN + 44, y, 40, 20, COLORS.border);
-    setFont(7, 'bold', COLORS.muted);
-    doc.text('CONFIDENCE', MARGIN + 48, y + 6);
-    setFont(14, 'bold', COLORS.amber);
-    doc.text(`${s7.confidence_score}/100`, MARGIN + 48, y + 16);
-
+    // Reason card — fills remaining width
+    const rxStart = MARGIN + 78;
+    const rxW     = COL - 78;
     if (s7.go_no_go?.reason) {
-      const rLines = wrapText(s7.go_no_go.reason, COL - 90, 8);
-      fillRect(MARGIN + 88, y, COL - 88, 20, COLORS.card);
-      addBorder(MARGIN + 88, y, COL - 88, 20, COLORS.border);
-      setFont(7, 'bold', COLORS.muted);
-      doc.text('REASON', MARGIN + 92, y + 6);
-      setFont(8, 'normal', COLORS.text);
-      doc.text(rLines.slice(0,2), MARGIN + 92, y + 12);
+      const rLines = split(s7.go_no_go.reason, rxW - 8, 8);
+      fr(rxStart, y, rxW, heroH, COLORS.card);
+      br(rxStart, y, rxW, heroH, COLORS.border);
+      sf(6, 'bold', COLORS.muted);
+      doc.text('REASON', rxStart + 4, y + 7);
+      sf(8, 'normal', COLORS.text);
+      doc.text(rLines.slice(0, 2), rxStart + 4, y + 12);
     }
-    y += 25;
+    y += heroH + GAP + 2;
 
-    // Executive Brief
-    labelValue('Executive Brief', s7.executive_brief);
+    // ── Executive Brief ──────────────────────────────────────
+    lv('Executive Brief', s7.executive_brief, COLORS.deep);
 
-    // Buying Signals
+    // ── Buying Signals ───────────────────────────────────────
     if (s7.signal_summary?.length) {
-      checkPage(12);
-      setFont(7, 'bold', COLORS.muted);
+      ck(12);
+      sf(6.5, 'bold', COLORS.muted);
       doc.text('BUYING SIGNALS', MARGIN, y + 4);
       y += 8;
       s7.signal_summary.forEach(sig => {
-        const strColor = sig.strength === 'High' ? COLORS.green : sig.strength === 'Medium' ? COLORS.amber : COLORS.muted;
-        const desc = wrapText(sig.signal_description || '', COL - 40, 8);
-        const bH = 6 + desc.length * 5 + 2;
-        checkPage(bH + 2);
-        fillRect(MARGIN, y, COL, bH, [13, 17, 29]);
-        addBorder(MARGIN, y, COL, bH, COLORS.border);
+        const strColor   = sig.strength === 'High' ? COLORS.green : sig.strength === 'Medium' ? COLORS.amber : COLORS.muted;
+        const descLines  = split(sig.signal_description || '—', COL - 8, 8);
+        const sigH       = blockHeight(descLines.length, LH8);
+        ck(sigH + 2);
+        fr(MARGIN, y, COL, sigH, COLORS.deep);
         doc.setFillColor(...strColor);
-        doc.rect(MARGIN, y, 1.5, bH, 'F');
-        setFont(7, 'bold', strColor);
-        const typeLabel = (sig.signal_type || '').replace(/_/g,' ').toUpperCase();
-        doc.text(`${typeLabel}  ·  ${(sig.strength||'').toUpperCase()}`, MARGIN + 4, y + 5);
-        setFont(8, 'normal', COLORS.text);
-        doc.text(desc, MARGIN + 4, y + 10);
-        y += bH + 3;
+        doc.rect(MARGIN, y, 2, sigH, 'F');
+        br(MARGIN, y, COL, sigH, COLORS.border);
+        const typeLabel = (sig.signal_type || '').replace(/_/g, ' ').toUpperCase();
+        sf(6.5, 'bold', strColor);
+        doc.text(`${typeLabel}  ·  ${(sig.strength || '').toUpperCase()}`, MARGIN + 5, y + LPAD);
+        sf(8, 'normal', COLORS.text);
+        doc.text(descLines, MARGIN + 5, y + LPAD + CGAP);
+        y += sigH + GAP;
       });
     }
 
-    // Why Now + Persona
-    twoCol('Why Now Analysis', s7.why_now_analysis, 'Priority Persona', `${s7.persona_priority?.persona || '—'}\n\n${s7.persona_priority?.reason || ''}`);
+    // ── Why Now + Persona ─────────────────────────────────────
+    const personaStr = `${s7.persona_priority?.persona || '—'}\n${s7.persona_priority?.reason || ''}`;
+    tc('Why Now Analysis', s7.why_now_analysis, 'Priority Persona', personaStr);
 
-    // MCC View
+    // ── MCC View — FIX: compute max height across all 3 cols first ──
     if (s7.mcc_view) {
-      checkPage(30);
-      setFont(7, 'bold', COLORS.muted);
-      doc.text('MARKET · CLIENT · COMPETITOR VIEW', MARGIN, y + 4);
-      y += 8;
-      const third = (COL - 6) / 3;
-      [
-        ['MARKET',     s7.mcc_view.market,     COLORS.blue],
-        ['CLIENT',     s7.mcc_view.client,     COLORS.accent],
-        ['COMPETITOR', s7.mcc_view.competitor, COLORS.amber],
-      ].forEach(([lbl, val, col], i) => {
-        const lines = wrapText(safeText(val), third - 6, 8);
-        const bH = 8 + lines.length * 5 + 3;
-        const bx = MARGIN + i * (third + 3);
-        fillRect(bx, y, third, bH, [13,17,29]);
-        doc.setFillColor(...col);
-        doc.rect(bx, y, 1.5, bH, 'F');
-        addBorder(bx, y, third, bH, COLORS.border);
-        setFont(7, 'bold', col);
-        doc.text(lbl, bx + 4, y + 6);
-        setFont(8, 'normal', COLORS.text);
-        doc.text(lines, bx + 4, y + 11);
-        // Update y after all three
-        if (i === 2) y += bH + 4;
-      });
+      ck(14);
+      sf(6.5, 'bold', COLORS.muted);
+      doc.text('MARKET  ·  CLIENT  ·  COMPETITOR VIEW', MARGIN, y + 4);
+      y += 9;
+      threeCol([
+        { label: 'Market',     value: s7.mcc_view.market,     color: COLORS.blue },
+        { label: 'Client',     value: s7.mcc_view.client,     color: COLORS.accent },
+        { label: 'Competitor', value: s7.mcc_view.competitor, color: COLORS.amber },
+      ]);
     }
 
-    // Strategic Hook
+    // ── Strategic Hook ────────────────────────────────────────
     if (s7.strategic_hook) {
-      checkPage(18);
-      fillRect(MARGIN, y, COL, 16, [30, 20, 50]);
-      addBorder(MARGIN, y, COL, 16, COLORS.accent, 0.5);
-      setFont(7, 'bold', COLORS.muted);
-      doc.text('STRATEGIC HOOK', MARGIN + 4, y + 5);
-      setFont(9, 'bolditalic', COLORS.white);
-      const hookLines = wrapText(`"${s7.strategic_hook}"`, COL - 8, 9);
-      doc.text(hookLines, MARGIN + 4, y + 11);
-      y += 20;
+      const hookLines = split(`"${s7.strategic_hook}"`, COL - 12, 9.5);
+      const hookH     = LPAD + CGAP + hookLines.length * (LH + 0.8) + BPAD;
+      ck(hookH + GAP);
+      fr(MARGIN, y, COL, hookH, [28, 16, 52]);
+      br(MARGIN, y, COL, hookH, COLORS.accent, 0.5);
+      sf(6, 'bold', COLORS.muted);
+      doc.text('STRATEGIC HOOK', MARGIN + 5, y + LPAD);
+      sf(9.5, 'bolditalic', COLORS.white);
+      doc.text(hookLines, MARGIN + 5, y + LPAD + CGAP + 1);
+      y += hookH + GAP;
+    }
+
+    // ── Data Quality Audit ─────────────────────────────────────
+    if (s7._data_quality) {
+      const dq = s7._data_quality;
+      const capped = dq.confidence_ai_claimed > dq.confidence_after_cap;
+      const auditStr = `Data richness: ${dq.richness_score}/100  ·  Signals found/used: ${dq.signals_before_filter}→${dq.signals_after_filter}  ·  ${capped ? `AI claimed ${dq.confidence_ai_claimed} — capped to ${dq.confidence_after_cap} by data richness` : `Confidence verified: ${dq.confidence_after_cap}/100`}`;
+      const auditLines = split(auditStr, COL - 8, 7.5);
+      const auditH     = blockHeight(auditLines.length, LH7);
+      ck(auditH + GAP);
+      fr(MARGIN, y, COL, auditH, [8, 12, 22]);
+      br(MARGIN, y, COL, auditH, COLORS.border, 0.2);
+      sf(6, 'bold', COLORS.muted);
+      doc.text('DATA QUALITY AUDIT', MARGIN + 5, y + LPAD);
+      sf(7.5, 'normal', [capped ? 245 : 107, capped ? 158 : 114, capped ? 11 : 128]);
+      doc.text(auditLines, MARGIN + 5, y + LPAD + CGAP);
+      y += auditH + GAP;
     }
   }
 
-  // ── Save file ──────────────────────────────────────────────────
-  const filename = `GTM_Strategy_${(state.company||'Report').replace(/[^a-zA-Z0-9]/g,'_')}_${new Date().toISOString().slice(0,10)}.pdf`;
+  /* ── Save ──────────────────────────────────────────────────── */
+  const filename = `GTM_Strategy_${(state.company || 'Report').replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
   doc.save(filename);
   showToast(`✅ PDF Downloaded: ${filename}`, 'success');
   closeExportModal();
