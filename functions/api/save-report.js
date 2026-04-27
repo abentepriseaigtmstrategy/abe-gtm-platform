@@ -3,6 +3,10 @@
  * Spec-compliant wrapper around gtm.js action:save_strategy.
  * Accepts: { strategy, company_name }
  * Returns: { success: true, report_id }
+ *
+ * v2: Passes through enterprise report fields (step_7_intelligence, full_report,
+ *     company_url, scraped_profile) so enhanced reports persist correctly.
+ *     Old payloads without these fields still save — all new fields default to null.
  */
 import { verifyAuth, corsHeaders, validate, sanitise, errRes, okRes } from './_middleware.js';
 
@@ -38,17 +42,26 @@ export async function onRequestPost(context) {
     6: strategy.step_6_messaging || null,
   };
 
+  // ── Build the save payload ────────────────────────────────────
+  // All new enterprise fields default to null for backward compatibility.
+  // Old reports that lack these fields will save without error.
+  const savePayload = {
+    action:                'save_strategy',
+    company_name:          sanitise(company_name, 200),
+    industry:              strategy.industry           || null,
+    steps,
+    total_tokens:          strategy.total_tokens        || 0,
+    company_url:           strategy.company_url         || null,
+    scraped_profile:       strategy.scraped_profile     || null,
+    full_report:           strategy.full_report         || null,
+    step_7_intelligence:   strategy.step_7_intelligence || null,
+  };
+
   try {
     const res = await fetch(`${baseUrl}/api/gtm`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', Authorization: token },
-      body: JSON.stringify({
-        action:       'save_strategy',
-        company_name: sanitise(company_name, 200),
-        industry:     strategy.industry || null,
-        steps,
-        total_tokens: strategy.total_tokens || 0,
-      }),
+      body: JSON.stringify(savePayload),
     });
 
     const data = await res.json();
