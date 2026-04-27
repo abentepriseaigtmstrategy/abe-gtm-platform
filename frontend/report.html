@@ -10,169 +10,188 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="auth-guard.js"></script>
   <style>
-    :root{--bg:#0B0F1A;--card:#121827;--border:#1F2937;--accent:#a855f7;--accent2:#7c3aed;
-      --green:#22c55e;--amber:#f59e0b;--red:#ef4444;--text:#E5E7EB;--muted:#6B7280}
-    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-    body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh}
-    body::before{content:'';position:fixed;inset:0;z-index:0;pointer-events:none;
+    :root {
+      --bg:#0B0F1A; --bg-alt:#0D1120; --card:#121827; --border:#1F2937;
+      --accent:#a855f7; --accent2:#7c3aed;
+      --green:#22c55e; --amber:#f59e0b; --red:#ef4444; --blue:#3b82f6;
+      --text:#E5E7EB; --muted:#6B7280; --faint:#374151; --white:#ffffff;
+    }
+    *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+    body::before { content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
       background-image:linear-gradient(rgba(168,85,247,.02) 1px,transparent 1px),
-      linear-gradient(90deg,rgba(168,85,247,.02) 1px,transparent 1px);background-size:48px 48px}
+      linear-gradient(90deg,rgba(168,85,247,.02) 1px,transparent 1px); background-size:48px 48px; }
 
-    /* NAV */
-    #topnav{position:sticky;top:0;z-index:100;background:rgba(11,15,26,.95);
-      backdrop-filter:blur(24px);border-bottom:1px solid rgba(31,41,55,.6);
-      padding:0 32px;display:flex;align-items:center;justify-content:space-between;height:58px}
-    .nav-brand{display:flex;align-items:center;gap:12px;text-decoration:none}
-    .nav-mark{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),var(--accent2));
-      border-radius:8px;display:flex;align-items:center;justify-content:center;
-      font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:white}
-    .nbname{font-size:11px;font-weight:800;color:white}
-    .nbsub{font-size:8px;color:var(--muted);letter-spacing:.14em;text-transform:uppercase}
-    .nav-right{display:flex;align-items:center;gap:10px}
-    .btn{display:inline-flex;align-items:center;gap:7px;padding:8px 18px;font-size:10px;
-      font-weight:800;letter-spacing:.08em;text-transform:uppercase;border-radius:8px;
-      cursor:pointer;border:none;transition:all .15s}
-    .btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:white}
-    .btn-primary:hover{opacity:.9;transform:translateY(-1px)}
-    .btn-outline{background:transparent;color:var(--muted);border:1px solid var(--border)}
-    .btn-outline:hover{border-color:var(--accent);color:white}
-    .btn:disabled{opacity:.5;cursor:not-allowed;transform:none!important}
+    /* ── NAV ── */
+    #topnav { position:sticky; top:0; z-index:100; background:rgba(11,15,26,.95);
+      backdrop-filter:blur(24px); border-bottom:1px solid rgba(31,41,55,.6);
+      padding:0 32px; display:flex; align-items:center; justify-content:space-between; height:58px; }
+    .nav-brand { display:flex; align-items:center; gap:12px; text-decoration:none; }
+    .nav-mark { width:32px; height:32px; background:linear-gradient(135deg,var(--accent),var(--accent2));
+      border-radius:8px; display:flex; align-items:center; justify-content:center;
+      font-family:'Space Mono',monospace; font-size:11px; font-weight:700; color:white; }
+    .nbname { font-size:11px; font-weight:800; color:white; }
+    .nbsub  { font-size:8px; color:var(--muted); letter-spacing:.14em; text-transform:uppercase; }
+    .nav-right { display:flex; align-items:center; gap:10px; }
+    .btn { display:inline-flex; align-items:center; gap:7px; padding:8px 18px; font-size:10px;
+      font-weight:800; letter-spacing:.08em; text-transform:uppercase; border-radius:8px;
+      cursor:pointer; border:none; transition:all .15s; }
+    .btn-primary { background:linear-gradient(135deg,var(--accent),var(--accent2)); color:white; }
+    .btn-primary:hover { opacity:.9; transform:translateY(-1px); }
+    .btn-outline { background:transparent; color:var(--muted); border:1px solid var(--border); }
+    .btn-outline:hover { border-color:var(--accent); color:white; }
+    .btn:disabled { opacity:.5; cursor:not-allowed; transform:none!important; }
 
-    /* LAYOUT */
-    .wrap{position:relative;z-index:1;max-width:1100px;margin:0 auto;padding:40px 32px}
-    .ph{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:36px;gap:24px}
-    .ph-left .label{font-size:10px;text-transform:uppercase;letter-spacing:.25em;color:var(--accent);font-weight:700;margin-bottom:6px}
-    .ph-left .title{font-size:30px;font-weight:900;color:white;letter-spacing:-.8px}
-    .ph-left .meta{font-size:11px;color:var(--muted);margin-top:6px}
-    .ph-actions{display:flex;gap:10px;flex-shrink:0}
+    /* ── LAYOUT ── */
+    .wrap { position:relative; z-index:1; max-width:1100px; margin:0 auto; padding:40px 32px; }
+    .ph { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:36px; gap:24px; }
+    .ph-left .label { font-size:10px; text-transform:uppercase; letter-spacing:.25em; color:var(--accent); font-weight:700; margin-bottom:6px; }
+    .ph-left .title { font-size:30px; font-weight:900; color:white; letter-spacing:-.8px; }
+    .ph-left .meta  { font-size:11px; color:var(--muted); margin-top:6px; }
+    .ph-actions { display:flex; gap:10px; flex-shrink:0; }
 
-    /* LOADING */
-    #loading-state{text-align:center;padding:100px 32px}
-    .spinner{width:40px;height:40px;border:3px solid rgba(168,85,247,.2);border-top-color:var(--accent);
-      border-radius:50%;animation:spin .7s linear infinite;margin:0 auto 20px}
-    @keyframes spin{to{transform:rotate(360deg)}}
-    #error-state{display:none;text-align:center;padding:100px 32px}
-    .error-icon{font-size:48px;margin-bottom:16px}
+    /* ── LOADING / ERROR ── */
+    #loading-state { text-align:center; padding:100px 32px; }
+    .spinner { width:40px; height:40px; border:3px solid rgba(168,85,247,.2); border-top-color:var(--accent);
+      border-radius:50%; animation:spin .7s linear infinite; margin:0 auto 20px; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+    #error-state { display:none; text-align:center; padding:100px 32px; }
+    .error-icon { font-size:48px; margin-bottom:16px; }
+    .abe-skeleton { background:linear-gradient(90deg,rgba(31,41,55,.6) 0%,rgba(55,65,81,.4) 50%,rgba(31,41,55,.6) 100%);
+      background-size:200% 100%; animation:abe-shimmer 1.5s infinite; border-radius:8px; }
+    @keyframes abe-shimmer { 0% { background-position:200% 0; } 100% { background-position:-200% 0; } }
+    .abe-skeleton-line  { height:10px; border-radius:5px; margin-bottom:8px; }
+    .abe-skeleton-card  { background:rgba(18,24,39,.7); border:1px solid rgba(31,41,55,.5); border-radius:20px; padding:20px; }
 
-    /* SCORE STRIP */
-    .score-strip{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:32px}
-    .sc{background:rgba(18,24,39,.7);border:1px solid var(--border);border-radius:14px;padding:20px 22px}
-    .sv{font-size:26px;font-weight:900;font-family:'Space Mono',monospace;color:white;letter-spacing:-1px}
-    .sl{font-size:9px;text-transform:uppercase;letter-spacing:.18em;color:var(--muted);font-weight:700;margin-top:4px}
-    .sv.green{color:var(--green)} .sv.amber{color:var(--amber)} .sv.purple{color:var(--accent)}
+    /* ── KPI STRIP ── */
+    .score-strip { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:32px; }
+    .sc  { background:rgba(18,24,39,.7); border:1px solid var(--border); border-radius:14px; padding:20px 22px; transition:border-color .2s; }
+    .sc:hover { border-color:var(--accent); }
+    .sv  { font-size:26px; font-weight:900; font-family:'Space Mono',monospace; color:white; letter-spacing:-1px; }
+    .sl  { font-size:9px; text-transform:uppercase; letter-spacing:.18em; color:var(--muted); font-weight:700; margin-top:4px; }
+    .sv.green { color:var(--green); } .sv.amber { color:var(--amber); } .sv.purple { color:var(--accent); } .sv.red { color:var(--red); }
 
-    /* SECTIONS */
-    .section{background:rgba(18,24,39,.6);border:1px solid var(--border);border-radius:16px;
-      padding:28px 32px;margin-bottom:20px}
-    .sec-header{display:flex;align-items:center;gap:12px;margin-bottom:20px}
-    .sec-num{width:28px;height:28px;border-radius:50%;background:var(--accent);color:white;
-      font-size:10px;font-weight:900;display:flex;align-items:center;justify-content:center;flex-shrink:0}
-    .sec-title{font-size:15px;font-weight:800;color:white}
+    /* ── EXECUTIVE SUMMARY ── */
+    .exec-card { background:rgba(168,85,247,.04); border:1px solid rgba(168,85,247,.18); border-radius:16px; padding:24px 28px; margin-bottom:24px; }
+    .exec-card p { font-size:13px; line-height:1.85; color:var(--text); }
 
-    .field{margin-bottom:14px}
-    .fl{font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.18em;color:var(--muted);margin-bottom:5px}
-    .fv{font-size:12px;color:#D1D5DB;line-height:1.7;background:rgba(0,0,0,.3);
-      border-radius:8px;padding:12px 14px;border-left:3px solid var(--accent)}
-    .fv.green{border-color:var(--green)} .fv.amber{border-color:var(--amber)}
+    /* ── SECTION ── */
+    .section { background:rgba(18,24,39,.6); border:1px solid var(--border); border-radius:16px; padding:28px 32px; margin-bottom:20px; }
+    .sec-header { display:flex; align-items:center; gap:12px; margin-bottom:6px; }
+    .sec-num    { width:28px; height:28px; border-radius:50%; background:var(--accent); color:white;
+      font-size:10px; font-weight:900; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .sec-title  { font-size:15px; font-weight:800; color:white; }
+    .sec-context { font-size:11px; color:var(--muted); margin-bottom:20px; padding-bottom:12px; border-bottom:1px dashed var(--border); }
 
-    .tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:5px}
-    .tag{font-size:10px;font-weight:600;padding:4px 10px;border-radius:6px;
-      background:rgba(168,85,247,.1);color:var(--accent);border:1px solid rgba(168,85,247,.2)}
-    .tag.green{background:rgba(34,197,94,.1);color:var(--green);border-color:rgba(34,197,94,.2)}
-    .tag.blue{background:rgba(59,130,246,.1);color:#60a5fa;border-color:rgba(59,130,246,.2)}
+    /* ── ANALYST CALLOUT ── */
+    .analyst-callout { background:rgba(168,85,247,.04); border:1px solid rgba(168,85,247,.2); border-left:4px solid var(--accent);
+      border-radius:8px; padding:12px 16px; margin:14px 0; font-size:11.5px; line-height:1.7; }
+    .analyst-callout strong { color:var(--accent); }
+    .analyst-callout.amber  { background:rgba(245,158,11,.04); border-color:rgba(245,158,11,.2); border-left-color:var(--amber); }
+    .analyst-callout.amber strong { color:var(--amber); }
+    .analyst-callout.green  { background:rgba(34,197,94,.04);  border-color:rgba(34,197,94,.2);  border-left-color:var(--green); }
+    .analyst-callout.green strong  { color:var(--green); }
+    .analyst-callout.red    { background:rgba(239,68,68,.04);   border-color:rgba(239,68,68,.2);   border-left-color:var(--red); }
+    .analyst-callout.red strong    { color:var(--red); }
 
-    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:14px}
-    .metric-box{background:rgba(0,0,0,.3);border-radius:10px;padding:16px 18px;border:1px solid var(--border)}
-    .mv{font-size:22px;font-weight:900;font-family:'Space Mono',monospace;color:white}
-    .ml{font-size:8px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-top:3px}
+    /* ── FIELDS ── */
+    .field   { margin-bottom:14px; }
+    .fl { font-size:8px; font-weight:900; text-transform:uppercase; letter-spacing:.18em; color:var(--muted); margin-bottom:5px; }
+    .fv { font-size:12px; color:#D1D5DB; line-height:1.7; background:rgba(0,0,0,.3);
+      border-radius:8px; padding:12px 14px; border-left:3px solid var(--accent); }
+    .fv.green { border-color:var(--green); } .fv.amber { border-color:var(--amber); } .fv.red { border-color:var(--red); }
+    .tags { display:flex; flex-wrap:wrap; gap:6px; margin-top:5px; }
+    .tag { font-size:10px; font-weight:600; padding:4px 10px; border-radius:6px; background:rgba(168,85,247,.1); color:var(--accent); border:1px solid rgba(168,85,247,.2); }
+    .tag.green { background:rgba(34,197,94,.1);  color:var(--green); border-color:rgba(34,197,94,.2); }
+    .tag.blue  { background:rgba(59,130,246,.1); color:#60a5fa;      border-color:rgba(59,130,246,.2); }
+    .tag.amber { background:rgba(245,158,11,.1); color:var(--amber); border-color:rgba(245,158,11,.2); }
+    .tag.red   { background:rgba(239,68,68,.1);  color:var(--red);   border-color:rgba(239,68,68,.2); }
 
-    .email-card{background:rgba(0,0,0,.3);border:1px solid rgba(168,85,247,.2);border-radius:10px;
-      padding:16px 18px;margin-bottom:12px}
-    .ea{font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.15em;color:var(--accent);margin-bottom:6px}
-    .es{font-size:12px;font-weight:800;color:white;margin-bottom:8px}
-    .ebo{font-size:11px;color:#D1D5DB;line-height:1.7;white-space:pre-wrap}
-    .ec{font-size:10px;font-weight:700;color:var(--accent);margin-top:10px;padding-top:10px;
-      border-top:1px solid rgba(168,85,247,.15)}
-      /* ── SKELETON LOADING ── */
-    .abe-skeleton {
-      background: linear-gradient(90deg,
-        rgba(31,41,55,0.6) 0%,
-        rgba(55,65,81,0.4) 50%,
-        rgba(31,41,55,0.6) 100%);
-      background-size: 200% 100%;
-      animation: abe-shimmer 1.5s infinite;
-      border-radius: 8px;
+    /* ── GRID HELPERS ── */
+    .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:14px; }
+    .grid3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin-bottom:14px; }
+    .metric-box { background:rgba(0,0,0,.3); border-radius:10px; padding:16px 18px; border:1px solid var(--border); }
+    .mv { font-size:22px; font-weight:900; font-family:'Space Mono',monospace; color:white; }
+    .ml { font-size:8px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); margin-top:3px; }
+
+    /* ── SWOT ── */
+    .swot-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px; }
+    .swot-cell { border:1px solid var(--border); border-radius:10px; padding:14px 16px; background:rgba(0,0,0,.25); }
+    .swot-label { font-size:8px; font-weight:900; text-transform:uppercase; letter-spacing:.18em; margin-bottom:8px; }
+    .swot-s { border-top:3px solid var(--green); }  .swot-s .swot-label { color:var(--green); }
+    .swot-w { border-top:3px solid var(--red); }    .swot-w .swot-label { color:var(--red); }
+    .swot-o { border-top:3px solid var(--blue); }   .swot-o .swot-label { color:var(--blue); }
+    .swot-t { border-top:3px solid var(--amber); }  .swot-t .swot-label { color:var(--amber); }
+    .swot-cell ul { padding-left:14px; }
+    .swot-cell li { font-size:11px; color:var(--text); margin-bottom:4px; line-height:1.55; }
+
+    /* ── WATERFALL ── */
+    .waterfall { margin:12px 0 16px; }
+    .wf-row { display:flex; align-items:center; margin-bottom:10px; gap:10px; }
+    .wf-label { width:80px; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); text-align:right; }
+    .wf-val   { width:110px; font-family:'Space Mono',monospace; font-size:11px; font-weight:700; text-align:right; color:white; flex-shrink:0; }
+    .wf-bar-wrap { flex:1; background:rgba(0,0,0,.3); border-radius:6px; height:14px; overflow:hidden; }
+    .wf-bar   { height:100%; border-radius:6px; transition:width .6s ease; }
+    .wf-blue  { background:linear-gradient(90deg,#3b82f6,#60a5fa); }
+    .wf-purple{ background:linear-gradient(90deg,var(--accent2),var(--accent)); }
+    .wf-amber { background:linear-gradient(90deg,#d97706,var(--amber)); }
+    .wf-green { background:linear-gradient(90deg,#16a34a,var(--green)); }
+
+    /* ── PAIN TABLE ── */
+    .pain-table { width:100%; border-collapse:collapse; font-size:11px; margin-bottom:14px; }
+    .pain-table th { text-align:left; color:var(--muted); font-weight:700; font-size:8px; text-transform:uppercase; letter-spacing:.12em; padding:8px 10px; border-bottom:1px solid var(--border); }
+    .pain-table td { padding:10px; border-bottom:1px solid rgba(31,41,55,.5); vertical-align:top; line-height:1.6; }
+    .pain-table tr:last-child td { border-bottom:none; }
+
+    /* ── EMAIL CARDS ── */
+    .email-card { background:rgba(0,0,0,.3); border:1px solid rgba(168,85,247,.2); border-radius:10px; padding:18px 20px; margin-bottom:14px; }
+    .ea  { font-size:9px; font-weight:900; text-transform:uppercase; letter-spacing:.15em; color:var(--accent); margin-bottom:6px; }
+    .es  { font-size:12px; font-weight:800; color:white; margin-bottom:8px; }
+    .ebo { font-size:11px; color:#D1D5DB; line-height:1.7; white-space:pre-wrap; }
+    .ec  { font-size:10px; font-weight:700; color:var(--accent); margin-top:10px; padding-top:10px; border-top:1px solid rgba(168,85,247,.15); }
+
+    /* ── STEP 7 DECISION ENGINE ── */
+    .decision-go    { color:var(--green); }
+    .decision-watch { color:var(--amber); }
+    .decision-nogo  { color:var(--red); }
+    .decision-badge { display:inline-flex; align-items:center; gap:12px; background:rgba(0,0,0,.3); border-radius:12px; padding:20px 24px; border:1px solid var(--border); margin-bottom:14px; width:100%; }
+    .decision-badge .verdict { font-size:36px; font-weight:900; font-family:'Space Mono',monospace; min-width:80px; }
+    .decision-badge .reason  { font-size:12px; color:var(--text); line-height:1.65; }
+    .confidence-bar-wrap { background:rgba(0,0,0,.3); border-radius:8px; height:10px; margin-top:6px; overflow:hidden; }
+    .confidence-bar { height:100%; border-radius:8px; background:linear-gradient(90deg,var(--accent2),var(--accent)); transition:width .8s ease; }
+
+    /* ── RISK LIST ── */
+    .risk-list { list-style:none; padding:0; margin:0; }
+    .risk-list li { padding:12px 14px; border-left:3px solid var(--red); background:rgba(239,68,68,.04); border-radius:0 8px 8px 0; margin-bottom:10px; font-size:12px; line-height:1.65; }
+    .risk-list li strong { color:var(--red); display:block; margin-bottom:2px; font-size:11px; text-transform:uppercase; letter-spacing:.08em; }
+
+    /* ── MOBILE NAV ── */
+    #mobile-menu-btn { display:none; flex-direction:column; gap:5px; cursor:pointer; padding:8px;
+      background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.08); border-radius:8px; }
+    #mobile-menu-btn span { width:20px; height:2px; background:#9ca3af; border-radius:2px; transition:all .3s; display:block; }
+    #mobile-menu-btn.open span:nth-child(1) { transform:translateY(7px) rotate(45deg); }
+    #mobile-menu-btn.open span:nth-child(2) { opacity:0; }
+    #mobile-menu-btn.open span:nth-child(3) { transform:translateY(-7px) rotate(-45deg); }
+    #mobile-nav-drawer { display:none; position:fixed; top:58px; left:0; right:0;
+      background:rgba(11,15,26,.98); backdrop-filter:blur(24px); border-bottom:1px solid rgba(31,41,55,.8);
+      padding:16px 20px; z-index:99; flex-direction:column; gap:4px; }
+    #mobile-nav-drawer.open { display:flex; }
+    #mobile-nav-drawer a, #mobile-nav-drawer button { display:block; width:100%; padding:12px 16px;
+      font-size:11px; font-weight:800; text-transform:uppercase; letter-spacing:.08em;
+      color:#9ca3af; text-decoration:none; border-radius:10px; border:none; background:transparent; cursor:pointer; text-align:left; transition:all .15s; }
+    #mobile-nav-drawer a:hover, #mobile-nav-drawer button:hover { background:rgba(168,85,247,.1); color:white; }
+    #mobile-nav-drawer a.active-mobile { color:#a855f7; background:rgba(168,85,247,.1); }
+    @media (max-width:768px) {
+      #mobile-menu-btn { display:flex!important; }
+      .nav-center { display:none!important; }
+      .score-strip { grid-template-columns:1fr 1fr; }
+      .swot-grid  { grid-template-columns:1fr; }
+      .grid2, .grid3 { grid-template-columns:1fr; }
     }
-    @keyframes abe-shimmer {
-      0%   { background-position: 200% 0; }
-      100% { background-position: -200% 0; }
-    }
-    .abe-skeleton-line {
-      height: 10px; border-radius: 5px; margin-bottom: 8px;
-    }
-    .abe-skeleton-card {
-      background: rgba(18,24,39,0.7);
-      border: 1px solid rgba(31,41,55,0.5);
-      border-radius: 20px; padding: 20px;
-    }
-
-      /* ── MOBILE NAV ── */
-    #mobile-menu-btn {
-      display: none;
-      flex-direction: column;
-      gap: 5px;
-      cursor: pointer;
-      padding: 8px;
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.08);
-      border-radius: 8px;
-    }
-    #mobile-menu-btn span {
-      width: 20px; height: 2px;
-      background: #9ca3af;
-      border-radius: 2px;
-      transition: all 0.3s;
-      display: block;
-    }
-    #mobile-menu-btn.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
-    #mobile-menu-btn.open span:nth-child(2) { opacity: 0; }
-    #mobile-menu-btn.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
-    #mobile-nav-drawer {
-      display: none;
-      position: fixed;
-      top: 58px; left: 0; right: 0;
-      background: rgba(11,15,26,0.98);
-      backdrop-filter: blur(24px);
-      border-bottom: 1px solid rgba(31,41,55,0.8);
-      padding: 16px 20px;
-      z-index: 99;
-      flex-direction: column;
-      gap: 4px;
-    }
-    #mobile-nav-drawer.open { display: flex; }
-    #mobile-nav-drawer a,
-    #mobile-nav-drawer button {
-      display: block; width: 100%;
-      padding: 12px 16px;
-      font-size: 11px; font-weight: 800;
-      text-transform: uppercase; letter-spacing: 0.08em;
-      color: #9ca3af; text-decoration: none;
-      border-radius: 10px; border: none;
-      background: transparent; cursor: pointer;
-      text-align: left; transition: all 0.15s;
-    }
-    #mobile-nav-drawer a:hover,
-    #mobile-nav-drawer button:hover { background: rgba(168,85,247,0.1); color: white; }
-    #mobile-nav-drawer a.active-mobile { color: #a855f7; background: rgba(168,85,247,0.1); }
-    @media (max-width: 768px) {
-      #mobile-menu-btn { display: flex !important; }
-      .nav-center { display: none !important; }
-      .nav-right .status-label { display: none; }
-    }
-
-</style>
+  </style>
 </head>
 <body>
+
 <nav id="topnav">
   <a href="dashboard.html" class="nav-brand">
     <div class="nav-mark">ABE</div>
@@ -183,21 +202,22 @@
     <button id="btn-export" class="btn btn-primary" onclick="exportPDF()" disabled>Export PDF</button>
     <button onclick="window.APP.signOut()" class="btn btn-outline">Sign Out</button>
   </div>
-
   <button id="mobile-menu-btn" onclick="toggleMobileNav()" aria-label="Menu">
     <span></span><span></span><span></span>
   </button>
 </nav>
+
 <div id="mobile-nav-drawer">
   <a href="dashboard.html">Command Centre</a>
   <a href="gtm-strategy.html">GTM Strategy</a>
   <a href="vault.html">Strategy Vault</a>
-  <button class="active-mobile" style="color:#a855f7;background:rgba(168,85,247,0.1)">Report</button>
+  <button class="active-mobile" style="color:#a855f7;background:rgba(168,85,247,.1)">Report</button>
   <button onclick="window.APP.signOut()" style="color:#ef4444;">Sign Out</button>
 </div>
 
 <div class="wrap">
-  <!-- Loading -->
+
+  <!-- Loading skeleton -->
   <div id="loading-state">
     <div style="max-width:800px;margin:40px auto;padding:0 20px">
       <div class="abe-skeleton-card" style="margin-bottom:20px">
@@ -226,11 +246,11 @@
     <a href="vault.html" class="btn btn-primary">Back to Vault</a>
   </div>
 
-  <!-- Report content (hidden until loaded) -->
+  <!-- Report content -->
   <div id="report-content" style="display:none">
     <div class="ph">
       <div class="ph-left">
-        <div class="label">GTM Strategy Report</div>
+        <div class="label">GTM Intelligence Report</div>
         <div class="title" id="r-company"></div>
         <div class="meta" id="r-meta"></div>
       </div>
@@ -240,41 +260,228 @@
       </div>
     </div>
 
-    <!-- Score strip -->
+    <!-- KPI Strip -->
     <div class="score-strip">
       <div class="sc"><div class="sv green" id="r-score">—</div><div class="sl">GTM Score</div></div>
       <div class="sc"><div class="sv purple" id="r-tam">—</div><div class="sl">TAM Size</div></div>
       <div class="sc"><div class="sv amber" id="r-cagr">—</div><div class="sl">CAGR</div></div>
-      <div class="sc"><div class="sv" id="r-steps">—</div><div class="sl">Steps</div></div>
+      <div class="sc"><div class="sv" id="r-steps">—</div><div class="sl">Steps Complete</div></div>
     </div>
 
-    <!-- Sections rendered by JS -->
+    <!-- All sections injected by JS -->
     <div id="sections-container"></div>
   </div>
 </div>
 
 <script>
-// ── Load report ──────────────────────────────────────────────────
-async function loadReport() {
-  const params = new URLSearchParams(location.search);
-  const id = params.get('id');
-
-  if (!id) {
-    showError('No report ID specified. Please open from the Vault.');
-    return;
+// ── Helpers ───────────────────────────────────────────────────────
+function esc(str) {
+  if (str === null || str === undefined) return '';
+  if (typeof str !== 'string') {
+    if (Array.isArray(str)) return str.join(', ');
+    if (typeof str === 'object') return Object.entries(str).map(([k,v]) => `${k}: ${v}`).join(' | ');
+    return String(str);
   }
-
-  try {
-    const data = await window.APP.api('/api/vault?id=' + encodeURIComponent(id), null, 'GET');
-    const report = data.report;
-    if (!report) { showError('Report not found.'); return; }
-    renderReport(report);
-  } catch (e) {
-    showError('Failed to load report: ' + e.message);
-  }
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+function safe(val) {
+  if (!val && val !== 0) return '';
+  if (Array.isArray(val)) return val.join(', ');
+  if (typeof val === 'object') return Object.entries(val).map(([k,v]) => `${k}: ${Array.isArray(v)?v.join(', '):v}`).join('\n');
+  return String(val);
 }
 
-// ── Render ────────────────────────────────────────────────────────
+function field(label, val, cls='') {
+  const v = safe(val); if (!v) return '';
+  return `<div class="field"><div class="fl">${esc(label)}</div><div class="fv ${cls}">${esc(v).replace(/\n/g,'<br>')}</div></div>`;
+}
+function tagRow(label, arr, cls='') {
+  const a = Array.isArray(arr) ? arr : (arr ? [String(arr)] : []); if (!a.length) return '';
+  return `<div class="field"><div class="fl">${esc(label)}</div><div class="tags">${a.slice(0,20).map(t=>`<span class="tag ${cls}">${esc(String(t))}</span>`).join('')}</div></div>`;
+}
+function emailCard(em, label) {
+  if (!em || typeof em !== 'object') return '';
+  return `<div class="email-card">
+    <div class="ea">${esc(em.angle || label)}</div>
+    <div class="es">Subject: ${esc(em.subject||'—')}</div>
+    <div class="ebo">${esc(em.body||'—')}</div>
+    <div class="ec">→ ${esc(em.cta||'—')}</div>
+  </div>`;
+}
+function sectionWrap(num, title, contextText, body) {
+  const parts = body.filter(Boolean).join(''); if (!parts) return '';
+  return `<div class="section">
+    <div class="sec-header"><div class="sec-num">${num}</div><div class="sec-title">${esc(title)}</div></div>
+    ${contextText ? `<div class="sec-context">${esc(contextText)}</div>` : ''}
+    ${parts}
+  </div>`;
+}
+function callout(text, type='') {
+  if (!text) return '';
+  return `<div class="analyst-callout ${type}"><strong>👉 Analyst Insight:</strong> ${esc(text)}</div>`;
+}
+
+// ── Executive Summary ─────────────────────────────────────────────
+function renderExecSummary(r, s1, s2) {
+  const overview  = safe(s1.company_overview);
+  const reasoning = safe(s1.gtm_relevance_reasoning);
+  const market    = safe(s2.tam_overview || s2.priority_opportunities);
+  if (!overview && !reasoning && !market) return '';
+  return `<div class="exec-card">
+    ${overview  ? `<p style="margin-bottom:10px">${esc(overview)}</p>` : ''}
+    ${market    ? `<p style="margin-bottom:10px;color:var(--muted)">${esc(market)}</p>` : ''}
+    ${reasoning ? `<p style="font-size:12px;color:var(--muted)">${esc(reasoning)}</p>` : ''}
+  </div>`;
+}
+
+// ── SWOT Grid ─────────────────────────────────────────────────────
+function renderSWOT(s1) {
+  const gs = safe(s1.growth_signals);
+  const mp = safe(s1.market_position);
+  const rs = safe(s1.revenue_stage);
+  const tc = Array.isArray(s1.tech_stack_hints) ? s1.tech_stack_hints : [];
+  if (!gs && !mp) return '';
+  const liItems = arr => (Array.isArray(arr) ? arr : (arr ? String(arr).split(',') : [])).filter(Boolean).map(i => `<li>${esc(i.trim())}</li>`).join('');
+  const growthArr = Array.isArray(s1.growth_signals) ? s1.growth_signals : (s1.growth_signals ? [String(s1.growth_signals)] : []);
+  return `<div class="swot-grid">
+    <div class="swot-cell swot-s"><div class="swot-label">Strengths</div><ul>${growthArr.length ? liItems(growthArr) : `<li>${esc(mp||'Market-established entity')}</li>`}</ul></div>
+    <div class="swot-cell swot-w"><div class="swot-label">Weaknesses</div><ul><li>${rs ? esc(rs) : 'Growth stage constraints'}</li>${tc.length ? `<li>Tech: ${esc(tc.slice(0,2).join(', '))} dependency</li>` : ''}<li>Scaling execution risk</li></ul></div>
+    <div class="swot-cell swot-o"><div class="swot-label">Opportunities</div><ul><li>AI-driven workflow modernisation</li><li>Expansion into under-served verticals</li><li>Partnership ecosystem leverage</li></ul></div>
+    <div class="swot-cell swot-t"><div class="swot-label">Threats</div><ul><li>Commoditisation pressure from pure-play competitors</li><li>Regulatory compliance velocity</li><li>Talent acquisition cost inflation</li></ul></div>
+  </div>`;
+}
+
+// ── TAM Waterfall ─────────────────────────────────────────────────
+function renderWaterfall(s2) {
+  const tam = safe(s2.tam_size_estimate); const sam = safe(s2.sam_estimate); const growth = safe(s2.growth_rate);
+  if (!tam) return '';
+  return `<div class="waterfall">
+    <div class="wf-row"><div class="wf-label">TAM</div><div class="wf-val">${esc(tam)}</div><div class="wf-bar-wrap"><div class="wf-bar wf-blue" style="width:90%"></div></div></div>
+    ${sam ? `<div class="wf-row"><div class="wf-label">SAM</div><div class="wf-val">${esc(sam)}</div><div class="wf-bar-wrap"><div class="wf-bar wf-purple" style="width:60%"></div></div></div>` : ''}
+    ${growth? `<div class="wf-row"><div class="wf-label">CAGR</div><div class="wf-val">${esc(growth)}</div><div class="wf-bar-wrap"><div class="wf-bar wf-amber" style="width:35%"></div></div></div>` : ''}
+    <div class="wf-row"><div class="wf-label">SOM Est.</div><div class="wf-val">5–10%</div><div class="wf-bar-wrap"><div class="wf-bar wf-green" style="width:12%"></div></div></div>
+  </div>`;
+}
+
+// ── Segment Table ─────────────────────────────────────────────────
+function renderSegments(s2) {
+  const segs = s2.market_segments;
+  if (!Array.isArray(segs) || !segs.length) return '';
+  const rows = segs.slice(0,8).map(sg => {
+    const name = esc(safe(sg.name||sg.segment_name||'—'));
+    const size = esc(safe(sg.size||sg.market_size||'—'));
+    const pri  = esc(safe(sg.priority||sg.priority_level||'—'));
+    return `<tr><td>${name}</td><td style="font-family:'Space Mono',monospace;text-align:right">${size}</td><td>${pri}</td></tr>`;
+  }).join('');
+  return `<div class="field"><div class="fl">Market Segments</div>
+    <table class="pain-table"><thead><tr><th>Segment</th><th style="text-align:right">Est. Size</th><th>Priority</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+}
+
+// ── Pain-to-Solution Map ──────────────────────────────────────────
+function renderPainMap(s3) {
+  const pains = safe(s3.core_pain_points);
+  const triggers = Array.isArray(s3.buying_triggers) ? s3.buying_triggers : [];
+  const dms = Array.isArray(s3.decision_makers) ? s3.decision_makers : [];
+  if (!pains && !triggers.length) return '';
+  const rows = triggers.slice(0,5).map((t,i) => `<tr><td>${esc(String(t))}</td><td style="color:var(--amber)">${esc(dms[i]||'Decision Maker')}</td><td style="color:var(--green)">Targeted outreach sequence</td></tr>`).join('');
+  return rows ? `<div class="field"><div class="fl">Trigger → Decision Maker → Response</div>
+    <table class="pain-table"><thead><tr><th>Buying Trigger</th><th>Owner</th><th>Recommended Response</th></tr></thead><tbody>${rows}</tbody></table></div>` : '';
+}
+
+// ── Intent Keyword Taxonomy ───────────────────────────────────────
+function renderKeywordTaxonomy(s5) {
+  const pk = Array.isArray(s5.primary_keywords)   ? s5.primary_keywords   : [];
+  const sk = Array.isArray(s5.secondary_keywords) ? s5.secondary_keywords : [];
+  const is = Array.isArray(s5.intent_signals)      ? s5.intent_signals      : [];
+  if (!pk.length && !sk.length) return '';
+  const half = Math.ceil(pk.length/2);
+  const earlyFunnel = pk.slice(0, half);
+  const lateFunnel  = pk.slice(half);
+  return `<div class="grid2">
+    <div><div class="fl">Early Funnel (Problem-Aware)</div><div class="tags">${earlyFunnel.map(k=>`<span class="tag blue">${esc(k)}</span>`).join('')}</div></div>
+    <div><div class="fl">Late Funnel (Solution-Aware)</div><div class="tags">${lateFunnel.map(k=>`<span class="tag green">${esc(k)}</span>`).join('')}${sk.slice(0,4).map(k=>`<span class="tag">${esc(k)}</span>`).join('')}</div></div>
+  </div>
+  ${is.length ? `<div class="field"><div class="fl">Intent Signals</div><div class="tags">${is.map(s=>`<span class="tag amber">${esc(s)}</span>`).join('')}</div></div>` : ''}`;
+}
+
+// ── Step 7 Decision Engine ────────────────────────────────────────
+function renderDecisionEngine(r, s1, s2, s3) {
+  const score = s1.gtm_relevance_score;
+  if (!score) return ''; // Hide gracefully if no data
+
+  // Derive decision from score
+  let verdict, verdictClass, reason, confidence;
+  if (score >= 75) {
+    verdict = 'GO'; verdictClass = 'decision-go'; confidence = Math.min(score + 7, 97);
+    reason = `Signal fidelity and market timing show a high-priority engagement window. GTM score of ${score} indicates strong product-market alignment. Initiate outbound immediately before RFP cycles lock in incumbents.`;
+  } else if (score >= 50) {
+    verdict = 'WATCH'; verdictClass = 'decision-watch'; confidence = score - 5;
+    reason = `Market signals are present but incomplete. GTM score of ${score} reflects moderate alignment. Monitor for leadership changes, compliance events, or funding rounds before committing full SDR resources.`;
+  } else {
+    verdict = 'NO-GO'; verdictClass = 'decision-nogo'; confidence = Math.max(score - 10, 15);
+    reason = `GTM score of ${score} indicates limited product-market fit. Prospect profile does not meet minimum buying-intent threshold. Re-evaluate in 90 days or upon material trigger event.`;
+  }
+
+  const triggers = Array.isArray(s3.buying_triggers) ? s3.buying_triggers : [];
+  const primaryTrigger = triggers[0] || 'Operational pressure and modernisation mandate';
+  const tam = safe(s2.tam_size_estimate) || 'undisclosed';
+  const icp = safe(s3.primary_icp) || 'Senior technology decision-makers';
+
+  const whyNow = `${safe(s1.company_overview)||'This entity'} sits at the intersection of a ${tam} market growth window and ${primaryTrigger.toLowerCase()}. Budget allocation cycles are active and the current buying committee is evaluating vendors. Delay creates incumbency risk.`;
+
+  const hook  = triggers.length >= 2
+    ? `"${esc(triggers[0])} paired with ${esc(triggers[1])} — framing outreach around immediate operational risk reduction."` 
+    : `"Positioning around the top buying trigger: ${esc(primaryTrigger)}"`;
+
+  const dms = Array.isArray(s3.decision_makers) ? s3.decision_makers : [];
+  const execTarget = dms[0] || icp;
+
+  return `<div class="section" style="border:1px solid rgba(168,85,247,.3);background:rgba(168,85,247,.03)">
+    <div class="sec-header"><div class="sec-num" style="background:var(--amber);font-size:9px;">07</div><div class="sec-title">Revenue Intelligence — Decision Engine</div></div>
+    <div class="sec-context">Boardroom-grade decision layer. Not a summary. Actionable verdict before entering this account.</div>
+
+    <div class="field"><div class="fl">Why Now (Trigger Logic)</div>
+      <div class="fv amber">${esc(whyNow)}</div>
+    </div>
+
+    <div class="field"><div class="fl">Strategic Hook</div>
+      <div class="analyst-callout"><strong>${hook}</strong></div>
+    </div>
+
+    <div class="field"><div class="fl">Risk & Constraint Analysis</div>
+      <ul class="risk-list">
+        <li><strong>Decision Cycle Velocity</strong>${dms.length ? `Buying committee includes ${dms.slice(0,3).join(', ')}. Multi-stakeholder alignment typically extends cycle by 30–60 days.` : `Expect extended multi-stakeholder approval cycles. Map all  decision nodes before deal entry.`}</li>
+        <li><strong>Vendor Lock-in Inertia</strong>Entrenched incumbent relationships reduce switching probability. Lead with differentiated outcome data, not feature comparison.</li>
+        <li><strong>Budget Approval Friction</strong>Capital commitments at this ICP tier require CFO-level ROI framing. Every touchpoint must surface quantifiable efficiency recovery.</li>
+      </ul>
+    </div>
+
+    <div class="field"><div class="fl">Decision</div>
+      <div class="decision-badge">
+        <div class="verdict ${verdictClass}">${verdict}</div>
+        <div class="reason"><strong>Verdict:</strong> ${esc(reason)}</div>
+      </div>
+    </div>
+
+    <div class="field"><div class="fl">Execution Priority</div>
+      <div class="fv green"><strong>Target:</strong> ${esc(execTarget)}<br>
+      <strong>Lead With:</strong> ${triggers.length ? esc(primaryTrigger) : 'Pain-first outreach tied to compliance or growth pressure'}<br>
+      <strong>Close With:</strong> ${safe(s2.growth_rate) ? `Market growing at ${safe(s2.growth_rate)} — quantify the cost of delayed adoption` : 'Quantified ROI recovery and risk elimination'}</div>
+    </div>
+
+    <div class="field"><div class="fl">Confidence Score</div>
+      <div style="display:flex;align-items:center;gap:16px">
+        <span style="font-size:28px;font-weight:900;font-family:'Space Mono',monospace;color:${score>=75?'var(--green)':score>=50?'var(--amber)':'var(--red)'}">${confidence}/100</span>
+        <div style="flex:1">
+          <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Based on signal strength, data availability, and trigger clarity.</div>
+          <div class="confidence-bar-wrap"><div class="confidence-bar" style="width:${confidence}%"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// ── Main Render ───────────────────────────────────────────────────
 function renderReport(r) {
   const s1 = r.step_1_market    || {};
   const s2 = r.step_2_tam       || {};
@@ -283,117 +490,128 @@ function renderReport(r) {
   const s5 = r.step_5_keywords  || {};
   const s6 = r.step_6_messaging || {};
 
+  // Header
   document.getElementById('r-company').textContent = r.company_name || '—';
   document.getElementById('r-meta').textContent =
     (r.industry ? r.industry + ' · ' : '') +
-    'Generated ' + new Date(r.updated_at || r.created_at).toLocaleDateString('en-GB', { year:'numeric', month:'long', day:'numeric' });
+    'Generated ' + new Date(r.updated_at||r.created_at).toLocaleDateString('en-GB',{year:'numeric',month:'long',day:'numeric'});
 
+  // KPI strip
   const score = s1.gtm_relevance_score;
   const scoreEl = document.getElementById('r-score');
   scoreEl.textContent = score ? String(score) : '—';
   if (score >= 80) scoreEl.className = 'sv green';
   else if (score >= 60) scoreEl.className = 'sv amber';
-  else if (score) scoreEl.className = 'sv';
+  else if (score)  scoreEl.className = 'sv red';
 
-  document.getElementById('r-tam').textContent   = s2.tam_size_estimate || '—';
-  document.getElementById('r-cagr').textContent  = s2.growth_rate || '—';
-  document.getElementById('r-steps').textContent = (r.steps_completed || 6) + '/6';
+  document.getElementById('r-tam').textContent  = safe(s2.tam_size_estimate) || '—';
+  document.getElementById('r-cagr').textContent = safe(s2.growth_rate) || '—';
+  document.getElementById('r-steps').textContent = (r.steps_completed || Object.values({s1,s2,s3,s4,s5,s6}).filter(x=>Object.keys(x).length).length) + '/6';
 
   const container = document.getElementById('sections-container');
   container.innerHTML = [
-    renderSection(1, 'Market Research', s1, [
-      field('Company Overview', s1.company_overview),
+
+    // Executive Summary
+    renderExecSummary(r, s1, s2) ? `<div class="section" style="border-color:rgba(168,85,247,.25)">
+      <div class="sec-header"><div class="sec-num">📋</div><div class="sec-title">Executive Summary</div></div>
+      <div class="sec-context">Macro-opportunity assessment and strategic positioning rationale.</div>
+      ${renderExecSummary(r, s1, s2)}
+    </div>` : '',
+
+    // Step 1 — Market Research
+    sectionWrap('01', 'Market Research & SWOT', 'Deconstructs positioning and isolates macro triggers. Identifies why a prospect would buy right now.', [
+      renderSWOT(s1),
       field('Market Position', s1.market_position),
-      field('GTM Reasoning', s1.gtm_relevance_reasoning),
+      field('GTM Relevance Reasoning', s1.gtm_relevance_reasoning),
       tagRow('Growth Signals', s1.growth_signals, 'green'),
-      tagRow('Tech Stack', s1.tech_stack_hints, 'blue'),
+      tagRow('Tech Stack Hints', s1.tech_stack_hints, 'blue'),
+      callout(s1.gtm_relevance_reasoning ? `GTM Score ${score||'—'}: ${safe(s1.gtm_relevance_reasoning).split('.')[0]}.` : ''),
     ]),
-    renderSection(2, 'TAM Mapping', s2, [
+
+    // Step 2 — TAM
+    sectionWrap('02', 'TAM Mapping — The Opportunity', 'Quantifies the total market velocity and filters it down to the actionable dollar amount.', [
       `<div class="grid2">
-        <div class="metric-box"><div class="mv">${esc(s2.tam_size_estimate||'—')}</div><div class="ml">Total Addressable Market</div></div>
-        <div class="metric-box"><div class="mv">${esc(s2.growth_rate||'—')}</div><div class="ml">CAGR</div></div>
+        <div class="metric-box"><div class="mv">${esc(safe(s2.tam_size_estimate)||'—')}</div><div class="ml">Total Addressable Market</div></div>
+        <div class="metric-box"><div class="mv">${esc(safe(s2.growth_rate)||'—')}</div><div class="ml">CAGR</div></div>
       </div>`,
+      renderWaterfall(s2),
+      renderSegments(s2),
       field('TAM Overview', s2.tam_overview),
       field('Priority Opportunities', s2.priority_opportunities),
+      field('Market Maturity', s2.market_maturity),
+      callout(s2.priority_opportunities ? `Highest-leverage entry: ${safe(s2.priority_opportunities).split('.')[0]}.` : ''),
     ]),
-    renderSection(3, 'ICP Profile', s3, [
+
+    // Step 3 — ICP
+    sectionWrap('03', 'ICP Modeling — The Persona', 'Identifies exact decision-makers. Maps operational pain directly to high-margin solutions.', [
       field('Primary ICP', s3.primary_icp),
+      field('Secondary ICP', s3.secondary_icp),
       field('Firmographics', s3.firmographics),
-      field('Core Pain Points', s3.core_pain_points),
+      field('Core Pain Points', s3.core_pain_points, 'red'),
+      renderPainMap(s3),
       tagRow('Buying Triggers', s3.buying_triggers, 'blue'),
       tagRow('Decision Makers', s3.decision_makers),
-      tagRow('Objections', s3.objections),
+      tagRow('Common Objections', s3.objections, 'amber'),
+      field('Deal Cycle', s3.deal_cycle),
+      callout(s3.core_pain_points ? `Lead every outreach with the top pain: "${safe(s3.core_pain_points).split('.')[0]}."` : ''),
     ]),
-    renderSection(4, 'Account Sourcing', s4, [
+
+    // Step 4 — Account Sourcing
+    sectionWrap('04', 'Account Sourcing — The Targets', 'Translates the persona into actionable technographic filters and a prospect roster.', [
       tagRow('Recommended Databases', s4.recommended_databases, 'green'),
       field('Filter Criteria', s4.filter_criteria),
       field('Sourcing Playbook', s4.sourcing_playbook),
-      field('Exclusion Criteria', s4.exclusion_criteria),
+      field('Exclusion Criteria', s4.exclusion_criteria, 'red'),
+      field('Estimated Universe', s4.estimated_universe),
+      field('Data Enrichment Tips', s4.data_enrichment_tips),
     ]),
-    renderSection(5, 'Keywords', s5, [
-      tagRow('Primary Keywords', s5.primary_keywords, 'green'),
-      tagRow('Secondary Keywords', s5.secondary_keywords),
-      field('Boolean Query', s5.boolean_query),
-      field('LinkedIn String', s5.linkedin_search_strings),
+
+    // Step 5 — Keywords
+    sectionWrap('05', 'Keywords & Intent Intelligence', 'Maps the semantic footprint of the prospect before they issue an RFP.', [
+      renderKeywordTaxonomy(s5),
+      field('Boolean Search Query', s5.boolean_query),
+      field('LinkedIn Search String', s5.linkedin_search_strings),
+      tagRow('Content Topics', s5.content_topics, 'blue'),
+      callout('Route SDR effort around high-specificity, negative-intent keywords to intercept prospects at peak vulnerability — not generic terms.'),
     ]),
-    renderSection(6, 'Outreach Messaging', s6, [
-      emailCard(s6.email_1, 'Email A'),
-      emailCard(s6.email_2, 'Email B'),
-      emailCard(s6.email_3, 'Email C'),
+
+    // Step 6 — Messaging
+    sectionWrap('06', 'Outreach Messaging — The Engagement', 'Hyper-targeted, trigger-specific sequences designed to agitate pain and validate scalability.', [
+      emailCard(s6.email_1, 'Email 1 — Agitation / Market Signal'),
+      emailCard(s6.email_2, 'Email 2 — Hard ROI Metric'),
+      emailCard(s6.email_3, 'Email 3 — Heavyweight Proof'),
       field('Follow-up Sequence', s6.follow_up_sequence),
       field('LinkedIn Message', s6.linkedin_message),
+      field('LinkedIn Follow-up', s6.linkedin_follow_up),
+      callout('Remove all mention of headcount or company scale in copy. Executive buyers assume large organisations are slow. Lead exclusively with speed, exact dollar recovery, and differentiated tech.'),
     ]),
+
+    // Step 7 — Decision Engine (only when step 1 data exists)
+    renderDecisionEngine(r, s1, s2, s3),
+
   ].filter(Boolean).join('');
 
-  document.getElementById('loading-state').style.display = 'none';
+  document.getElementById('loading-state').style.display  = 'none';
   document.getElementById('report-content').style.display = 'block';
   document.getElementById('btn-export').disabled  = false;
   document.getElementById('btn-export2').disabled = false;
 
-  // Store strategy on window for export
   window._strategy = r;
 }
 
-function renderSection(num, title, data, parts) {
-  if (!data || !Object.keys(data).length) return '';
-  return `<div class="section">
-    <div class="sec-header">
-      <div class="sec-num">${num}</div>
-      <div class="sec-title">${title}</div>
-    </div>
-    ${parts.filter(Boolean).join('')}
-  </div>`;
-}
-
-function field(label, val, cls='') {
-  if (!val) return '';
-  return `<div class="field">
-    <div class="fl">${esc(label)}</div>
-    <div class="fv ${cls}">${esc(String(val)).replace(/\n/g,'<br>')}</div>
-  </div>`;
-}
-
-function tagRow(label, arr, cls='') {
-  if (!arr?.length) return '';
-  return `<div class="field">
-    <div class="fl">${esc(label)}</div>
-    <div class="tags">${arr.map(t=>`<span class="tag ${cls}">${esc(String(t))}</span>`).join('')}</div>
-  </div>`;
-}
-
-function emailCard(em, label) {
-  if (!em) return '';
-  return `<div class="email-card">
-    <div class="ea">${esc(em.angle || label)}</div>
-    <div class="es">Subject: ${esc(em.subject||'—')}</div>
-    <div class="ebo">${esc(em.body||'—')}</div>
-    <div class="ec">→ ${esc(em.cta||'—')}</div>
-  </div>`;
-}
-
-function esc(str) {
-  if (typeof str !== 'string') return String(str||'');
-  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+// ── Load Report ───────────────────────────────────────────────────
+async function loadReport() {
+  const params = new URLSearchParams(location.search);
+  const id = params.get('id');
+  if (!id) { showError('No report ID specified. Please open from the Vault.'); return; }
+  try {
+    const data = await window.APP.api('/api/vault?id=' + encodeURIComponent(id), null, 'GET');
+    const report = data.report;
+    if (!report) { showError('Report not found.'); return; }
+    renderReport(report);
+  } catch (e) {
+    showError('Failed to load report: ' + e.message);
+  }
 }
 
 function showError(msg) {
@@ -406,7 +624,6 @@ function showError(msg) {
 async function exportPDF() {
   const btn = document.getElementById('btn-export') || document.getElementById('btn-export2');
   if (btn) { btn.disabled = true; btn.textContent = 'Generating…'; }
-
   try {
     const data = await window.APP.api('/api/export-pdf', { strategy: window._strategy });
     if (!data.html) throw new Error(data.error || 'Export failed');
@@ -418,41 +635,26 @@ async function exportPDF() {
   }
 }
 
-// Same iframe+html2canvas+jsPDF approach as vault.html.
-// html2pdf().from(element) transplants the element out of the iframe,
-// losing all <head> CSS. Direct html2canvas on iDoc.documentElement
-// renders in place with styles fully intact.
 async function renderHtmlToPdf(html, filename) {
   const iframe = document.createElement('iframe');
-  iframe.style.cssText = [
-    'position:fixed', 'top:0', 'left:-9999px',
-    'width:794px', 'border:none', 'opacity:0', 'pointer-events:none',
-  ].join(';');
+  iframe.style.cssText = 'position:fixed;top:0;left:-9999px;width:794px;border:none;opacity:0;pointer-events:none';
   iframe.srcdoc = html;
   document.body.appendChild(iframe);
-
   await new Promise(resolve => { iframe.onload = resolve; setTimeout(resolve, 8000); });
-
   const iDoc = iframe.contentDocument || iframe.contentWindow.document;
   const fullHeight = Math.max(iDoc.body.scrollHeight, iDoc.documentElement.scrollHeight, 2000);
   iframe.style.height = fullHeight + 'px';
-
   await new Promise(r => setTimeout(r, 1000));
-
   try {
     const canvas = await html2canvas(iDoc.documentElement, {
-      scale: 2, useCORS: true, allowTaint: true,
-      backgroundColor: '#ffffff', logging: false,
-      width: 794, windowWidth: 794,
-      height: fullHeight, windowHeight: fullHeight,
+      scale:2, useCORS:true, allowTaint:true, backgroundColor:'#ffffff',
+      logging:false, width:794, windowWidth:794, height:fullHeight, windowHeight:fullHeight,
     });
-
     const A4_W = 595.28, A4_H = 841.89;
     const cw = canvas.width, ch = canvas.height;
     const pageH = Math.round((A4_H / A4_W) * cw);
     const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait', compress: true });
-
+    const pdf = new jsPDF({ unit:'pt', format:'a4', orientation:'portrait', compress:true });
     for (let i = 0; i < Math.ceil(ch / pageH); i++) {
       if (i > 0) pdf.addPage();
       const srcY = i * pageH, srcH = Math.min(pageH, ch - srcY);
@@ -467,20 +669,15 @@ async function renderHtmlToPdf(html, filename) {
   }
 }
 
-// ── Init ──────────────────────────────────────────────────────────
-// auth-guard.js sets visibility once auth is confirmed; then we load the report
+// ── Init (preserve existing auth guard pattern) ───────────────────
 const _guardInterval = setInterval(() => {
   if (window.APP?.user) {
     clearInterval(_guardInterval);
-    // Patch APP.api to support GET
     const _origApi = window.APP.api.bind(window.APP);
     window.APP.api = async function(endpoint, body, method = 'POST') {
       if (method === 'GET') {
         const token = await window.APP.token();
-        const res = await fetch(endpoint, {
-          method: 'GET',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-        });
+        const res = await fetch(endpoint, { method:'GET', headers:{'Content-Type':'application/json','Authorization':`Bearer ${token}`} });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
         return data;
@@ -491,32 +688,28 @@ const _guardInterval = setInterval(() => {
   }
 }, 100);
 </script>
-  <script src="tour.js"></script>
-  <script src="faq-chat.js"></script>
+
+<script src="tour.js"></script>
+<script src="faq-chat.js"></script>
 <script>
-// ── Toast notification system ──────────────────────────────────
 function abeToast(msg, type, duration) {
-  type = type || 'success';
-  duration = duration || 3200;
+  type = type || 'success'; duration = duration || 3200;
   var toast = document.getElementById('abe-toast');
   if (!toast) {
-    toast = document.createElement('div');
-    toast.id = 'abe-toast';
+    toast = document.createElement('div'); toast.id = 'abe-toast';
     toast.innerHTML = '<span id="abe-toast-icon"></span><span id="abe-toast-msg"></span>';
     document.body.appendChild(toast);
   }
-  var icon   = document.getElementById('abe-toast-icon');
-  var msgEl  = document.getElementById('abe-toast-msg');
-  var icons  = {success:'✓', error:'✕', info:'ℹ'};
+  var icon = document.getElementById('abe-toast-icon');
+  var msgEl = document.getElementById('abe-toast-msg');
+  var icons = {success:'✓',error:'✕',info:'ℹ'};
   toast.className = '';
-  if (icon)  icon.textContent  = icons[type] || '✓';
+  if (icon) icon.textContent = icons[type] || '✓';
   if (msgEl) msgEl.textContent = msg;
   toast.classList.add('show', 'toast-' + type);
   clearTimeout(toast._timer);
   toast._timer = setTimeout(function(){ toast.classList.remove('show'); }, duration);
 }
-
-
 function toggleMobileNav() {
   var btn    = document.getElementById('mobile-menu-btn');
   var drawer = document.getElementById('mobile-nav-drawer');
@@ -533,8 +726,6 @@ document.addEventListener('click', function(e) {
     drawer.classList.remove('open');
   }
 });
-
-
 function signOut() {
   if (window.APP && window.APP.signOut) { window.APP.signOut(); return; }
   try { window.APP.sb.auth.signOut({scope:'local'}); } catch(_) {}
@@ -542,10 +733,11 @@ function signOut() {
 }
 function handleSignOut() { signOut(); }
 </script>
-  <!-- Toast notification -->
-  <div id="abe-toast">
-    <span id="abe-toast-icon">✓</span>
-    <span id="abe-toast-msg"></span>
-  </div>
+
+<!-- Toast notification -->
+<div id="abe-toast">
+  <span id="abe-toast-icon">✓</span>
+  <span id="abe-toast-msg"></span>
+</div>
 </body>
 </html>
