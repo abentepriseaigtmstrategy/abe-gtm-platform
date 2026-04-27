@@ -2725,16 +2725,16 @@ function renderStep2(d) {
 function renderStep3(d) {
   document.getElementById('oc-icp-primary').innerHTML    = escHtml(d.primary_icp || '—');
   document.getElementById('oc-icp-secondary').innerHTML  = escHtml(d.secondary_icp || '—');
-  document.getElementById('oc-icp-firmographic').innerHTML = escHtml(d.firmographics || '—') +
+  document.getElementById('oc-icp-firmographic').innerHTML = smartRender(d.firmographics) +
     (d.deal_cycle ? `<br><span style="font-size:9px;color:var(--muted);">Deal cycle: ${escHtml(d.deal_cycle)}</span>` : '');
-  document.getElementById('oc-icp-pains').innerHTML      = escHtml(d.core_pain_points || '—');
+  document.getElementById('oc-icp-pains').innerHTML      = smartRender(d.core_pain_points);
 
   const trigs = document.getElementById('oc-icp-triggers');
   trigs.innerHTML = '';
   (d.buying_triggers || []).forEach(t => {
     const el = document.createElement('div');
     el.className = 'tag tag-blue';
-    el.textContent = t;
+    el.textContent = typeof t === 'string' ? t : objToLines(t);
     trigs.appendChild(el);
   });
 }
@@ -2745,14 +2745,14 @@ function renderStep4(d) {
   (d.recommended_databases || []).forEach(db => {
     const el = document.createElement('div');
     el.className = 'tag tag-accent';
-    el.textContent = db;
+    el.textContent = typeof db === 'string' ? db : objToLines(db);
     dbs.appendChild(el);
   });
 
-  document.getElementById('oc-src-filters').innerHTML   = escHtml(d.filter_criteria || '—');
-  document.getElementById('oc-src-playbook').innerHTML  = escHtml(d.sourcing_playbook || '—') +
+  document.getElementById('oc-src-filters').innerHTML   = smartRender(d.filter_criteria);
+  document.getElementById('oc-src-playbook').innerHTML  = smartRender(d.sourcing_playbook) +
     (d.estimated_universe ? `<br><span style="font-size:10px;color:var(--muted);">Est. universe: ${escHtml(d.estimated_universe)}</span>` : '');
-  document.getElementById('oc-src-exclusions').innerHTML = escHtml(d.exclusion_criteria || '—');
+  document.getElementById('oc-src-exclusions').innerHTML = smartRender(d.exclusion_criteria);
 }
 
 function renderStep5(d) {
@@ -2985,6 +2985,13 @@ function showSummary() {
 }
 
 function buildExportText() {
+  const safeStr = (v) => {
+    if (v === null || v === undefined) return '—';
+    if (typeof v === 'string') return v || '—';
+    if (Array.isArray(v)) return v.map(safeStr).join(', ');
+    if (typeof v === 'object') return Object.entries(v).filter(([,x])=>x).map(([k,x])=>`${k}: ${Array.isArray(x)?x.join(', '):x}`).join(' | ');
+    return String(v);
+  };
   let text = `GTM STRATEGY REPORT — ${state.company.toUpperCase()}\n`;
   text += `Generated: ${new Date().toLocaleDateString()}\n`;
   text += `Total Tokens: ${state.totalTokens.toLocaleString()}\n`;
@@ -3032,9 +3039,8 @@ function buildExportText() {
 }
 
 function openExportModal() {
-  const text = buildExportText();
   document.getElementById('export-title').textContent = `${state.company} — GTM Strategy Export`;
-  document.getElementById('export-content').textContent = text;
+  document.getElementById('export-content').textContent = buildExportText();
   document.getElementById('exportModal').classList.add('show');
 }
 
@@ -3043,24 +3049,514 @@ function closeExportModal() {
 }
 
 function downloadExport() {
-  const text = buildExportText();
-  
-  // Export as text file with .pdf extension
-  // This creates a downloadable file that can be opened as text
-  // Users can convert to true PDF using their own tools if needed
-  const blob = new Blob([text], { type: 'text/plain; charset=utf-8' });
-  const link = document.createElement('a');
-  link.href = URL.createObjectURL(blob);
-  const filename = `GTM_Strategy_${state.company.replace(/\s+/g,'_')}_${new Date().toISOString().slice(0,10)}.pdf`;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  showToast(`✅ Downloaded: ${filename}`);
+  generateProfessionalPDF();
 }
 
 function copyAllToClipboard() {
   navigator.clipboard.writeText(buildExportText()).then(() => showToast('Copied to clipboard ✓'));
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   PROFESSIONAL PDF GENERATOR
+   Uses jsPDF (loaded from CDN). Produces a properly formatted,
+   multi-page A4 PDF with cover page, section headers, branded
+   colours, and all 6 steps + optional Step 7 intelligence.
+═══════════════════════════════════════════════════════════════ */
+async function generateProfessionalPDF() {
+  showToast('Generating PDF…', 'info');
+
+  // Dynamically load jsPDF if not already present
+  if (!window.jspdf) {
+    await new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      s.onload = resolve; s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+  // ── Design tokens ──────────────────────────────────────────────
+  const W = 210, H = 297;
+  const MARGIN = 18;
+  const COL = W - MARGIN * 2;
+  const COLORS = {
+    bg:        [10,  14,  26],   // #0a0e1a
+    card:      [17,  24,  39],   // #111827
+    accent:    [168, 85,  247],  // purple
+    green:     [34,  197, 94],   // #22c55e
+    amber:     [251, 191, 36],   // #fbbf24
+    blue:      [59,  130, 246],  // #3b82f6
+    muted:     [107, 114, 128],  // #6b7280
+    text:      [229, 231, 235],  // #e5e7eb
+    white:     [255, 255, 255],
+    border:    [31,  41,  55],   // #1f2937
+  };
+
+  let y = 0; // current Y cursor
+  let page = 1;
+
+  // ── Helpers ────────────────────────────────────────────────────
+  const setFont = (size, style = 'normal', color = COLORS.text) => {
+    doc.setFontSize(size);
+    doc.setFont('helvetica', style);
+    doc.setTextColor(...color);
+  };
+
+  const fillRect = (x, fy, w, h, color) => {
+    doc.setFillColor(...color);
+    doc.rect(x, fy, w, h, 'F');
+  };
+
+  const addBorder = (x, fy, w, h, color, lw = 0.3) => {
+    doc.setDrawColor(...color);
+    doc.setLineWidth(lw);
+    doc.rect(x, fy, w, h, 'S');
+  };
+
+  const safeText = (v) => {
+    if (v === null || v === undefined) return '—';
+    if (typeof v === 'string') return v || '—';
+    if (Array.isArray(v)) return v.map(safeText).join(', ') || '—';
+    if (typeof v === 'object') return Object.entries(v)
+      .filter(([,val]) => val)
+      .map(([k,val]) => `${k.replace(/_/g,' ')}: ${Array.isArray(val) ? val.join(', ') : val}`)
+      .join(' | ') || '—';
+    return String(v);
+  };
+
+  const wrapText = (text, maxW, fontSize) => {
+    doc.setFontSize(fontSize);
+    return doc.splitTextToSize(String(text || '—'), maxW);
+  };
+
+  const checkPage = (needed = 20) => {
+    if (y + needed > H - 20) {
+      doc.addPage();
+      page++;
+      // Dark background on every page
+      fillRect(0, 0, W, H, COLORS.bg);
+      // Header strip
+      fillRect(0, 0, W, 10, COLORS.card);
+      setFont(7, 'normal', COLORS.muted);
+      doc.text(`${state.company} — GTM Strategy Report`, MARGIN, 7);
+      doc.text(`Page ${page}`, W - MARGIN, 7, { align: 'right' });
+      // Footer
+      fillRect(0, H - 10, W, 10, COLORS.card);
+      setFont(6, 'normal', COLORS.muted);
+      doc.text('CONFIDENTIAL · Generated by ABE AI Revenue Infrastructure', W / 2, H - 4, { align: 'center' });
+      y = 18;
+    }
+  };
+
+  const sectionHeader = (emoji, label, color = COLORS.accent) => {
+    checkPage(16);
+    fillRect(MARGIN, y, COL, 10, COLORS.card);
+    // Left accent bar
+    doc.setFillColor(...color);
+    doc.rect(MARGIN, y, 2.5, 10, 'F');
+    setFont(9, 'bold', color);
+    doc.text(`  ${emoji}  ${label.toUpperCase()}`, MARGIN + 4, y + 6.5);
+    addBorder(MARGIN, y, COL, 10, COLORS.border);
+    y += 13;
+  };
+
+  const labelValue = (label, value, indent = 0) => {
+    const lines = wrapText(safeText(value), COL - indent - 6, 8.5);
+    const blockH = 6 + lines.length * 5 + 4;
+    checkPage(blockH);
+    fillRect(MARGIN + indent, y, COL - indent, blockH, [15, 23, 42]);
+    addBorder(MARGIN + indent, y, COL - indent, blockH, COLORS.border);
+    setFont(7, 'bold', COLORS.muted);
+    doc.text(label.toUpperCase(), MARGIN + indent + 4, y + 5);
+    setFont(8.5, 'normal', COLORS.text);
+    doc.text(lines, MARGIN + indent + 4, y + 10);
+    y += blockH + 3;
+  };
+
+  const twoCol = (l1, v1, l2, v2) => {
+    const half = (COL - 4) / 2;
+    const lines1 = wrapText(safeText(v1), half - 6, 8.5);
+    const lines2 = wrapText(safeText(v2), half - 6, 8.5);
+    const blockH = 6 + Math.max(lines1.length, lines2.length) * 5 + 4;
+    checkPage(blockH);
+    // Left card
+    fillRect(MARGIN, y, half, blockH, [15, 23, 42]);
+    addBorder(MARGIN, y, half, blockH, COLORS.border);
+    setFont(7, 'bold', COLORS.muted);
+    doc.text(l1.toUpperCase(), MARGIN + 4, y + 5);
+    setFont(8.5, 'normal', COLORS.text);
+    doc.text(lines1, MARGIN + 4, y + 10);
+    // Right card
+    fillRect(MARGIN + half + 4, y, half, blockH, [15, 23, 42]);
+    addBorder(MARGIN + half + 4, y, half, blockH, COLORS.border);
+    setFont(7, 'bold', COLORS.muted);
+    doc.text(l2.toUpperCase(), MARGIN + half + 8, y + 5);
+    setFont(8.5, 'normal', COLORS.text);
+    doc.text(lines2, MARGIN + half + 8, y + 10);
+    y += blockH + 3;
+  };
+
+  const tagRow = (label, items) => {
+    const arr = Array.isArray(items) ? items : [safeText(items)];
+    if (!arr.length) return;
+    checkPage(16);
+    setFont(7, 'bold', COLORS.muted);
+    doc.text(label.toUpperCase(), MARGIN, y + 4);
+    y += 7;
+    let tx = MARGIN;
+    arr.forEach(tag => {
+      const t = safeText(tag);
+      const tw = doc.getTextWidth(t) + 6;
+      if (tx + tw > W - MARGIN) { y += 8; tx = MARGIN; checkPage(10); }
+      fillRect(tx, y - 4, tw, 6.5, [31, 41, 55]);
+      addBorder(tx, y - 4, tw, 6.5, COLORS.border, 0.2);
+      setFont(7.5, 'normal', COLORS.accent);
+      doc.text(t, tx + 3, y + 0.5);
+      tx += tw + 3;
+    });
+    y += 10;
+  };
+
+  const divider = (color = COLORS.border) => {
+    checkPage(6);
+    doc.setDrawColor(...color);
+    doc.setLineWidth(0.2);
+    doc.line(MARGIN, y, W - MARGIN, y);
+    y += 6;
+  };
+
+  // ══════════════════════════════════════════
+  // PAGE 1 — COVER PAGE
+  // ══════════════════════════════════════════
+  fillRect(0, 0, W, H, COLORS.bg);
+
+  // Top gradient band
+  fillRect(0, 0, W, 70, COLORS.card);
+  doc.setFillColor(168, 85, 247, 0.3);
+  doc.rect(0, 0, W, 3, 'F');
+
+  // ABE logo area
+  setFont(9, 'bold', COLORS.muted);
+  doc.text('ABE  ·  AI REVENUE INFRASTRUCTURE', MARGIN, 20);
+  setFont(7, 'normal', COLORS.muted);
+  doc.text('ENTERPRISE GTM PLATFORM  ·  CONFIDENTIAL', MARGIN, 27);
+
+  // Horizontal rule
+  doc.setDrawColor(...COLORS.accent);
+  doc.setLineWidth(0.5);
+  doc.line(MARGIN, 32, W - MARGIN, 32);
+
+  // Company name
+  setFont(26, 'bold', COLORS.white);
+  const compLines = doc.splitTextToSize(state.company || 'Company', COL);
+  doc.text(compLines, MARGIN, 48);
+
+  setFont(12, 'normal', COLORS.accent);
+  doc.text('Go-To-Market Strategy Report', MARGIN, 62);
+
+  // Meta row
+  y = 80;
+  const metaItems = [
+    ['Generated', new Date().toLocaleDateString('en-GB', { day: '2-digit', month: 'long', year: 'numeric' })],
+    ['Total Tokens', state.totalTokens.toLocaleString()],
+    ['Steps Completed', '6 / 6'],
+    ['Industry', state.industry || 'General'],
+  ];
+  metaItems.forEach(([label, value], i) => {
+    const x = MARGIN + i * 45;
+    fillRect(x, y, 43, 18, COLORS.card);
+    addBorder(x, y, 43, 18, COLORS.border);
+    setFont(6.5, 'bold', COLORS.muted);
+    doc.text(label.toUpperCase(), x + 3, y + 6);
+    setFont(9, 'bold', COLORS.white);
+    doc.text(String(value), x + 3, y + 14);
+  });
+  y += 28;
+
+  // Table of contents
+  fillRect(MARGIN, y, COL, 8, COLORS.card);
+  setFont(8, 'bold', COLORS.accent);
+  doc.text('CONTENTS', MARGIN + 4, y + 5.5);
+  y += 11;
+
+  const tocItems = [
+    ['01', 'Market Research',        'Deep Market Intelligence'],
+    ['02', 'TAM Mapping',            'Total Addressable Market Analysis'],
+    ['03', 'ICP Modeling',           'Ideal Customer Profile'],
+    ['04', 'Account Sourcing',       'Lead Database Strategy'],
+    ['05', 'Keyword Generation',     'Search Intelligence Engine'],
+    ['06', 'Messaging Creation',     'Outbound Messaging Playbook'],
+    ...(state.step7 ? [['07', 'Revenue Intelligence', 'Executive Enhancement Layer']] : []),
+  ];
+
+  tocItems.forEach(([num, title, sub], i) => {
+    const even = i % 2 === 0;
+    fillRect(MARGIN, y, COL, 9, even ? [13, 17, 29] : COLORS.card);
+    doc.setFillColor(...COLORS.accent);
+    doc.rect(MARGIN, y, 1.5, 9, 'F');
+    setFont(7, 'bold', COLORS.accent);
+    doc.text(num, MARGIN + 4, y + 6);
+    setFont(8, 'bold', COLORS.white);
+    doc.text(title, MARGIN + 12, y + 6);
+    setFont(7, 'normal', COLORS.muted);
+    doc.text(sub, MARGIN + 12, y + 12.5);
+    y += 10;
+  });
+
+  // Footer
+  fillRect(0, H - 14, W, 14, COLORS.card);
+  setFont(6.5, 'normal', COLORS.muted);
+  doc.text('This document is confidential and prepared exclusively for the recipient. Generated by ABE AI Revenue Infrastructure.', W / 2, H - 5, { align: 'center' });
+
+  // ══════════════════════════════════════════
+  // STEP PAGES
+  // ══════════════════════════════════════════
+  const stepConfigs = [
+    {
+      n: 1, emoji: '🔍', label: 'STEP 01 — MARKET RESEARCH', sub: 'Deep Market Intelligence',
+      color: COLORS.blue,
+      render: (d) => {
+        twoCol('Company Overview', d.company_overview, 'Market Position', d.market_position);
+        twoCol('GTM Relevance Score', d.gtm_relevance_score, 'Revenue Stage', d.revenue_stage);
+        tagRow('Growth Signals', d.growth_signals);
+        labelValue('Products & Services', d.products_services);
+        labelValue('Technology Stack Hints', d.tech_stack_hints);
+        labelValue('GTM Fit Narrative', d.gtm_fit_narrative);
+      },
+    },
+    {
+      n: 2, emoji: '📊', label: 'STEP 02 — TAM MAPPING', sub: 'Total Addressable Market Analysis',
+      color: COLORS.green,
+      render: (d) => {
+        twoCol('TAM Size Estimate', d.tam_size_estimate, 'Growth Rate', d.growth_rate);
+        twoCol('SAM Estimate', d.sam_estimate, 'Market Maturity', d.market_maturity);
+        labelValue('TAM Overview', d.tam_overview || d.tam_description);
+        tagRow('Market Segments', (d.market_segments||[]).map(s => typeof s === 'string' ? s : `${s.name || ''} · ${s.size || ''}`));
+        labelValue('Priority Opportunities', d.priority_opportunities);
+        labelValue('Market Risks', d.market_risks);
+      },
+    },
+    {
+      n: 3, emoji: '👤', label: 'STEP 03 — ICP MODELING', sub: 'Ideal Customer Profile',
+      color: COLORS.accent,
+      render: (d) => {
+        twoCol('Primary ICP', d.primary_icp, 'Secondary ICP', d.secondary_icp);
+        labelValue('Firmographics', safeText(d.firmographics));
+        labelValue('Deal Cycle', d.deal_cycle);
+        tagRow('Buying Triggers', d.buying_triggers);
+        labelValue('Core Pain Points', d.core_pain_points);
+        tagRow('Decision Makers', d.decision_makers);
+        tagRow('Key Objections', d.objections);
+      },
+    },
+    {
+      n: 4, emoji: '🗄️', label: 'STEP 04 — ACCOUNT SOURCING', sub: 'Lead Database Strategy',
+      color: [249, 115, 22],
+      render: (d) => {
+        tagRow('Recommended Databases', d.recommended_databases);
+        labelValue('Filter Criteria', safeText(d.filter_criteria));
+        labelValue('Exclusion Criteria', safeText(d.exclusion_criteria));
+        labelValue('Sourcing Playbook', d.sourcing_playbook);
+        labelValue('Estimated Universe', d.estimated_universe);
+        labelValue('Data Enrichment Tips', d.data_enrichment_tips);
+      },
+    },
+    {
+      n: 5, emoji: '🔑', label: 'STEP 05 — KEYWORD GENERATION', sub: 'Search Intelligence Engine',
+      color: [20, 184, 166],
+      render: (d) => {
+        tagRow('Primary Keywords', d.primary_keywords);
+        tagRow('Secondary Keywords', d.secondary_keywords);
+        labelValue('Boolean Query', d.boolean_query);
+        labelValue('LinkedIn Search Strings', Array.isArray(d.linkedin_search_strings) ? d.linkedin_search_strings.join('\n') : d.linkedin_search_strings);
+        tagRow('Intent Signals', d.intent_signals);
+        tagRow('Content Topics', d.content_topics);
+      },
+    },
+    {
+      n: 6, emoji: '✉️', label: 'STEP 06 — MESSAGING CREATION', sub: 'Outbound Messaging Playbook',
+      color: [236, 72, 153],
+      render: (d) => {
+        ['email_1','email_2','email_3'].forEach((key, i) => {
+          const e = d[key];
+          if (!e) return;
+          checkPage(40);
+          const angle = e.angle || `Email ${i+1}`;
+          fillRect(MARGIN, y, COL, 7, COLORS.card);
+          setFont(8, 'bold', COLORS.accent);
+          doc.text(`EMAIL ${i+1}  ·  ${angle.toUpperCase()}`, MARGIN + 4, y + 5);
+          y += 10;
+          labelValue('Subject', e.subject);
+          labelValue('Body', e.body);
+          labelValue('CTA', e.cta);
+          y += 2;
+        });
+        if (d.linkedin_message) labelValue('LinkedIn Message', d.linkedin_message);
+      },
+    },
+  ];
+
+  for (const cfg of stepConfigs) {
+    const d = state.steps[cfg.n]?.data;
+    if (!d) continue;
+
+    doc.addPage();
+    page++;
+    fillRect(0, 0, W, H, COLORS.bg);
+
+    // Page header
+    fillRect(0, 0, W, 14, COLORS.card);
+    doc.setFillColor(...cfg.color);
+    doc.rect(0, 0, 3, 14, 'F');
+    setFont(7, 'bold', cfg.color);
+    doc.text(cfg.label, MARGIN, 6);
+    setFont(8.5, 'bold', COLORS.white);
+    doc.text(cfg.sub, MARGIN, 11);
+    setFont(7, 'normal', COLORS.muted);
+    doc.text(`${state.company}  ·  Page ${page}`, W - MARGIN, 9, { align: 'right' });
+
+    // Footer
+    fillRect(0, H - 10, W, 10, COLORS.card);
+    setFont(6, 'normal', COLORS.muted);
+    doc.text('CONFIDENTIAL · ABE AI Revenue Infrastructure', W / 2, H - 4, { align: 'center' });
+
+    y = 22;
+    cfg.render(d);
+  }
+
+  // ══════════════════════════════════════════
+  // STEP 7 — REVENUE INTELLIGENCE (if generated)
+  // ══════════════════════════════════════════
+  if (state.step7) {
+    const s7 = state.step7;
+    doc.addPage(); page++;
+    fillRect(0, 0, W, H, COLORS.bg);
+
+    // Header with amber accent
+    fillRect(0, 0, W, 14, COLORS.card);
+    doc.setFillColor(...COLORS.amber);
+    doc.rect(0, 0, 3, 14, 'F');
+    setFont(7, 'bold', COLORS.amber);
+    doc.text('STEP 07 — REVENUE INTELLIGENCE ENHANCEMENT  ·  OPTIONAL LAYER', MARGIN, 6);
+    setFont(8.5, 'bold', COLORS.white);
+    doc.text('Executive Signal Analysis & Go/No-Go Recommendation', MARGIN, 11);
+    setFont(7, 'normal', COLORS.muted);
+    doc.text(`${state.company}  ·  Page ${page}`, W - MARGIN, 9, { align: 'right' });
+    fillRect(0, H - 10, W, 10, COLORS.card);
+    setFont(6, 'normal', COLORS.muted);
+    doc.text('CONFIDENTIAL · ABE AI Revenue Infrastructure', W / 2, H - 4, { align: 'center' });
+
+    y = 22;
+
+    // Go/No-Go + Confidence Score hero row
+    checkPage(24);
+    const gng = s7.go_no_go?.recommendation || 'Watch';
+    const gngColor = gng === 'Go' ? COLORS.green : gng === 'No-Go' ? [239,68,68] : COLORS.amber;
+    fillRect(MARGIN, y, 40, 20, COLORS.card);
+    addBorder(MARGIN, y, 40, 20, gngColor, 0.5);
+    setFont(7, 'bold', COLORS.muted);
+    doc.text('GO / NO-GO', MARGIN + 4, y + 6);
+    setFont(14, 'bold', gngColor);
+    doc.text(gng.toUpperCase(), MARGIN + 4, y + 16);
+
+    fillRect(MARGIN + 44, y, 40, 20, COLORS.card);
+    addBorder(MARGIN + 44, y, 40, 20, COLORS.border);
+    setFont(7, 'bold', COLORS.muted);
+    doc.text('CONFIDENCE', MARGIN + 48, y + 6);
+    setFont(14, 'bold', COLORS.amber);
+    doc.text(`${s7.confidence_score}/100`, MARGIN + 48, y + 16);
+
+    if (s7.go_no_go?.reason) {
+      const rLines = wrapText(s7.go_no_go.reason, COL - 90, 8);
+      fillRect(MARGIN + 88, y, COL - 88, 20, COLORS.card);
+      addBorder(MARGIN + 88, y, COL - 88, 20, COLORS.border);
+      setFont(7, 'bold', COLORS.muted);
+      doc.text('REASON', MARGIN + 92, y + 6);
+      setFont(8, 'normal', COLORS.text);
+      doc.text(rLines.slice(0,2), MARGIN + 92, y + 12);
+    }
+    y += 25;
+
+    // Executive Brief
+    labelValue('Executive Brief', s7.executive_brief);
+
+    // Buying Signals
+    if (s7.signal_summary?.length) {
+      checkPage(12);
+      setFont(7, 'bold', COLORS.muted);
+      doc.text('BUYING SIGNALS', MARGIN, y + 4);
+      y += 8;
+      s7.signal_summary.forEach(sig => {
+        const strColor = sig.strength === 'High' ? COLORS.green : sig.strength === 'Medium' ? COLORS.amber : COLORS.muted;
+        const desc = wrapText(sig.signal_description || '', COL - 40, 8);
+        const bH = 6 + desc.length * 5 + 2;
+        checkPage(bH + 2);
+        fillRect(MARGIN, y, COL, bH, [13, 17, 29]);
+        addBorder(MARGIN, y, COL, bH, COLORS.border);
+        doc.setFillColor(...strColor);
+        doc.rect(MARGIN, y, 1.5, bH, 'F');
+        setFont(7, 'bold', strColor);
+        const typeLabel = (sig.signal_type || '').replace(/_/g,' ').toUpperCase();
+        doc.text(`${typeLabel}  ·  ${(sig.strength||'').toUpperCase()}`, MARGIN + 4, y + 5);
+        setFont(8, 'normal', COLORS.text);
+        doc.text(desc, MARGIN + 4, y + 10);
+        y += bH + 3;
+      });
+    }
+
+    // Why Now + Persona
+    twoCol('Why Now Analysis', s7.why_now_analysis, 'Priority Persona', `${s7.persona_priority?.persona || '—'}\n\n${s7.persona_priority?.reason || ''}`);
+
+    // MCC View
+    if (s7.mcc_view) {
+      checkPage(30);
+      setFont(7, 'bold', COLORS.muted);
+      doc.text('MARKET · CLIENT · COMPETITOR VIEW', MARGIN, y + 4);
+      y += 8;
+      const third = (COL - 6) / 3;
+      [
+        ['MARKET',     s7.mcc_view.market,     COLORS.blue],
+        ['CLIENT',     s7.mcc_view.client,     COLORS.accent],
+        ['COMPETITOR', s7.mcc_view.competitor, COLORS.amber],
+      ].forEach(([lbl, val, col], i) => {
+        const lines = wrapText(safeText(val), third - 6, 8);
+        const bH = 8 + lines.length * 5 + 3;
+        const bx = MARGIN + i * (third + 3);
+        fillRect(bx, y, third, bH, [13,17,29]);
+        doc.setFillColor(...col);
+        doc.rect(bx, y, 1.5, bH, 'F');
+        addBorder(bx, y, third, bH, COLORS.border);
+        setFont(7, 'bold', col);
+        doc.text(lbl, bx + 4, y + 6);
+        setFont(8, 'normal', COLORS.text);
+        doc.text(lines, bx + 4, y + 11);
+        // Update y after all three
+        if (i === 2) y += bH + 4;
+      });
+    }
+
+    // Strategic Hook
+    if (s7.strategic_hook) {
+      checkPage(18);
+      fillRect(MARGIN, y, COL, 16, [30, 20, 50]);
+      addBorder(MARGIN, y, COL, 16, COLORS.accent, 0.5);
+      setFont(7, 'bold', COLORS.muted);
+      doc.text('STRATEGIC HOOK', MARGIN + 4, y + 5);
+      setFont(9, 'bolditalic', COLORS.white);
+      const hookLines = wrapText(`"${s7.strategic_hook}"`, COL - 8, 9);
+      doc.text(hookLines, MARGIN + 4, y + 11);
+      y += 20;
+    }
+  }
+
+  // ── Save file ──────────────────────────────────────────────────
+  const filename = `GTM_Strategy_${(state.company||'Report').replace(/[^a-zA-Z0-9]/g,'_')}_${new Date().toISOString().slice(0,10)}.pdf`;
+  doc.save(filename);
+  showToast(`✅ PDF Downloaded: ${filename}`, 'success');
+  closeExportModal();
 }
 
 function copyEmail(btn) {
@@ -3768,12 +4264,37 @@ async function handleSignOut() {
 }
 
 function escHtml(str) {
-  if (typeof str !== 'string') return str;
+  if (typeof str !== 'string') return String(str ?? '');
   return str
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
     .replace(/\n/g, '<br>');
+}
+
+// Safely render any value — handles strings, arrays, and objects the AI sometimes returns
+// instead of a plain string.
+function objToLines(obj) {
+  if (!obj || typeof obj !== 'object') return String(obj ?? '');
+  if (Array.isArray(obj)) return obj.map(v => objToLines(v)).join(', ');
+  // For objects: render as "key: value" pairs
+  return Object.entries(obj)
+    .filter(([, v]) => v !== null && v !== undefined && v !== '')
+    .map(([k, v]) => {
+      const label = k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+      const val   = Array.isArray(v) ? v.join(', ') : (typeof v === 'object' ? objToLines(v) : String(v));
+      return `${label}: ${val}`;
+    })
+    .join(' · ');
+}
+
+// Main smart renderer — returns safe HTML string regardless of value type
+function smartRender(val) {
+  if (val === null || val === undefined) return '—';
+  if (typeof val === 'string')  return escHtml(val) || '—';
+  if (Array.isArray(val))       return val.map(v => escHtml(objToLines(v))).join('<br>') || '—';
+  if (typeof val === 'object')  return escHtml(objToLines(val)) || '—';
+  return escHtml(String(val));
 }
 
 /* ═══════════════════════════════════════════════════════════════
