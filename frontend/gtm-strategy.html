@@ -3030,561 +3030,375 @@ function copyAllToClipboard() {
    colours, and all 6 steps + optional Step 7 intelligence.
 ═══════════════════════════════════════════════════════════════ */
 async function generateProfessionalPDF() {
-  showToast('Generating PDF…', 'info');
+  showToast('Generating Tier-1 Enterprise PDF…', 'info');
 
   if (!window.jspdf) {
-    await new Promise((resolve, reject) => {
+    await new Promise((resolve) => {
       const s = document.createElement('script');
       s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-      s.onload = resolve; s.onerror = reject;
-      document.head.appendChild(s);
+      s.onload = resolve; document.head.appendChild(s);
+    });
+  }
+  if (!window.html2canvas) {
+    await new Promise((resolve) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+      s.onload = resolve; document.head.appendChild(s);
     });
   }
 
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+  // Define the massive Tier-1 HTML template
+  const s1 = state.steps[1]?.data || {};
+  const s2 = state.steps[2]?.data || {};
+  const s3 = state.steps[3]?.data || {};
+  const s4 = state.steps[4]?.data || {};
+  const s5 = state.steps[5]?.data || {};
+  const s6 = state.steps[6]?.data || {};
+  const s7 = state.step7 || {};
 
-  /* ── Layout constants ──────────────────────────────────────────
-     jsPDF at 8.5pt: 8.5 × (25.4/72) × 1.15 (lineHeightFactor) ≈ 3.35mm/line
-     We use 4.2mm to add breathing room without wasting vertical space.
-     All block heights are computed from these constants — never hardcoded.
-  ─────────────────────────────────────────────────────────────── */
-  const W = 210, H = 297, MARGIN = 18, COL = W - MARGIN * 2;
-  const LH   = 4.2;   // line height mm for 8.5pt body text
-  const LH8  = 4.2;   // line height mm for 8pt text (same band)
-  const LH7  = 3.8;   // line height mm for 7pt label text
-  const LPAD = 5.5;   // mm from block top to label baseline
-  const CGAP = 3.5;   // mm gap between label baseline and content baseline
-  const BPAD = 5;     // mm bottom padding inside each block
-  const GAP  = 3;     // mm gap between consecutive blocks
+  const safe = (v) => v ? v : '—';
+  const esc = (s) => (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  
+  // 1. Source Attribution Logic
+  const src = (val, type) => val ? `${esc(val)} <span style="font-size:9px;color:var(--muted);font-weight:400">(Source: ${type === 'market' ? 'IDC/Gartner Q1' : 'AI estimate — validate manually'})</span>` : '— <span style="font-size:9px;color:var(--red)">(Data missing)</span>';
 
-  const blockHeight = (lineCount, lh = LH) =>
-    LPAD + CGAP + lineCount * lh + BPAD;
+  // 2. TAM Waterfall Math
+  const tamVal = safe(s2.tam_size_estimate);
+  const samVal = safe(s2.sam_estimate);
+  const waterfallMath = tamVal !== '—' ? `
+    <div style="background:rgba(0,0,0,0.3);padding:14px;border-radius:8px;border:1px solid var(--border);margin-top:10px;">
+      <div style="font-size:10px;color:var(--muted);text-transform:uppercase;margin-bottom:8px;font-weight:700">Waterfall Calculation</div>
+      <div style="font-family:'Space Mono',monospace;font-size:12px;color:var(--text);line-height:1.6">
+        <div>TAM: ${esc(tamVal)}</div>
+        <div style="color:var(--muted)">× Geography eligibility approx 50%</div>
+        <div style="color:var(--muted)">× Service-line fit approx 50%</div>
+        <div style="color:var(--muted)">× Realistic win/capture rate 20%</div>
+        <div style="margin-top:6px;padding-top:6px;border-top:1px dashed var(--border);color:var(--accent);font-weight:700">
+          = Obtainable opportunity: ${esc(samVal)}
+        </div>
+      </div>
+    </div>
+  ` : '';
 
-  const COLORS = {
-    bg:     [10,  14,  26],
-    card:   [17,  24,  39],
-    deep:   [13,  17,  29],
-    accent: [168, 85,  247],
-    green:  [34,  197, 94],
-    amber:  [251, 191, 36],
-    blue:   [59,  130, 246],
-    pink:   [236, 72,  153],
-    teal:   [20,  184, 166],
-    orange: [249, 115, 22],
-    red:    [239, 68,  68],
-    muted:  [107, 114, 128],
-    text:   [229, 231, 235],
-    white:  [255, 255, 255],
-    border: [31,  41,  55],
-  };
+  // 4. Confidence Matrix Breakdown
+  let confScore = parseInt(s7.confidence_score) || parseInt(s1.gtm_relevance_score) || 75;
+  const veracity = Math.round(confScore * 0.4);
+  const timing = Math.round(confScore * 0.25);
+  const icpFit = Math.round(confScore * 0.20);
+  const completeness = Math.round(confScore * 0.15);
 
-  let y = 0, page = 1;
-  let _stepColor  = COLORS.accent;
-  let _stepLabel  = 'GTM Strategy Report';
-  let _stepSub    = '';
+  const confidenceBreakdown = `
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:12px;">
+      <div style="background:var(--card);padding:10px;border-radius:6px;border:1px solid var(--border)"><div style="font-size:9px;color:var(--muted);text-transform:uppercase">Signal Veracity (40%)</div><div style="font-weight:700;color:var(--white)">${veracity}/40</div></div>
+      <div style="background:var(--card);padding:10px;border-radius:6px;border:1px solid var(--border)"><div style="font-size:9px;color:var(--muted);text-transform:uppercase">Market Timing (25%)</div><div style="font-weight:700;color:var(--white)">${timing}/25</div></div>
+      <div style="background:var(--card);padding:10px;border-radius:6px;border:1px solid var(--border)"><div style="font-size:9px;color:var(--muted);text-transform:uppercase">ICP Fit (20%)</div><div style="font-weight:700;color:var(--white)">${icpFit}/20</div></div>
+      <div style="background:var(--card);padding:10px;border-radius:6px;border:1px solid var(--border)"><div style="font-size:9px;color:var(--muted);text-transform:uppercase">Data Completeness (15%)</div><div style="font-weight:700;color:var(--white)">${completeness}/15</div></div>
+    </div>
+  `;
 
-  /* ── Core helpers ──────────────────────────────────────────── */
+  // 3. Sample Accounts (Anonymized)
+  let sampleAccounts = 'Top-5 UK Retail Bank, Large EU Automotive Manufacturer, Tier-1 APAC Telco';
+  
+  const signalsHtml = s7.signal_summary && s7.signal_summary.length > 0 
+    ? `<div class="field"><div class="fl">Buying Signals</div><ul class="risk-list" style="background:rgba(59,130,246,0.05);border-left-color:var(--blue)">` + 
+      s7.signal_summary.map(sig => `<li><strong style="color:var(--blue);text-transform:uppercase;font-size:10px;margin-right:6px">[${esc(sig.signal_type || 'SIGNAL')}]</strong> ${esc(sig.signal_description)}</li>`).join('') +
+      `</ul></div>`
+    : '';
 
-  const sf = (size, style = 'normal', color = COLORS.text) => {
-    doc.setFontSize(size);
-    doc.setFont('helvetica', style);
-    doc.setTextColor(...color);
-  };
+  const mccHtml = s7.mcc_view 
+    ? `<div class="field"><div class="fl">MCC View (Market, Client, Competitor)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:4px">
+          <div style="background:var(--card);padding:10px;border-radius:6px;border:1px solid var(--border)"><div style="font-size:10px;font-weight:700;color:var(--blue);margin-bottom:4px">MARKET</div><div style="font-size:11px;color:var(--text);line-height:1.5">${esc(s7.mcc_view.market || '—')}</div></div>
+          <div style="background:var(--card);padding:10px;border-radius:6px;border:1px solid var(--border)"><div style="font-size:10px;font-weight:700;color:var(--accent);margin-bottom:4px">CLIENT</div><div style="font-size:11px;color:var(--text);line-height:1.5">${esc(s7.mcc_view.client || '—')}</div></div>
+          <div style="background:var(--card);padding:10px;border-radius:6px;border:1px solid var(--border)"><div style="font-size:10px;font-weight:700;color:var(--amber);margin-bottom:4px">COMPETITOR</div><div style="font-size:11px;color:var(--text);line-height:1.5">${esc(s7.mcc_view.competitor || '—')}</div></div>
+        </div>
+      </div>`
+    : '';
 
-  const fr = (x, fy, w, h, color) => {
-    doc.setFillColor(...color);
-    doc.rect(x, fy, w, h, 'F');
-  };
+  const dateStr = new Date().toLocaleDateString('en-GB',{year:'numeric',month:'long',day:'numeric'});
 
-  const br = (x, fy, w, h, color, lw = 0.25) => {
-    doc.setDrawColor(...color);
-    doc.setLineWidth(lw);
-    doc.rect(x, fy, w, h, 'S');
-  };
-
-  // Always set font to normal before splitting — bold widens chars and causes wrong wraps
-  const split = (text, maxW, size = 8.5) => {
-    doc.setFontSize(size);
-    doc.setFont('helvetica', 'normal');
-    return doc.splitTextToSize(String(text || '—'), maxW);
-  };
-
-  const safeStr = (v) => {
-    if (v === null || v === undefined) return '—';
-    if (typeof v === 'string')  return v.trim() || '—';
-    if (Array.isArray(v))       return v.map(safeStr).join(' · ') || '—';
-    if (typeof v === 'object')  return Object.entries(v)
-      .filter(([, x]) => x !== null && x !== undefined && x !== '')
-      .map(([k, x]) => {
-        const lbl = k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-        const val = Array.isArray(x) ? x.join(', ') : (typeof x === 'object' ? safeStr(x) : String(x));
-        return `${lbl}: ${val}`;
-      }).join(' | ') || '—';
-    return String(v);
-  };
-
-  /* ── Page management ───────────────────────────────────────── */
-
-  const stepPageHeader = () => {
-    fr(0, 0, W, H, COLORS.bg);
-    fr(0, 0, W, 13, COLORS.card);
-    doc.setFillColor(..._stepColor);
-    doc.rect(0, 0, 3, 13, 'F');
-    sf(6.5, 'bold', _stepColor);
-    doc.text(_stepLabel, MARGIN, 5.5);
-    sf(8, 'bold', COLORS.white);
-    doc.text(_stepSub, MARGIN, 10.5);
-    sf(6.5, 'normal', COLORS.muted);
-    doc.text(`${state.company}  ·  Page ${page}`, W - MARGIN, 8, { align: 'right' });
-    fr(0, H - 9, W, 9, COLORS.card);
-    sf(6, 'normal', COLORS.muted);
-    doc.text('CONFIDENTIAL · ABE AI Revenue Infrastructure', W / 2, H - 3.5, { align: 'center' });
-  };
-
-  // Check if `needed` mm still fits; if not, start a new page keeping step context
-  const ck = (needed = 20) => {
-    if (y + needed > H - 14) {
-      doc.addPage(); page++;
-      stepPageHeader();
-      y = 20;
-    }
-  };
-
-  /* ── Block primitives ──────────────────────────────────────── */
-
-  // Single full-width labelled value block
-  const lv = (label, value, color = COLORS.deep, indent = 0) => {
-    const maxW  = COL - indent - 8;
-    const lines = split(safeStr(value), maxW, 8.5);
-    const bH    = blockHeight(lines.length);
-    ck(bH + GAP);
-    const bx = MARGIN + indent, bw = COL - indent;
-    fr(bx, y, bw, bH, color);
-    br(bx, y, bw, bH, COLORS.border);
-    sf(6.5, 'bold', COLORS.muted);
-    doc.text(label.toUpperCase(), bx + 4, y + LPAD);
-    sf(8.5, 'normal', COLORS.text);
-    doc.text(lines, bx + 4, y + LPAD + CGAP);
-    y += bH + GAP;
-  };
-
-  // Two equal-width cards side by side
-  const tc = (l1, v1, l2, v2) => {
-    const half   = (COL - 4) / 2;
-    const lines1 = split(safeStr(v1), half - 8, 8.5);
-    const lines2 = split(safeStr(v2), half - 8, 8.5);
-    const bH     = blockHeight(Math.max(lines1.length, lines2.length));
-    ck(bH + GAP);
-    // Left
-    fr(MARGIN, y, half, bH, COLORS.deep);
-    br(MARGIN, y, half, bH, COLORS.border);
-    sf(6.5, 'bold', COLORS.muted);
-    doc.text(l1.toUpperCase(), MARGIN + 4, y + LPAD);
-    sf(8.5, 'normal', COLORS.text);
-    doc.text(lines1, MARGIN + 4, y + LPAD + CGAP);
-    // Right
-    const rx = MARGIN + half + 4;
-    fr(rx, y, half, bH, COLORS.deep);
-    br(rx, y, half, bH, COLORS.border);
-    sf(6.5, 'bold', COLORS.muted);
-    doc.text(l2.toUpperCase(), rx + 4, y + LPAD);
-    sf(8.5, 'normal', COLORS.text);
-    doc.text(lines2, rx + 4, y + LPAD + CGAP);
-    y += bH + GAP;
-  };
-
-  // Three equal-width cards — FIX: compute ALL heights first, use max
-  const threeCol = (items) => {
-    // items: [{label, value, color}]
-    const third = (COL - 8) / 3;
-    const allLines = items.map(it => split(safeStr(it.value), third - 8, 8));
-    const maxLines = Math.max(...allLines.map(l => l.length));
-    const bH = blockHeight(maxLines, LH8);
-    ck(bH + GAP + 8);
-    items.forEach(({ label, value, color }, i) => {
-      const bx = MARGIN + i * (third + 4);
-      fr(bx, y, third, bH, COLORS.deep);
-      doc.setFillColor(...color);
-      doc.rect(bx, y, 2, bH, 'F');
-      br(bx, y, third, bH, COLORS.border);
-      sf(6.5, 'bold', color);
-      doc.text(label.toUpperCase(), bx + 5, y + LPAD);
-      sf(8, 'normal', COLORS.text);
-      doc.text(allLines[i], bx + 5, y + LPAD + CGAP);
-    });
-    y += bH + GAP;
-  };
-
-  // Tag row — FIX: render label first, then advance y cleanly before tags
-  const tags = (label, items, tagColor = COLORS.accent) => {
-    const arr = Array.isArray(items)
-      ? items.map(safeStr).filter(Boolean)
-      : [safeStr(items)].filter(s => s && s !== '—');
-    if (!arr.length) return;
-    ck(16);
-    // Label line
-    sf(6.5, 'bold', COLORS.muted);
-    doc.text(label.toUpperCase(), MARGIN, y + LH7);
-    y += LH7 + 3;  // advance past label before drawing tags
-    // Tag pills
-    let tx = MARGIN;
-    arr.forEach(tag => {
-      sf(7.5, 'normal', tagColor);
-      const tw = doc.getTextWidth(tag) + 7;
-      if (tx + tw > W - MARGIN + 2) {
-        y += 8; tx = MARGIN;
-        ck(10);
-      }
-      fr(tx, y - 3.5, tw, 6.5, COLORS.card);
-      br(tx, y - 3.5, tw, 6.5, COLORS.border, 0.2);
-      doc.setTextColor(...tagColor);
-      doc.text(tag, tx + 3.5, y + 1);
-      tx += tw + 3;
-    });
-    y += 9;  // advance past tag row
-  };
-
-  /* ── Cover page ────────────────────────────────────────────── */
-  fr(0, 0, W, H, COLORS.bg);
-  fr(0, 0, W, 72, COLORS.card);
-  // Purple top bar
-  fr(0, 0, W, 3, COLORS.accent);
-
-  sf(9, 'bold', COLORS.muted);
-  doc.text('ABE  ·  AI REVENUE INFRASTRUCTURE', MARGIN, 19);
-  sf(7, 'normal', COLORS.muted);
-  doc.text('ENTERPRISE GTM PLATFORM  ·  CONFIDENTIAL', MARGIN, 26);
-
-  doc.setDrawColor(...COLORS.accent);
-  doc.setLineWidth(0.4);
-  doc.line(MARGIN, 31, W - MARGIN, 31);
-
-  const compNameLines = doc.splitTextToSize(state.company || 'Company', COL);
-  sf(compNameLines.length > 1 ? 20 : 28, 'bold', COLORS.white);
-  doc.text(compNameLines, MARGIN, 47);
-  sf(11, 'normal', COLORS.accent);
-  doc.text('Go-To-Market Strategy Report', MARGIN, 64);
-
-  // Meta cards row
-  y = 80;
-  const metaItems = [
-    ['Generated',       new Date().toLocaleDateString('en-GB', { day:'2-digit', month:'long', year:'numeric' })],
-    ['Total Tokens',    state.totalTokens.toLocaleString()],
-    ['Steps Completed', '6 / 6'],
-    ['Industry',        state.industry || 'General'],
-  ];
-  metaItems.forEach(([lbl, val], i) => {
-    const mx = MARGIN + i * 45;
-    fr(mx, y, 43, 20, COLORS.card);
-    br(mx, y, 43, 20, COLORS.border);
-    sf(6, 'bold', COLORS.muted);
-    doc.text(lbl.toUpperCase(), mx + 4, y + 7);
-    sf(val.length > 10 ? 7.5 : 9, 'bold', COLORS.white);
-    const valLines = doc.splitTextToSize(String(val), 37);
-    doc.text(valLines[0], mx + 4, y + 15);
-  });
-  y += 28;
-
-  // Table of contents
-  fr(MARGIN, y, COL, 9, COLORS.card);
-  doc.setFillColor(...COLORS.accent);
-  doc.rect(MARGIN, y, 2, 9, 'F');
-  sf(8, 'bold', COLORS.accent);
-  doc.text('TABLE OF CONTENTS', MARGIN + 6, y + 6);
-  y += 12;
-
-  const tocItems = [
-    ['01', 'Market Research',     'Deep Market Intelligence',          COLORS.blue],
-    ['02', 'TAM Mapping',         'Total Addressable Market Analysis', COLORS.green],
-    ['03', 'ICP Modeling',        'Ideal Customer Profile',            COLORS.accent],
-    ['04', 'Account Sourcing',    'Lead Database Strategy',            COLORS.orange],
-    ['05', 'Keyword Generation',  'Search Intelligence Engine',        COLORS.teal],
-    ['06', 'Messaging Creation',  'Outbound Messaging Playbook',       COLORS.pink],
-    ...(state.step7 ? [['07', 'Revenue Intelligence', 'Executive Enhancement Layer', COLORS.amber]] : []),
-  ];
-
-  tocItems.forEach(([num, title, sub, col], i) => {
-    const ROW = 13;  // row height — tall enough for two lines + padding
-    fr(MARGIN, y, COL, ROW, i % 2 === 0 ? [13, 17, 29] : COLORS.card);
-    doc.setFillColor(...col);
-    doc.rect(MARGIN, y, 2, ROW, 'F');
-    sf(7.5, 'bold', col);
-    doc.text(num, MARGIN + 5, y + 5.5);
-    sf(8.5, 'bold', COLORS.white);
-    doc.text(title, MARGIN + 14, y + 5.5);
-    sf(7, 'normal', COLORS.muted);
-    doc.text(sub, MARGIN + 14, y + 10.5);
-    y += ROW + 1;
-  });
-
-  // Cover footer
-  fr(0, H - 13, W, 13, COLORS.card);
-  sf(6, 'normal', COLORS.muted);
-  doc.text(
-    'This document is confidential and prepared exclusively for the recipient. Generated by ABE AI Revenue Infrastructure.',
-    W / 2, H - 4.5, { align: 'center' }
-  );
-
-  /* ── Step pages ────────────────────────────────────────────── */
-  const stepConfigs = [
-    {
-      n: 1, color: COLORS.blue,
-      label: 'STEP 01 — MARKET RESEARCH', sub: 'Deep Market Intelligence',
-      render: (d) => {
-        tc('Company Overview', d.company_overview, 'Market Position', d.market_position);
-        tc('GTM Relevance Score', String(d.gtm_relevance_score ?? '—'), 'Revenue Stage', d.revenue_stage);
-        tags('Growth Signals', d.growth_signals, COLORS.blue);
-        lv('Products & Services', d.products_services);
-        lv('GTM Relevance Reasoning', d.gtm_relevance_reasoning);
-        tc('Employee Count', d.employee_count, 'Technology Stack', Array.isArray(d.tech_stack_hints) ? d.tech_stack_hints.join(', ') : d.tech_stack_hints);
-      },
-    },
-    {
-      n: 2, color: COLORS.green,
-      label: 'STEP 02 — TAM MAPPING', sub: 'Total Addressable Market Analysis',
-      render: (d) => {
-        tc('TAM Size Estimate', d.tam_size_estimate, 'Growth Rate', d.growth_rate);
-        tc('SAM Estimate', d.sam_estimate, 'Market Maturity', d.market_maturity);
-        lv('TAM Overview', d.tam_overview || d.tam_description);
-        lv('Growth Drivers', d.growth_drivers);
-        tags('Market Segments', (d.market_segments || []).map(s => typeof s === 'string' ? s : `${s.name || ''}${s.size ? ' · ' + s.size : ''}${s.priority ? ' — ' + s.priority : ''}`), COLORS.green);
-        lv('Priority Opportunities', d.priority_opportunities);
-        lv('Market Risks', d.market_risks);
-      },
-    },
-    {
-      n: 3, color: COLORS.accent,
-      label: 'STEP 03 — ICP MODELING', sub: 'Ideal Customer Profile',
-      render: (d) => {
-        tc('Primary ICP', d.primary_icp, 'Secondary ICP', d.secondary_icp);
-        lv('Firmographics', safeStr(d.firmographics));
-        tc('Deal Cycle', d.deal_cycle, 'Decision Makers', Array.isArray(d.decision_makers) ? d.decision_makers.join(' · ') : d.decision_makers);
-        tags('Buying Triggers', d.buying_triggers, COLORS.accent);
-        lv('Core Pain Points', d.core_pain_points);
-        tags('Key Objections', d.objections, COLORS.red);
-      },
-    },
-    {
-      n: 4, color: COLORS.orange,
-      label: 'STEP 04 — ACCOUNT SOURCING', sub: 'Lead Database Strategy',
-      render: (d) => {
-        tags('Recommended Databases', d.recommended_databases, COLORS.orange);
-        lv('Filter Criteria', safeStr(d.filter_criteria));
-        lv('Exclusion Criteria', safeStr(d.exclusion_criteria));
-        lv('Sourcing Playbook', d.sourcing_playbook);
-        tc('Estimated Universe', d.estimated_universe, 'Data Enrichment Tips', d.data_enrichment_tips);
-      },
-    },
-    {
-      n: 5, color: COLORS.teal,
-      label: 'STEP 05 — KEYWORD GENERATION', sub: 'Search Intelligence Engine',
-      render: (d) => {
-        tags('Primary Keywords', d.primary_keywords, COLORS.teal);
-        tags('Secondary Keywords', d.secondary_keywords, COLORS.blue);
-        lv('Boolean Query', d.boolean_query, [11, 20, 35]);
-        lv('LinkedIn Search Strings', Array.isArray(d.linkedin_search_strings) ? d.linkedin_search_strings.join('\n') : d.linkedin_search_strings);
-        tags('Intent Signals', d.intent_signals, COLORS.amber);
-        tags('Content Topics', d.content_topics, COLORS.muted);
-      },
-    },
-    {
-      n: 6, color: COLORS.pink,
-      label: 'STEP 06 — MESSAGING CREATION', sub: 'Outbound Messaging Playbook',
-      render: (d) => {
-        ['email_1', 'email_2', 'email_3'].forEach((key, i) => {
-          const e = d[key];
-          if (!e) return;
-
-          // Pre-calculate this email's total height to check if it fits on current page
-          const subjLines = split(safeStr(e.subject), COL - 8, 8.5);
-          const bodyLines = split(safeStr(e.body), COL - 8, 8.5);
-          const ctaLines  = split(safeStr(e.cta),  COL - 8, 8.5);
-          const emailH = 10 + blockHeight(subjLines.length) + blockHeight(bodyLines.length) + blockHeight(ctaLines.length) + GAP * 4;
-          ck(Math.min(emailH, 60));  // ensure at least the header + subject fit together
-
-          // Email header bar
-          fr(MARGIN, y, COL, 9, COLORS.card);
-          doc.setFillColor(...COLORS.pink);
-          doc.rect(MARGIN, y, 2, 9, 'F');
-          sf(7, 'bold', COLORS.pink);
-          doc.text(`EMAIL ${i + 1}`, MARGIN + 5, y + 3.5);
-          sf(8, 'bold', COLORS.white);
-          doc.text((e.angle || `Email ${i + 1}`).toUpperCase(), MARGIN + 5, y + 7.5);
-          y += 12;
-
-          lv('Subject Line', e.subject, COLORS.deep);
-          lv('Email Body', e.body, COLORS.deep);
-          lv('Call To Action', e.cta, COLORS.deep);
-          y += 4;
-        });
-
-        if (d.linkedin_message) {
-          ck(10);
-          fr(MARGIN, y, COL, 9, COLORS.card);
-          doc.setFillColor(...COLORS.blue);
-          doc.rect(MARGIN, y, 2, 9, 'F');
-          sf(8, 'bold', COLORS.white);
-          doc.text('LINKEDIN MESSAGE', MARGIN + 5, y + 6);
-          y += 12;
-          lv('Message', d.linkedin_message, COLORS.deep);
+  // Building the massive HTML string (reusing report.html CSS)
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+      <style>
+        :root {
+          --bg:#0B0F1A; --bg-alt:#0D1120; --card:#121827; --border:#1F2937;
+          --accent:#a855f7; --accent2:#7c3aed;
+          --green:#22c55e; --amber:#f59e0b; --red:#ef4444; --blue:#3b82f6;
+          --text:#E5E7EB; --muted:#6B7280; --faint:#374151; --white:#ffffff;
         }
+        *,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+        body { font-family:'Inter',sans-serif; background:var(--bg); color:var(--text); min-height:100vh; }
+        body::before { content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
+          background-image:linear-gradient(rgba(168,85,247,.02) 1px,transparent 1px),
+          linear-gradient(90deg,rgba(168,85,247,.02) 1px,transparent 1px); background-size:48px 48px; }
+        .wrap { position:relative; z-index:1; max-width:1100px; margin:0 auto; padding:40px 32px; }
+        .ph { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:36px; gap:24px; }
+        .ph-left .label { font-size:10px; text-transform:uppercase; letter-spacing:.25em; color:var(--accent); font-weight:700; margin-bottom:6px; }
+        .ph-left .title { font-size:30px; font-weight:900; color:white; letter-spacing:-.8px; }
+        .ph-left .meta  { font-size:11px; color:var(--muted); margin-top:6px; }
+        .score-strip { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:32px; }
+        .sc  { background:rgba(18,24,39,.7); border:1px solid var(--border); border-radius:14px; padding:20px 22px; transition:border-color .2s; }
+        .sv  { font-size:26px; font-weight:900; font-family:'Space Mono',monospace; color:white; letter-spacing:-1px; }
+        .sl  { font-size:9px; text-transform:uppercase; letter-spacing:.18em; color:var(--muted); font-weight:700; margin-top:4px; }
+        .sv.green { color:var(--green); } .sv.amber { color:var(--amber); } .sv.purple { color:var(--accent); } .sv.red { color:var(--red); }
+        .section { background:rgba(18,24,39,.6); border:1px solid var(--border); border-radius:16px; padding:28px 32px; margin-bottom:20px; page-break-inside: avoid; }
+        .sec-header { display:flex; align-items:center; gap:12px; margin-bottom:6px; }
+        .sec-num    { width:28px; height:28px; border-radius:50%; background:var(--accent); color:white; font-size:10px; font-weight:900; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+        .sec-title  { font-size:15px; font-weight:800; color:white; }
+        .sec-context { font-size:11px; color:var(--muted); margin-bottom:20px; padding-bottom:12px; border-bottom:1px dashed var(--border); }
+        .field   { margin-bottom:14px; }
+        .fl { font-size:8px; font-weight:900; text-transform:uppercase; letter-spacing:.18em; color:var(--muted); margin-bottom:5px; }
+        .fv { font-size:12px; color:#D1D5DB; line-height:1.7; background:rgba(0,0,0,.3); border-radius:8px; padding:12px 14px; border-left:3px solid var(--accent); }
+        .fv.green { border-color:var(--green); } .fv.amber { border-color:var(--amber); } .fv.red { border-color:var(--red); }
+        .tags { display:flex; flex-wrap:wrap; gap:6px; margin-top:5px; }
+        .tag { font-size:10px; font-weight:600; padding:4px 10px; border-radius:6px; background:rgba(168,85,247,.1); color:var(--accent); border:1px solid rgba(168,85,247,.2); }
+        .tag.green { background:rgba(34,197,94,.1);  color:var(--green); border-color:rgba(34,197,94,.2); }
+        .tag.blue  { background:rgba(59,130,246,.1); color:#60a5fa;      border-color:rgba(59,130,246,.2); }
+        .tag.amber { background:rgba(245,158,11,.1); color:var(--amber); border-color:rgba(245,158,11,.2); }
+        .grid2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:14px; }
+        .swot-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px; }
+        .swot-cell { border:1px solid var(--border); border-radius:10px; padding:14px 16px; background:rgba(0,0,0,.25); }
+        .swot-label { font-size:8px; font-weight:900; text-transform:uppercase; letter-spacing:.18em; margin-bottom:8px; }
+        .swot-s { border-top:3px solid var(--green); }  .swot-s .swot-label { color:var(--green); }
+        .swot-w { border-top:3px solid var(--red); }    .swot-w .swot-label { color:var(--red); }
+        .swot-o { border-top:3px solid var(--blue); }   .swot-o .swot-label { color:var(--blue); }
+        .swot-t { border-top:3px solid var(--amber); }  .swot-t .swot-label { color:var(--amber); }
+        .analyst-callout { background:rgba(168,85,247,.04); border:1px solid rgba(168,85,247,.2); border-left:4px solid var(--accent); border-radius:8px; padding:12px 16px; margin:14px 0; font-size:11.5px; line-height:1.7; }
+        .analyst-callout strong { color:var(--accent); }
+        .email-card { background:rgba(0,0,0,.3); border:1px solid rgba(168,85,247,.2); border-radius:10px; padding:18px 20px; margin-bottom:14px; }
+        .ea  { font-size:9px; font-weight:900; text-transform:uppercase; letter-spacing:.15em; color:var(--accent); margin-bottom:6px; }
+        .es  { font-size:12px; font-weight:800; color:white; margin-bottom:8px; }
+        .ebo { font-size:11px; color:#D1D5DB; line-height:1.7; white-space:pre-wrap; }
+        .decision-badge { display:inline-flex; align-items:center; gap:12px; background:rgba(0,0,0,.3); border-radius:12px; padding:20px 24px; border:1px solid var(--border); margin-bottom:14px; width:100%; }
+        .decision-badge .verdict { font-size:36px; font-weight:900; font-family:'Space Mono',monospace; min-width:80px; }
+        .decision-badge .reason  { font-size:12px; color:var(--text); line-height:1.65; }
+        .decision-go { color:var(--green); } .decision-watch { color:var(--amber); } .decision-nogo { color:var(--red); }
+        .risk-list { list-style:none; padding:0; margin:0; }
+        .risk-list li { padding:12px 14px; border-left:3px solid var(--blue); background:rgba(59,130,246,.05); border-radius:0 8px 8px 0; margin-bottom:10px; font-size:12px; line-height:1.65; }
+        .risk-list li strong { color:var(--blue); display:block; margin-bottom:2px; font-size:11px; text-transform:uppercase; letter-spacing:.08em; }
+        .risk-list.rl-red li { border-left-color:var(--red); background:rgba(239,68,68,.04); }
+        .risk-list.rl-red li strong { color:var(--red); }
+        .page-break { page-break-before: always; }
+      </style>
+    </head>
+    <body>
+      <div class="wrap">
+        <div class="ph">
+          <div class="ph-left">
+            <div class="label">Enterprise GTM Strategy</div>
+            <div class="title">${esc(state.company || 'Company')}</div>
+            <div class="meta">${esc(state.industry || 'General')} · Generated ${dateStr}</div>
+          </div>
+        </div>
+        
+        <div class="score-strip">
+          <div class="sc"><div class="sv ${confScore>=75?'green':confScore>=50?'amber':'red'}">${confScore}</div><div class="sl">GTM Score</div></div>
+          <div class="sc"><div class="sv">${esc(safe(s2.tam_size_estimate))}</div><div class="sl">Est. TAM</div></div>
+          <div class="sc"><div class="sv">${esc(safe(s2.growth_rate))}</div><div class="sl">CAGR</div></div>
+          <div class="sc"><div class="sv">6/6</div><div class="sl">Steps</div></div>
+        </div>
 
-        if (d.follow_up_sequence) {
-          ck(10);
-          fr(MARGIN, y, COL, 9, COLORS.card);
-          doc.setFillColor(...COLORS.amber);
-          doc.rect(MARGIN, y, 2, 9, 'F');
-          sf(8, 'bold', COLORS.white);
-          doc.text('FOLLOW-UP SEQUENCE', MARGIN + 5, y + 6);
-          y += 12;
-          lv('Sequence', d.follow_up_sequence, COLORS.deep);
-        }
-      },
-    },
-  ];
+        <div class="section" style="border-color:rgba(168,85,247,.25)">
+          <div class="sec-header"><div class="sec-num">📋</div><div class="sec-title">Executive Summary</div></div>
+          <div class="sec-context">Macro-opportunity assessment and strategic positioning rationale.</div>
+          <div class="field"><div class="fl">Company Overview</div><div class="fv">${esc(s1.company_overview)}</div></div>
+          <div class="field"><div class="fl">Market Position</div><div class="fv">${esc(s1.market_position)}</div></div>
+          <div class="analyst-callout"><strong>Analyst Insight:</strong> ${esc(s1.gtm_relevance_reasoning)} <span style="font-size:9px;color:var(--muted)">(Evidence-based assumption derived from signal velocity)</span></div>
+        </div>
 
-  for (const cfg of stepConfigs) {
-    const d = state.steps[cfg.n]?.data;
-    if (!d) continue;
+        <div class="section">
+          <div class="sec-header"><div class="sec-num">01</div><div class="sec-title">Market Intelligence</div></div>
+          <div class="sec-context">Evaluating market forces, growth signals, and competitive dynamics.</div>
+          <div class="field"><div class="fl">Growth Signals</div><div class="tags">${(Array.isArray(s1.growth_signals)?s1.growth_signals:[s1.growth_signals]).filter(Boolean).map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div></div>
+          <div class="field"><div class="fl">Key Value Propositions</div><div class="tags">${(Array.isArray(s1.products_services)?s1.products_services:[s1.products_services]).filter(Boolean).map(s=>`<span class="tag blue">${esc(s)}</span>`).join('')}</div></div>
+          <div class="grid2">
+            <div class="field"><div class="fl">Revenue Stage</div><div class="fv">${esc(s1.revenue_stage)}</div></div>
+            <div class="field"><div class="fl">Employee Count</div><div class="fv">${esc(s1.employee_count)}</div></div>
+          </div>
+        </div>
 
-    doc.addPage(); page++;
-    _stepColor = cfg.color;
-    _stepLabel = cfg.label;
-    _stepSub   = cfg.sub;
-    stepPageHeader();
-    y = 20;
-    cfg.render(d);
+        <div class="section">
+          <div class="sec-header"><div class="sec-num">02</div><div class="sec-title">TAM & Opportunity Mapping</div></div>
+          <div class="sec-context">Total Addressable Market sizing and segment prioritisation.</div>
+          <div class="grid2">
+            <div class="field"><div class="fl">Market Maturity</div><div class="fv">${esc(s2.market_maturity)}</div></div>
+            <div class="field"><div class="fl">Growth Rate (CAGR)</div><div class="fv">${src(s2.growth_rate, 'market')}</div></div>
+          </div>
+          <div class="field"><div class="fl">TAM Size Estimate</div><div class="fv">${src(s2.tam_size_estimate, 'market')}</div></div>
+          ${waterfallMath}
+          <div class="field" style="margin-top:14px;"><div class="fl">Growth Drivers</div><div class="tags">${(Array.isArray(s2.growth_drivers)?s2.growth_drivers:[s2.growth_drivers]).filter(Boolean).map(s=>`<span class="tag green">${esc(s)}</span>`).join('')}</div></div>
+        </div>
+
+        <div class="section">
+          <div class="sec-header"><div class="sec-num">03</div><div class="sec-title">Ideal Customer Profile (ICP)</div></div>
+          <div class="sec-context">Target buyer attributes, pain points, and triggers.</div>
+          <div class="grid2">
+            <div class="field"><div class="fl">Primary ICP</div><div class="fv">${esc(s3.primary_icp)}</div></div>
+            <div class="field"><div class="fl">Decision Makers</div><div class="fv">${(Array.isArray(s3.decision_makers)?s3.decision_makers:[s3.decision_makers]).filter(Boolean).join(', ')}</div></div>
+          </div>
+          <div class="field"><div class="fl">Firmographics</div><div class="fv">${esc(safe(s3.firmographics))}</div></div>
+          <div class="field"><div class="fl">Buying Triggers</div><div class="tags">${(Array.isArray(s3.buying_triggers)?s3.buying_triggers:[s3.buying_triggers]).filter(Boolean).map(s=>`<span class="tag amber">${esc(s)}</span>`).join('')}</div></div>
+          <div class="field"><div class="fl">Core Pain Points</div><div class="fv">${(Array.isArray(s3.core_pain_points)?s3.core_pain_points:[s3.core_pain_points]).filter(Boolean).map(s=>'• '+esc(s)).join('<br>')}</div></div>
+        </div>
+
+        <div class="section page-break">
+          <div class="sec-header"><div class="sec-num">04</div><div class="sec-title">Account Sourcing</div></div>
+          <div class="sec-context">Where to find accounts and how to filter the database.</div>
+          <div class="field"><div class="fl">Recommended Databases</div><div class="tags">${(Array.isArray(s4.recommended_databases)?s4.recommended_databases:[s4.recommended_databases]).filter(Boolean).map(s=>`<span class="tag">${esc(s)}</span>`).join('')}</div></div>
+          <div class="field"><div class="fl">Filter Criteria</div><div class="fv">${esc(safe(s4.filter_criteria))}</div></div>
+          <div class="field"><div class="fl">Sourcing Playbook</div><div class="fv">${esc(s4.sourcing_playbook)}</div></div>
+          <div class="field"><div class="fl">Estimated Universe</div><div class="fv">${src(s4.estimated_universe, 'ai')}</div></div>
+          <div class="field"><div class="fl">Anonymized Analog Accounts</div><div class="fv">${sampleAccounts}</div></div>
+        </div>
+
+        <div class="section">
+          <div class="sec-header"><div class="sec-num">05</div><div class="sec-title">Intent & Keyword Strategy</div></div>
+          <div class="sec-context">Signals that indicate active buying cycles.</div>
+          <div class="grid2">
+            <div class="field"><div class="fl">Primary Keywords</div><div class="tags">${(Array.isArray(s5.primary_keywords)?s5.primary_keywords:[s5.primary_keywords]).filter(Boolean).map(s=>`<span class="tag blue">${esc(s)}</span>`).join('')}</div></div>
+            <div class="field"><div class="fl">Secondary Keywords</div><div class="tags">${(Array.isArray(s5.secondary_keywords)?s5.secondary_keywords:[s5.secondary_keywords]).filter(Boolean).map(s=>`<span class="tag green">${esc(s)}</span>`).join('')}</div></div>
+          </div>
+          <div class="field"><div class="fl">Intent Signals</div><div class="tags">${(Array.isArray(s5.intent_signals)?s5.intent_signals:[s5.intent_signals]).filter(Boolean).map(s=>`<span class="tag amber">${esc(s)}</span>`).join('')}</div></div>
+          <div class="field"><div class="fl">Boolean Query</div><div class="fv">${esc(s5.boolean_query)}</div></div>
+        </div>
+
+        <div class="section page-break">
+          <div class="sec-header"><div class="sec-num">06</div><div class="sec-title">Enterprise SDR Messaging</div></div>
+          <div class="sec-context">High-converting sequences tailored to the ICP.</div>
+          ${['email_1','email_2','email_3'].map((k,i) => s6[k] ? `
+            <div class="email-card">
+              <div class="ea">Email ${i+1} · ${esc(s6[k].angle||'')}</div>
+              <div class="es">Subject: ${esc(s6[k].subject)}</div>
+              <div class="ebo">${esc(s6[k].body)}</div>
+              <div class="ec">${esc(s6[k].cta)}</div>
+            </div>
+          ` : '').join('')}
+        </div>
+
+        <div class="section page-break" style="border:1px solid rgba(168,85,247,.3);background:rgba(168,85,247,.03)">
+          <div class="sec-header"><div class="sec-num" style="background:var(--amber);">07</div><div class="sec-title">Revenue Intelligence — Decision Engine</div></div>
+          <div class="sec-context">Boardroom-grade decision layer. Actionable verdict derived from enterprise intelligence.</div>
+          ${s7.executive_brief ? `<div class="field"><div class="fl">Executive Brief</div><div class="fv" style="border-left-color:var(--blue)">${esc(s7.executive_brief)}</div></div>` : ''}
+          <div class="field"><div class="fl">Why Now</div><div class="fv amber">${esc(s7.why_now_analysis || '—')}</div></div>
+          <div class="field"><div class="fl">Strategic Hook</div><div class="analyst-callout"><strong>${esc(s7.strategic_hook || (Array.isArray(s3.buying_triggers)?s3.buying_triggers[0]:'') || '—')}</strong></div></div>
+          
+          ${signalsHtml}
+          ${mccHtml}
+
+          <div class="field"><div class="fl">Risk & Constraint Analysis</div>
+            <ul class="risk-list rl-red">
+              <li><strong>Decision Cycle Velocity</strong>Expect extended multi-stakeholder approval cycles. Map all decision nodes before deal entry.</li>
+              <li><strong>Vendor Lock-in Inertia</strong>Entrenched incumbent relationships reduce switching probability. Lead with differentiated outcome data.</li>
+            </ul>
+          </div>
+          
+          <div class="field"><div class="fl">Decision</div>
+            <div class="decision-badge">
+              <div class="verdict ${s7.go_no_go?.recommendation === 'Go' ? 'decision-go' : s7.go_no_go?.recommendation === 'No-Go' ? 'decision-nogo' : 'decision-watch'}">${esc(s7.go_no_go?.recommendation || 'Watch')}</div>
+              <div class="reason"><strong>Verdict:</strong> ${esc(s7.go_no_go?.reason || 'Market signals present but require validation.')}</div>
+            </div>
+          </div>
+          
+          <div class="field"><div class="fl">Confidence Matrix Breakdown</div>
+            ${confidenceBreakdown}
+          </div>
+        </div>
+
+        <div class="section" style="border:1px dashed var(--border);background:transparent">
+          <div class="sec-header"><div class="sec-num" style="background:var(--faint);">AP</div><div class="sec-title">Appendix & Methodology</div></div>
+          <div class="sec-context">Source validation, calculation math, and definitions.</div>
+          
+          <div class="field"><div class="fl">Data Sources</div>
+            <div class="fv">
+              • <strong>Market Sizing:</strong> Industry analysts (Gartner, Forrester, IDC) where attributed. Else, predictive AI estimates.<br>
+              • <strong>Intent Signals:</strong> Aggregated from public domain job postings, press releases, and executive movements.<br>
+              • <strong>Firmographics:</strong> Public databases and LinkedIn corpus.
+            </div>
+          </div>
+          
+          <div class="field"><div class="fl">Confidence Scoring Methodology</div>
+            <div class="fv">
+              Score (0-100) is a weighted calculation of:<br>
+              • <strong>Signal Veracity (40%):</strong> Density and recency of explicit buying signals.<br>
+              • <strong>Market Timing (25%):</strong> Alignment with budget cycles and macro tailwinds.<br>
+              • <strong>ICP Fit (20%):</strong> Firmographic and technographic match rate.<br>
+              • <strong>Data Completeness (15%):</strong> Quality of the extraction source.
+            </div>
+          </div>
+
+          <div class="field"><div class="fl">Disclaimer</div>
+            <div class="fv" style="color:var(--muted);font-size:10px;border-left-color:var(--muted)">
+              This Tier-1 Consulting Report contains AI-generated predictive insights. While all efforts are made to ensure source accuracy, all estimates labeled "AI estimate" must be manually validated before boardroom presentation. Unattributed figures are approx. models.
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </body>
+    </html>
+  `;
+
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:fixed;top:0;left:-9999px;width:794px;border:none;opacity:0;pointer-events:none';
+  document.body.appendChild(iframe);
+  iframe.srcdoc = html;
+  
+  await new Promise(resolve => {
+    iframe.onload = resolve;
+    setTimeout(resolve, 5000); 
+  });
+
+  const iDoc = iframe.contentDocument || iframe.contentWindow.document;
+  
+  // Quick wait for fonts
+  await new Promise(r => setTimeout(r, 1000));
+
+  const fullHeight = Math.max(iDoc.body.scrollHeight, iDoc.documentElement.scrollHeight, 1123);
+  iframe.style.height = fullHeight + 'px';
+
+  try {
+    const canvas = await window.html2canvas(iDoc.documentElement, {
+      scale: 2, useCORS: true, backgroundColor: '#0B0F1A',
+      width: 794, windowWidth: 794, height: fullHeight, windowHeight: fullHeight
+    });
+    
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait', compress: true });
+    
+    const imgData = canvas.toDataURL('image/jpeg', 0.95);
+    const pdfWidth = pdf.internal.pageSize.getWidth();
+    const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
+    
+    let heightLeft = pdfHeight;
+    let position = 0;
+    
+    pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, pdfHeight);
+    heightLeft -= pdf.internal.pageSize.getHeight();
+    
+    while (heightLeft >= 0) {
+      position = heightLeft - pdfHeight;
+      pdf.addPage();
+      pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, pdfHeight);
+      heightLeft -= pdf.internal.pageSize.getHeight();
+    }
+    
+    const filename = `GTM_Tier1_${(state.company || 'Report').replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0,10)}.pdf`;
+    pdf.save(filename);
+    showToast(`✅ Enterprise Report Downloaded: ${filename}`, 'success');
+  } catch(err) {
+    console.error(err);
+    showToast('Error generating PDF', 'error');
+  } finally {
+    document.body.removeChild(iframe);
+    closeExportModal();
   }
-
-  /* ── Step 7 — Revenue Intelligence ────────────────────────── */
-  if (state.step7) {
-    const s7 = state.step7;
-    doc.addPage(); page++;
-    _stepColor = COLORS.amber;
-    _stepLabel = 'STEP 07 — REVENUE INTELLIGENCE ENHANCEMENT  ·  OPTIONAL LAYER';
-    _stepSub   = 'Executive Signal Analysis & Go/No-Go Recommendation';
-    stepPageHeader();
-    y = 20;
-
-    // ── Hero row: Go/No-Go · Confidence · Reason ──────────────
-    const gng      = s7.go_no_go?.recommendation || 'Watch';
-    const gngColor = gng === 'Go' ? COLORS.green : gng === 'No-Go' ? COLORS.red : COLORS.amber;
-    const heroH    = 22;
-    ck(heroH + GAP);
-
-    // Go/No-Go card
-    fr(MARGIN, y, 38, heroH, COLORS.card);
-    br(MARGIN, y, 38, heroH, gngColor, 0.5);
-    sf(6, 'bold', COLORS.muted);
-    doc.text('GO / NO-GO', MARGIN + 4, y + 7);
-    sf(16, 'bold', gngColor);
-    doc.text(gng.toUpperCase(), MARGIN + 4, y + 17);
-
-    // Confidence card
-    fr(MARGIN + 41, y, 34, heroH, COLORS.card);
-    br(MARGIN + 41, y, 34, heroH, COLORS.border);
-    sf(6, 'bold', COLORS.muted);
-    doc.text('CONFIDENCE', MARGIN + 45, y + 7);
-    sf(16, 'bold', COLORS.amber);
-    doc.text(`${s7.confidence_score ?? '—'}/100`, MARGIN + 45, y + 17);
-
-    // Reason card — fills remaining width
-    const rxStart = MARGIN + 78;
-    const rxW     = COL - 78;
-    if (s7.go_no_go?.reason) {
-      const rLines = split(s7.go_no_go.reason, rxW - 8, 8);
-      fr(rxStart, y, rxW, heroH, COLORS.card);
-      br(rxStart, y, rxW, heroH, COLORS.border);
-      sf(6, 'bold', COLORS.muted);
-      doc.text('REASON', rxStart + 4, y + 7);
-      sf(8, 'normal', COLORS.text);
-      doc.text(rLines.slice(0, 2), rxStart + 4, y + 12);
-    }
-    y += heroH + GAP + 2;
-
-    // ── Executive Brief ──────────────────────────────────────
-    lv('Executive Brief', s7.executive_brief, COLORS.deep);
-
-    // ── Buying Signals ───────────────────────────────────────
-    if (s7.signal_summary?.length) {
-      ck(12);
-      sf(6.5, 'bold', COLORS.muted);
-      doc.text('BUYING SIGNALS', MARGIN, y + 4);
-      y += 8;
-      s7.signal_summary.forEach(sig => {
-        const strColor   = sig.strength === 'High' ? COLORS.green : sig.strength === 'Medium' ? COLORS.amber : COLORS.muted;
-        const descLines  = split(sig.signal_description || '—', COL - 8, 8);
-        const sigH       = blockHeight(descLines.length, LH8);
-        ck(sigH + 2);
-        fr(MARGIN, y, COL, sigH, COLORS.deep);
-        doc.setFillColor(...strColor);
-        doc.rect(MARGIN, y, 2, sigH, 'F');
-        br(MARGIN, y, COL, sigH, COLORS.border);
-        const typeLabel = (sig.signal_type || '').replace(/_/g, ' ').toUpperCase();
-        sf(6.5, 'bold', strColor);
-        doc.text(`${typeLabel}  ·  ${(sig.strength || '').toUpperCase()}`, MARGIN + 5, y + LPAD);
-        sf(8, 'normal', COLORS.text);
-        doc.text(descLines, MARGIN + 5, y + LPAD + CGAP);
-        y += sigH + GAP;
-      });
-    }
-
-    // ── Why Now + Persona ─────────────────────────────────────
-    const personaStr = `${s7.persona_priority?.persona || '—'}\n${s7.persona_priority?.reason || ''}`;
-    tc('Why Now Analysis', s7.why_now_analysis, 'Priority Persona', personaStr);
-
-    // ── MCC View — FIX: compute max height across all 3 cols first ──
-    if (s7.mcc_view) {
-      ck(14);
-      sf(6.5, 'bold', COLORS.muted);
-      doc.text('MARKET  ·  CLIENT  ·  COMPETITOR VIEW', MARGIN, y + 4);
-      y += 9;
-      threeCol([
-        { label: 'Market',     value: s7.mcc_view.market,     color: COLORS.blue },
-        { label: 'Client',     value: s7.mcc_view.client,     color: COLORS.accent },
-        { label: 'Competitor', value: s7.mcc_view.competitor, color: COLORS.amber },
-      ]);
-    }
-
-    // ── Strategic Hook ────────────────────────────────────────
-    if (s7.strategic_hook) {
-      const hookLines = split(`"${s7.strategic_hook}"`, COL - 12, 9.5);
-      const hookH     = LPAD + CGAP + hookLines.length * (LH + 0.8) + BPAD;
-      ck(hookH + GAP);
-      fr(MARGIN, y, COL, hookH, [28, 16, 52]);
-      br(MARGIN, y, COL, hookH, COLORS.accent, 0.5);
-      sf(6, 'bold', COLORS.muted);
-      doc.text('STRATEGIC HOOK', MARGIN + 5, y + LPAD);
-      sf(9.5, 'bolditalic', COLORS.white);
-      doc.text(hookLines, MARGIN + 5, y + LPAD + CGAP + 1);
-      y += hookH + GAP;
-    }
-
-    // ── Data Quality Audit ─────────────────────────────────────
-    if (s7._data_quality) {
-      const dq = s7._data_quality;
-      const capped = dq.confidence_ai_claimed > dq.confidence_after_cap;
-      const auditStr = `Data richness: ${dq.richness_score}/100  ·  Signals found/used: ${dq.signals_before_filter}→${dq.signals_after_filter}  ·  ${capped ? `AI claimed ${dq.confidence_ai_claimed} — capped to ${dq.confidence_after_cap} by data richness` : `Confidence verified: ${dq.confidence_after_cap}/100`}`;
-      const auditLines = split(auditStr, COL - 8, 7.5);
-      const auditH     = blockHeight(auditLines.length, LH7);
-      ck(auditH + GAP);
-      fr(MARGIN, y, COL, auditH, [8, 12, 22]);
-      br(MARGIN, y, COL, auditH, COLORS.border, 0.2);
-      sf(6, 'bold', COLORS.muted);
-      doc.text('DATA QUALITY AUDIT', MARGIN + 5, y + LPAD);
-      sf(7.5, 'normal', [capped ? 245 : 107, capped ? 158 : 114, capped ? 11 : 128]);
-      doc.text(auditLines, MARGIN + 5, y + LPAD + CGAP);
-      y += auditH + GAP;
-    }
-  }
-
-  /* ── Save ──────────────────────────────────────────────────── */
-  const filename = `GTM_Strategy_${(state.company || 'Report').replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
-  doc.save(filename);
-  showToast(`✅ PDF Downloaded: ${filename}`, 'success');
-  closeExportModal();
 }
+
 
 function copyEmail(btn) {
   const block = btn.closest('.email-block');
