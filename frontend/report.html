@@ -406,6 +406,89 @@ function renderKeywordTaxonomy(s5) {
 
 // ── Step 7 Decision Engine ────────────────────────────────────────
 function renderDecisionEngine(r, s1, s2, s3) {
+  // 1. Prioritize real Step 7 enterprise data
+  const s7 = r.step_7_intelligence || (r.full_report && r.full_report.step_7_intelligence) || r.step7_decision_engine;
+
+  if (s7 && typeof s7 === 'object' && Object.keys(s7).length > 0) {
+    const verdict = s7.go_no_go?.recommendation || 'Watch';
+    const verdictClass = verdict === 'Go' ? 'decision-go' : verdict === 'No-Go' ? 'decision-nogo' : 'decision-watch';
+    const reason = s7.go_no_go?.reason || '';
+    const confidence = s7.confidence_score || s1.gtm_relevance_score || 0;
+    
+    let signalsHtml = '';
+    if (s7.signal_summary && s7.signal_summary.length > 0) {
+      const sigs = s7.signal_summary.map(sig => {
+        const str = sig.strength === 'High' ? 'var(--green)' : sig.strength === 'Medium' ? 'var(--amber)' : 'var(--blue)';
+        return `<li><strong style="color:${str};text-transform:uppercase;font-size:10px;margin-right:6px">[${esc(sig.signal_type || 'SIGNAL')}]</strong> ${esc(sig.signal_description)}</li>`;
+      }).join('');
+      signalsHtml = `<div class="field"><div class="fl">Buying Signals</div><ul class="risk-list" style="background:rgba(59,130,246,0.05);border-left-color:var(--blue)">${sigs}</ul></div>`;
+    }
+    
+    let mccHtml = '';
+    if (s7.mcc_view) {
+      mccHtml = `<div class="field"><div class="fl">MCC View (Market, Client, Competitor)</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-top:4px">
+          <div style="background:var(--card);padding:10px;border-radius:6px;border:1px solid var(--border)"><div style="font-size:10px;font-weight:700;color:var(--blue);margin-bottom:4px">MARKET</div><div style="font-size:11px;color:var(--text);line-height:1.5">${esc(s7.mcc_view.market || '—')}</div></div>
+          <div style="background:var(--card);padding:10px;border-radius:6px;border:1px solid var(--border)"><div style="font-size:10px;font-weight:700;color:var(--accent);margin-bottom:4px">CLIENT</div><div style="font-size:11px;color:var(--text);line-height:1.5">${esc(s7.mcc_view.client || '—')}</div></div>
+          <div style="background:var(--card);padding:10px;border-radius:6px;border:1px solid var(--border)"><div style="font-size:10px;font-weight:700;color:var(--amber);margin-bottom:4px">COMPETITOR</div><div style="font-size:11px;color:var(--text);line-height:1.5">${esc(s7.mcc_view.competitor || '—')}</div></div>
+        </div>
+      </div>`;
+    }
+
+    const execTarget = s7.persona_priority?.persona || (s3.decision_makers ? s3.decision_makers[0] : 'Decision Maker');
+    const priorityReason = s7.persona_priority?.reason || 'Primary stakeholder identified via signals';
+    const dms = Array.isArray(s3.decision_makers) ? s3.decision_makers : [];
+
+    return `<div class="section" style="border:1px solid rgba(168,85,247,.3);background:rgba(168,85,247,.03)">
+      <div class="sec-header"><div class="sec-num" style="background:var(--amber);font-size:9px;">07</div><div class="sec-title">Revenue Intelligence — Decision Engine</div></div>
+      <div class="sec-context">Boardroom-grade decision layer. Actionable verdict derived from enterprise intelligence.</div>
+
+      ${s7.executive_brief ? `<div class="field"><div class="fl">Executive Brief</div><div class="fv" style="border-left-color:var(--blue);font-size:12px">${esc(s7.executive_brief)}</div></div>` : ''}
+
+      <div class="field"><div class="fl">Why Now</div>
+        <div class="fv amber">${esc(s7.why_now_analysis || '—')}</div>
+      </div>
+
+      <div class="field"><div class="fl">Strategic Hook</div>
+        <div class="analyst-callout"><strong>${esc(s7.strategic_hook || '—')}</strong></div>
+      </div>
+
+      ${signalsHtml}
+      ${mccHtml}
+
+      <div class="field"><div class="fl">Risk & Constraint Analysis</div>
+        <ul class="risk-list">
+          <li><strong>Decision Cycle Velocity</strong>${dms.length ? `Buying committee includes ${esc(dms.slice(0,3).join(', '))}. Multi-stakeholder alignment typically extends cycle by 30–60 days.` : `Expect extended multi-stakeholder approval cycles. Map all decision nodes before deal entry.`}</li>
+          <li><strong>Vendor Lock-in Inertia</strong>Entrenched incumbent relationships reduce switching probability. Lead with differentiated outcome data, not feature comparison.</li>
+          <li><strong>Budget Approval Friction</strong>Capital commitments at this tier require CFO-level ROI framing. Every touchpoint must surface quantifiable efficiency recovery.</li>
+        </ul>
+      </div>
+
+      <div class="field"><div class="fl">Decision</div>
+        <div class="decision-badge">
+          <div class="verdict ${verdictClass}">${verdict}</div>
+          <div class="reason"><strong>Verdict:</strong> ${esc(reason)}</div>
+        </div>
+      </div>
+
+      <div class="field"><div class="fl">Execution Priority</div>
+        <div class="fv green"><strong>Target:</strong> ${esc(execTarget)}<br>
+        <strong>Reasoning:</strong> ${esc(priorityReason)}</div>
+      </div>
+
+      <div class="field"><div class="fl">Confidence Score</div>
+        <div style="display:flex;align-items:center;gap:16px">
+          <span style="font-size:28px;font-weight:900;font-family:'Space Mono',monospace;color:${confidence>=75?'var(--green)':confidence>=50?'var(--amber)':'var(--red)'}">${confidence}/100</span>
+          <div style="flex:1">
+            <div style="font-size:11px;color:var(--muted);margin-bottom:6px">Based on signal strength, data availability, and trigger clarity.</div>
+            <div class="confidence-bar-wrap"><div class="confidence-bar" style="width:${confidence}%"></div></div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+  }
+
+  // 2. Fallback Logic (if no real Step 7 data exists)
   const score = s1.gtm_relevance_score;
   if (!score) return ''; // Hide gracefully if no data
 
@@ -437,7 +520,7 @@ function renderDecisionEngine(r, s1, s2, s3) {
   const execTarget = dms[0] || icp;
 
   return `<div class="section" style="border:1px solid rgba(168,85,247,.3);background:rgba(168,85,247,.03)">
-    <div class="sec-header"><div class="sec-num" style="background:var(--amber);font-size:9px;">07</div><div class="sec-title">Revenue Intelligence — Decision Engine</div></div>
+    <div class="sec-header"><div class="sec-num" style="background:var(--amber);font-size:9px;">07</div><div class="sec-title">Revenue Intelligence — Decision Engine (Derived)</div></div>
     <div class="sec-context">Boardroom-grade decision layer. Not a summary. Actionable verdict before entering this account.</div>
 
     <div class="field"><div class="fl">Why Now (Trigger Logic)</div>
@@ -450,7 +533,7 @@ function renderDecisionEngine(r, s1, s2, s3) {
 
     <div class="field"><div class="fl">Risk & Constraint Analysis</div>
       <ul class="risk-list">
-        <li><strong>Decision Cycle Velocity</strong>${dms.length ? `Buying committee includes ${dms.slice(0,3).join(', ')}. Multi-stakeholder alignment typically extends cycle by 30–60 days.` : `Expect extended multi-stakeholder approval cycles. Map all  decision nodes before deal entry.`}</li>
+        <li><strong>Decision Cycle Velocity</strong>${dms.length ? `Buying committee includes ${esc(dms.slice(0,3).join(', '))}. Multi-stakeholder alignment typically extends cycle by 30–60 days.` : `Expect extended multi-stakeholder approval cycles. Map all  decision nodes before deal entry.`}</li>
         <li><strong>Vendor Lock-in Inertia</strong>Entrenched incumbent relationships reduce switching probability. Lead with differentiated outcome data, not feature comparison.</li>
         <li><strong>Budget Approval Friction</strong>Capital commitments at this ICP tier require CFO-level ROI framing. Every touchpoint must surface quantifiable efficiency recovery.</li>
       </ul>
