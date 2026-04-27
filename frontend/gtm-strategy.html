@@ -651,6 +651,177 @@
       .footer-g { grid-template-columns: 1fr; gap: 36px; }
       .footer-cols { grid-template-columns: repeat(2, 1fr); gap: 28px; }
     }
+
+    /* ══════════════════════════════════════════
+       STEP 7 — Revenue Intelligence Enhancement
+    ══════════════════════════════════════════ */
+    #step7-panel {
+      display: none;
+      margin-top: 28px;
+      border-radius: 20px;
+      border: 1px solid rgba(251,191,36,0.25);
+      background: linear-gradient(160deg, rgba(18,24,39,0.95), rgba(13,17,32,0.9));
+      overflow: hidden;
+      position: relative;
+    }
+    #step7-panel::before {
+      content: '';
+      position: absolute; top: 0; left: 0; right: 0; height: 1px;
+      background: linear-gradient(90deg, transparent, #fbbf24, transparent);
+    }
+    #step7-panel.show { display: block; }
+
+    .s7-header {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 28px 32px 24px;
+      border-bottom: 1px solid rgba(251,191,36,0.1);
+    }
+    .s7-badge {
+      display: inline-flex; align-items: center; gap: 7px;
+      background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.25);
+      border-radius: 30px; padding: 5px 14px;
+      font-size: 8px; font-weight: 900; text-transform: uppercase;
+      letter-spacing: 0.2em; color: #fbbf24;
+    }
+    .s7-title { font-size: 18px; font-weight: 800; color: white; margin: 8px 0 4px; letter-spacing: -0.3px; }
+    .s7-sub { font-size: 11px; color: var(--muted); line-height: 1.5; }
+
+    .s7-trigger-area {
+      padding: 28px 32px;
+      display: flex; align-items: center; gap: 20px;
+    }
+    .btn-s7-generate {
+      display: inline-flex; align-items: center; gap: 9px;
+      padding: 13px 26px;
+      background: linear-gradient(135deg, #d97706, #b45309);
+      color: white; border: none; border-radius: 12px;
+      font-size: 11px; font-weight: 800; text-transform: uppercase;
+      letter-spacing: 0.1em; cursor: pointer; transition: all 0.2s;
+      white-space: nowrap;
+    }
+    .btn-s7-generate:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(217,119,6,0.35); }
+    .btn-s7-generate:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+
+    .s7-body {
+      display: none;
+      padding: 0 32px 32px;
+    }
+    .s7-body.show { display: block; }
+
+    .s7-grid {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 16px;
+      margin-top: 24px;
+    }
+    @media (max-width: 900px) { .s7-grid { grid-template-columns: 1fr; } }
+
+    .s7-card {
+      background: rgba(0,0,0,0.25);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 14px;
+      padding: 20px;
+    }
+    .s7-card-full { grid-column: 1 / -1; }
+
+    .s7-card-label {
+      font-size: 8px; font-weight: 900; text-transform: uppercase;
+      letter-spacing: 0.22em; color: var(--muted); margin-bottom: 12px;
+    }
+    .s7-card-value { font-size: 12px; color: #d1d5db; line-height: 1.7; }
+
+    /* Signal pills */
+    .s7-signals { display: flex; flex-direction: column; gap: 10px; }
+    .s7-signal {
+      display: flex; align-items: flex-start; gap: 12px;
+      padding: 12px 14px;
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 10px;
+    }
+    .s7-signal-type {
+      font-size: 8px; font-weight: 900; text-transform: uppercase;
+      letter-spacing: 0.15em; padding: 3px 8px; border-radius: 20px;
+      white-space: nowrap; flex-shrink: 0; margin-top: 2px;
+    }
+    .sig-High   { background: rgba(34,197,94,0.12);  color: #86efac; border: 1px solid rgba(34,197,94,0.25); }
+    .sig-Medium { background: rgba(245,158,11,0.12); color: #fcd34d; border: 1px solid rgba(245,158,11,0.25); }
+    .sig-Low    { background: rgba(107,114,128,0.12);color: #9ca3af; border: 1px solid rgba(107,114,128,0.25); }
+    .s7-signal-desc { font-size: 11px; color: #d1d5db; line-height: 1.6; }
+
+    /* MCC View */
+    .s7-mcc { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
+    @media (max-width: 700px) { .s7-mcc { grid-template-columns: 1fr; } }
+    .s7-mcc-cell {
+      background: rgba(0,0,0,0.3); border-radius: 10px; padding: 14px;
+      border-left: 3px solid;
+    }
+    .s7-mcc-cell.market   { border-color: #3b82f6; }
+    .s7-mcc-cell.client   { border-color: #a855f7; }
+    .s7-mcc-cell.competitor { border-color: #f59e0b; }
+    .s7-mcc-label { font-size: 7px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.2em; margin-bottom: 6px; }
+    .s7-mcc-cell.market   .s7-mcc-label { color: #93c5fd; }
+    .s7-mcc-cell.client   .s7-mcc-label { color: #c4b5fd; }
+    .s7-mcc-cell.competitor .s7-mcc-label { color: #fcd34d; }
+    .s7-mcc-text { font-size: 11px; color: #d1d5db; line-height: 1.6; }
+
+    /* Go/No-Go badge */
+    .s7-gng-badge {
+      display: inline-block; padding: 8px 20px; border-radius: 30px;
+      font-size: 12px; font-weight: 900; text-transform: uppercase;
+      letter-spacing: 0.12em; margin-bottom: 10px;
+    }
+    .gng-Go    { background: rgba(34,197,94,0.15);  color: #4ade80; border: 1px solid rgba(34,197,94,0.3); }
+    .gng-Watch { background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3); }
+    .gng-NoGo  { background: rgba(239,68,68,0.15);  color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
+
+    /* Confidence meter */
+    .s7-confidence-bar-wrap {
+      height: 8px; background: rgba(255,255,255,0.07);
+      border-radius: 8px; overflow: hidden; margin: 10px 0;
+    }
+    .s7-confidence-bar-fill {
+      height: 100%; border-radius: 8px; transition: width 1s ease;
+    }
+    .s7-score-num {
+      font-size: 32px; font-weight: 900; font-family: 'Space Mono', monospace;
+    }
+
+    /* Strategic hook */
+    .s7-hook {
+      font-size: 14px; font-weight: 700; color: white;
+      line-height: 1.5; padding: 14px 18px;
+      background: rgba(168,85,247,0.07);
+      border: 1px solid rgba(168,85,247,0.2);
+      border-radius: 10px; position: relative;
+    }
+    .s7-hook::before {
+      content: '"';
+      font-size: 40px; color: rgba(168,85,247,0.3);
+      position: absolute; top: 2px; left: 12px; line-height: 1;
+      font-family: Georgia, serif;
+    }
+    .s7-hook span { position: relative; z-index: 1; }
+
+    /* Executive brief */
+    .s7-brief {
+      font-size: 12px; line-height: 1.8; color: #e5e7eb;
+      padding: 16px 20px;
+      background: rgba(255,255,255,0.03);
+      border-radius: 10px;
+      border: 1px solid rgba(255,255,255,0.07);
+    }
+
+    /* Sidebar Step 7 nav item special styling */
+    #step-nav-7 { border-top: 1px dashed rgba(251,191,36,0.15); margin-top: 8px; padding-top: 8px; }
+    #step-nav-7 .step-num { background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.25); color: #fbbf24; font-size: 7px; letter-spacing: 0.05em; }
+    #step-nav-7 .step-name { color: #fbbf24; }
+    #step-nav-7.active { border-left-color: #fbbf24; background: rgba(251,191,36,0.05); }
+    .s7-optional-pill {
+      font-size: 6px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em;
+      background: rgba(251,191,36,0.1); color: #fbbf24; border: 1px solid rgba(251,191,36,0.2);
+      padding: 2px 6px; border-radius: 4px; margin-left: 4px; vertical-align: middle;
+    }
   </style>
 </head>
 <body>
@@ -768,6 +939,14 @@
       <div class="step-info">
         <div class="step-name">Messaging Creation</div>
         <div class="step-desc">Emails · Subject Lines · CTAs</div>
+      </div>
+    </div>
+
+    <div id="step-nav-7" class="step-nav-item locked" onclick="scrollToStep7()" title="Revenue Intelligence Enhancement — Optional">
+      <div class="step-num" id="snnum-7">RIQ</div>
+      <div class="step-info">
+        <div class="step-name">Revenue Intel <span class="s7-optional-pill">Optional</span></div>
+        <div class="step-desc">Signals · Hook · Go/No-Go</div>
       </div>
     </div>
 
@@ -1194,6 +1373,133 @@
       </div>
     </div>
 
+    <!-- ══ STEP 7: Revenue Intelligence Enhancement ══ -->
+    <div id="step7-panel">
+      <!-- Header -->
+      <div class="s7-header">
+        <div>
+          <div class="s7-badge">⚡ Optional Layer · Step 7</div>
+          <div class="s7-title">Revenue Intelligence Enhancement</div>
+          <div class="s7-sub">Executive-grade signal analysis built from your completed GTM output — no re-runs required.</div>
+        </div>
+        <div id="s7-status-pill" style="display:none; align-items:center; gap:7px; background:rgba(34,197,94,0.1); border:1px solid rgba(34,197,94,0.25); border-radius:20px; padding:5px 14px; font-size:8px; font-weight:900; text-transform:uppercase; letter-spacing:0.15em; color:#4ade80;">
+          <span>✓</span> Intelligence Generated
+        </div>
+      </div>
+
+      <!-- Trigger area — shown before generation -->
+      <div id="s7-trigger" class="s7-trigger-area">
+        <div>
+          <button id="s7-generate-btn" class="btn-s7-generate" onclick="runStep7()">
+            <span id="s7-btn-icon">⚡</span>
+            <span id="s7-btn-text">Generate Revenue Intelligence</span>
+          </button>
+        </div>
+        <div style="font-size:11px; color:var(--muted); line-height:1.6; max-width:360px;">
+          Analyses all 6 completed steps and produces a board-ready intelligence brief — signals, hooks, persona priority, and Go/No-Go recommendation.
+        </div>
+      </div>
+
+      <!-- Loading state -->
+      <div id="s7-loading" style="display:none; padding:24px 32px; display:none; align-items:center; gap:14px;">
+        <div style="width:18px; height:18px; border:2px solid rgba(251,191,36,0.3); border-top-color:#fbbf24; border-radius:50%; animation:spin 0.8s linear infinite; flex-shrink:0;"></div>
+        <div>
+          <div style="font-size:11px; font-weight:700; color:white;">Generating Revenue Intelligence…</div>
+          <div style="font-size:10px; color:var(--muted); margin-top:2px;">Synthesising signals from all 6 GTM steps</div>
+        </div>
+      </div>
+
+      <!-- Error state -->
+      <div id="s7-error" style="display:none; padding:16px 32px;">
+        <div style="background:rgba(239,68,68,0.07); border:1px solid rgba(239,68,68,0.2); border-radius:10px; padding:14px 18px;">
+          <div style="font-size:10px; font-weight:800; color:#f87171; margin-bottom:4px;">⚠ Generation Failed</div>
+          <div id="s7-error-text" style="font-size:11px; color:#9ca3af;"></div>
+          <button onclick="runStep7()" style="margin-top:10px; background:rgba(239,68,68,0.1); border:1px solid rgba(239,68,68,0.2); color:#f87171; border-radius:8px; padding:6px 14px; font-size:10px; font-weight:700; cursor:pointer;">Retry</button>
+        </div>
+      </div>
+
+      <!-- Output body — rendered after generation -->
+      <div id="s7-body" class="s7-body">
+
+        <!-- Signals -->
+        <div class="s7-grid">
+          <div class="s7-card s7-card-full">
+            <div class="s7-card-label">📡 Buying Signal Summary</div>
+            <div id="s7-signals" class="s7-signals"></div>
+          </div>
+
+          <!-- Why Now -->
+          <div class="s7-card">
+            <div class="s7-card-label">⏱ Why Now Analysis</div>
+            <div id="s7-why-now" class="s7-card-value"></div>
+          </div>
+
+          <!-- Persona Priority -->
+          <div class="s7-card">
+            <div class="s7-card-label">👤 Priority Persona</div>
+            <div id="s7-persona-name" style="font-size:18px; font-weight:900; color:white; margin-bottom:6px;"></div>
+            <div id="s7-persona-reason" class="s7-card-value"></div>
+          </div>
+
+          <!-- MCC View -->
+          <div class="s7-card s7-card-full">
+            <div class="s7-card-label">🔺 Market · Client · Competitor View</div>
+            <div id="s7-mcc" class="s7-mcc">
+              <div class="s7-mcc-cell market">
+                <div class="s7-mcc-label">Market</div>
+                <div id="s7-mcc-market" class="s7-mcc-text"></div>
+              </div>
+              <div class="s7-mcc-cell client">
+                <div class="s7-mcc-label">Client</div>
+                <div id="s7-mcc-client" class="s7-mcc-text"></div>
+              </div>
+              <div class="s7-mcc-cell competitor">
+                <div class="s7-mcc-label">Competitor</div>
+                <div id="s7-mcc-competitor" class="s7-mcc-text"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Strategic Hook -->
+          <div class="s7-card">
+            <div class="s7-card-label">🎯 Strategic Hook</div>
+            <div class="s7-hook"><span id="s7-hook-text"></span></div>
+            <button onclick="copyS7Hook()" style="margin-top:10px; background:rgba(168,85,247,0.08); border:1px solid rgba(168,85,247,0.2); color:#c4b5fd; border-radius:8px; padding:5px 12px; font-size:9px; font-weight:700; cursor:pointer;" id="s7-copy-hook-btn">📋 Copy Hook</button>
+          </div>
+
+          <!-- Go / No-Go -->
+          <div class="s7-card">
+            <div class="s7-card-label">✅ Go / No-Go Recommendation</div>
+            <div id="s7-gng-badge" class="s7-gng-badge"></div>
+            <div id="s7-gng-reason" class="s7-card-value" style="margin-top:6px;"></div>
+          </div>
+
+          <!-- Confidence Score -->
+          <div class="s7-card">
+            <div class="s7-card-label">📊 Data Confidence Score</div>
+            <div style="display:flex; align-items:baseline; gap:6px; margin-bottom:6px;">
+              <div id="s7-confidence-num" class="s7-score-num">—</div>
+              <div style="font-size:12px; color:var(--muted);">/100</div>
+            </div>
+            <div class="s7-confidence-bar-wrap">
+              <div id="s7-confidence-fill" class="s7-confidence-bar-fill" style="width:0%; background: linear-gradient(90deg,#f59e0b,#fbbf24);"></div>
+            </div>
+            <div id="s7-confidence-label" style="font-size:9px; color:var(--muted); margin-top:4px;"></div>
+          </div>
+
+          <!-- Executive Brief -->
+          <div class="s7-card s7-card-full">
+            <div class="s7-card-label" style="display:flex; align-items:center; justify-content:space-between;">
+              <span>📋 Executive Brief</span>
+              <button onclick="copyS7Brief()" style="background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1); color:#9ca3af; border-radius:6px; padding:3px 10px; font-size:8px; font-weight:700; cursor:pointer;" id="s7-copy-brief-btn">Copy</button>
+            </div>
+            <div id="s7-brief" class="s7-brief"></div>
+          </div>
+
+        </div><!-- /s7-grid -->
+      </div><!-- /s7-body -->
+    </div><!-- /step7-panel -->
+
   </main>
 </div>
 
@@ -1326,6 +1632,9 @@ const state = {
   totalTokens: 0,
   apiMode: 'proxy',
   apiKey: '',
+  step7: null,         // Revenue Intelligence Enhancement (Step 7)
+  strategyId: null,
+  userId: null,
 };
 
 /* ── Session Persistence ── */
@@ -1336,6 +1645,7 @@ function persistState() {
       industry:    state.industry,
       steps:       state.steps,
       totalTokens: state.totalTokens,
+      step7:       state.step7 || null,
     }));
   } catch(e) { /* quota exceeded — non-fatal */ }
 }
@@ -1491,6 +1801,10 @@ const STEP_META = {
           if (stepMap[i]) { state.steps[i].status = 'complete'; state.steps[i].data = stepMap[i]; }
         }
         state.totalTokens = s.total_tokens || 0;
+        // Restore Step 7 if present
+        if (s.step_7_intelligence) {
+          state.step7 = s.step_7_intelligence;
+        }
         document.getElementById('company-input').value  = state.company;
         document.getElementById('industry-input').value = state.industry;
         rebuildUIFromState();
@@ -1554,6 +1868,12 @@ function rebuildUIFromState() {
 
   // Show summary if all complete
   if (Object.values(state.steps).every(s => s.status === 'complete')) showSummary();
+
+  // Restore Step 7 if present in saved state
+  if (state.step7) {
+    unlockStep7();
+    renderStep7(state.step7);
+  }
 }
 
 /* ═══════════════════════════════════════════
@@ -1604,10 +1924,18 @@ function scrollToStep(n) {
   }
 }
 
+function scrollToStep7() {
+  const panel = document.getElementById('step7-panel');
+  if (panel && panel.classList.contains('show')) {
+    panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setNavActive(7);
+  }
+}
+
 function setNavActive(n) {
-  for (let i = 1; i <= 6; i++) {
+  for (let i = 1; i <= 7; i++) {
     const el = document.getElementById(`step-nav-${i}`);
-    el.classList.remove('active');
+    if (el) el.classList.remove('active');
   }
   document.getElementById(`step-nav-${n}`)?.classList.add('active');
 }
@@ -1784,6 +2112,18 @@ function resetAll() {
   document.getElementById('logs-list').innerHTML = '';
   document.getElementById('log-count-badge').textContent = '0 events';
   document.getElementById('exec-logs-panel').style.display = 'none';
+  // Clear Step 7
+  state.step7 = null;
+  document.getElementById('step7-panel').classList.remove('show');
+  document.getElementById('step7-panel').style.display = 'none';
+  document.getElementById('step-nav-7').classList.add('locked');
+  document.getElementById('s7-body').classList.remove('show');
+  document.getElementById('s7-trigger').style.display = 'flex';
+  document.getElementById('s7-loading').style.display = 'none';
+  document.getElementById('s7-error').style.display = 'none';
+  document.getElementById('s7-generate-btn').disabled = false;
+  document.getElementById('s7-btn-text').textContent = 'Generate Revenue Intelligence';
+  document.getElementById('s7-status-pill').style.display = 'none';
   // Clear persisted session
   sessionStorage.removeItem('gtm_state');
   showToast('Strategy reset', 'success');
@@ -2640,6 +2980,8 @@ function showSummary() {
   document.getElementById('summary-cost').textContent = '6/6';
   panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
   showToast('🎉 Complete GTM Strategy Generated!', 'success');
+  // Reveal Step 7 panel
+  unlockStep7();
 }
 
 function buildExportText() {
@@ -2664,6 +3006,28 @@ function buildExportText() {
       text += '\n\n';
     }
   }
+
+  // Include Step 7 if generated
+  if (state.step7) {
+    text += `STEP 7: REVENUE INTELLIGENCE ENHANCEMENT\n${'─'.repeat(40)}\n`;
+    const s7 = state.step7;
+    if (s7.go_no_go) text += `RECOMMENDATION: ${s7.go_no_go.recommendation} — ${s7.go_no_go.reason}\n\n`;
+    if (s7.executive_brief) text += `EXECUTIVE BRIEF:\n${s7.executive_brief}\n\n`;
+    if (s7.strategic_hook) text += `STRATEGIC HOOK:\n"${s7.strategic_hook}"\n\n`;
+    if (s7.why_now_analysis) text += `WHY NOW:\n${s7.why_now_analysis}\n\n`;
+    if (s7.persona_priority) text += `PRIORITY PERSONA: ${s7.persona_priority.persona} — ${s7.persona_priority.reason}\n\n`;
+    if (s7.confidence_score !== undefined) text += `DATA CONFIDENCE SCORE: ${s7.confidence_score}/100\n\n`;
+    if (s7.signal_summary?.length) {
+      text += `BUYING SIGNALS:\n`;
+      s7.signal_summary.forEach(sig => { text += `  • [${sig.strength}] ${sig.signal_type}: ${sig.signal_description}\n`; });
+      text += '\n';
+    }
+    if (s7.mcc_view) {
+      text += `MCC VIEW:\n  Market: ${s7.mcc_view.market}\n  Client: ${s7.mcc_view.client}\n  Competitor: ${s7.mcc_view.competitor}\n\n`;
+    }
+    text += `Full JSON:\n${JSON.stringify(s7, null, 2)}\n`;
+  }
+
   return text;
 }
 
@@ -2914,10 +3278,257 @@ function loadCachedStrategy() {
     }
   }
   state.totalTokens = s.total_tokens || 0;
+
+  // Restore Step 7 if saved
+  if (s.step_7_intelligence) {
+    state.step7 = s.step_7_intelligence;
+  }
+
   rebuildUIFromState();
   persistState();
   showToast(`Loaded cached strategy for "${s.company_name}" ✓`, 'success');
   addLog('OK', 0, `Cached strategy loaded — ${s.steps_completed}/6 steps`);
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   STEP 7 — Revenue Intelligence Enhancement
+   Optional post-processing layer. Uses only completed step data.
+   Never touches Steps 1–6 or forces any re-run.
+═══════════════════════════════════════════════════════════════ */
+
+function unlockStep7() {
+  const panel = document.getElementById('step7-panel');
+  const nav   = document.getElementById('step-nav-7');
+  panel.style.display = '';   // remove any inline display:none from reset
+  panel.classList.add('show');
+  nav.classList.remove('locked');
+  // If step7 was already generated, show the generated state
+  if (state.step7) {
+    document.getElementById('s7-trigger').style.display = 'none';
+    document.getElementById('s7-status-pill').style.display = 'flex';
+  }
+}
+
+async function runStep7() {
+  if (!state.company) { showToast('No strategy loaded', 'error'); return; }
+
+  const allDone = Object.values(state.steps).every(s => s.status === 'complete');
+  if (!allDone) {
+    showToast('Complete all 6 GTM steps before running Revenue Intelligence', 'error');
+    return;
+  }
+
+  // UI: loading state
+  const btn = document.getElementById('s7-generate-btn');
+  btn.disabled = true;
+  document.getElementById('s7-btn-text').textContent = 'Generating…';
+  document.getElementById('s7-btn-icon').textContent = '⏳';
+  document.getElementById('s7-loading').style.display = 'flex';
+  document.getElementById('s7-error').style.display = 'none';
+  document.getElementById('s7-body').classList.remove('show');
+
+  addLog('INFO', 7, `Generating Revenue Intelligence for "${state.company}"`);
+
+  try {
+    const token = await getAuthToken();
+    const steps = {};
+    for (let i = 1; i <= 6; i++) {
+      if (state.steps[i].data) steps[i] = state.steps[i].data;
+    }
+
+    const res = await fetch('/api/gtm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({
+        action:   'run_step7',
+        company:  state.company,
+        industry: state.industry || '',
+        steps,
+      }),
+    });
+
+    if (res.status === 429) throw new Error('Rate limit reached. Please wait before retrying.');
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      throw new Error(e.error || `Server error ${res.status}`);
+    }
+
+    const payload = await res.json();
+    if (!payload.data) throw new Error('Empty response from server');
+
+    state.step7 = payload.data;
+    persistState();
+
+    renderStep7(state.step7);
+
+    document.getElementById('s7-loading').style.display = 'none';
+    document.getElementById('s7-trigger').style.display = 'none';
+    document.getElementById('s7-status-pill').style.display = 'flex';
+    document.getElementById('s7-body').classList.add('show');
+    setNavActive(7);
+
+    addLog('OK', 7, `Revenue Intelligence generated (${payload.tokens} tokens · confidence ${payload.data.confidence_score}/100)`);
+    showToast('⚡ Revenue Intelligence Ready!', 'success');
+
+    // Auto-save Step 7 to DB if we have a strategy ID
+    if (state.strategyId) {
+      saveStep7ToVault(state.strategyId, state.step7);
+    }
+
+  } catch(err) {
+    document.getElementById('s7-loading').style.display = 'none';
+    document.getElementById('s7-error').style.display = 'block';
+    document.getElementById('s7-error-text').textContent = err.message;
+    btn.disabled = false;
+    document.getElementById('s7-btn-text').textContent = 'Generate Revenue Intelligence';
+    document.getElementById('s7-btn-icon').textContent = '⚡';
+    addLog('ERR', 7, 'Step 7 failed: ' + err.message);
+    showToast('Revenue Intelligence failed: ' + err.message, 'error');
+  }
+}
+
+async function saveStep7ToVault(strategyId, step7Data) {
+  try {
+    const token = await getAuthToken();
+    const res = await fetch('/api/gtm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({
+        action:              'save_step7',
+        strategy_id:         strategyId,
+        step_7_intelligence: step7Data,
+      }),
+    });
+    const d = await res.json();
+    if (d.saved) {
+      addLog('OK', 7, 'Revenue Intelligence saved to Supabase');
+    }
+  } catch(e) {
+    addLog('WARN', 7, 'Could not persist Step 7 to vault: ' + e.message);
+  }
+}
+
+function renderStep7(d) {
+  if (!d) return;
+
+  // Signal Summary
+  const sigContainer = document.getElementById('s7-signals');
+  if (sigContainer && d.signal_summary?.length) {
+    sigContainer.innerHTML = d.signal_summary.map(sig => {
+      const st = sig.strength || 'Medium';
+      const typeLabel = (sig.signal_type || 'signal').replace(/_/g, ' ');
+      return `<div class="s7-signal">
+        <div class="s7-signal-type sig-${st}">${typeLabel}</div>
+        <div>
+          <div class="s7-signal-desc">${escHtml(sig.signal_description || '')}</div>
+          <div style="font-size:9px;color:var(--muted);margin-top:3px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;">${st} strength</div>
+        </div>
+      </div>`;
+    }).join('');
+  } else if (sigContainer) {
+    sigContainer.innerHTML = '<div style="font-size:11px;color:var(--muted);">No strong signals identified from available data.</div>';
+  }
+
+  // Why Now
+  const whyNow = document.getElementById('s7-why-now');
+  if (whyNow) whyNow.textContent = d.why_now_analysis || '—';
+
+  // MCC View
+  if (d.mcc_view) {
+    const mm = document.getElementById('s7-mcc-market');
+    const mc = document.getElementById('s7-mcc-client');
+    const mx = document.getElementById('s7-mcc-competitor');
+    if (mm) mm.textContent = d.mcc_view.market    || '—';
+    if (mc) mc.textContent = d.mcc_view.client    || '—';
+    if (mx) mx.textContent = d.mcc_view.competitor || '—';
+  }
+
+  // Strategic Hook
+  const hook = document.getElementById('s7-hook-text');
+  if (hook) hook.textContent = d.strategic_hook || '—';
+
+  // Persona
+  if (d.persona_priority) {
+    const pn = document.getElementById('s7-persona-name');
+    const pr = document.getElementById('s7-persona-reason');
+    if (pn) pn.textContent = d.persona_priority.persona || '—';
+    if (pr) pr.textContent = d.persona_priority.reason  || '—';
+  }
+
+  // Go/No-Go
+  if (d.go_no_go) {
+    const badge  = document.getElementById('s7-gng-badge');
+    const reason = document.getElementById('s7-gng-reason');
+    const rec = d.go_no_go.recommendation || 'Watch';
+    const cls = rec.replace(/[-\/]/g, '').replace(/\s+/g, '');
+    if (badge) {
+      badge.textContent = rec;
+      badge.className = `s7-gng-badge gng-${cls}`;
+    }
+    if (reason) reason.textContent = d.go_no_go.reason || '';
+  }
+
+  // Confidence Score
+  const score = typeof d.confidence_score === 'number' ? d.confidence_score : parseInt(d.confidence_score) || 0;
+  const scoreNum  = document.getElementById('s7-confidence-num');
+  const scoreFill = document.getElementById('s7-confidence-fill');
+  const scoreLbl  = document.getElementById('s7-confidence-label');
+  if (scoreNum) scoreNum.textContent = score;
+  if (scoreFill) {
+    scoreFill.style.width = '0%';
+    const color = score >= 75 ? '#22c55e' : score >= 50 ? '#f59e0b' : '#ef4444';
+    scoreFill.style.background = `linear-gradient(90deg, ${color}99, ${color})`;
+    setTimeout(() => { scoreFill.style.width = score + '%'; }, 200);
+    if (scoreNum) scoreNum.style.color = color;
+  }
+  if (scoreLbl) {
+    const lbl = score >= 75 ? 'High confidence — rich data across all steps' :
+                score >= 50 ? 'Moderate confidence — some data gaps present' :
+                              'Low confidence — insufficient data for certainty';
+    scoreLbl.textContent = lbl;
+  }
+
+  // Data quality audit trail (from _data_quality metadata)
+  const dq = d._data_quality;
+  if (dq) {
+    const auditEl = document.getElementById('s7-confidence-fill')?.closest('.s7-card');
+    if (auditEl && !auditEl.querySelector('.s7-audit')) {
+      const audit = document.createElement('div');
+      audit.className = 's7-audit';
+      audit.style.cssText = 'margin-top:10px; padding:8px 10px; background:rgba(0,0,0,0.2); border-radius:8px; border:1px solid rgba(255,255,255,0.05);';
+      const capped = dq.confidence_ai_claimed > dq.confidence_after_cap;
+      audit.innerHTML = `
+        <div style="font-size:8px; font-weight:900; text-transform:uppercase; letter-spacing:.15em; color:var(--muted); margin-bottom:5px;">Data Quality Audit</div>
+        <div style="font-size:9px; color:#6b7280; line-height:1.8;">
+          Data richness score: <span style="color:#9ca3af">${dq.richness_score}/100</span><br/>
+          Signals found / used: <span style="color:#9ca3af">${dq.signals_before_filter} → ${dq.signals_after_filter}</span><br/>
+          ${capped ? `<span style="color:#f59e0b;">⚠ AI claimed ${dq.confidence_ai_claimed} — capped to ${dq.confidence_after_cap} by data richness</span>` : `Confidence verified: ${dq.confidence_after_cap}/100`}
+        </div>`;
+      auditEl.appendChild(audit);
+    }
+  }
+
+  // Executive Brief
+  const brief = document.getElementById('s7-brief');
+  if (brief) brief.textContent = d.executive_brief || '—';
+}
+
+function copyS7Hook() {
+  const hook = document.getElementById('s7-hook-text')?.textContent || '';
+  if (!hook || hook === '—') return;
+  navigator.clipboard.writeText(hook).then(() => {
+    const btn = document.getElementById('s7-copy-hook-btn');
+    if (btn) { btn.textContent = '✓ Copied'; setTimeout(() => btn.textContent = '📋 Copy Hook', 1600); }
+  });
+}
+
+function copyS7Brief() {
+  const brief = document.getElementById('s7-brief')?.textContent || '';
+  if (!brief || brief === '—') return;
+  navigator.clipboard.writeText(brief).then(() => {
+    const btn = document.getElementById('s7-copy-brief-btn');
+    if (btn) { btn.textContent = '✓ Copied'; setTimeout(() => btn.textContent = 'Copy', 1600); }
+  });
 }
 
 // ── Auto-save to vault after each step completes ──────────────────
@@ -2990,13 +3601,14 @@ async function autoSaveToVault() {
           'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({
-          action:       'save_strategy',
-          user_id:      state.userId,
-          company_name: state.company,
-          industry:     state.industry || null,
+          action:              'save_strategy',
+          user_id:             state.userId,
+          company_name:        state.company,
+          industry:            state.industry || null,
           steps,
-          total_tokens: state.totalTokens,
-          full_report:  fullReport,
+          total_tokens:        state.totalTokens,
+          full_report:         fullReport,
+          step_7_intelligence: state.step7 || null,
         }),
       });
       const data = await res.json();
@@ -3105,7 +3717,8 @@ function showCompletionCelebration() {
     '<div style="font-size:22px;font-weight:900;color:white;margin-bottom:8px;letter-spacing:-0.4px">' + (state.company || 'Your Company') + '</div>' +
     '<div style="font-size:12px;color:#6b7280;margin-bottom:28px;line-height:1.7">All 6 GTM strategy steps completed.<br/>Auto-saved to Supabase · ' + (state.totalTokens || 0).toLocaleString() + ' tokens used.</div>' +
     '<div style="display:flex;flex-direction:column;gap:10px">' +
-      '<button id="cel-vault" style="width:100%;padding:14px;background:linear-gradient(135deg,#a855f7,#7c3aed);color:white;border:none;border-radius:12px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;cursor:pointer;transition:all .2s">🗄️ View in Strategy Vault</button>' +
+      '<button id="cel-step7" style="width:100%;padding:14px;background:linear-gradient(135deg,#d97706,#b45309);color:white;border:none;border-radius:12px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;cursor:pointer;transition:all .2s">⚡ Generate Revenue Intelligence</button>' +
+      '<button id="cel-vault" style="width:100%;padding:12px;background:rgba(168,85,247,0.12);border:1px solid rgba(168,85,247,0.25);color:#c4b5fd;border-radius:12px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;cursor:pointer;transition:all .2s">🗄️ View in Strategy Vault</button>' +
       '<button id="cel-report" style="width:100%;padding:12px;background:rgba(99,102,241,0.12);border:1px solid rgba(99,102,241,0.25);color:#818cf8;border-radius:12px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;cursor:pointer;transition:all .2s">📄 Export Strategy Report</button>' +
       '<button id="cel-new" style="width:100%;padding:12px;background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.08);color:#6b7280;border-radius:12px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;cursor:pointer;transition:all .2s">⚡ Run Another Strategy</button>' +
     '</div>' +
@@ -3116,6 +3729,12 @@ function showCompletionCelebration() {
 
   document.getElementById('cel-close').onclick = function() { modal.remove(); };
   modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
+
+  document.getElementById('cel-step7').onclick = function() {
+    modal.remove();
+    scrollToStep7();
+    setTimeout(() => runStep7(), 400);
+  };
 
   document.getElementById('cel-vault').onclick = function() {
     modal.remove();
