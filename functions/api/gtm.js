@@ -909,32 +909,59 @@ Examples of correct scoring:
 - Mid-size fintech SaaS: 76
 
 Never give the same score to different companies. Be specific and honest.
-Return:{"company_overview":"2-3 sentences","market_position":"competitive position","products_services":"main offerings","gtm_relevance_score":<integer 0-100 based on rubric above>,"gtm_relevance_reasoning":"specific reasoning for this exact score","growth_signals":["s1","s2","s3"],"revenue_stage":"e.g. Series B","employee_count":"range","tech_stack_hints":["hint1"]}`,
+Also generate:
+- section_context: one sentence describing why market research matters for this company
+- analyst_insight: one actionable insight a strategist would give about this company's GTM positioning
+- swot: a SWOT analysis with arrays of 2-3 bullet strings each for strengths, weaknesses, opportunities, threats — based on the company's actual market position, do NOT use generic placeholders
+- kpi_summary: object with keys gtm_score, tam, cagr, verdict (Go/Watch/No-Go) — derived from data
+Return:{"company_overview":"2-3 sentences","market_position":"competitive position","products_services":"main offerings","gtm_relevance_score":<integer 0-100 based on rubric above>,"gtm_relevance_reasoning":"specific reasoning for this exact score","growth_signals":["s1","s2","s3"],"revenue_stage":"e.g. Series B","employee_count":"range","tech_stack_hints":["hint1"],"section_context":"why this step matters","analyst_insight":"one actionable insight","swot":{"strengths":["s1","s2"],"weaknesses":["w1","w2"],"opportunities":["o1","o2"],"threats":["t1","t2"]},"kpi_summary":{"gtm_score":82,"tam":"$Xb","cagr":"X%","verdict":"Go"}}`,
 
     2:`${base}${profileBlock}
 TAM mapping for companies selling TO/partnering with "${company}"${ind}.
 Context: ${ctx}
-Return:{"tam_overview":"market description","tam_size_estimate":"$Xb","sam_estimate":"SAM","growth_rate":"X% CAGR","growth_drivers":"drivers","market_segments":[{"name":"Seg","size":"$Xm","priority":"High"}],"priority_opportunities":"top opps","market_maturity":"Growth"}`,
+Also generate:
+- section_context: one sentence describing why TAM analysis matters for targeting this company
+- analyst_insight: one actionable market-sizing insight specific to this opportunity
+- tam_segments: enhanced market_segments array with name, size, priority, and growth_rate for each segment
+- waterfall: object with tam_value, sam_value, som_value as strings (e.g. "$5.2B")
+Return:{"tam_overview":"market description","tam_size_estimate":"$Xb","sam_estimate":"SAM","growth_rate":"X% CAGR","growth_drivers":"drivers","market_segments":[{"name":"Seg","size":"$Xm","priority":"High","growth_rate":"X%"}],"priority_opportunities":"top opps","market_maturity":"Growth","section_context":"why TAM matters here","analyst_insight":"one actionable insight","waterfall":{"tam_value":"$Xb","sam_value":"$Xb","som_value":"$Xm"}}`,
 
     3:`${base}${profileBlock}
 Build ICP for companies selling TO "${company}"${ind}.
 Context: ${ctx}
-Return:{"primary_icp":"persona","secondary_icp":"secondary","firmographics":"size/ARR/industry","buying_triggers":["t1","t2"],"core_pain_points":"3 pains","decision_makers":["VP Sales"],"deal_cycle":"cycle","objections":["obj1"]}`,
+Also generate:
+- section_context: one sentence on why ICP modeling matters for this account
+- analyst_insight: one strategic recommendation about targeting this persona
+- persona_map: object with primary_role, economic_buyer, and champion — each with title and key_responsibility
+- pain_solution_map: array of objects with operational_friction, business_impact, and recommended_intervention
+Return:{"primary_icp":"persona","secondary_icp":"secondary","firmographics":"size/ARR/industry","buying_triggers":["t1","t2"],"core_pain_points":"3 pains","decision_makers":["VP Sales"],"deal_cycle":"cycle","objections":["obj1"],"section_context":"why ICP matters here","analyst_insight":"one strategic insight","persona_map":{"primary_role":{"title":"CIO","key_responsibility":"..."},"economic_buyer":{"title":"CFO","key_responsibility":"..."},"champion":{"title":"VP Engineering","key_responsibility":"..."}},"pain_solution_map":[{"operational_friction":"...","business_impact":"...","recommended_intervention":"..."}]}`,
 
     4:`${base}
 Account sourcing strategy for "${company}"${ind}.
 Context: ${ctx}
-Return:{"recommended_databases":["Apollo.io","ZoomInfo"],"filter_criteria":"filters","sourcing_playbook":"steps","exclusion_criteria":"exclusions","estimated_universe":"est","data_enrichment_tips":"tips"}`,
+Also generate:
+- section_context: one sentence on why account sourcing matters for this target
+- analyst_insight: one tactical recommendation about sourcing high-fit accounts
+- account_targets: array of 3-5 sample high-fit accounts with account_name, fit_score (0-100), and actionable_trigger
+Return:{"recommended_databases":["Apollo.io","ZoomInfo"],"filter_criteria":"filters","sourcing_playbook":"steps","exclusion_criteria":"exclusions","estimated_universe":"est","data_enrichment_tips":"tips","section_context":"why sourcing matters here","analyst_insight":"one tactical insight","account_targets":[{"account_name":"Sample Corp","fit_score":88,"actionable_trigger":"trigger"}]}`,
 
     5:`${base}
 Keywords for "${company}"${ind}.
 Context: ${ctx}
-Return:{"primary_keywords":["kw1","kw2","kw3","kw4","kw5","kw6"],"secondary_keywords":["k1","k2","k3","k4","k5","k6","k7","k8"],"boolean_query":"\"kw\" OR \"kw2\"","linkedin_search_strings":"LI string","intent_signals":["s1","s2","s3"],"content_topics":["t1","t2","t3"]}`,
+Also generate:
+- section_context: one sentence on why intent keyword strategy matters for this target
+- analyst_insight: one strategic keyword/intent recommendation
+- keyword_taxonomy: object with early_funnel (problem-aware keywords array) and late_funnel (solution-aware keywords array)
+Return:{"primary_keywords":["kw1","kw2","kw3","kw4","kw5","kw6"],"secondary_keywords":["k1","k2","k3","k4","k5","k6","k7","k8"],"boolean_query":"\"kw\" OR \"kw2\"","linkedin_search_strings":"LI string","intent_signals":["s1","s2","s3"],"content_topics":["t1","t2","t3"],"section_context":"why keywords matter here","analyst_insight":"one strategic insight","keyword_taxonomy":{"early_funnel":["problem keyword 1","problem keyword 2"],"late_funnel":["solution keyword 1","solution keyword 2"]}}`,
 
     6:`${base}
 Hyper-personalised outreach for "${company}"${ind}. Use ALL prior context.
 Context: ${buildCompressedCtx(priorSteps)}
-Return:{"email_1":{"angle":"Pain","subject":"subj","body":"body","cta":"cta"},"email_2":{"angle":"ROI","subject":"s","body":"b","cta":"c"},"email_3":{"angle":"Proof","subject":"s","body":"b","cta":"c"},"follow_up_sequence":"Day 3: action. Day 7: action. Day 14: action.","linkedin_message":"<300 chars","linkedin_follow_up":"<200 chars"}`,
+Also generate:
+- section_context: one sentence on why enterprise-grade messaging matters for this target
+- analyst_insight: one messaging strategy recommendation
+- messaging_sequence: object with touch_1_label, touch_2_label, touch_3_label describing the 3-email cadence theme
+Return:{"email_1":{"angle":"Pain","subject":"subj","body":"body","cta":"cta"},"email_2":{"angle":"ROI","subject":"s","body":"b","cta":"c"},"email_3":{"angle":"Proof","subject":"s","body":"b","cta":"c"},"follow_up_sequence":"Day 3: action. Day 7: action. Day 14: action.","linkedin_message":"<300 chars","linkedin_follow_up":"<200 chars","section_context":"why messaging matters here","analyst_insight":"one messaging insight","messaging_sequence":{"touch_1_label":"Agitation / Market Signal","touch_2_label":"Hard ROI Metric","touch_3_label":"Heavyweight Proof"}}`,
   };
 
   return prompts[step];
@@ -960,12 +987,12 @@ function buildCompressedCtx(steps) {
 }
 
 const SCHEMAS = {
-  1:['company_overview','market_position','products_services','gtm_relevance_score','growth_signals'],
-  2:['tam_overview','tam_size_estimate','growth_rate','market_segments','priority_opportunities'],
-  3:['primary_icp','secondary_icp','firmographics','buying_triggers','core_pain_points'],
-  4:['recommended_databases','filter_criteria','sourcing_playbook','exclusion_criteria'],
-  5:['primary_keywords','secondary_keywords','boolean_query','linkedin_search_strings'],
-  6:['email_1','email_2','email_3','follow_up_sequence'],
+  1:['company_overview','market_position','products_services','gtm_relevance_score','growth_signals','section_context','analyst_insight','swot'],
+  2:['tam_overview','tam_size_estimate','growth_rate','market_segments','priority_opportunities','section_context','analyst_insight'],
+  3:['primary_icp','secondary_icp','firmographics','buying_triggers','core_pain_points','section_context','analyst_insight'],
+  4:['recommended_databases','filter_criteria','sourcing_playbook','exclusion_criteria','section_context','analyst_insight'],
+  5:['primary_keywords','secondary_keywords','boolean_query','linkedin_search_strings','section_context','analyst_insight'],
+  6:['email_1','email_2','email_3','follow_up_sequence','section_context','analyst_insight'],
 };
 
 async function parseWithRetry(rawText, step, originalPrompt, openaiKey) {
