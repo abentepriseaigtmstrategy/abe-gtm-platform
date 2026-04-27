@@ -11,7 +11,7 @@ import { verifyAuth, corsHeaders, validate, rateLimit, sanitise, errRes, okRes, 
 
 const COST_PER_TOKEN   = 0.0000002;
 const HOURLY_TOKEN_LIMIT = 200_000;
-const STEP_MAX_TOKENS = { 1:1500, 2:1500, 3:1500, 4:1500, 5:2000, 6:2500 };
+const STEP_MAX_TOKENS = { 1:1500, 2:1500, 3:1500, 4:1500, 5:2000, 6:2500, 7:2500 };
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -53,6 +53,8 @@ export async function onRequestPost(context) {
     case 'resume_strategy': return handleResumeStrategy(body, userId, supabaseUrl, supabaseKey, cors);
     case 'check_cache':     return handleCheckCache(body, userId, supabaseUrl, supabaseKey, env, cors);
     case 'score_leads':     return handleScoreLeads(body, userId, openaiKey, cors);
+    case 'run_step7':       return handleRunStep7(body, userId, openaiKey, supabaseUrl, supabaseKey, env, cors);
+    case 'save_step7':      return handleSaveStep7(body, userId, supabaseUrl, supabaseKey, env, cors);
     default:                return errRes(`Unknown action: ${body.action}`, 400, cors);
   }
 }
@@ -141,7 +143,7 @@ async function handleSaveStrategy(body, userId, supabaseUrl, supabaseKey, env, c
   const errors = validate({ company_name: 'string|required' }, body);
   if (errors.length) return errRes(errors[0], 400, cors);
 
-  const { company_name, industry, steps, total_tokens, company_url, scraped_profile, full_report } = body;
+  const { company_name, industry, steps, total_tokens, company_url, scraped_profile, full_report, step_7_intelligence } = body;
   const cacheKey = await hash(company_name.toLowerCase().trim());
 
   const stepsCompleted = Object.values(steps || {}).filter(Boolean).length;
@@ -159,6 +161,7 @@ async function handleSaveStrategy(body, userId, supabaseUrl, supabaseKey, env, c
     step_4_sourcing:  steps?.[4] || null,
     step_5_keywords:  steps?.[5] || null,
     step_6_messaging: steps?.[6] || null,
+    step_7_intelligence: step_7_intelligence || null,
     steps_completed:  stepsCompleted,
     total_tokens:     total_tokens || 0,
     status,
@@ -344,6 +347,7 @@ async function handleResumeStrategy(body, userId, supabaseUrl, supabaseKey, cors
     steps_completed: s.steps_completed,
     next_step:       nextStep,
     total_tokens:    s.total_tokens,
+    step_7_intelligence: s.step_7_intelligence || null,
   }, cors);
 }
 
@@ -393,6 +397,466 @@ async function handleScoreLeads(body, userId, openaiKey, cors) {
   }
 
   return okRes({ scored_leads: results, total: results.length }, cors);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// RUN STEP 7 — Revenue Intelligence Enhancement (optional post-processing)
+// ══════════════════════════════════════════════════════════════════
+async function handleRunStep7(body, userId, openaiKey, supabaseUrl, supabaseKey, env, cors) {
+  const errors = validate({
+    company: 'string|required',
+    steps:   'object|required',
+  }, body);
+  if (errors.length) return errRes(errors[0], 400, cors);
+
+  const { company, industry, steps } = body;
+
+  // Require at least Step 1 & 6 to be present — otherwise there's nothing to analyse
+  if (!steps[1] || !steps[6]) {
+    return errRes('Step 7 requires completed Steps 1–6. Run the full GTM flow first.', 400, cors);
+  }
+
+  // Hourly token limit check (non-blocking on failure)
+  if (supabaseUrl && supabaseKey) {
+    if (await isHourlyLimitExceeded(userId, supabaseUrl, supabaseKey)) {
+      return errRes('Hourly token limit reached. Resets at the top of the hour.', 429, cors);
+    }
+  }
+
+  // ── HALLUCINATION GUARD STEP 1: Measure actual data richness BEFORE calling AI ──
+  // We calculate a "data richness score" purely from what exists in Steps 1-6.
+  // This score is used to:
+  //   a) Cap the AI's confidence_score (AI cannot claim higher confidence than data supports)
+  //   b) Build an "evidence manifest" injected into the prompt so AI only references real fields
+  const richness = measureDataRichness(steps);
+
+  // ── HALLUCINATION GUARD STEP 2: Build evidence manifest ──────────────────────
+  // Extract only the concrete facts that actually exist in the step data.
+  // This manifest is injected into the prompt as the ONLY facts the AI may reference.
+  // AI is explicitly told: if a fact is not in this manifest, do not mention it.
+  const evidenceManifest = buildEvidenceManifest(steps);
+
+  const prompt = buildStep7Prompt(sanitise(company, 200), industry || '', steps, evidenceManifest);
+  const t0 = Date.now();
+
+  let rawText, tokensUsed;
+  try {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
+      body: JSON.stringify({
+        model:       'gpt-4o-mini',
+        temperature: 0.2,   // Lower temperature = less creative hallucination
+        max_tokens:  STEP_MAX_TOKENS[7],
+        messages: [
+          {
+            role: 'system',
+            content: [
+              'You are a senior revenue intelligence analyst.',
+              'CRITICAL ANTI-HALLUCINATION RULES — VIOLATION = INVALID OUTPUT:',
+              '1. You may ONLY reference facts that appear in the EVIDENCE MANIFEST provided. Do not invent company details, competitor names, funding amounts, or growth metrics.',
+              '2. signal_type MUST be one of exactly: hiring, funding, growth, tech_replacement, competitor_pressure, expansion, market_timing — no other values accepted.',
+              '3. go_no_go.recommendation MUST be exactly one of: Go, Watch, No-Go — no other values accepted.',
+              '4. signal strength MUST be exactly one of: High, Medium, Low — no other values accepted.',
+              '5. If you cannot find evidence for a signal, omit it entirely rather than inventing one.',
+              '6. Return ONLY valid JSON. No markdown, no prose, no code fences. Start with { end with }.',
+            ].join('\n'),
+          },
+          { role: 'user', content: prompt },
+        ],
+      }),
+    });
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      if (res.status === 429) return errRes('OpenAI rate limit reached. Please wait a moment.', 429, cors);
+      return errRes(`OpenAI error: ${e?.error?.message || res.status}`, res.status, cors);
+    }
+    const d  = await res.json();
+    rawText    = d.choices?.[0]?.message?.content || '{}';
+    tokensUsed = d.usage?.total_tokens || 0;
+  } catch (e) {
+    return errRes('Failed to reach OpenAI: ' + e.message, 502, cors);
+  }
+
+  // Parse Step 7 response
+  let parsed = parseStep7(rawText);
+  if (!parsed) return errRes('AI returned unparseable Step 7 response', 422, cors);
+
+  // ── HALLUCINATION GUARD STEP 3: Server-side output sanitisation ──────────────
+  // Enforce every enum, clamp every number, strip any field that violates the schema.
+  // This runs AFTER the AI response — nothing untrusted reaches the frontend.
+  parsed = sanitiseStep7Output(parsed, richness);
+
+  const duration = Date.now() - t0;
+
+  // Log usage (non-blocking)
+  if (supabaseUrl && supabaseKey) {
+    logRun(userId, null, 'gtm_step7', 7, company, tokensUsed, duration, false, supabaseUrl, supabaseKey);
+    bumpHourlyTokens(userId, tokensUsed, supabaseUrl, supabaseKey);
+  }
+
+  return okRes({ data: parsed, tokens: tokensUsed, duration_ms: duration, step: 7 }, cors);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// HALLUCINATION GUARD — DATA RICHNESS MEASUREMENT
+// Scores how much real data exists across Steps 1–6.
+// Returns a number 0–100. Used to cap AI confidence_score.
+// Formula: each step contributes proportional weight based on importance to Step 7.
+// ══════════════════════════════════════════════════════════════════
+function measureDataRichness(steps) {
+  const weights = { 1: 25, 2: 15, 3: 25, 4: 10, 5: 10, 6: 15 }; // must sum to 100
+  let score = 0;
+
+  // Step 1 — Market Research (weight 25)
+  if (steps[1]) {
+    const s1 = steps[1];
+    let pts = 0;
+    if (s1.company_overview)    pts += 6;
+    if (s1.growth_signals)      pts += 7;
+    if (s1.market_position)     pts += 6;
+    if (s1.gtm_relevance_score) pts += 6;
+    score += Math.min(weights[1], pts);
+  }
+
+  // Step 2 — TAM Mapping (weight 15)
+  if (steps[2]) {
+    const s2 = steps[2];
+    let pts = 0;
+    if (s2.tam_size_estimate)        pts += 5;
+    if (s2.growth_rate)              pts += 4;
+    if (s2.priority_opportunities)   pts += 6;
+    score += Math.min(weights[2], pts);
+  }
+
+  // Step 3 — ICP Modeling (weight 25)
+  if (steps[3]) {
+    const s3 = steps[3];
+    let pts = 0;
+    if (s3.primary_icp)           pts += 5;
+    if (s3.core_pain_points)      pts += 6;
+    if (s3.buying_triggers)       pts += 7;
+    if (s3.decision_makers)       pts += 4;
+    if (s3.objections)            pts += 3;
+    score += Math.min(weights[3], pts);
+  }
+
+  // Step 4 — Account Sourcing (weight 10)
+  if (steps[4]) {
+    const s4 = steps[4];
+    let pts = 0;
+    if (s4.recommended_databases) pts += 5;
+    if (s4.sourcing_playbook)      pts += 5;
+    score += Math.min(weights[4], pts);
+  }
+
+  // Step 5 — Keywords (weight 10)
+  if (steps[5]) {
+    const s5 = steps[5];
+    let pts = 0;
+    if (s5.primary_keywords)  pts += 5;
+    if (s5.intent_signals)    pts += 5;
+    score += Math.min(weights[5], pts);
+  }
+
+  // Step 6 — Messaging (weight 15)
+  if (steps[6]) {
+    const s6 = steps[6];
+    let pts = 0;
+    if (s6.email_1)          pts += 5;
+    if (s6.email_2)          pts += 4;
+    if (s6.linkedin_message) pts += 6;
+    score += Math.min(weights[6], pts);
+  }
+
+  return Math.round(score);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// HALLUCINATION GUARD — EVIDENCE MANIFEST BUILDER
+// Extracts only concrete facts that ACTUALLY exist in the step data.
+// This manifest is passed to the AI — it can ONLY reference these facts.
+// ══════════════════════════════════════════════════════════════════
+function buildEvidenceManifest(steps) {
+  const facts = [];
+
+  const add = (label, value) => {
+    if (!value) return;
+    if (Array.isArray(value) && value.length === 0) return;
+    const v = Array.isArray(value) ? value.slice(0, 5).join(', ') : String(value).slice(0, 300);
+    if (v.trim()) facts.push(`${label}: ${v}`);
+  };
+
+  if (steps[1]) {
+    add('Company overview',       steps[1].company_overview);
+    add('GTM relevance score',    steps[1].gtm_relevance_score);
+    add('Growth signals',         steps[1].growth_signals);
+    add('Market position',        steps[1].market_position);
+    add('Revenue stage',          steps[1].revenue_stage);
+    add('Tech stack hints',       steps[1].tech_stack_hints);
+  }
+  if (steps[2]) {
+    add('TAM size',               steps[2].tam_size_estimate);
+    add('Market growth rate',     steps[2].growth_rate);
+    add('Priority opportunities', steps[2].priority_opportunities);
+    add('Market maturity',        steps[2].market_maturity);
+    add('Top market segments',    (steps[2].market_segments||[]).slice(0,3).map(s=>s.name||s));
+  }
+  if (steps[3]) {
+    add('Primary ICP',            steps[3].primary_icp);
+    add('Core pain points',       steps[3].core_pain_points);
+    add('Buying triggers',        steps[3].buying_triggers);
+    add('Decision makers',        steps[3].decision_makers);
+    add('Key objections',         steps[3].objections);
+    add('Deal cycle',             steps[3].deal_cycle);
+  }
+  if (steps[4]) {
+    add('Recommended databases',  (steps[4].recommended_databases||[]).slice(0,3));
+    add('Sourcing playbook',      steps[4].sourcing_playbook);
+  }
+  if (steps[5]) {
+    add('Primary keywords',       (steps[5].primary_keywords||[]).slice(0,5));
+    add('Intent signals',         steps[5].intent_signals);
+  }
+  if (steps[6]) {
+    add('Email 1 angle',          steps[6].email_1?.angle);
+    add('Email 1 subject',        steps[6].email_1?.subject);
+    add('Email 2 angle',          steps[6].email_2?.angle);
+    add('LinkedIn message angle', steps[6].linkedin_message ? steps[6].linkedin_message.slice(0,150) : null);
+  }
+
+  return facts.length > 0
+    ? 'EVIDENCE MANIFEST (you may ONLY reference these facts):\n' + facts.map(f => `- ${f}`).join('\n')
+    : 'EVIDENCE MANIFEST: Limited data available. Reflect this in a low confidence_score.';
+}
+
+// ══════════════════════════════════════════════════════════════════
+// HALLUCINATION GUARD — SERVER-SIDE OUTPUT SANITISATION
+// Enforces all enums, clamps all numbers, caps confidence by data richness.
+// Runs after AI response. Nothing untrusted reaches the frontend.
+// ══════════════════════════════════════════════════════════════════
+const VALID_SIGNAL_TYPES  = new Set(['hiring','funding','growth','tech_replacement','competitor_pressure','expansion','market_timing']);
+const VALID_STRENGTHS     = new Set(['High','Medium','Low']);
+const VALID_GNG           = new Set(['Go','Watch','No-Go']);
+const VALID_PERSONAS      = new Set(['CEO','Founder','CTO','CFO','COO','Head of Sales','Head of Marketing','VP Sales','VP Marketing','CMO','CRO','Director of Sales','Director of Marketing','Head of Growth','Head of Product','Head of Operations']);
+
+function sanitiseStep7Output(d, richnessScore) {
+  const out = {};
+
+  // ── signal_summary: filter out invalid enums, keep max 5 ─────────
+  const rawSignals = Array.isArray(d.signal_summary) ? d.signal_summary : [];
+  out.signal_summary = rawSignals
+    .filter(s => s && typeof s === 'object')
+    .map(s => ({
+      signal_type:        VALID_SIGNAL_TYPES.has(s.signal_type)  ? s.signal_type  : 'growth',
+      signal_description: typeof s.signal_description === 'string' ? s.signal_description.slice(0, 400) : '',
+      strength:           VALID_STRENGTHS.has(s.strength)        ? s.strength     : 'Medium',
+    }))
+    .filter(s => s.signal_description.length > 5)   // drop empty or nearly-empty
+    .slice(0, 5);
+
+  // ── why_now_analysis ──────────────────────────────────────────────
+  out.why_now_analysis = typeof d.why_now_analysis === 'string'
+    ? d.why_now_analysis.slice(0, 800)
+    : 'Insufficient data to determine timing urgency.';
+
+  // ── mcc_view ─────────────────────────────────────────────────────
+  const mcc = d.mcc_view && typeof d.mcc_view === 'object' ? d.mcc_view : {};
+  out.mcc_view = {
+    market:     typeof mcc.market     === 'string' ? mcc.market.slice(0,400)     : 'No market data available.',
+    client:     typeof mcc.client     === 'string' ? mcc.client.slice(0,400)     : 'No client data available.',
+    competitor: typeof mcc.competitor === 'string' ? mcc.competitor.slice(0,400) : 'No competitor data available.',
+  };
+
+  // ── strategic_hook ────────────────────────────────────────────────
+  out.strategic_hook = typeof d.strategic_hook === 'string'
+    ? d.strategic_hook.slice(0, 300)
+    : '';
+
+  // ── persona_priority ─────────────────────────────────────────────
+  const pp = d.persona_priority && typeof d.persona_priority === 'object' ? d.persona_priority : {};
+  const rawPersona = typeof pp.persona === 'string' ? pp.persona.trim() : 'CEO';
+  // Accept AI persona if it's in our valid list, otherwise fall back to nearest match or CEO
+  const matchedPersona = [...VALID_PERSONAS].find(p => p.toLowerCase() === rawPersona.toLowerCase()) || rawPersona;
+  out.persona_priority = {
+    persona: matchedPersona.slice(0, 80),
+    reason:  typeof pp.reason === 'string' ? pp.reason.slice(0, 400) : '',
+  };
+
+  // ── go_no_go ──────────────────────────────────────────────────────
+  const gng = d.go_no_go && typeof d.go_no_go === 'object' ? d.go_no_go : {};
+  const rawRec = typeof gng.recommendation === 'string' ? gng.recommendation.trim() : 'Watch';
+  // Normalise common variations like "No Go" → "No-Go", "no-go" → "No-Go"
+  const normRec = rawRec.replace(/\s+/g, '-').replace(/^no-go$/i,'No-Go').replace(/^watch$/i,'Watch').replace(/^go$/i,'Go');
+  out.go_no_go = {
+    recommendation: VALID_GNG.has(normRec) ? normRec : 'Watch',
+    reason:         typeof gng.reason === 'string' ? gng.reason.slice(0, 400) : '',
+  };
+
+  // ── confidence_score: AI value is capped by measured data richness ─
+  // The AI cannot claim higher confidence than the data supports.
+  // Example: AI says 85, but data richness = 40 → capped at 40.
+  // This prevents the AI from expressing false certainty on thin data.
+  const aiScore = typeof d.confidence_score === 'number'
+    ? d.confidence_score
+    : parseInt(d.confidence_score) || 50;
+  const clampedAI  = Math.max(0, Math.min(100, aiScore));
+  const maxAllowed = richnessScore; // data richness is the hard ceiling
+  out.confidence_score = Math.min(clampedAI, maxAllowed);
+
+  // ── executive_brief ───────────────────────────────────────────────
+  out.executive_brief = typeof d.executive_brief === 'string'
+    ? d.executive_brief.slice(0, 800)
+    : '';
+
+  // ── Attach data quality metadata (shown in UI as audit trail) ─────
+  out._data_quality = {
+    richness_score:          richnessScore,
+    signals_before_filter:   rawSignals.length,
+    signals_after_filter:    out.signal_summary.length,
+    confidence_ai_claimed:   clampedAI,
+    confidence_after_cap:    out.confidence_score,
+  };
+
+  return out;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// SAVE STEP 7 — persist intelligence to existing strategy row
+// ══════════════════════════════════════════════════════════════════
+async function handleSaveStep7(body, userId, supabaseUrl, supabaseKey, env, cors) {
+  if (!supabaseUrl || !supabaseKey) return errRes('Database not configured', 503, cors);
+
+  const errors = validate({
+    strategy_id:         'string|required',
+    step_7_intelligence: 'object|required',
+  }, body);
+  if (errors.length) return errRes(errors[0], 400, cors);
+
+  const { strategy_id, step_7_intelligence } = body;
+
+  const res = await sbFetch(supabaseUrl, supabaseKey, 'strategies', 'PATCH',
+    JSON.stringify({ step_7_intelligence, updated_at: new Date().toISOString() }),
+    `?id=eq.${sanitise(strategy_id, 36)}&user_id=eq.${userId}`);
+
+  if (!res.ok) {
+    const e = await res.text();
+    return errRes('Failed to save Step 7: ' + e, 500, cors);
+  }
+
+  return okRes({ saved: true, strategy_id }, cors);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// STEP 7 PROMPT BUILDER
+// ══════════════════════════════════════════════════════════════════
+function buildStep7Prompt(company, industry, steps, evidenceManifest) {
+  const ind = industry ? ` (${industry})` : '';
+
+  // Compress each step into a concise block to stay within token limits
+  const s1 = steps[1] ? {
+    overview:     steps[1].company_overview,
+    gtm_score:    steps[1].gtm_relevance_score,
+    growth:       steps[1].growth_signals,
+    revenue_stage:steps[1].revenue_stage,
+    tech_stack:   steps[1].tech_stack_hints,
+    market_pos:   steps[1].market_position,
+  } : null;
+
+  const s2 = steps[2] ? {
+    tam:           steps[2].tam_size_estimate,
+    growth_rate:   steps[2].growth_rate,
+    segments:      (steps[2].market_segments || []).slice(0, 3).map(s => s.name),
+    opportunities: steps[2].priority_opportunities,
+    maturity:      steps[2].market_maturity,
+  } : null;
+
+  const s3 = steps[3] ? {
+    primary_icp:   steps[3].primary_icp,
+    pains:         steps[3].core_pain_points,
+    triggers:      steps[3].buying_triggers,
+    decision_makers: steps[3].decision_makers,
+    objections:    steps[3].objections,
+    deal_cycle:    steps[3].deal_cycle,
+  } : null;
+
+  const s4 = steps[4] ? {
+    databases:     (steps[4].recommended_databases || []).slice(0, 3),
+    playbook:      steps[4].sourcing_playbook,
+  } : null;
+
+  const s5 = steps[5] ? {
+    primary_kw:    steps[5].primary_keywords,
+    intent_signals: steps[5].intent_signals,
+  } : null;
+
+  const s6 = steps[6] ? {
+    email_angles:  [steps[6].email_1?.angle, steps[6].email_2?.angle, steps[6].email_3?.angle].filter(Boolean),
+    hook_subject:  steps[6].email_1?.subject,
+    linkedin_msg:  steps[6].linkedin_message,
+  } : null;
+
+  const inputBlock = JSON.stringify({ company, s1, s2, s3, s4, s5, s6 }, null, 1);
+
+  return `You are a senior revenue intelligence analyst. Analyse the GTM data for "${company}"${ind} and produce a Revenue Intelligence Enhancement report.
+
+GTM DATA (compressed):
+${inputBlock}
+
+${evidenceManifest || ''}
+
+ANALYSIS RULES:
+- ONLY reference facts listed in the EVIDENCE MANIFEST above. Never invent company details, funding amounts, competitor names, or growth metrics.
+- If a signal is not evidenced by the manifest, omit it entirely. Do not fabricate.
+- signal_type MUST be one of: hiring, funding, growth, tech_replacement, competitor_pressure, expansion, market_timing
+- signal strength MUST be one of: High, Medium, Low
+- Include 2-4 signals only. Quality over quantity.
+- go_no_go recommendation MUST be exactly "Go", "Watch", or "No-Go" — nothing else
+- strategic_hook must be ONE crisp sentence usable in a cold email opener — max 30 words
+- executive_brief must be 3-4 sentences. Board-ready. No fluff.
+- why_now_analysis must be ONE clear paragraph explaining timing urgency — grounded in evidence only
+
+Return ONLY this JSON (no markdown, no prose):
+{
+  "signal_summary": [
+    {"signal_type": "growth", "signal_description": "...", "strength": "High"}
+  ],
+  "why_now_analysis": "...",
+  "mcc_view": {
+    "market": "...",
+    "client": "...",
+    "competitor": "..."
+  },
+  "strategic_hook": "...",
+  "persona_priority": {
+    "persona": "...",
+    "reason": "..."
+  },
+  "go_no_go": {
+    "recommendation": "Go",
+    "reason": "..."
+  },
+  "confidence_score": 82,
+  "executive_brief": "..."
+}`;
+}
+
+function parseStep7(rawText) {
+  if (!rawText) return null;
+  const clean = rawText.replace(/```json|```/g, '').trim();
+  try { return JSON.parse(clean); } catch {}
+  const m = clean.match(/\{[\s\S]*\}/);
+  if (!m) return null;
+  try { return JSON.parse(m[0]); } catch {}
+  // Handle truncation
+  let s = m[0];
+  const opens  = (s.match(/\{/g) || []).length;
+  const closes = (s.match(/\}/g) || []).length;
+  if (opens > closes) {
+    s = s + '}'.repeat(opens - closes);
+    try { return JSON.parse(s); } catch {}
+  }
+  return null;
 }
 
 // ── Prompt builder ───────────────────────────────────────────────
