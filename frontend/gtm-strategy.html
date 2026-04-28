@@ -3044,7 +3044,7 @@ function downloadExport() {
     });
     const data = await res.json();
     if (!res.ok || !data.html) throw new Error(data.error || 'Export failed');
-    await renderBackendHtmlToPdf(data.html, data.filename || ('GTM_Enterprise_' + state.company.replace(/[^a-zA-Z0-9]/g,'_') + '_' + new Date().toISOString().slice(0,10) + '.pdf'));
+   await generateProfessionalPDF(data.html, data.filename || ('GTM_Enterprise_' + state.company.replace(/[^a-zA-Z0-9]/g, '_') + '.pdf'));
     showToast('Enterprise Report Downloaded', 'success');
   } catch (err) {
     console.error('Backend PDF export failed:', err);
