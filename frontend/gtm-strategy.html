@@ -897,48 +897,48 @@
     <div id="step-nav-1" class="step-nav-item active" onclick="scrollToStep(1)">
       <div class="step-num" id="snnum-1">01</div>
       <div class="step-info">
-        <div class="step-name">Market Research</div>
-        <div class="step-desc">Company Profile · GTM Fit</div>
+        <div class="step-name">Market Research & Insights</div>
+        <div class="step-desc">Company · Market · Signals</div>
       </div>
     </div>
 
     <div id="step-nav-2" class="step-nav-item locked" onclick="scrollToStep(2)">
       <div class="step-num" id="snnum-2">02</div>
       <div class="step-info">
-        <div class="step-name">TAM Mapping</div>
-        <div class="step-desc">Segments · Sizing · Growth</div>
+        <div class="step-name">Market Attractiveness & TAM</div>
+        <div class="step-desc">Company · Market · Signals</div>
       </div>
     </div>
 
     <div id="step-nav-3" class="step-nav-item locked" onclick="scrollToStep(3)">
       <div class="step-num" id="snnum-3">03</div>
       <div class="step-info">
-        <div class="step-name">ICP Modeling</div>
-        <div class="step-desc">Personas · Pain Points</div>
+        <div class="step-name">GTM Recommendation</div>
+        <div class="step-desc">Strategy Direction · Priority</div>
       </div>
     </div>
 
     <div id="step-nav-4" class="step-nav-item locked" onclick="scrollToStep(4)">
       <div class="step-num" id="snnum-4">04</div>
       <div class="step-info">
-        <div class="step-name">Account Sourcing</div>
-        <div class="step-desc">Databases · Filters</div>
+        <div class="step-name">Target Accounts & GTM Strategy</div>
+        <div class="step-desc">ICP · Approach · Deal Size</div>
       </div>
     </div>
 
     <div id="step-nav-5" class="step-nav-item locked" onclick="scrollToStep(5)">
       <div class="step-num" id="snnum-5">05</div>
       <div class="step-info">
-        <div class="step-name">Keyword Generation</div>
-        <div class="step-desc">Search Strings · Boolean</div>
+        <div class="step-name">Execution Risks & Considerations</div>
+        <div class="step-desc">Risks · Gaps · Confidence</div>
       </div>
     </div>
 
     <div id="step-nav-6" class="step-nav-item locked" onclick="scrollToStep(6)">
       <div class="step-num" id="snnum-6">06</div>
       <div class="step-info">
-        <div class="step-name">Messaging Creation</div>
-        <div class="step-desc">Emails · Subject Lines · CTAs</div>
+        <div class="step-name">GTM Summary & Action Plan</div>
+        <div class="step-desc">Summary · Score · Action Plan</div>
       </div>
     </div>
 
@@ -1009,14 +1009,14 @@
       </div>
     </div>
 
-    <!-- Step 1: Market Research -->
+    <!-- Step 1: Market Research & Insights -->
     <div class="step-card is-active" id="card-1">
       <div class="step-card-header" onclick="toggleStep(1)">
         <div class="step-icon">🔍</div>
         <div class="step-card-meta">
-          <div class="step-card-num">Step 01 — Market Research</div>
-          <div class="step-card-title">Deep Market Intelligence</div>
-          <div class="step-card-desc">Company profile, market position, GTM relevance analysis</div>
+          <div class="step-card-num">Step 01 — Market Research & Insights</div>
+          <div class="step-card-title">Company Intelligence & Market Research</div>
+          <div class="step-card-desc">Company profile · Market signals · Growth indicators · ICP fit</div>
         </div>
         <div class="step-pill pill-ready" id="pill-1">Ready</div>
       </div>
@@ -1026,8 +1026,8 @@
         <div class="loading-state" id="loading-1">
           <div class="loader-ring"></div>
           <div class="loader-text">
-            <div class="loader-headline">Running Deep Market Research</div>
-            <div class="loader-sub">Analysing company profile, market position & GTM fit <span class="loader-dots"><span></span><span></span><span></span></span></div>
+            <div class="loader-headline">Running Market Research</div>
+            <div class="loader-sub">Analysing company profile, market signals &amp; GTM fit <span class="loader-dots"><span></span><span></span><span></span></span></div>
           </div>
         </div>
 
@@ -1035,25 +1035,25 @@
 
         <div class="output-section" id="output-1">
           <div class="output-grid">
-            <div class="output-block" id="ob-company-overview">
-              <div class="output-block-label">🏢 Company Overview</div>
-              <div class="output-block-content" id="oc-overview">—</div>
+            <div class="output-block output-grid-full">
+              <div class="output-block-label">📈 Market Demand Signals</div>
+              <div id="oc-demand-signals" class="tag-list"></div>
             </div>
-            <div class="output-block" id="ob-market-pos">
-              <div class="output-block-label">📊 Market Position</div>
-              <div class="output-block-content" id="oc-market-pos">—</div>
+            <div class="output-block output-grid-full">
+              <div class="output-block-label">⏱ Market Timing & Trends</div>
+              <div id="oc-market-timing" class="tag-list"></div>
             </div>
-            <div class="output-block" id="ob-gtm-fit">
-              <div class="output-block-label"><span class="obl-accent">GTM Relevance Score</span></div>
-              <div id="oc-gtm-score" style="margin-top:4px;"></div>
+            <div class="output-block">
+              <div class="output-block-label">🎯 ICP Fit</div>
+              <div class="output-block-content" id="oc-icp-fit">—</div>
             </div>
-            <div class="output-block" id="ob-signals">
-              <div class="output-block-label">⚡ Growth Signals</div>
-              <div class="tag-list" id="oc-signals"></div>
+            <div class="output-block">
+              <div class="output-block-label">📋 Data Completeness</div>
+              <div id="oc-data-completeness" class="output-block-content">—</div>
             </div>
-            <div class="output-block output-grid-full" id="ob-products">
-              <div class="output-block-label">🛠 Products & Services</div>
-              <div class="output-block-content" id="oc-products">—</div>
+            <div class="output-block output-grid-full">
+              <div class="output-block-label">💡 Analyst Insight</div>
+              <div class="output-block-content" id="oc-p1-insight">—</div>
             </div>
           </div>
         </div>
@@ -1072,71 +1072,71 @@
       </div>
     </div>
 
-    <!-- Step 2: TAM Mapping -->
+    <!-- Step 2: Market Attractiveness & TAM Analysis -->
     <div class="step-card is-locked" id="card-2">
       <div class="step-card-header" onclick="toggleStep(2)">
-        <div class="step-icon">🗺</div>
+        <div class="step-icon">🎯</div>
         <div class="step-card-meta">
-          <div class="step-card-num">Step 02 — TAM Mapping</div>
-          <div class="step-card-title">Total Addressable Market Analysis</div>
-          <div class="step-card-desc">Market segments, sizing estimates, growth rates & opportunity ranking</div>
+          <div class="step-card-num">Step 02 — Market Attractiveness & TAM Analysis</div>
+          <div class="step-card-title">Market Sizing & Attractiveness Score</div>
+          <div class="step-card-desc">Market demand · Growth timing · ICP alignment · Data quality</div>
         </div>
         <div class="step-pill pill-locked" id="pill-2">Locked</div>
       </div>
       <div class="step-body" id="body-2">
         <div class="step-divider"></div>
-
         <div class="context-chips" id="ctx-chips-2"></div>
-
         <div class="loading-state" id="loading-2">
           <div class="loader-ring"></div>
           <div class="loader-text">
-            <div class="loader-headline">Mapping Total Addressable Market</div>
-            <div class="loader-sub">Calculating segments, sizing & growth vectors <span class="loader-dots"><span></span><span></span><span></span></span></div>
+            <div class="loader-headline">Analysing Market Attractiveness</div>
+            <div class="loader-sub">Sizing the market opportunity and scoring attractiveness <span class="loader-dots"><span></span><span></span><span></span></span></div>
           </div>
         </div>
-
         <div class="error-state" id="error-2"></div>
-
         <div class="output-section" id="output-2">
           <div class="output-grid">
             <div class="output-block">
-              <div class="output-block-label">💰 TAM Overview</div>
-              <div class="output-block-content" id="oc-tam-overview">—</div>
+              <div class="output-block-label">📈 Demand Score</div>
+              <div id="oc-demand-score" class="output-block-content">—</div>
             </div>
             <div class="output-block">
-              <div class="output-block-label">📈 Growth Rate</div>
-              <div class="output-block-content" id="oc-tam-growth">—</div>
+              <div class="output-block-label">⏱ Market Timing Score</div>
+              <div id="oc-timing-score" class="output-block-content">—</div>
+            </div>
+            <div class="output-block">
+              <div class="output-block-label">🎯 ICP Fit Score</div>
+              <div id="oc-icp-score" class="output-block-content">—</div>
+            </div>
+            <div class="output-block">
+              <div class="output-block-label">📋 Data Completeness Score</div>
+              <div id="oc-data-score" class="output-block-content">—</div>
             </div>
             <div class="output-block output-grid-full">
-              <div class="output-block-label">🎯 Market Segments</div>
-              <div class="tag-list" id="oc-tam-segments"></div>
-            </div>
-            <div class="output-block output-grid-full">
-              <div class="output-block-label">🏆 Priority Opportunities</div>
-              <div class="output-block-content" id="oc-tam-opps">—</div>
+              <div class="output-block-label"><span class="obl-accent">Total Score</span></div>
+              <div id="oc-total-score" style="margin-top:4px;"></div>
+              <div class="output-block-content" id="oc-score-verification" style="font-family:monospace;font-size:11px;margin-top:6px;"></div>
             </div>
           </div>
         </div>
-
         <div class="run-row">
           <div class="run-row-meta">Uses context from <strong>Step 1</strong></div>
           <div style="display:flex;gap:8px;align-items:center;">
             <div class="token-counter" id="tokens-2" style="display:none;"><div class="token-dot"></div><span>0 tokens</span></div>
-            <button class="btn btn-primary btn-sm" id="run-btn-2" onclick="runStep(2)" disabled>▶ Map Market</button>
+            <button class="btn btn-primary btn-sm" id="run-btn-2" onclick="runStep(2)" disabled>▶ Analyse Market</button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Step 3: ICP Modeling -->
+            <!-- Step 3: GTM Recommendation -->
     <div class="step-card is-locked" id="card-3">
       <div class="step-card-header" onclick="toggleStep(3)">
-        <div class="step-icon">👤</div>
+        <div class="step-icon">✅</div>
         <div class="step-card-meta">
-          <div class="step-card-num">Step 03 — ICP Modeling</div>
-          <div class="step-card-title">Ideal Customer Profile</div>
-          <div class="step-card-desc">Target personas, firmographics, pain points & buying triggers</div>
+          <div class="step-card-num">Step 03 — GTM Recommendation</div>
+          <div class="step-card-title">Strategic Go / No-Go Assessment</div>
+          <div class="step-card-desc">Data-backed recommendation for GTM pursuit or pass</div>
         </div>
         <div class="step-pill pill-locked" id="pill-3">Locked</div>
       </div>
@@ -1146,32 +1146,29 @@
         <div class="loading-state" id="loading-3">
           <div class="loader-ring"></div>
           <div class="loader-text">
-            <div class="loader-headline">Building Ideal Customer Profile</div>
-            <div class="loader-sub">Modelling personas, pain points & buying triggers <span class="loader-dots"><span></span><span></span><span></span></span></div>
+            <div class="loader-headline">Generating GTM Recommendation</div>
+            <div class="loader-sub">Evaluating market fit and strategic GTM direction <span class="loader-dots"><span></span><span></span><span></span></span></div>
           </div>
         </div>
         <div class="error-state" id="error-3"></div>
         <div class="output-section" id="output-3">
           <div class="output-grid">
-            <div class="output-block">
-              <div class="output-block-label">🎯 Primary ICP</div>
-              <div class="output-block-content" id="oc-icp-primary">—</div>
-            </div>
-            <div class="output-block">
-              <div class="output-block-label">🤝 Secondary ICP</div>
-              <div class="output-block-content" id="oc-icp-secondary">—</div>
-            </div>
-            <div class="output-block">
-              <div class="output-block-label">🏢 Firmographics</div>
-              <div class="output-block-content" id="oc-icp-firmographic">—</div>
-            </div>
-            <div class="output-block">
-              <div class="output-block-label">⚡ Buying Triggers</div>
-              <div class="tag-list" id="oc-icp-triggers"></div>
-            </div>
             <div class="output-block output-grid-full">
-              <div class="output-block-label">😤 Core Pain Points</div>
-              <div class="output-block-content" id="oc-icp-pains">—</div>
+              <div class="output-block-label">✅ GTM Recommendation</div>
+              <div id="oc-verdict-badge" style="margin-top:8px;"></div>
+              <div class="output-block-content" id="oc-verdict-reasoning" style="margin-top:8px;"></div>
+            </div>
+            <div class="output-block">
+              <div class="output-block-label">📊 Score Basis</div>
+              <div class="output-block-content" id="oc-score-basis">—</div>
+            </div>
+            <div class="output-block">
+              <div class="output-block-label">🔄 What Would Change This</div>
+              <div class="output-block-content" id="oc-verdict-change">—</div>
+            </div>
+            <div class="output-block output-grid-full" id="oc-conditions-block" style="display:none;">
+              <div class="output-block-label">⚠️ Conditions to Satisfy</div>
+              <div id="oc-conditions" class="tag-list"></div>
             </div>
           </div>
         </div>
@@ -1179,20 +1176,20 @@
           <div class="run-row-meta">Uses context from <strong>Steps 1–2</strong></div>
           <div style="display:flex;gap:8px;align-items:center;">
             <div class="token-counter" id="tokens-3" style="display:none;"><div class="token-dot"></div><span>0 tokens</span></div>
-            <button class="btn btn-primary btn-sm" id="run-btn-3" onclick="runStep(3)" disabled>▶ Model ICP</button>
+            <button class="btn btn-primary btn-sm" id="run-btn-3" onclick="runStep(3)" disabled>▶ Get Recommendation</button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Step 4: Account Sourcing -->
+        <!-- Step 4: Target Accounts & GTM Strategy -->
     <div class="step-card is-locked" id="card-4">
       <div class="step-card-header" onclick="toggleStep(4)">
-        <div class="step-icon">🎣</div>
+        <div class="step-icon">💼</div>
         <div class="step-card-meta">
-          <div class="step-card-num">Step 04 — Account Sourcing</div>
-          <div class="step-card-title">Lead Database Strategy</div>
-          <div class="step-card-desc">Best databases, filtering strategies & account prioritisation</div>
+          <div class="step-card-num">Step 04 — Target Accounts & GTM Strategy</div>
+          <div class="step-card-title">Account Targeting & GTM Playbook</div>
+          <div class="step-card-desc">Target personas · Core pain · Solution fit · Deal sizing · Sales motion</div>
         </div>
         <div class="step-pill pill-locked" id="pill-4">Locked</div>
       </div>
@@ -1202,28 +1199,40 @@
         <div class="loading-state" id="loading-4">
           <div class="loader-ring"></div>
           <div class="loader-text">
-            <div class="loader-headline">Strategising Account Sourcing</div>
-            <div class="loader-sub">Identifying databases & filtering criteria <span class="loader-dots"><span></span><span></span><span></span></span></div>
+            <div class="loader-headline">Building GTM Strategy</div>
+            <div class="loader-sub">Defining target accounts, ICP and GTM sales approach <span class="loader-dots"><span></span><span></span><span></span></span></div>
           </div>
         </div>
         <div class="error-state" id="error-4"></div>
         <div class="output-section" id="output-4">
           <div class="output-grid">
             <div class="output-block">
-              <div class="output-block-label">🗄 Recommended Databases</div>
-              <div class="tag-list" id="oc-src-databases"></div>
+              <div class="output-block-label">👤 Target Roles</div>
+              <div class="tag-list" id="oc-target-roles"></div>
             </div>
             <div class="output-block">
-              <div class="output-block-label">🔧 Filter Criteria</div>
-              <div class="output-block-content" id="oc-src-filters">—</div>
+              <div class="output-block-label">💡 Solution Angle</div>
+              <div class="output-block-content" id="oc-solution-angle">—</div>
             </div>
             <div class="output-block output-grid-full">
-              <div class="output-block-label">📋 Sourcing Playbook</div>
-              <div class="output-block-content" id="oc-src-playbook">—</div>
+              <div class="output-block-label">🔥 Core Problem</div>
+              <div class="output-block-content" id="oc-core-problem">—</div>
             </div>
             <div class="output-block output-grid-full">
-              <div class="output-block-label">⚠ Exclusion Criteria</div>
-              <div class="output-block-content" id="oc-src-exclusions">—</div>
+              <div class="output-block-label">📣 Solution Pitch</div>
+              <div class="output-block-content" id="oc-solution-pitch">—</div>
+            </div>
+            <div class="output-block">
+              <div class="output-block-label">⏰ Why Now</div>
+              <div class="output-block-content" id="oc-why-now">—</div>
+            </div>
+            <div class="output-block">
+              <div class="output-block-label">💰 Estimated Deal Size</div>
+              <div class="output-block-content" id="oc-deal-size">—</div>
+            </div>
+            <div class="output-block output-grid-full">
+              <div class="output-block-label">🛣 Sales Approach</div>
+              <div class="output-block-content" id="oc-sales-approach">—</div>
             </div>
           </div>
         </div>
@@ -1231,20 +1240,20 @@
           <div class="run-row-meta">Uses context from <strong>Steps 1–3</strong></div>
           <div style="display:flex;gap:8px;align-items:center;">
             <div class="token-counter" id="tokens-4" style="display:none;"><div class="token-dot"></div><span>0 tokens</span></div>
-            <button class="btn btn-primary btn-sm" id="run-btn-4" onclick="runStep(4)" disabled>▶ Source Accounts</button>
+            <button class="btn btn-primary btn-sm" id="run-btn-4" onclick="runStep(4)" disabled>▶ Build GTM Strategy</button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Step 5: Keyword Generation -->
+        <!-- Step 5: Execution Risks & Considerations -->
     <div class="step-card is-locked" id="card-5">
       <div class="step-card-header" onclick="toggleStep(5)">
-        <div class="step-icon">🔑</div>
+        <div class="step-icon">⚠️</div>
         <div class="step-card-meta">
-          <div class="step-card-num">Step 05 — Keyword Generation</div>
-          <div class="step-card-title">Search Intelligence Engine</div>
-          <div class="step-card-desc">Search strings, Boolean queries & LinkedIn search operators</div>
+          <div class="step-card-num">Step 05 — Execution Risks & Considerations</div>
+          <div class="step-card-title">GTM Execution Risk Analysis</div>
+          <div class="step-card-desc">Market risks · Execution gaps · Confidence level · Validation checklist</div>
         </div>
         <div class="step-pill pill-locked" id="pill-5">Locked</div>
       </div>
@@ -1254,30 +1263,25 @@
         <div class="loading-state" id="loading-5">
           <div class="loader-ring"></div>
           <div class="loader-text">
-            <div class="loader-headline">Generating Search Intelligence</div>
-            <div class="loader-sub">Building keyword lists & Boolean queries <span class="loader-dots"><span></span><span></span><span></span></span></div>
+            <div class="loader-headline">Analysing Execution Risks</div>
+            <div class="loader-sub">Identifying GTM risks, gaps and execution considerations <span class="loader-dots"><span></span><span></span><span></span></span></div>
           </div>
         </div>
         <div class="error-state" id="error-5"></div>
         <div class="output-section" id="output-5">
           <div class="output-grid">
-            <div class="output-block">
-              <div class="output-block-label">🔍 Primary Keywords</div>
-              <div class="tag-list" id="oc-kw-primary"></div>
-            </div>
-            <div class="output-block">
-              <div class="output-block-label">🔀 Secondary Keywords</div>
-              <div class="tag-list" id="oc-kw-secondary"></div>
-            </div>
             <div class="output-block output-grid-full">
-              <div class="output-block-label">⚙ Boolean Query</div>
-              <div style="background:rgba(0,0,0,0.5);border:1px solid rgba(168,85,247,0.15);border-radius:8px;padding:14px 16px;margin-top:8px;">
-                <code id="oc-kw-boolean" style="font-family:'Space Mono',monospace;font-size:10px;color:#c4b5fd;line-height:1.8;white-space:pre-wrap;">—</code>
-              </div>
+              <div class="output-block-label">🔴 Key Risks</div>
+              <div id="oc-key-risks"></div>
             </div>
-            <div class="output-block output-grid-full">
-              <div class="output-block-label">💼 LinkedIn Search Strings</div>
-              <div class="output-block-content" id="oc-kw-linkedin">—</div>
+            <div class="output-block">
+              <div class="output-block-label">📊 Confidence Score</div>
+              <div id="oc-confidence-score" style="margin-top:4px;"></div>
+              <div class="output-block-content" id="oc-confidence-reasoning" style="margin-top:6px;font-size:10px;"></div>
+            </div>
+            <div class="output-block">
+              <div class="output-block-label">✅ Validation Needed</div>
+              <div class="tag-list" id="oc-validation"></div>
             </div>
           </div>
         </div>
@@ -1285,20 +1289,20 @@
           <div class="run-row-meta">Uses context from <strong>Steps 1–4</strong></div>
           <div style="display:flex;gap:8px;align-items:center;">
             <div class="token-counter" id="tokens-5" style="display:none;"><div class="token-dot"></div><span>0 tokens</span></div>
-            <button class="btn btn-primary btn-sm" id="run-btn-5" onclick="runStep(5)" disabled>▶ Generate Keywords</button>
+            <button class="btn btn-primary btn-sm" id="run-btn-5" onclick="runStep(5)" disabled>▶ Identify Risks</button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Step 6: Messaging Creation -->
+        <!-- Step 6: GTM Summary & Action Plan -->
     <div class="step-card is-locked" id="card-6">
       <div class="step-card-header" onclick="toggleStep(6)">
-        <div class="step-icon">✉</div>
+        <div class="step-icon">📋</div>
         <div class="step-card-meta">
-          <div class="step-card-num">Step 06 — Messaging Creation</div>
-          <div class="step-card-title">Hyper-Relevant Outreach Engine</div>
-          <div class="step-card-desc">Email variations, subject lines, CTAs & follow-up sequences</div>
+          <div class="step-card-num">Step 06 — GTM Summary & Action Plan</div>
+          <div class="step-card-title">Complete GTM Strategy Report</div>
+          <div class="step-card-desc">Market highlights · Strategy score · Recommendation · Action plan · Executive brief</div>
         </div>
         <div class="step-pill pill-locked" id="pill-6">Locked</div>
       </div>
@@ -1308,29 +1312,54 @@
         <div class="loading-state" id="loading-6">
           <div class="loader-ring"></div>
           <div class="loader-text">
-            <div class="loader-headline">Crafting Hyper-Relevant Messaging</div>
-            <div class="loader-sub">Building email sequences, subject lines & CTAs from all context <span class="loader-dots"><span></span><span></span><span></span></span></div>
+            <div class="loader-headline">Generating GTM Summary</div>
+            <div class="loader-sub">Compiling the complete GTM strategy and action plan <span class="loader-dots"><span></span><span></span><span></span></span></div>
           </div>
         </div>
         <div class="error-state" id="error-6"></div>
         <div class="output-section" id="output-6">
-          <div id="oc-messages-container"></div>
-          <div class="output-block" style="margin-top:16px;">
-            <div class="output-block-label">🔄 Follow-Up Sequence</div>
-            <div class="output-block-content" id="oc-followup">—</div>
+          <div class="output-grid">
+            <div class="output-block output-grid-full">
+              <div class="output-block-label">📡 Market Highlights</div>
+              <div id="oc-signal-highlights" class="tag-list"></div>
+            </div>
+            <div class="output-block output-grid-full">
+              <div class="output-block-label"><span class="obl-accent">Score Breakdown</span></div>
+              <div id="oc-score-breakdown" style="margin-top:8px;"></div>
+            </div>
+            <div class="output-block output-grid-full">
+              <div class="output-block-label">✅ Final GTM Recommendation</div>
+              <div id="oc-final-verdict-badge" style="margin-top:8px;"></div>
+            </div>
+            <div class="output-block output-grid-full">
+              <div class="output-block-label">📋 Executive Brief</div>
+              <div class="output-block-content" id="oc-exec-brief">—</div>
+            </div>
+            <div class="output-block">
+              <div class="output-block-label">💼 GTM Strategy Summary</div>
+              <div class="output-block-content" id="oc-deal-summary">—</div>
+            </div>
+            <div class="output-block">
+              <div class="output-block-label">⚠️ Execution Risks Summary</div>
+              <div class="output-block-content" id="oc-risks-summary">—</div>
+            </div>
+            <div class="output-block output-grid-full">
+              <div class="output-block-label">🚀 Recommended Next Action</div>
+              <div class="output-block-content" id="oc-next-action">—</div>
+            </div>
           </div>
         </div>
         <div class="run-row">
           <div class="run-row-meta">Uses context from <strong>ALL Steps 1–5</strong> — most context-rich output</div>
           <div style="display:flex;gap:8px;align-items:center;">
             <div class="token-counter" id="tokens-6" style="display:none;"><div class="token-dot"></div><span>0 tokens</span></div>
-            <button class="btn btn-primary btn-sm" id="run-btn-6" onclick="runStep(6)" disabled>▶ Create Messaging</button>
+            <button class="btn btn-primary btn-sm" id="run-btn-6" onclick="runStep(6)" disabled>▶ Generate GTM Summary</button>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Execution Logs Panel -->
+        <!-- Execution Logs Panel -->
     <div id="exec-logs-panel" style="display:none; background:rgba(13,17,32,0.8); border:1px solid var(--border); border-radius:16px; margin-bottom:24px; overflow:hidden;">
       <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 22px;cursor:pointer;border-bottom:1px solid rgba(31,41,55,0.5);" onclick="toggleLogs()">
         <div style="display:flex;align-items:center;gap:10px;">
@@ -1350,7 +1379,7 @@
         <div>
           <div class="section-eyebrow">Strategy Complete</div>
           <div class="section-title" id="summary-company-name">Company GTM Strategy</div>
-          <div class="section-sub">Complete 6-prompt orchestration — all context carried through chain</div>
+          <div class="section-sub">6-step GTM strategy — research → TAM → recommendation → strategy → risks → action plan</div>
         </div>
         <div class="summary-export-row">
           <button class="btn btn-outline btn-sm" onclick="openExportModal()">📄 Export PDF</button>
@@ -1689,14 +1718,14 @@ function toggleLogs() {
   chev.textContent = open ? '▼' : '▲';
 }
 
-/* ── JSON Schema Validators (Fix #1) ── */
+/* ── JSON Schema Validators — Phase-wise ── */
 const STEP_SCHEMAS = {
-  1: ['company_overview','market_position','products_services','gtm_relevance_score','growth_signals'],
-  2: ['tam_overview','tam_size_estimate','growth_rate','market_segments','priority_opportunities'],
-  3: ['primary_icp','secondary_icp','firmographics','buying_triggers','core_pain_points'],
-  4: ['recommended_databases','filter_criteria','sourcing_playbook','exclusion_criteria'],
-  5: ['primary_keywords','secondary_keywords','boolean_query','linkedin_search_strings'],
-  6: ['email_1','email_2','email_3','follow_up_sequence'],
+  1: ['demand_signals','market_timing','icp_fit','data_completeness'],
+  2: ['demand_score','market_timing_score','icp_fit_score','data_completeness_score','total_score','score_verification'],
+  3: ['verdict','verdict_reasoning','score_basis','demand_assessment','icp_assessment'],
+  4: ['target_roles','core_problem','solution_angle','solution_pitch','why_now','estimated_deal_size','sales_approach'],
+  5: ['key_risks','confidence_level','confidence_score','validation_needed'],
+  6: ['signal_highlights','score_breakdown','verdict','deal_lens_summary','risks_summary','confidence_note','executive_brief','recommended_next_action'],
 };
 
 function validateSchema(step, data) {
@@ -1719,11 +1748,11 @@ const activeControllers = {};
 
 const STEP_META = {
   1: { icon: '🔍', label: 'Market Research' },
-  2: { icon: '🗺', label: 'TAM Mapping' },
-  3: { icon: '👤', label: 'ICP Modeling' },
-  4: { icon: '🎣', label: 'Account Sourcing' },
-  5: { icon: '🔑', label: 'Keywords' },
-  6: { icon: '✉', label: 'Messaging' },
+  2: { icon: '📊', label: 'TAM Analysis' },
+  3: { icon: '✅', label: 'GTM Recommendation' },
+  4: { icon: '🎯', label: 'GTM Strategy' },
+  5: { icon: '⚠️', label: 'Execution Risks' },
+  6: { icon: '📋', label: 'GTM Summary' },
 };
 
 /* ═══════════════════════════════════════════
@@ -2035,7 +2064,7 @@ function buildContextChips(n) {
   const container = document.getElementById(`ctx-chips-${n}`);
   if (!container) return;
   container.innerHTML = '';
-  const labels = { 1:'Market Research', 2:'TAM Map', 3:'ICP Model', 4:'Account Sourcing', 5:'Keywords' };
+  const labels = { 1:'Research', 2:'TAM Analysis', 3:'Recommendation', 4:'GTM Strategy', 5:'Risk Analysis' };
   for (let i = 1; i < n; i++) {
     if (state.steps[i].status === 'complete') {
       const chip = document.createElement('div');
@@ -2145,242 +2174,163 @@ function buildContextString(upToStep) {
   return parts.join('\n\n');
 }
 
-/** Compressed context for Step 6 — avoids token explosion */
+/** Build compressed prior-phase context for direct-mode chaining */
 function buildCompressedContext() {
   const d = (n) => state.steps[n].data;
+  const labels = {1:'PHASE 1 — Signal Extraction',2:'PHASE 2 — Scoring',3:'PHASE 3 — Verdict',4:'PHASE 4 — Deal Lens',5:'PHASE 5 — Risks'};
   const lines = [];
-
-  if (d(1)) {
-    lines.push(`COMPANY: ${d(1).company_overview || ''}`);
-    lines.push(`MARKET POSITION: ${d(1).market_position || ''}`);
-    lines.push(`GTM SCORE: ${d(1).gtm_relevance_score || ''} — ${d(1).gtm_relevance_reasoning || ''}`);
-    lines.push(`GROWTH SIGNALS: ${(d(1).growth_signals || []).join(', ')}`);
+  for (let i = 1; i <= 5; i++) {
+    if (d(i)) lines.push(`[${labels[i]}]\n${JSON.stringify(d(i))}`);
   }
-  if (d(2)) {
-    lines.push(`TAM: ${d(2).tam_size_estimate || ''} (${d(2).growth_rate || ''})`);
-    lines.push(`TOP SEGMENTS: ${(d(2).market_segments || []).slice(0,3).map(s=>s.name).join(', ')}`);
-    lines.push(`PRIORITY OPPS: ${d(2).priority_opportunities || ''}`);
-  }
-  if (d(3)) {
-    lines.push(`PRIMARY ICP: ${d(3).primary_icp || ''}`);
-    lines.push(`FIRMOGRAPHICS: ${d(3).firmographics || ''}`);
-    lines.push(`CORE PAINS: ${d(3).core_pain_points || ''}`);
-    lines.push(`BUYING TRIGGERS: ${(d(3).buying_triggers || []).join(', ')}`);
-    lines.push(`KEY OBJECTIONS: ${(d(3).objections || []).join(', ')}`);
-  }
-  if (d(4)) {
-    lines.push(`BEST DATABASES: ${(d(4).recommended_databases || []).slice(0,4).join(', ')}`);
-    lines.push(`FILTER CRITERIA: ${d(4).filter_criteria || ''}`);
-  }
-  if (d(5)) {
-    lines.push(`PRIMARY KEYWORDS: ${(d(5).primary_keywords || []).join(', ')}`);
-    lines.push(`BOOLEAN QUERY: ${d(5).boolean_query || ''}`);
-  }
-
-  const compressed = lines.join('\n');
-  const estTokens  = Math.round(compressed.length / 4);
-  addLog('INFO', 6, `Compressed context: ~${estTokens.toLocaleString()} tokens (vs full chain ~${Math.round(buildContextString(6).length/4).toLocaleString()})`);
-  return compressed;
+  return lines.join('\n\n') || 'No prior phase data.';
 }
 
 function getPrompt(step) {
-  const co   = state.company;
-  const ind  = state.industry ? ` in the ${state.industry} industry` : '';
+  const co  = state.company;
+  const ind = state.industry ? ` in the ${state.industry} industry` : '';
+  const ctx = buildCompressedContext(); // always full chain — phases are chained
 
-  // Steps 1–5: full context from prior steps
-  // Step 6: compressed context to reduce token usage (Fix #3)
-  const ctx  = step === 6 ? buildCompressedContext() : buildContextString(step);
-
-  const baseInstruction = `You are a world-class B2B GTM strategist. CRITICAL: Return ONLY a valid JSON object. No markdown. No code fences. No explanation text before or after. Start your response with { and end with }.`;
+  const base = `You are a B2B GTM opportunity qualification analyst. CRITICAL: Return ONLY a valid JSON object. No markdown. No code fences. Start with { end with }.`;
 
   const prompts = {
-    1: `${baseInstruction}
 
-Perform deep, insight-driven market research on "${co}"${ind}.
+    // ══════════════════════════════════════════════
+    // STEP 1 — MARKET RESEARCH & INSIGHTS
+    // ══════════════════════════════════════════════
+    1: `${base}
 
-QUALITY RULES — STRICTLY ENFORCE:
-- Every field must answer "So what?" — no generic descriptions
-- Forbidden phrases: "competitive landscape", "digital transformation", "market is growing", "solid reputation", "diverse clientele"
-- growth_signals must be specific observable facts WITH business implication (e.g. "Hiring 3 senior engineers → scaling delivery capacity → trigger for tooling/support vendors")
-- market_position must name actual competitors and a real differentiator — not just "strong position"
-- gtm_relevance_reasoning must explain WHO benefits from selling TO this company and WHY NOW
-- revenue_stage must map to a recognisable funding/ARR band: Bootstrapped / Pre-Seed / Seed / Series A / Series B / Series C+ / PE-backed / Enterprise / Public
-- tech_stack_hints must list actual technologies, not categories
+PHASE 1 — SIGNAL EXTRACTION for "${co}"${ind}.
 
-Return this exact JSON structure:
-{
-  "company_overview": "2-3 sentence factual description: what they build, who they serve, approximate scale. Include founding year and HQ if known.",
-  "market_position": "Their actual standing vs named competitors. What makes them win deals or lose them. One specific differentiator.",
-  "products_services": "Bulleted list of their core offerings. Each item: product/service name + one-line description of what it solves.",
-  "gtm_relevance_score": 0,
-  "gtm_relevance_reasoning": "Who should sell TO this company, why this company is a buyer, and what pain state makes them receptive now.",
-  "growth_signals": ["Signal: observable fact → Implication: what this means for a seller approaching them"],
-  "revenue_stage": "Stage label + estimated ARR band",
-  "employee_count": "Number or range",
-  "tech_stack_hints": ["Specific technology 1", "Specific technology 2", "Specific technology 3"]
-}`,
+Your ONLY job: extract real, observable business signals. Do NOT score. Do NOT conclude. Do NOT invent.
+If a signal category has no evidence, use "missing data" as the value.
 
-    2: `${baseInstruction}
+Group signals into 4 categories:
+1. DEMAND SIGNALS: hiring, expansion, product launches, partnerships, funding
+2. MARKET TIMING: growth trends, competitive pressure, regulation, technology shifts
+3. ICP FIT: who they sell to, how well they match a B2B sales-team-equipped buyer
+4. DATA COMPLETENESS: what information is available vs missing
 
-Map the Total Addressable Market for companies that sell TO or partner with "${co}"${ind}.
+Rules:
+- Every signal must be a real, observable fact
+- If no evidence exists for a category, set to "missing data"
+- No scoring, no summaries, no conclusions
 
-QUALITY RULES — STRICTLY ENFORCE:
-- tam_overview must explain market dynamics, NOT just say "market is growing" — name the force driving growth
-- All size estimates must have a unit ($B / $M) and a year or CAGR range
-- Each market_segment must have a real name, a realistic size, and a priority rationale — not just "High/Medium/Low"
-- priority_opportunities must name a specific strategic action with a reason (e.g. "Target Series B SaaS companies in the ICP segment — they have budget, headcount growth, and active tooling evaluations")
-- market_maturity must be one of: Nascent / Early / Growth / Consolidating / Mature / Declining — with a one-line reason
+Return exact JSON:
+{"demand_signals":[{"signal":"observable fact","type":"hiring|expansion|product_launch|partnership|funding","strength":"High|Medium|Low"}],"market_timing":[{"signal":"observable fact","category":"growth|competition|regulation|trend","strength":"High|Medium|Low"}],"icp_fit":{"target_description":"who they sell to, or missing data","fit_indicators":["evidence of fit"],"mismatches":["evidence of mismatch, or missing data"]},"data_completeness":{"available":["fields with real data"],"missing":["missing data: field name"]},"section_context":"one sentence on why signal extraction matters first","analyst_insight":"one specific observation about signal quality for this company"}`,
 
-Context from Step 1:
+    // ══════════════════════════════════════════════
+    // STEP 2 — MARKET ATTRACTIVENESS & TAM
+    // ══════════════════════════════════════════════
+    2: `${base}
+
+PHASE 2 — SCORING for "${co}"${ind}.
+
+Phase 1 extracted signals:
 ${ctx}
 
-Return this exact JSON structure:
-{
-  "tam_overview": "What is this market, what force is driving it, and what is the consequence for buyers/sellers operating in it.",
-  "tam_size_estimate": "$XB (YYYY estimate)",
-  "sam_estimate": "$XM — segment that is realistically addressable given ICP fit",
-  "growth_rate": "X% CAGR YYYY–YYYY — driven by [specific driver]",
-  "growth_drivers": "2-3 specific named drivers with a one-line causal explanation each.",
-  "market_segments": [
-    {"name": "Specific segment name", "size": "$Xm", "priority": "High — reason why"},
-    {"name": "Specific segment name", "size": "$Xm", "priority": "Medium — reason why"},
-    {"name": "Specific segment name", "size": "$Xm", "priority": "Low — reason why"}
-  ],
-  "priority_opportunities": "Top 2-3 opportunity areas with a specific action and the commercial rationale behind it.",
-  "market_maturity": "Stage label — one sentence on what this stage means for go-to-market timing.",
-  "market_risks": "2-3 specific risks a seller faces in this market — regulatory, competitive displacement, or buyer behaviour shift."
-}`,
+Your ONLY job: score the signals. No new assumptions.
 
-    3: `${baseInstruction}
+Scoring buckets (must sum to total_score exactly):
+- Demand signals:    max 40 points
+- Market timing:     max 25 points
+- ICP fit:           max 20 points
+- Data completeness: max 15 points
 
-Build a precise Ideal Customer Profile (ICP) for vendors that sell TO or partner with "${co}"${ind}.
+Rules:
+- Strong, specific signal = full points
+- Partial/vague signal = proportional points
+- "missing data" = 0 points, no exceptions
+- total_score = exact arithmetic sum
+- Show exact calculation string: "X + Y + Z + W = total"
 
-QUALITY RULES — STRICTLY ENFORCE:
-- primary_icp and secondary_icp must name a SPECIFIC persona title + seniority + department, NOT just "CTO" — explain why that person feels the pain
-- firmographics MUST be returned as a flat STRING — not an object or nested JSON. Format: "Size: X–Y employees | ARR: $X–$Y | Industry: [vertical] | Geography: [region] | Tech maturity: [descriptor]"
-- buying_triggers must be specific, observable events — not "need for digital transformation" — e.g. "Hiring engineering manager role → building internal capability → window for external tooling"
-- core_pain_points must be business-consequential pains — not just feature gaps. Format: "Pain → Business consequence if unsolved"
-- objections must reflect REAL blockers, not generic pushback — include the underlying fear driving each objection
-- deal_cycle must include typical steps in the buying process, not just a timeframe
+Return exact JSON:
+{"demand_score":{"score":0,"max":40,"rationale":"specific reason from Phase 1","sub_breakdown":"e.g. hiring: +12, expansion: +10"},"market_timing_score":{"score":0,"max":25,"rationale":"specific reason from Phase 1","sub_breakdown":"e.g. growth trend: +10"},"icp_fit_score":{"score":0,"max":20,"rationale":"specific reason from Phase 1","sub_breakdown":"e.g. target match: +12"},"data_completeness_score":{"score":0,"max":15,"rationale":"fields present vs missing","sub_breakdown":"e.g. 8 of 12 fields: +10"},"total_score":0,"score_verification":"X + Y + Z + W = total","section_context":"one sentence on why rigorous scoring prevents over-qualifying","analyst_insight":"one insight on scoring gaps and what data would improve it"}`,
 
-Context from Steps 1-2:
+    // ══════════════════════════════════════════════
+    // STEP 3 — GTM RECOMMENDATION
+    // ══════════════════════════════════════════════
+    3: `${base}
+
+PHASE 3 — VERDICT for "${co}"${ind}.
+
+Prior phases:
 ${ctx}
 
-Return this exact JSON structure:
-{
-  "primary_icp": "Title + seniority + why they feel the problem acutely. One sentence on what outcome they are accountable for.",
-  "secondary_icp": "Title + role context + how they influence the buying decision.",
-  "firmographics": "Size: X–Y employees | ARR: $X–$Y | Industry: [specific vertical] | Geography: [region] | Tech maturity: [descriptor]",
-  "buying_triggers": ["Observable event → what this means for a seller (the window it opens)"],
-  "core_pain_points": "Pain 1 → consequence. Pain 2 → consequence. Pain 3 → consequence.",
-  "decision_makers": ["Primary decision-maker title", "Budget holder title", "Technical evaluator title"],
-  "deal_cycle": "Typical length + key stages: awareness → evaluation → pilot → procurement → close.",
-  "objections": ["Objection stated as buyer would say it → underlying fear → how to reframe"]
-}`,
+Your ONLY job: assign verdict strictly from scores. No opinion overrides.
 
-    4: `${baseInstruction}
+Verdict rules (follow exactly):
+- GO: total_score >= 70 AND demand is strong AND ICP fit is strong
+- CONDITIONAL GO: total_score 55-69, OR one major fixable gap exists
+- NO GO: total_score < 55 OR demand is weak
 
-Build a precise account sourcing strategy for finding and qualifying companies that buy from or partner with "${co}"${ind}.
+verdict must be exactly: "GO", "CONDITIONAL GO", or "NO GO"
 
-QUALITY RULES — STRICTLY ENFORCE:
-- recommended_databases must be real, named platforms with a specific reason for each (e.g. "Apollo.io — best for filtering by tech stack + headcount growth signals")
-- filter_criteria MUST be a flat STRING — not an object. Format: "Company size: X–Y | Revenue: $X–$Y | Industry: [vertical] | Tech stack includes: [tech] | Headcount growth: >X% in 12mo"
-- exclusion_criteria MUST be a flat STRING — not an object. Format: "Exclude: [specific signals that indicate wrong fit] because [reason]"
-- sourcing_playbook must be actionable steps a real SDR could follow — numbered, specific, not generic
-- estimated_universe must give a realistic range with a rationale, not just a round number
-- data_enrichment_tips must name specific data points to add and where to find them
+Return exact JSON:
+{"verdict":"GO|CONDITIONAL GO|NO GO","verdict_reasoning":"specific reasoning citing scores — no opinion","score_basis":"Total: X/100 (Demand: A/40 · Timing: B/25 · ICP: C/20 · Data: D/15)","demand_assessment":"strong|partial|weak","icp_assessment":"strong|partial|weak","conditions":["condition if CONDITIONAL GO — empty array if GO or NO GO"],"what_would_change_verdict":"single data point that would flip the verdict","section_context":"one sentence on why verdict must follow scores","analyst_insight":"one honest observation about this verdict's strength"}`,
 
-Context from Steps 1-3:
+    // ══════════════════════════════════════════════
+    // STEP 4 — TARGET ACCOUNTS & GTM STRATEGY
+    // ══════════════════════════════════════════════
+    4: `${base}
+
+PHASE 4 — DEAL LENS for "${co}"${ind}.
+
+Prior phases:
 ${ctx}
 
-Return this exact JSON structure:
-{
-  "recommended_databases": ["Platform name — why it fits this specific ICP and what filter to use first"],
-  "filter_criteria": "Company size: X–Y | Annual revenue: $X–$Y | Industry: [vertical] | Tech stack: [specific tech] | Signals: [growth indicator]",
-  "sourcing_playbook": "Step 1: [specific action]. Step 2: [specific action]. Step 3: [specific action]. Step 4: [specific action]. Step 5: [qualification check before handing to AE].",
-  "exclusion_criteria": "Exclude companies that [specific red flag signals] — these indicate [wrong fit reason].",
-  "estimated_universe": "X,000–Y,000 accounts globally / in [region] — based on [size + industry filter rationale].",
-  "data_enrichment_tips": "Add: LinkedIn headcount growth (6mo), open engineering/sales roles (signal), recent funding (Crunchbase), tech stack (BuiltWith/G2). Prioritise accounts with 2+ signals active simultaneously."
-}`,
+Your job: convert verified signals into practical sales direction.
 
-    5: `${baseInstruction}
+Rules:
+- Every element must trace back to a Phase 1 signal
+- No generic statements
+- Use exact job titles
+- Clearly label deal size estimates
+- solution_angle must be: cost_saving, growth, efficiency, compliance, or risk_reduction
 
-Generate a high-precision keyword and search intelligence package for targeting "${co}"${ind} and similar companies.
+Return exact JSON:
+{"target_roles":["Exact Title 1","Exact Title 2","Exact Title 3"],"core_problem":"specific evidence-backed problem from signals","solution_angle":"cost_saving|growth|efficiency|compliance|risk_reduction","solution_pitch":"2-3 sentences tied directly to signals — industry-neutral","why_now":"specific reason from market timing or demand signal — not generic","estimated_deal_size":{"range":"$X – $Y","is_estimate":true,"basis":"reasoning: company size, deal type, signals"},"sales_approach":"enterprise|mid_market|partnership|direct","approach_rationale":"why this approach fits based on signals","section_context":"one sentence on why deal lens must come from signals","analyst_insight":"one revenue-specific observation"}`,
 
-QUALITY RULES — STRICTLY ENFORCE:
-- primary_keywords must reflect the BUYER's language — what they search for when in pain, not the vendor's product names
-- secondary_keywords must include job titles, tech stack terms, and competitor names — real intent signals
-- boolean_query must be a working LinkedIn/Google Boolean string with correct syntax
-- linkedin_search_strings must include title filters, seniority, company size, and at least one keyword exclusion
-- intent_signals must describe an observable buyer behaviour — not just a topic. Format: "Signal: [what you see] → Intent: [what it means they're evaluating]"
-- content_topics must be specific enough to write a real article title from, not just a subject area
+    // ══════════════════════════════════════════════
+    // STEP 5 — EXECUTION RISKS & CONSIDERATIONS
+    // ══════════════════════════════════════════════
+    5: `${base}
 
-Context from Steps 1-4:
+PHASE 5 — RISKS & CONFIDENCE for "${co}"${ind}.
+
+Prior phases:
 ${ctx}
 
-Return this exact JSON structure:
-{
-  "primary_keywords": ["exact phrase buyer would search", "pain-driven keyword", "outcome-driven keyword", "job-to-be-done keyword", "trigger-event keyword", "competitor comparison keyword"],
-  "secondary_keywords": ["job title keyword", "tech stack term", "competitor name + alternative", "industry-specific term", "buying signal keyword", "problem descriptor", "solution category", "outcome metric"],
-  "boolean_query": "(\\"keyword1\\" OR \\"keyword2\\") AND (\\"pain term\\" OR \\"trigger term\\") NOT \\"exclusion term\\"",
-  "linkedin_search_strings": "Title: (CTO OR VP Engineering OR Head of Product) AND Seniority: (Director, VP, CXO) AND Company size: (51–200) AND Keywords: (\\"${co.split(' ')[0]}\\" OR \\"[industry term]\\") NOT (\\"intern\\" OR \\"student\\")",
-  "intent_signals": ["Signal: [observable action] → Intent: [what buying stage this indicates]"],
-  "content_topics": ["Specific article title that addresses a real ICP pain point", "Specific article title on a trigger event or market shift", "Comparison or alternative guide title"]
-}`,
+Your job: identify genuine uncertainties. Every risk from missing or weak signals.
 
-    6: `${baseInstruction}
+Rules:
+- Each risk must come from a specific missing or weak signal in Phase 1
+- No generic risks ("market may change")
+- confidence_score is a number 0-100, capped by data_completeness_score from Phase 2
 
-Write outbound email sequences FROM "${co}"${ind} TO their ideal customer prospects.
+Return exact JSON:
+{"key_risks":[{"risk":"specific risk description","source":"exact missing or weak signal","impact":"high|medium|low","mitigation":"what would resolve this risk"}],"confidence_level":"high|medium|low","confidence_score":0,"confidence_reasoning":"explanation linking confidence to data completeness","validation_needed":["specific action that would validate this opportunity"],"section_context":"one sentence on why data gaps drive confidence not gut feel","analyst_insight":"one honest assessment of the biggest uncertainty"}`,
 
-CRITICAL CONTEXT: You are writing sales emails on behalf of "${co}". These emails are FROM ${co}'s sales team TO the prospect companies and personas identified in Steps 1–5.
+    // ══════════════════════════════════════════════
+    // STEP 6 — GTM SUMMARY & ACTION PLAN
+    // ══════════════════════════════════════════════
+    6: `${base}
 
-QUALITY RULES — STRICTLY ENFORCE:
-- Every email MUST open with a specific, researched observation — not a generic hook
-- Reference at least ONE specific signal or trigger identified in the GTM research
-- Subject lines must create curiosity or name a pain — not describe the sender's product
-- Body must follow this structure: [Trigger/Observation] → [Pain consequence] → [Specific outcome ${co} delivers] → [Proof or specificity] → [Low-friction CTA]
-- CTA must be a single, specific ask — not "let's connect" or "would love to chat"
-- Avoid: "I hope this email finds you well", "At ${co} we specialize in", "our cutting-edge solutions", "we'd love to partner"
-- Every email body must start with: "Hi {prospect_name},"
-- Every email body must end with: "Best, {sender_name}"
-- Use ONLY curly brace tokens: {prospect_name}, {prospect_company}, {prospect_title}, {sender_name}
+PHASE 6 — FINAL OUTPUT for "${co}"${ind}.
 
-USE CONTEXT FROM ALL STEPS 1–5:
+ALL prior phases:
 ${ctx}
 
-Return this exact JSON structure:
-{
-  "email_1": {
-    "angle": "Pain-led — triggered by a specific signal from the research",
-    "subject": "Subject line that names the pain or trigger (max 50 chars, no tokens)",
-    "body": "Hi {prospect_name},\\n\\n[Specific observation about {prospect_company} or their situation based on research]. [Name the pain consequence — what happens if this goes unresolved]. [One sentence on what ${co} specifically does to solve this]. [Outcome or proof — specific result, not a generic claim].\\n\\n[CTA sentence].\\n\\nBest, {sender_name}",
-    "cta": "Specific, single ask — e.g. '15-minute call this week to walk through how we solved [X] for a similar [industry] company?'"
-  },
-  "email_2": {
-    "angle": "ROI-led — built around a measurable outcome relevant to this ICP",
-    "subject": "Subject line focused on a specific outcome (max 50 chars, no tokens)",
-    "body": "Hi {prospect_name},\\n\\n[Reference a buying trigger from the research — something happening at {prospect_company} or in their market]. [Quantify the opportunity or risk]. [Connect ${co}'s specific capability to this outcome]. [Add specificity — timeframe, metric, or comparable result].\\n\\n[CTA sentence].\\n\\nBest, {sender_name}",
-    "cta": "Outcome-specific ask — e.g. 'Can I send you a one-pager on how we cut [metric] by [X] for a [size] company in [industry]?'"
-  },
-  "email_3": {
-    "angle": "Proof-led — social proof specific to this industry or persona",
-    "subject": "Subject line with specificity or social proof signal (max 50 chars, no tokens)",
-    "body": "Hi {prospect_name},\\n\\n[Name a specific challenge {prospect_title}s in {prospect_company}'s segment face — from the ICP research]. [Reference how similar companies solved it with ${co}]. [One concrete result or proof point]. [Connect urgency to a market timing signal from the research].\\n\\n[CTA sentence].\\n\\nBest, {sender_name}",
-    "cta": "Proof-based ask — e.g. 'Worth a 20-minute call to see the case study from [similar company type]?'"
-  },
-  "follow_up_sequence": "Day 3: Reply to Email 1 — add one new data point or trigger event relevant to {prospect_name}. Day 7: Send new angle focusing on a competitor gap identified in research. Day 14: Share a specific case study or result relevant to {prospect_title} at {prospect_company}. Day 21: Final note — acknowledge timing may be off, leave a clear door open.",
-  "compliance_check": {
-    "email_1_mentions_sender_company": true,
-    "email_1_has_all_tokens": true,
-    "email_2_mentions_sender_company": true,
-    "email_2_has_all_tokens": true,
-    "email_3_mentions_sender_company": true,
-    "email_3_has_all_tokens": true,
-    "no_generic_openers": true,
-    "no_square_brackets": true,
-    "all_curly_braces": true
-  }
-}`,
+Your job: produce the final structured output. Combine all phases.
+
+Rules:
+- Do NOT change scores or verdicts from prior phases
+- Do NOT add new assumptions
+- Everything must be consistent with prior phases
+- executive_brief: 3-5 sentences, board-ready, no jargon
+- signal_highlights: the 3 strongest real signals from Phase 1
+
+Return exact JSON:
+{"signal_highlights":[{"signal":"top signal 1","type":"demand|timing|icp","strength":"High|Medium|Low"},{"signal":"top signal 2","type":"demand|timing|icp","strength":"High|Medium|Low"},{"signal":"top signal 3","type":"demand|timing|icp","strength":"High|Medium|Low"}],"score_breakdown":{"demand":0,"market_timing":0,"icp_fit":0,"data_completeness":0,"total":0,"verification":"X + Y + Z + W = total"},"verdict":"GO|CONDITIONAL GO|NO GO","deal_lens_summary":"2-sentence summary of who to target, problem, and why now","risks_summary":"2-sentence summary of key risk and resolution","confidence_note":"confidence score and what it means for next steps","executive_brief":"3-5 sentence board-ready opportunity summary","recommended_next_action":"single most important next step","section_context":"one sentence on why final output must be consistent","analyst_insight":"one strategic observation tying the full analysis together"}`,
   };
 
   return prompts[step];
@@ -2643,228 +2593,242 @@ function renderOutput(n, data) {
 }
 
 function renderStep1(d) {
-  document.getElementById('oc-overview').innerHTML    = escHtml(d.company_overview || '—');
-  document.getElementById('oc-market-pos').innerHTML  = escHtml(d.market_position || '—');
-  document.getElementById('oc-products').innerHTML    = escHtml(d.products_services || '—');
-
-  const score = d.gtm_relevance_score || 0;
-  const scoreColor = score >= 80 ? '#22c55e' : score >= 60 ? '#f59e0b' : '#ef4444';
-  document.getElementById('oc-gtm-score').innerHTML = `
-    <div style="display:flex;align-items:center;gap:14px;margin-bottom:10px;">
-      <div style="font-size:36px;font-weight:900;color:${scoreColor};font-family:'Space Mono',monospace;">${score}</div>
-      <div>
-        <div style="font-size:10px;font-weight:700;color:${scoreColor};">${score >= 80 ? 'High Relevance' : score >= 60 ? 'Medium Relevance' : 'Low Relevance'}</div>
-        <div style="font-size:9px;color:var(--muted);">${escHtml(d.revenue_stage || '')}</div>
-      </div>
-    </div>
-    <div style="font-size:11px;color:#9ca3af;line-height:1.7;">${escHtml(d.gtm_relevance_reasoning || '—')}</div>
-  `;
-
-  const sigs = document.getElementById('oc-signals');
-  sigs.innerHTML = '';
-  (d.growth_signals || []).forEach(s => {
-    const t = document.createElement('div');
-    t.className = 'tag tag-accent';
-    t.textContent = s;
-    sigs.appendChild(t);
+  // Step 1: Market Research & Insights
+  const demandEl = document.getElementById('oc-demand-signals');
+  demandEl.innerHTML = '';
+  (d.demand_signals || []).forEach(s => {
+    const el = document.createElement('div');
+    const strengthColors = { High:'tag-green', Medium:'tag-amber', Low:'' };
+    el.className = `tag ${strengthColors[s.strength] || ''}`;
+    el.textContent = `[${s.type || '?'}] ${s.signal}`;
+    el.title = `Strength: ${s.strength || 'Unknown'}`;
+    demandEl.appendChild(el);
   });
+  if (!d.demand_signals?.length) demandEl.innerHTML = '<span style="color:var(--muted);font-size:11px;">missing data</span>';
+
+  const timingEl = document.getElementById('oc-market-timing');
+  timingEl.innerHTML = '';
+  (d.market_timing || []).forEach(s => {
+    const el = document.createElement('div');
+    const strengthColors = { High:'tag-blue', Medium:'tag-amber', Low:'' };
+    el.className = `tag ${strengthColors[s.strength] || ''}`;
+    el.textContent = `[${s.category || '?'}] ${s.signal}`;
+    timingEl.appendChild(el);
+  });
+  if (!d.market_timing?.length) timingEl.innerHTML = '<span style="color:var(--muted);font-size:11px;">missing data</span>';
+
+  const icp = d.icp_fit || {};
+  document.getElementById('oc-icp-fit').innerHTML = escHtml(icp.target_description || '—') +
+    (icp.fit_indicators?.length ? `<br><span style="color:var(--green);font-size:10px;">✓ ${icp.fit_indicators.join(' · ')}</span>` : '') +
+    (icp.mismatches?.length ? `<br><span style="color:#ef4444;font-size:10px;">⚠ ${icp.mismatches.join(' · ')}</span>` : '');
+
+  const dc = d.data_completeness || {};
+  document.getElementById('oc-data-completeness').innerHTML =
+    (dc.available?.length ? `<span style="color:var(--green);font-size:11px;">Available: ${escHtml(dc.available.join(', '))}</span>` : '') +
+    (dc.missing?.length ? `<br><span style="color:#ef4444;font-size:11px;">Missing: ${escHtml(dc.missing.join(', '))}</span>` : '');
+
+  document.getElementById('oc-p1-insight').innerHTML = escHtml(d.analyst_insight || '—');
 }
 
 function renderStep2(d) {
-  document.getElementById('oc-tam-overview').innerHTML = escHtml(d.tam_overview || '—') +
-    (d.tam_size_estimate ? `<br><strong style="color:var(--accent);font-size:14px;">${escHtml(d.tam_size_estimate)}</strong>` : '');
-  document.getElementById('oc-tam-growth').innerHTML   = `<strong style="color:var(--green);font-size:18px;font-family:'Space Mono',monospace;">${escHtml(d.growth_rate || '—')}</strong><br><span style="font-size:11px;color:var(--muted);">${escHtml(d.growth_drivers || '')}</span>`;
+  // Step 2: Market Attractiveness & TAM Analysis
+  function scoreBlock(elId, scoreObj, maxPts) {
+    const s = scoreObj?.score ?? 0;
+    const color = s >= maxPts * 0.8 ? '#22c55e' : s >= maxPts * 0.5 ? '#f59e0b' : '#ef4444';
+    document.getElementById(elId).innerHTML =
+      `<strong style="font-size:20px;color:${color};font-family:'Space Mono',monospace;">${s}/${maxPts}</strong>` +
+      (scoreObj?.rationale ? `<br><span style="font-size:11px;color:#9ca3af;">${escHtml(scoreObj.rationale)}</span>` : '') +
+      (scoreObj?.sub_breakdown ? `<br><code style="font-size:9px;color:var(--accent);">${escHtml(scoreObj.sub_breakdown)}</code>` : '');
+  }
+  scoreBlock('oc-demand-score',  d.demand_score,           40);
+  scoreBlock('oc-timing-score',  d.market_timing_score,    25);
+  scoreBlock('oc-icp-score',     d.icp_fit_score,          20);
+  scoreBlock('oc-data-score',    d.data_completeness_score,15);
 
-  const segs = document.getElementById('oc-tam-segments');
-  segs.innerHTML = '';
-  (d.market_segments || []).forEach(s => {
-    const priorityColors = { High: 'tag-green', Medium: 'tag-amber', Low: '' };
-    const t = document.createElement('div');
-    t.className = `tag ${priorityColors[s.priority] || ''}`;
-    t.textContent = `${s.name} · ${s.size}`;
-    segs.appendChild(t);
-  });
-
-  document.getElementById('oc-tam-opps').innerHTML = escHtml(d.priority_opportunities || '—') +
-    (d.sam_estimate ? `<br><span style="font-size:10px;color:var(--muted);">SAM: ${escHtml(d.sam_estimate)}</span>` : '');
+  const total = d.total_score ?? 0;
+  const totalColor = total >= 70 ? '#22c55e' : total >= 55 ? '#f59e0b' : '#ef4444';
+  const totalLabel = total >= 70 ? 'GO Territory' : total >= 55 ? 'Conditional Territory' : 'NO GO Territory';
+  document.getElementById('oc-total-score').innerHTML =
+    `<div style="display:flex;align-items:center;gap:12px;">
+      <div style="font-size:42px;font-weight:900;color:${totalColor};font-family:'Space Mono',monospace;">${total}</div>
+      <div>
+        <div style="font-size:11px;font-weight:700;color:${totalColor};">${totalLabel}</div>
+        <div style="font-size:9px;color:var(--muted);">out of 100</div>
+      </div>
+    </div>`;
+  document.getElementById('oc-score-verification').innerHTML =
+    `<span style="color:var(--muted);">Calculation: </span><code style="color:var(--accent);">${escHtml(d.score_verification || '—')}</code>`;
 }
 
 function renderStep3(d) {
-  document.getElementById('oc-icp-primary').innerHTML    = escHtml(d.primary_icp || '—');
-  document.getElementById('oc-icp-secondary').innerHTML  = escHtml(d.secondary_icp || '—');
-  document.getElementById('oc-icp-firmographic').innerHTML = smartRender(d.firmographics) +
-    (d.deal_cycle ? `<br><span style="font-size:9px;color:var(--muted);">Deal cycle: ${escHtml(d.deal_cycle)}</span>` : '');
-  document.getElementById('oc-icp-pains').innerHTML      = smartRender(d.core_pain_points);
+  // Step 3: GTM Recommendation
+  const verdict = (d.verdict || 'UNKNOWN').toUpperCase();
+  const verdictConfig = {
+    'GO':             { color:'#22c55e', bg:'rgba(34,197,94,0.1)', border:'rgba(34,197,94,0.3)', icon:'✅' },
+    'CONDITIONAL GO': { color:'#f59e0b', bg:'rgba(245,158,11,0.1)', border:'rgba(245,158,11,0.3)', icon:'⚠️' },
+    'NO GO':          { color:'#ef4444', bg:'rgba(239,68,68,0.1)', border:'rgba(239,68,68,0.3)', icon:'❌' },
+  };
+  const vc = verdictConfig[verdict] || verdictConfig['CONDITIONAL GO'];
+  document.getElementById('oc-verdict-badge').innerHTML =
+    `<div style="display:inline-flex;align-items:center;gap:10px;background:${vc.bg};border:2px solid ${vc.border};border-radius:12px;padding:12px 20px;">
+      <span style="font-size:20px;">${vc.icon}</span>
+      <div>
+        <div style="font-size:20px;font-weight:900;color:${vc.color};font-family:'Space Mono',monospace;">${verdict}</div>
+        <div style="font-size:9px;color:var(--muted);">${escHtml(d.demand_assessment||'')?.toUpperCase()} DEMAND · ${escHtml(d.icp_assessment||'')?.toUpperCase()} ICP FIT</div>
+      </div>
+    </div>`;
+  document.getElementById('oc-verdict-reasoning').innerHTML = escHtml(d.verdict_reasoning || '—');
+  document.getElementById('oc-score-basis').innerHTML = escHtml(d.score_basis || '—');
+  document.getElementById('oc-verdict-change').innerHTML = escHtml(d.what_would_change_verdict || '—');
 
-  const trigs = document.getElementById('oc-icp-triggers');
-  trigs.innerHTML = '';
-  (d.buying_triggers || []).forEach(t => {
-    const el = document.createElement('div');
-    el.className = 'tag tag-blue';
-    el.textContent = typeof t === 'string' ? t : objToLines(t);
-    trigs.appendChild(el);
-  });
+  const condBlock = document.getElementById('oc-conditions-block');
+  const condList = document.getElementById('oc-conditions');
+  const conditions = d.conditions || [];
+  if (conditions.length) {
+    condBlock.style.display = '';
+    condList.innerHTML = '';
+    conditions.forEach(c => {
+      const el = document.createElement('div');
+      el.className = 'tag tag-amber';
+      el.textContent = c;
+      condList.appendChild(el);
+    });
+  } else {
+    condBlock.style.display = 'none';
+  }
 }
 
 function renderStep4(d) {
-  const dbs = document.getElementById('oc-src-databases');
-  dbs.innerHTML = '';
-  (d.recommended_databases || []).forEach(db => {
+  // Step 4: Target Accounts & GTM Strategy
+  const rolesEl = document.getElementById('oc-target-roles');
+  rolesEl.innerHTML = '';
+  (d.target_roles || []).forEach(r => {
     const el = document.createElement('div');
     el.className = 'tag tag-accent';
-    el.textContent = typeof db === 'string' ? db : objToLines(db);
-    dbs.appendChild(el);
+    el.textContent = r;
+    rolesEl.appendChild(el);
   });
 
-  document.getElementById('oc-src-filters').innerHTML   = smartRender(d.filter_criteria);
-  document.getElementById('oc-src-playbook').innerHTML  = smartRender(d.sourcing_playbook) +
-    (d.estimated_universe ? `<br><span style="font-size:10px;color:var(--muted);">Est. universe: ${escHtml(d.estimated_universe)}</span>` : '');
-  document.getElementById('oc-src-exclusions').innerHTML = smartRender(d.exclusion_criteria);
+  const angleColors = { cost_saving:'#22c55e', growth:'#60a5fa', efficiency:'#f59e0b', compliance:'#a78bfa', risk_reduction:'#f87171' };
+  const angle = (d.solution_angle || '').toLowerCase();
+  document.getElementById('oc-solution-angle').innerHTML =
+    `<span style="font-size:14px;font-weight:800;color:${angleColors[angle]||'var(--accent)'};">${(d.solution_angle||'—').toUpperCase()}</span>` +
+    (d.approach_rationale ? `<br><span style="font-size:10px;color:var(--muted);">${escHtml(d.approach_rationale)}</span>` : '');
+  document.getElementById('oc-core-problem').innerHTML = escHtml(d.core_problem || '—');
+  document.getElementById('oc-solution-pitch').innerHTML = escHtml(d.solution_pitch || '—');
+  document.getElementById('oc-why-now').innerHTML = escHtml(d.why_now || '—');
+
+  const ds = d.estimated_deal_size || {};
+  document.getElementById('oc-deal-size').innerHTML =
+    `<strong style="font-size:16px;color:var(--green);">${escHtml(ds.range || '—')}</strong>` +
+    (ds.is_estimate ? ` <span style="font-size:9px;color:var(--muted);">(estimate)</span>` : '') +
+    (ds.basis ? `<br><span style="font-size:10px;color:var(--muted);">${escHtml(ds.basis)}</span>` : '');
+
+  document.getElementById('oc-sales-approach').innerHTML =
+    `<span style="font-size:14px;font-weight:800;color:var(--accent);">${(d.sales_approach||'—').toUpperCase()}</span>` +
+    (d.approach_rationale ? `<br><span style="font-size:10px;color:var(--muted);">${escHtml(d.approach_rationale)}</span>` : '');
 }
 
 function renderStep5(d) {
-  const pw = document.getElementById('oc-kw-primary');
-  pw.innerHTML = '';
-  (d.primary_keywords || []).forEach(k => {
-    const el = document.createElement('div');
-    el.className = 'tag tag-green';
-    el.textContent = k;
-    pw.appendChild(el);
+  // Step 5: Execution Risks & Considerations
+  const risksEl = document.getElementById('oc-key-risks');
+  risksEl.innerHTML = '';
+  (d.key_risks || []).forEach(r => {
+    const impactColors = { high:'#ef4444', medium:'#f59e0b', low:'#9ca3af' };
+    const impactColor = impactColors[(r.impact||'').toLowerCase()] || '#9ca3af';
+    const div = document.createElement('div');
+    div.style.cssText = `background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.15);border-radius:8px;padding:12px 14px;margin-bottom:8px;`;
+    div.innerHTML = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
+        <span style="font-size:10px;font-weight:800;color:${impactColor};">⚠ ${(r.impact||'').toUpperCase()} IMPACT</span>
+        <span style="font-size:9px;color:var(--muted);">Source: ${escHtml(r.source||'unknown')}</span>
+      </div>
+      <div style="font-size:12px;color:#e5e7eb;margin-bottom:6px;">${escHtml(r.risk||'')}</div>
+      ${r.mitigation ? `<div style="font-size:10px;color:var(--green);">→ Mitigation: ${escHtml(r.mitigation)}</div>` : ''}
+    `;
+    risksEl.appendChild(div);
   });
+  if (!d.key_risks?.length) risksEl.innerHTML = '<span style="color:var(--muted);font-size:11px;">No major risks identified</span>';
 
-  const sw = document.getElementById('oc-kw-secondary');
-  sw.innerHTML = '';
-  (d.secondary_keywords || []).forEach(k => {
+  const score = d.confidence_score ?? 0;
+  const confColor = score >= 70 ? '#22c55e' : score >= 45 ? '#f59e0b' : '#ef4444';
+  const confLabel = score >= 70 ? 'High Confidence' : score >= 45 ? 'Medium Confidence' : 'Low Confidence';
+  document.getElementById('oc-confidence-score').innerHTML =
+    `<div style="display:flex;align-items:center;gap:10px;">
+      <div style="font-size:32px;font-weight:900;color:${confColor};font-family:'Space Mono',monospace;">${score}</div>
+      <div>
+        <div style="font-size:10px;font-weight:700;color:${confColor};">${confLabel}</div>
+        <div style="font-size:9px;color:var(--muted);">/100</div>
+      </div>
+    </div>
+    <div style="margin-top:8px;background:rgba(255,255,255,0.05);border-radius:6px;overflow:hidden;height:4px;">
+      <div style="height:100%;width:${score}%;background:${confColor};border-radius:6px;transition:width 0.6s;"></div>
+    </div>`;
+  document.getElementById('oc-confidence-reasoning').innerHTML = escHtml(d.confidence_reasoning || '—');
+
+  const valEl = document.getElementById('oc-validation');
+  valEl.innerHTML = '';
+  (d.validation_needed || []).forEach(v => {
     const el = document.createElement('div');
-    el.className = 'tag';
-    el.textContent = k;
-    sw.appendChild(el);
+    el.className = 'tag tag-blue';
+    el.textContent = v;
+    valEl.appendChild(el);
   });
-
-  document.getElementById('oc-kw-boolean').textContent  = d.boolean_query || '—';
-  document.getElementById('oc-kw-linkedin').innerHTML   = escHtml(d.linkedin_search_strings || '—');
 }
 
 function renderStep6(d) {
-  const container = document.getElementById('oc-messages-container');
-  container.innerHTML = '';
-
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // 🚀 ENHANCEMENT #1: Token Visualization Guide
-  // ═══════════════════════════════════════════════════════════════════════════════
-  const guide = document.createElement('div');
-  guide.className = 'token-guide';
-  guide.style.cssText = `
-    background: linear-gradient(135deg, var(--accent-light) 0%, rgba(255,255,255,0.3) 100%);
-    border: 2px solid var(--accent);
-    border-radius: 12px;
-    padding: 16px;
-    margin-bottom: 20px;
-    font-size: 13px;
-    line-height: 1.6;
-  `;
-  
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // 🚀 ENHANCEMENT #2: CRM Selector
-  // ═══════════════════════════════════════════════════════════════════════════════
-  const crmSelector = `
-    <div style="margin-bottom: 12px; padding-bottom: 12px; border-bottom: 1px solid var(--border);">
-      <label style="font-weight:600;margin-bottom:6px;display:block;color:var(--text);">📱 Convert for your CRM:</label>
-      <div style="display:flex;gap:8px;flex-wrap:wrap;">
-        <button class="btn btn-sm" onclick="convertTokensForCRM('hubspot')" style="background:#0066CC;color:white;border:none;padding:10px 16px;border-radius:6px;font-weight:600;cursor:pointer;font-size:12px;">HubSpot</button>
-        <button class="btn btn-sm" onclick="convertTokensForCRM('outreach')" style="background:#FF6B00;color:white;border:none;padding:10px 16px;border-radius:6px;font-weight:600;cursor:pointer;font-size:12px;">Outreach</button>
-        <button class="btn btn-sm" onclick="convertTokensForCRM('apollo')" style="background:#9B59B6;color:white;border:none;padding:10px 16px;border-radius:6px;font-weight:600;cursor:pointer;font-size:12px;">Apollo</button>
-        <button class="btn btn-sm" onclick="convertTokensForCRM('salesforce')" style="background:#00A1E0;color:white;border:none;padding:10px 16px;border-radius:6px;font-weight:600;cursor:pointer;font-size:12px;">Salesforce</button>
-      </div>
-    </div>
-  `;
-  
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // 🚀 ENHANCEMENT #3: Token Legend
-  // ═══════════════════════════════════════════════════════════════════════════════
-  const tokenLegend = `
-    <div style="margin-bottom: 12px;">
-      <div style="font-weight:600;margin-bottom:8px;color:var(--text);">📝 Personalization Tokens (Replace in your CRM):</div>
-      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:8px;">
-        <div style="background:var(--bg-secondary);padding:8px;border-radius:6px;border-left:3px solid var(--accent);">
-          <code style="background:transparent;padding:0;font-weight:600;color:var(--accent);">{prospect_name}</code>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px;">Prospect first name</div>
-        </div>
-        <div style="background:var(--bg-secondary);padding:8px;border-radius:6px;border-left:3px solid var(--green);">
-          <code style="background:transparent;padding:0;font-weight:600;color:var(--green);">{prospect_company}</code>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px;">Their company name</div>
-        </div>
-        <div style="background:var(--bg-secondary);padding:8px;border-radius:6px;border-left:3px solid #fbbf24;">
-          <code style="background:transparent;padding:0;font-weight:600;color:#fbbf24;">{prospect_title}</code>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px;">Their job title</div>
-        </div>
-        <div style="background:var(--bg-secondary);padding:8px;border-radius:6px;border-left:3px solid #60a5fa;">
-          <code style="background:transparent;padding:0;font-weight:600;color:#60a5fa;">{sender_name}</code>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px;">Your name</div>
-        </div>
-      </div>
-    </div>
-  `;
-  
-  guide.innerHTML = crmSelector + tokenLegend;
-  container.appendChild(guide);
-
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // 🚀 ENHANCEMENT #4: Email Cards with Token Highlighting
-  // ═══════════════════════════════════════════════════════════════════════════════
-  const emails = [
-    { key: 'email_1', label: 'Email Variant A', colorClass: 'tag-accent' },
-    { key: 'email_2', label: 'Email Variant B', colorClass: 'tag-green' },
-    { key: 'email_3', label: 'Email Variant C', colorClass: 'tag-blue' },
-  ];
-
-  emails.forEach(({ key, label, colorClass }) => {
-    const email = d[key];
-    if (!email) return;
-    
-    // Highlight tokens in the body
-    const highlightedBody = escHtml(email.body || '—')
-      .replace(/\{prospect_name\}/g, '<span style="background:#fef3c7;padding:2px 6px;border-radius:3px;font-weight:600;color:#92400e;">{prospect_name}</span>')
-      .replace(/\{prospect_company\}/g, '<span style="background:#dcfce7;padding:2px 6px;border-radius:3px;font-weight:600;color:#166534;">{prospect_company}</span>')
-      .replace(/\{prospect_title\}/g, '<span style="background:#fce7f3;padding:2px 6px;border-radius:3px;font-weight:600;color:#be185d;">{prospect_title}</span>')
-      .replace(/\{sender_name\}/g, '<span style="background:#dbeafe;padding:2px 6px;border-radius:3px;font-weight:600;color:#1e40af;">{sender_name}</span>');
-    
-    const block = document.createElement('div');
-    block.className = 'email-block animate-in';
-    block.style.cssText = 'border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 16px;';
-    
-    block.innerHTML = `
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
-        <div style="display:flex;align-items:center;gap:8px;">
-          <div class="tag ${colorClass}" style="padding:4px 10px;">${escHtml(label)}</div>
-          <div style="font-size:10px;color:var(--muted);">${escHtml(email.angle || '')}</div>
-        </div>
-        <div style="display:flex;gap:6px;">
-          <button class="btn btn-outline btn-sm" onclick="copyEmail(this)" style="font-size:8px;padding:4px 10px;">📋 Copy</button>
-          <button class="btn btn-outline btn-sm" onclick="copyAsHubSpot(this)" style="font-size:8px;padding:4px 10px;" title="Copy with HubSpot tokens">HS</button>
-        </div>
-      </div>
-      <div class="email-subject" style="font-weight:600;margin-bottom:8px;color:var(--text);">Subject: ${escHtml(email.subject || '—')}</div>
-      <div class="email-body" style="line-height:1.6;color:var(--text);margin-bottom:12px;padding:12px;background:var(--bg-secondary);border-radius:6px;">${highlightedBody}</div>
-      <div class="email-cta" style="color:var(--accent);font-size:12px;">→ CTA: ${escHtml(email.cta || '—')}</div>
-      <div style="margin-top:8px;font-size:11px;color:var(--muted);">✅ Contains all required tokens: {prospect_name}, {prospect_company}, {prospect_title}, {sender_name}</div>
-    `;
-    container.appendChild(block);
+  // Step 6: GTM Summary & Action Plan
+  const highlightsEl = document.getElementById('oc-signal-highlights');
+  highlightsEl.innerHTML = '';
+  (d.signal_highlights || []).forEach(s => {
+    const typeColors = { demand:'tag-green', timing:'tag-blue', icp:'tag-accent' };
+    const el = document.createElement('div');
+    el.className = `tag ${typeColors[(s.type||'').toLowerCase()] || ''}`;
+    el.textContent = `[${s.type||'?'}/${s.strength||'?'}] ${s.signal}`;
+    highlightsEl.appendChild(el);
   });
 
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // 🚀 ENHANCEMENT #5: Follow-up Sequence with Better Formatting
-  // ═══════════════════════════════════════════════════════════════════════════════
-  const followupDiv = document.createElement('div');
-  followupDiv.style.cssText = 'background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:16px;margin-top:20px;';
-  followupDiv.innerHTML = `
-    <div style="font-weight:600;margin-bottom:12px;color:var(--text);">📅 Follow-up Sequence</div>
-    <div id="oc-followup" style="color:var(--text);line-height:1.8;">
-      ${escHtml(d.follow_up_sequence || '—').replace(/Day \d+:/g, m => `<div style="margin:8px 0;"><strong style="color:var(--accent)">${m}</strong>`)}
+  const sb = d.score_breakdown || {};
+  const total = sb.total ?? 0;
+  const totalColor = total >= 70 ? '#22c55e' : total >= 55 ? '#f59e0b' : '#ef4444';
+  document.getElementById('oc-score-breakdown').innerHTML =
+    `<div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px;">
+      ${[['Demand','demand',40],['Timing','market_timing',25],['ICP Fit','icp_fit',20],['Data','data_completeness',15]]
+        .map(([label,key,max]) => {
+          const v = sb[key] ?? 0;
+          const c = v >= max*0.8?'#22c55e':v>=max*0.5?'#f59e0b':'#ef4444';
+          return `<div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:10px;text-align:center;">
+            <div style="font-size:20px;font-weight:900;color:${c};font-family:'Space Mono',monospace;">${v}</div>
+            <div style="font-size:8px;color:var(--muted);">${label}/${max}</div>
+          </div>`;
+        }).join('')}
     </div>
-  `;
-  container.appendChild(followupDiv);
+    <div style="text-align:center;margin-bottom:6px;">
+      <span style="font-size:36px;font-weight:900;color:${totalColor};font-family:'Space Mono',monospace;">${total}</span>
+      <span style="font-size:12px;color:var(--muted);"> /100</span>
+    </div>
+    <div style="text-align:center;font-size:10px;color:var(--muted);font-family:monospace;">${escHtml(sb.verification||'')}</div>`;
+
+  const verdict = (d.verdict || 'UNKNOWN').toUpperCase();
+  const verdictConfig = {
+    'GO':             { color:'#22c55e', bg:'rgba(34,197,94,0.1)', border:'rgba(34,197,94,0.3)', icon:'✅' },
+    'CONDITIONAL GO': { color:'#f59e0b', bg:'rgba(245,158,11,0.1)', border:'rgba(245,158,11,0.3)', icon:'⚠️' },
+    'NO GO':          { color:'#ef4444', bg:'rgba(239,68,68,0.1)', border:'rgba(239,68,68,0.3)', icon:'❌' },
+  };
+  const vc = verdictConfig[verdict] || verdictConfig['CONDITIONAL GO'];
+  document.getElementById('oc-final-verdict-badge').innerHTML =
+    `<div style="display:inline-flex;align-items:center;gap:12px;background:${vc.bg};border:2px solid ${vc.border};border-radius:12px;padding:14px 24px;">
+      <span style="font-size:24px;">${vc.icon}</span>
+      <div style="font-size:24px;font-weight:900;color:${vc.color};font-family:'Space Mono',monospace;">${verdict}</div>
+    </div>`;
+
+  document.getElementById('oc-exec-brief').innerHTML   = escHtml(d.executive_brief || '—');
+  document.getElementById('oc-deal-summary').innerHTML = escHtml(d.deal_lens_summary || '—');
+  document.getElementById('oc-risks-summary').innerHTML= escHtml(d.risks_summary || '—');
+  document.getElementById('oc-next-action').innerHTML  =
+    `<strong style="color:var(--green);">→</strong> ${escHtml(d.recommended_next_action || '—')}`;
 }
+
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // 🚀 HELPER FUNCTION: Convert tokens for different CRM platforms
@@ -2942,11 +2906,11 @@ function copyAsHubSpot(btn) {
 function showSummary() {
   const panel = document.getElementById('summary-panel');
   panel.classList.add('show');
-  document.getElementById('summary-company-name').textContent = `${state.company} — Complete GTM Strategy`;
+  document.getElementById('summary-company-name').textContent = `${state.company} — GTM Strategy Report`;
   document.getElementById('summary-tokens').textContent = state.totalTokens.toLocaleString();
   document.getElementById('summary-cost').textContent = '6/6';
   panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  showToast('🎉 Complete GTM Strategy Generated!', 'success');
+  showToast('🎉 GTM Strategy Report Complete!', 'success');
   // Reveal Step 7 panel
   unlockStep7();
 }
@@ -2965,12 +2929,12 @@ function buildExportText() {
   text += '═'.repeat(60) + '\n\n';
 
   const stepLabels = {
-    1: 'STEP 1: MARKET RESEARCH',
-    2: 'STEP 2: TAM MAPPING',
-    3: 'STEP 3: ICP MODELING',
-    4: 'STEP 4: ACCOUNT SOURCING',
-    5: 'STEP 5: KEYWORD GENERATION',
-    6: 'STEP 6: MESSAGING CREATION',
+    1: 'STEP 1: MARKET RESEARCH & INSIGHTS',
+    2: 'STEP 2: MARKET ATTRACTIVENESS & TAM ANALYSIS',
+    3: 'STEP 3: GTM RECOMMENDATION',
+    4: 'STEP 4: TARGET ACCOUNTS & GTM STRATEGY',
+    5: 'STEP 5: EXECUTION RISKS & CONSIDERATIONS',
+    6: 'STEP 6: GTM SUMMARY & ACTION PLAN',
   };
 
   for (let i = 1; i <= 6; i++) {
@@ -3044,7 +3008,7 @@ function downloadExport() {
     });
     const data = await res.json();
     if (!res.ok || !data.html) throw new Error(data.error || 'Export failed');
-   await generateProfessionalPDF(data.html, data.filename || ('GTM_Enterprise_' + state.company.replace(/[^a-zA-Z0-9]/g, '_') + '.pdf'));
+    await renderBackendHtmlToPdf(data.html, data.filename || ('GTM_Enterprise_' + state.company.replace(/[^a-zA-Z0-9]/g,'_') + '_' + new Date().toISOString().slice(0,10) + '.pdf'));
     showToast('Enterprise Report Downloaded', 'success');
   } catch (err) {
     console.error('Backend PDF export failed:', err);
@@ -3063,7 +3027,7 @@ function copyAllToClipboard() {
    colours, and all 6 steps + optional Step 7 intelligence.
 ═══════════════════════════════════════════════════════════════ */
 async function generateProfessionalPDF() {
-  showToast('Generating Universal Enterprise Report...', 'info');
+  showToast('Generating GTM Strategy Report...', 'info');
 
   if (!window.jspdf) {
     await new Promise((resolve) => {
@@ -3080,408 +3044,345 @@ async function generateProfessionalPDF() {
     });
   }
 
-  // Define data references
-  const s1 = state.steps[1]?.data || {};
-  const s2 = state.steps[2]?.data || {};
-  const s3 = state.steps[3]?.data || {};
-  const s4 = state.steps[4]?.data || {};
-  const s5 = state.steps[5]?.data || {};
-  const s6 = state.steps[6]?.data || {};
+  // Phase data references
+  const p1 = state.steps[1]?.data || {};
+  const p2 = state.steps[2]?.data || {};
+  const p3 = state.steps[3]?.data || {};
+  const p4 = state.steps[4]?.data || {};
+  const p5 = state.steps[5]?.data || {};
+  const p6 = state.steps[6]?.data || {};
   const s7 = state.step7 || {};
 
-  const safe = (v) => v ? v : '—';
   const esc = (s) => (s||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   const arr = (val) => Array.isArray(val) ? val : (val ? [val] : []);
   const dateStr = new Date().toLocaleDateString('en-GB',{year:'numeric',month:'long',day:'numeric'});
-
-  let confScore = parseInt(s7.confidence_score) || parseInt(s1.gtm_relevance_score) || 75;
-  const veracity = Math.round(confScore * 0.4);
-  const timing = Math.round(confScore * 0.25);
-  const icpFit = Math.round(confScore * 0.20);
-  const completeness = Math.round(confScore * 0.15);
-  const recommendation = esc(s7.go_no_go?.recommendation || 'WATCH');
-  
-  const tamVal = safe(s2.tam_size_estimate);
-  const samVal = safe(s2.sam_estimate);
-  const somVal = safe(s2.som_estimate);
   const companyName = esc(state.company || 'Company');
 
-  // Emails
-  const emailsHtml = ['email_1','email_2','email_3'].map((k, i) => {
-    const em = s6[k];
-    if(!em) return '';
-    return `
-      <div class="card">
-        <div class="block-label">Email ${i+1} — ${esc(em.angle||'')}</div>
-        <p><strong>Subject:</strong> ${esc(em.subject)}</p>
-        <p style="white-space:pre-wrap; font-size:10.5px;">${esc(em.body)}</p>
-        <p><span class="tag green" style="margin-top:2mm;">CTA: ${esc(em.cta)}</span></p>
-      </div>
-    `;
-  }).join('');
+  // Scores
+  const demand   = p2.demand_score?.score ?? 0;
+  const timing   = p2.market_timing_score?.score ?? 0;
+  const icpScore = p2.icp_fit_score?.score ?? 0;
+  const dataComp = p2.data_completeness_score?.score ?? 0;
+  const total    = p2.total_score ?? (demand + timing + icpScore + dataComp);
+  const verdict  = esc((p3.verdict || p6.verdict || 'PENDING').toUpperCase());
+  const verdictColor = verdict === 'GO' ? '#22c55e' : verdict === 'NO GO' ? '#ef4444' : '#f59e0b';
 
-  const html = `
-<!DOCTYPE html>
-<html lang="en">
+  const confScore = p5.confidence_score ?? s7.confidence_score ?? Math.round(total * 0.85);
+  const scoreVerif = esc(p2.score_verification || `${demand} + ${timing} + ${icpScore} + ${dataComp} = ${total}`);
+
+  const htmlContent = `<!DOCTYPE html>
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
-  <style>
-    :root {
-      --bg:       #0B0F1A;
-      --bg-alt:   #0D1120;
-      --card:     #121827;
-      --border:   #1F2937;
-      --accent:   #a855f7;
-      --accent2:  #7c3aed;
-      --green:    #22c55e;
-      --amber:    #f59e0b;
-      --red:      #ef4444;
-      --blue:     #3b82f6;
-      --text:     #E5E7EB;
-      --muted:    #6B7280;
-      --faint:    #374151;
-      --white:    #ffffff;
-    }
-    * { margin: 0; padding: 0; box-sizing: border-box; }
-    body {
-      font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text);
-      font-size: 11.5px; line-height: 1.65;
-      -webkit-print-color-adjust: exact; print-color-adjust: exact;
-    }
-    .page {
-      width: 210mm; height: 297mm; overflow: hidden; /* Ensures strict boundary */
-      margin: 0; background: var(--bg);
-      padding: 15mm 18mm; position: relative;
-      page-break-after: always;
-    }
-    .page-header {
-      display: flex; align-items: center; justify-content: space-between;
-      margin-bottom: 8mm; border-bottom: 1px solid var(--border); padding-bottom: 4mm;
-    }
-    .abe-mark {
-      width: 32px; height: 32px; background: linear-gradient(135deg, var(--accent), var(--accent2));
-      border-radius: 8px; display: flex; align-items: center; justify-content: center;
-      font-family: 'Space Mono', monospace; font-size: 11px; font-weight: 700; color: white;
-    }
-    .abe-brand { display: flex; align-items: center; gap: 10px; }
-    .abe-brand-name { font-size: 12px; font-weight: 800; color: white; }
-    .abe-brand-sub { font-family: 'Space Mono', monospace; font-size: 8px; color: var(--muted); letter-spacing: 0.12em; text-transform: uppercase; }
-    .conf-badge { background: rgba(168,85,247,0.08); border: 1px solid rgba(168,85,247,0.25); border-radius: 20px; padding: 4px 14px; font-size: 9px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
-    h1 { font-size: 36px; font-weight: 900; color: white; letter-spacing: -0.5px; }
-    h2 { font-size: 18px; font-weight: 700; color: white; margin-bottom: 4mm; display: flex; align-items: center; gap: 8px; }
-    h3 { font-size: 14px; font-weight: 600; color: var(--text); margin-top: 5mm; margin-bottom: 3mm; }
-    p { margin-bottom: 3mm; }
-    .section-context { font-size: 13px; color: var(--muted); margin-bottom: 6mm; border-bottom: 1px dashed var(--border); padding-bottom: 3mm; }
-    .section-accent { display: inline-block; width: 28px; height: 28px; background: rgba(168,85,247,0.1); border: 1px solid rgba(168,85,247,0.3); border-radius: 8px; text-align: center; line-height: 26px; }
-    .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 5mm 6mm; margin-bottom: 5mm; }
-    .block-label { font-size: 8px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.15em; color: var(--muted); margin-bottom: 2mm; }
-    .data-table { width: 100%; border-collapse: collapse; margin-top: 2mm; font-size: 10px; margin-bottom: 4mm; }
-    .data-table th { text-align: left; color: var(--muted); font-weight: 600; padding: 2mm 3mm; border-bottom: 1px solid var(--border); }
-    .data-table td { padding: 2mm 3mm; border-bottom: 1px solid rgba(31,41,55,0.5); vertical-align: top; }
-    .num { font-family: 'Space Mono', monospace; text-align: right; }
-    .highlight-accent { color: var(--accent); font-weight: 700; }
-    .highlight-green { color: var(--green); font-weight: 700; }
-    .highlight-amber { color: var(--amber); font-weight: 700; }
-    .metric-number { font-size: 32px; font-weight: 900; font-family: 'Space Mono', monospace; color: var(--accent); }
-    .analyst-callout {
-      background: rgba(168,85,247,0.04); border: 1px solid rgba(168,85,247,0.2);
-      border-left: 4px solid var(--accent); border-radius: 8px;
-      padding: 4mm 5mm; margin: 4mm 0; font-size: 11px;
-    }
-    .analyst-callout strong { color: var(--accent); }
-    .analyst-callout.amber { border-left-color: var(--amber); background: rgba(245,158,11,0.04); border-color: rgba(245,158,11,0.2); }
-    .analyst-callout.amber strong { color: var(--amber); }
-    .analyst-callout.green { border-left-color: var(--green); background: rgba(34,197,94,0.04); border-color: rgba(34,197,94,0.2); }
-    .analyst-callout.green strong { color: var(--green); }
-    .analyst-callout.red { border-left-color: var(--red); background: rgba(239,68,68,0.04); border-color: rgba(239,68,68,0.2); }
-    .analyst-callout.red strong { color: var(--red); }
-    .waterfall { margin: 3mm 0; }
-    .waterfall-bar { display: flex; align-items: center; margin-bottom: 2.5mm; }
-    .waterfall-value { width: 140px; font-family: 'Space Mono', monospace; font-size: 10px; text-align: right; padding-right: 3mm; }
-    .waterfall-fill { height: 12px; border-radius: 6px; }
-    .wf-blue { background: var(--blue); } .wf-accent { background: var(--accent); } .wf-green { background: var(--green); } .wf-amber { background: var(--amber); }
-    .tag { display: inline-block; background: rgba(168,85,247,0.08); border: 1px solid rgba(168,85,247,0.2); border-radius: 6px; padding: 1.5mm 4mm; font-size: 9px; font-weight: 600; color: #c4b5fd; margin: 1mm 2mm 1mm 0; }
-    .tag.green { background: rgba(34,197,94,0.08); border-color: rgba(34,197,94,0.2); color: #86efac; }
-    .tag.amber { background: rgba(245,158,11,0.08); border-color: rgba(245,158,11,0.2); color: #fcd34d; }
-    .tag.blue  { background: rgba(59,130,246,0.08); border-color: rgba(59,130,246,0.2); color: #93c5fd; }
-    .tag.red   { background: rgba(239,68,68,0.08); border-color: rgba(239,68,68,0.2); color: #fca5a5; }
-    .swot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 3mm; margin-top: 2mm; margin-bottom: 4mm; }
-    .swot-cell { border: 1px solid var(--border); border-radius: 8px; padding: 3mm 4mm; }
-    .swot-label { font-size: 9px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.15em; margin-bottom: 1.5mm; }
-    .page-footer { position: absolute; bottom: 12mm; left: 18mm; right: 18mm; font-size: 8px; color: var(--faint); display: flex; justify-content: space-between; border-top: 1px solid var(--border); padding-top: 4mm; }
-    ul { padding-left: 5mm; } li { margin-bottom: 1.5mm; }
-  </style>
+<meta charset="UTF-8">
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Inter', Arial, sans-serif; background: #0d1120; color: #e5e7eb; font-size: 12px; }
+  .page { width: 210mm; min-height: 297mm; padding: 14mm 16mm; background: #0d1120; page-break-after: always; position: relative; }
+  .page:last-child { page-break-after: auto; }
+  h1 { font-size: 22px; font-weight: 900; color: white; letter-spacing: -0.02em; }
+  h2 { font-size: 15px; font-weight: 800; color: white; margin: 12px 0 8px; border-left: 3px solid #a855f7; padding-left: 8px; }
+  h3 { font-size: 11px; font-weight: 700; color: #c4b5fd; text-transform: uppercase; letter-spacing: 0.1em; margin: 8px 0 4px; }
+  p  { line-height: 1.65; color: #d1d5db; margin-bottom: 6px; }
+  .card { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 8px; padding: 12px 14px; margin-bottom: 8px; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .grid4 { display: grid; grid-template-columns: repeat(4,1fr); gap: 8px; }
+  .tag { display: inline-block; padding: 3px 8px; border-radius: 20px; font-size: 9px; font-weight: 700; margin: 2px; }
+  .tag-green  { background: rgba(34,197,94,0.12); color: #4ade80; border: 1px solid rgba(34,197,94,0.2); }
+  .tag-amber  { background: rgba(245,158,11,0.12); color: #fbbf24; border: 1px solid rgba(245,158,11,0.2); }
+  .tag-blue   { background: rgba(96,165,250,0.12); color: #60a5fa; border: 1px solid rgba(96,165,250,0.2); }
+  .tag-purple { background: rgba(168,85,247,0.12); color: #c4b5fd; border: 1px solid rgba(168,85,247,0.2); }
+  .score-big  { font-size: 32px; font-weight: 900; font-family: 'Space Mono', monospace; }
+  .muted      { color: #6b7280; font-size: 9px; }
+  .header-bar { display: flex; align-items: center; justify-content: space-between; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,0.08); margin-bottom: 14px; }
+  .page-footer { position: absolute; bottom: 10mm; left: 16mm; right: 16mm; display: flex; justify-content: space-between; font-size: 8px; color: #4b5563; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 6px; }
+  .score-bar-wrap { background: rgba(255,255,255,0.06); border-radius: 4px; height: 5px; margin-top: 4px; overflow: hidden; }
+  .score-bar-fill { height: 100%; border-radius: 4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 10px; }
+  th { background: rgba(255,255,255,0.06); color: #9ca3af; font-size: 8px; text-transform: uppercase; letter-spacing: 0.1em; padding: 6px 8px; text-align: left; }
+  td { padding: 6px 8px; border-bottom: 1px solid rgba(255,255,255,0.04); color: #d1d5db; vertical-align: top; }
+</style>
 </head>
 <body>
 
-<!-- COVER -->
-<div class="page" style="display:flex; flex-direction:column; justify-content:center; align-items:center; text-align:center;">
-  <div>
-    <div class="abe-mark" style="width:56px; height:56px; font-size:18px; margin:0 auto 8mm;">ABE</div>
-    <h1>${companyName}<br>GTM Intelligence Report</h1>
-    <p style="font-size:15px; color:var(--muted); margin-top:6mm;">Confidential · Senior Strategy Brief</p>
-    <p style="font-size:12px; color:var(--muted); margin-top:4mm;">Prepared by ABE AI Revenue Infrastructure<br>${dateStr}</p>
-  </div>
-  <div style="position:absolute; bottom:15mm; font-size:9px; color:var(--faint);">Classification: CONFIDENTIAL — Not for External Distribution</div>
-</div>
-
-<!-- EXECUTIVE SUMMARY -->
+<!-- PAGE 1: Cover + Score Summary -->
 <div class="page">
-  <div class="page-header"><div class="abe-brand"><div class="abe-mark">ABE</div><div><div class="abe-brand-name">AI Revenue Infrastructure</div><div class="abe-brand-sub">Enterprise GTM Platform</div></div></div><div class="conf-badge">Confidential</div></div>
-  <h2><span class="section-accent">📋</span> Executive Summary</h2>
-  
-  <div class="section-context">
-    Establishes the macro-opportunity and win-probability. Provides the highest-leverage vector for outbound strategy.
-  </div>
-
-  <div class="card">
-    <p style="font-size:13px; line-height:1.9;">
-      ${esc(s7.executive_brief || s1.company_overview || 'Strategic evaluation of market conditions and buyer readiness.')}
-    </p>
-  </div>
-  
-  <div style="display:flex; gap:4mm; margin-bottom:5mm;">
-    <div class="card" style="flex:1; text-align:center;"><div class="metric-number" style="font-size:24px;">${esc(tamVal)}</div><div class="block-label">TAM</div></div>
-    <div class="card" style="flex:1; text-align:center;"><div class="metric-number" style="color:var(--green);font-size:24px;">${esc(s2.growth_rate || 'N/A')}</div><div class="block-label">CAGR</div></div>
-    <div class="card" style="flex:1; text-align:center;"><div class="metric-number" style="color:var(--amber);font-size:24px;">${confScore}/100</div><div class="block-label">Relevance</div></div>
-    <div class="card" style="flex:1; text-align:center;"><div class="metric-number" style="color:var(--green);font-size:24px;">${recommendation}</div><div class="block-label">Verdict</div></div>
-  </div>
-  
-  <div class="analyst-callout">
-    <strong>👉 Analyst Insight:</strong> ${esc(s1.gtm_relevance_reasoning || 'Market conditions remain favorable. Execute targeted outreach immediately.')}
-  </div>
-  
-  <div style="display:flex; flex-wrap:wrap; gap:3mm; margin-top:5mm;">
-    <span class="tag green">01 Market Research</span><span class="tag green">02 TAM Mapping</span><span class="tag green">03 ICP Modeling</span><span class="tag green">04 Account Sourcing</span><span class="tag green">05 Keywords</span><span class="tag green">06 Messaging</span><span class="tag amber">07 Revenue Intel</span>
-  </div>
-  <div class="page-footer"><span>ABE · ${companyName} GTM Intelligence Report</span><span>1</span></div>
-</div>
-
-<!-- STEP 1: MARKET RESEARCH -->
-<div class="page">
-  <div class="page-header"><div class="abe-brand"><div class="abe-mark">ABE</div><div><div class="abe-brand-name">AI Revenue Infrastructure</div><div class="abe-brand-sub">Enterprise GTM Platform</div></div></div><div class="conf-badge">Confidential</div></div>
-  <h2><span class="section-accent">01</span> Market Research — The Context</h2>
-  
-  <div class="section-context">Deconstructs market positioning and isolates specific macro-triggers.</div>
-
-  <h3>1.1 · Market Position & Stage</h3>
-  <table class="data-table">
-    <tr><th>Category</th><th>Details</th></tr>
-    <tr><td><strong>Market Position</strong></td><td>${esc(s1.market_position || '—')}</td></tr>
-    <tr><td><strong>Revenue Stage</strong></td><td>${esc(s1.revenue_stage || '—')}</td></tr>
-    <tr><td><strong>Employee Count</strong></td><td>${esc(s1.employee_count || '—')}</td></tr>
-  </table>
-
-  <h3>1.2 · Strategic Growth Signals</h3>
-  <table class="data-table">
-    <tr><th>#</th><th>Signal Observed</th></tr>
-    ${arr(s1.growth_signals).map((s,i) => `<tr><td style="width:20px;">${i+1}</td><td>${esc(s)}</td></tr>`).join('')}
-  </table>
-
-  <h3>1.3 · Core Value Propositions</h3>
-  <table class="data-table">
-    <tr><th>#</th><th>Product / Service Line</th></tr>
-    ${arr(s1.products_services).map((s,i) => `<tr><td style="width:20px;">${i+1}</td><td>${esc(s)}</td></tr>`).join('')}
-  </table>
-
-  <div class="analyst-callout">
-    <strong>👉 Analyst Insight:</strong> Focus on the most unique differentiators observed in the growth signals to bypass standard procurement filters.
-  </div>
-  <div class="page-footer"><span>ABE · Market Research</span><span>2</span></div>
-</div>
-
-<!-- STEP 2: TAM MAPPING -->
-<div class="page">
-  <div class="page-header"><div class="abe-brand"><div class="abe-mark">ABE</div><div><div class="abe-brand-name">AI Revenue Infrastructure</div><div class="abe-brand-sub">Enterprise GTM Platform</div></div></div><div class="conf-badge">Confidential</div></div>
-  <h2><span class="section-accent">02</span> TAM Mapping — The Opportunity</h2>
-  
-  <div class="section-context">Quantifies the total market velocity and filters it down to the exact actionable dollar amount.</div>
-
-  <h3>2.1 · Market Maturity</h3>
-  <div class="card"><p>${esc(s2.market_maturity || '—')}</p></div>
-
-  <h3>2.2 · Waterfall Logic: TAM → SAM → SOM</h3>
-  <div class="waterfall">
-    <div class="waterfall-bar"><div class="waterfall-value">${esc(tamVal)}</div><div class="waterfall-fill wf-blue" style="width:80%;"></div><span style="margin-left:2mm;">TAM (Total Addressable)</span></div>
-    <div class="waterfall-bar"><div class="waterfall-value">${esc(samVal)}</div><div class="waterfall-fill wf-accent" style="width:50%;"></div><span style="margin-left:2mm;">SAM (Serviceable Addressable)</span></div>
-    <div class="waterfall-bar"><div class="waterfall-value">${esc(somVal)}</div><div class="waterfall-fill wf-amber" style="width:20%;"></div><span style="margin-left:2mm;">SOM (Serviceable Obtainable)</span></div>
-  </div>
-
-  <h3>2.3 · Growth Drivers</h3>
-  <div style="margin-top:4mm;">
-    ${arr(s2.growth_drivers).map(s => `<span class="tag green">${esc(s)}</span>`).join('')}
-  </div>
-
-  <div class="analyst-callout amber">
-    <strong>👉 Analyst Insight:</strong> Ensure execution is tightly aligned to the defined SOM to prevent resource bleed into non-ideal segments.
-  </div>
-  <div class="page-footer"><span>ABE · TAM Analysis</span><span>3</span></div>
-</div>
-
-<!-- STEP 3: ICP MODELING -->
-<div class="page">
-  <div class="page-header"><div class="abe-brand"><div class="abe-mark">ABE</div><div><div class="abe-brand-name">AI Revenue Infrastructure</div><div class="abe-brand-sub">Enterprise GTM Platform</div></div></div><div class="conf-badge">Confidential</div></div>
-  <h2><span class="section-accent">03</span> ICP Modeling — The Persona</h2>
-  
-  <div class="section-context">Identifies decision-makers and maps their operational pain directly to solutions.</div>
-
-  <h3>3.1 · Primary Persona & Firmographics</h3>
-  <table class="data-table">
-    <tr><th>Primary ICP</th><td>${esc(s3.primary_icp || '—')}</td></tr>
-    <tr><th>Decision Makers</th><td>${arr(s3.decision_makers).join(', ') || '—'}</td></tr>
-    <tr><th>Firmographics</th><td>${esc(s3.firmographics || '—')}</td></tr>
-  </table>
-
-  <h3>3.2 · Core Pain Points</h3>
-  <table class="data-table">
-    <tr><th>#</th><th>Identified Operational Pain</th></tr>
-    ${arr(s3.core_pain_points).map((s,i) => `<tr><td style="width:20px;">${i+1}</td><td>${esc(s)}</td></tr>`).join('')}
-  </table>
-
-  <h3>3.3 · Buying Triggers (Why buy now?)</h3>
-  <div style="margin-top:4mm;">
-    ${arr(s3.buying_triggers).map(s => `<span class="tag amber">${esc(s)}</span>`).join('')}
-  </div>
-
-  <div class="page-footer"><span>ABE · ICP Modeling</span><span>4</span></div>
-</div>
-
-<!-- STEP 4 & 5: SOURCING AND INTENT -->
-<div class="page">
-  <div class="page-header"><div class="abe-brand"><div class="abe-mark">ABE</div><div><div class="abe-brand-name">AI Revenue Infrastructure</div><div class="abe-brand-sub">Enterprise GTM Platform</div></div></div><div class="conf-badge">Confidential</div></div>
-  <h2><span class="section-accent">04</span> Account Sourcing & Intent</h2>
-  
-  <div class="section-context">Translates theoretical persona into actionable technographic logic and decodes semantic intent.</div>
-
-  <h3>4.1 · Boolean Sourcing Query</h3>
-  <div class="card"><code style="font-family:'Space Mono',monospace; font-size:10px; color:#c4b5fd; word-break:break-all;">${esc(s5.boolean_query || 'N/A')}</code></div>
-
-  <h3>4.2 · Sourcing Playbook</h3>
-  <table class="data-table">
-    <tr><th>Recommended Databases</th><td>${arr(s4.recommended_databases).join(', ') || '—'}</td></tr>
-    <tr><th>Filter Criteria</th><td>${esc(s4.filter_criteria || '—')}</td></tr>
-    <tr><th>Estimated Universe</th><td>${esc(s4.estimated_universe || '—')}</td></tr>
-    <tr><th>Execution Strategy</th><td>${esc(s4.sourcing_playbook || '—')}</td></tr>
-  </table>
-
-  <h3>5.1 · Intent & Signal Taxonomy</h3>
-  <div style="margin-bottom:3mm;"><strong>Primary Keywords:</strong><br>${arr(s5.primary_keywords).map(s => `<span class="tag blue">${esc(s)}</span>`).join('')}</div>
-  <div style="margin-bottom:3mm;"><strong>Secondary Keywords:</strong><br>${arr(s5.secondary_keywords).map(s => `<span class="tag">${esc(s)}</span>`).join('')}</div>
-  <div style="margin-bottom:3mm;"><strong>Intent Signals (Social / Event):</strong><br>${arr(s5.intent_signals).map(s => `<span class="tag amber">${esc(s)}</span>`).join('')}</div>
-
-  <div class="analyst-callout">
-    <strong>👉 Analyst Insight:</strong> Do not bid on generic terms. Syndicate outbound effort around highly specific, negative-intent keywords to intercept prospects at peak vulnerability.
-  </div>
-  <div class="page-footer"><span>ABE · Sourcing & Intent</span><span>5</span></div>
-</div>
-
-<!-- STEP 6: MESSAGING -->
-<div class="page">
-  <div class="page-header"><div class="abe-brand"><div class="abe-mark">ABE</div><div><div class="abe-brand-name">AI Revenue Infrastructure</div><div class="abe-brand-sub">Enterprise GTM Platform</div></div></div><div class="conf-badge">Confidential</div></div>
-  <h2><span class="section-accent">06</span> Messaging Playbook</h2>
-  
-  <div class="section-context">Replaces generic pitch cadences with hyper-targeted, symptom-based outreach.</div>
-
-  <h3>6.1 · 3-Touch Triggered Sequence</h3>
-  ${emailsHtml || '<p style="color:var(--muted)">No email sequence generated.</p>'}
-
-  <h3>6.2 · The Executive LinkedIn Hook</h3>
-  <div class="card"><p style="font-size:12px;"><strong>Direct Message:</strong><br>"${esc(s6.linkedin_approach || 'Hi {prospect_name}, noticed your recent activity. Let us connect.')}"</p></div>
-
-  <div class="page-footer"><span>ABE · Engagement Playbook</span><span>6</span></div>
-</div>
-
-<!-- STEP 7: REVENUE INTELLIGENCE -->
-<div class="page">
-  <div class="page-header"><div class="abe-brand"><div class="abe-mark">ABE</div><div><div class="abe-brand-name">AI Revenue Infrastructure</div><div class="abe-brand-sub">Enterprise GTM Platform</div></div></div><div class="conf-badge">Confidential</div></div>
-  <h2><span class="section-accent" style="background:rgba(251,191,36,0.1); border-color:rgba(251,191,36,0.3);">07</span> Revenue Intelligence — The Verdict</h2>
-
-  <div class="section-context">Final strategic audit. Validates the viability of execution and dictates immediate next steps.</div>
-
-  <h3>7.1 · Go / No-Go Validation</h3>
-  <div class="card">
-    <div style="display:flex; align-items:center; gap:5mm;">
-      <span class="metric-number" style="color:var(--${recommendation==='GO'?'green':recommendation==='NO-GO'?'red':'amber'});">${recommendation}</span>
-      <div><strong>Verdict Rationale:</strong><br>${esc(s7.go_no_go?.reason || 'Execute with targeted precision based on timing signals.')}</div>
+  <div class="header-bar">
+    <div>
+      <div style="font-size:9px;font-weight:700;color:#a855f7;text-transform:uppercase;letter-spacing:0.2em;margin-bottom:4px;">GTM Strategy Report</div>
+      <h1>${companyName}</h1>
+      <div class="muted" style="margin-top:4px;">${esc(state.industry || 'Industry not specified')} · Generated ${dateStr}</div>
+    </div>
+    <div style="text-align:right;">
+      <div class="score-big" style="color:${verdictColor};">${verdict}</div>
+      <div class="muted">Qualification Verdict</div>
     </div>
   </div>
 
-  <h3>7.2 · Risk Audit</h3>
-  <div class="analyst-callout red">
-    <strong>🚩 Identified Constraints:</strong><br>
-    ${arr(s7.risk_audit).map(s => `• ${esc(s)}<br>`).join('') || 'Standard execution risk.'}
+  <h2>Score Breakdown</h2>
+  <div class="grid4" style="margin-bottom:12px;">
+    ${[['Demand',demand,40,'#22c55e'],['Timing',timing,25,'#60a5fa'],['ICP Fit',icpScore,20,'#a855f7'],['Data',dataComp,15,'#f59e0b']].map(([l,v,m,c])=>`
+    <div class="card" style="text-align:center;">
+      <div class="score-big" style="color:${c};font-size:22px;">${v}</div>
+      <div class="muted">${l} / ${m}</div>
+      <div class="score-bar-wrap"><div class="score-bar-fill" style="width:${Math.round(v/m*100)}%;background:${c};"></div></div>
+    </div>`).join('')}
+  </div>
+  <div class="card" style="text-align:center;">
+    <div class="score-big" style="color:${verdictColor};font-size:40px;">${total} <span style="font-size:18px;color:#6b7280;">/100</span></div>
+    <div class="muted" style="margin-top:4px;">Calculation: ${scoreVerif}</div>
   </div>
 
-  <h3>7.3 · The "Why Now" Trigger</h3>
+  <h2 style="margin-top:14px;">Executive Brief</h2>
+  <div class="card"><p style="font-size:12px;line-height:1.8;">${esc(p6.executive_brief || s7.executive_brief || 'GTM Summary step not yet generated.')}</p></div>
+
+  ${(p3.verdict || p6.verdict) ? `
+  <div class="grid2" style="margin-top:8px;">
+    <div class="card">
+      <h3>Verdict Reasoning</h3>
+      <p>${esc(p3.verdict_reasoning || '—')}</p>
+    </div>
+    <div class="card">
+      <h3>Score Basis</h3>
+      <p style="font-family:monospace;font-size:10px;">${esc(p3.score_basis || '—')}</p>
+      <p style="margin-top:6px;"><strong style="color:#f59e0b;">Demand:</strong> ${esc(p3.demand_assessment||'—')} · <strong style="color:#a855f7;">ICP:</strong> ${esc(p3.icp_assessment||'—')}</p>
+    </div>
+  </div>
+  ` : ''}
+
+  <div class="card" style="margin-top:8px;border-color:${verdictColor};border-width:2px;">
+    <h3>Recommended Next Action</h3>
+    <p style="color:${verdictColor};font-weight:700;font-size:13px;">→ ${esc(p6.recommended_next_action || 'Complete all 6 phases to generate this recommendation.')}</p>
+  </div>
+
+  <div class="page-footer">
+    <span>ABE · GTM Strategy Report · ${companyName}</span>
+    <span>Page 1</span>
+  </div>
+</div>
+
+<!-- PAGE 2: Market Research & TAM Analysis -->
+<div class="page">
+  <div class="header-bar">
+    <div style="font-size:11px;font-weight:700;color:#a855f7;">Step 1 — Market Research &amp; Insights · Step 2 — Market Attractiveness &amp; TAM</div>
+    <div class="muted">${companyName}</div>
+  </div>
+
+  <h2>Demand Signals</h2>
   <div class="card">
-    <p><strong>The Convergence of Need and Timing:</strong></p>
-    <p style="font-size:13px; margin-top:2mm;">${esc(s7.why_now_analysis || 'Immediate engagement is recommended to preempt competitive lock-in.')}</p>
+    ${arr(p1.demand_signals).map(s=>`<div style="margin-bottom:6px;"><span class="tag tag-green">${esc(s.type||'?')}</span> <span class="tag ${s.strength==='High'?'tag-green':s.strength==='Medium'?'tag-amber':''}">${esc(s.strength||'')}</span> <span style="color:#e5e7eb;">${esc(s.signal)}</span></div>`).join('') || '<p class="muted">No demand signals extracted.</p>'}
   </div>
 
-  <h3>7.4 · Confidence Matrix Analysis</h3>
-  <table class="data-table">
-    <tr><td>Signal Veracity (40%)</td><td class="num">${veracity}/40</td><td>Evaluated density and recency of explicit buying signals.</td></tr>
-    <tr><td>Market Timing (25%)</td><td class="num">${timing}/25</td><td>Alignment with macro tailwinds.</td></tr>
-    <tr><td>ICP Fit (20%)</td><td class="num">${icpFit}/20</td><td>Firmographic and technographic match rate.</td></tr>
-    <tr><td>Data Completeness (15%)</td><td class="num">${completeness}/15</td><td>Quality of the extraction source.</td></tr>
-    <tr style="border-top:1px solid var(--accent)"><td><strong>Overall Fidelity</strong></td><td class="num highlight-accent">${confScore}/100</td><td></td></tr>
+  <h2>Market Timing</h2>
+  <div class="card">
+    ${arr(p1.market_timing).map(s=>`<div style="margin-bottom:6px;"><span class="tag tag-blue">${esc(s.category||'?')}</span> <span class="tag ${s.strength==='High'?'tag-green':s.strength==='Medium'?'tag-amber':''}">${esc(s.strength||'')}</span> <span style="color:#e5e7eb;">${esc(s.signal)}</span></div>`).join('') || '<p class="muted">No market timing signals extracted.</p>'}
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>ICP Fit</h3>
+      <p>${esc(p1.icp_fit?.target_description || '—')}</p>
+      ${arr(p1.icp_fit?.fit_indicators).map(f=>`<span class="tag tag-green">${esc(f)}</span>`).join('')}
+      ${arr(p1.icp_fit?.mismatches).length ? `<p style="margin-top:6px;color:#f87171;font-size:10px;">⚠ ${arr(p1.icp_fit?.mismatches).join(' · ')}</p>` : ''}
+    </div>
+    <div class="card">
+      <h3>Data Completeness</h3>
+      ${arr(p1.data_completeness?.available).length ? `<p style="color:#4ade80;font-size:10px;">✓ Available: ${arr(p1.data_completeness?.available).join(', ')}</p>` : ''}
+      ${arr(p1.data_completeness?.missing).length ? `<p style="color:#f87171;font-size:10px;margin-top:4px;">✗ Missing: ${arr(p1.data_completeness?.missing).join(', ')}</p>` : ''}
+    </div>
+  </div>
+
+  <h2 style="margin-top:12px;">Scoring Detail</h2>
+  <table>
+    <tr><th>Category</th><th>Score</th><th>Max</th><th>Rationale</th><th>Sub-breakdown</th></tr>
+    ${[['Demand',p2.demand_score,'#22c55e'],['Market Timing',p2.market_timing_score,'#60a5fa'],['ICP Fit',p2.icp_fit_score,'#a855f7'],['Data Completeness',p2.data_completeness_score,'#f59e0b']].map(([l,s,c])=>`
+    <tr>
+      <td style="color:${c};font-weight:700;">${l}</td>
+      <td style="color:${c};font-weight:900;font-size:14px;">${s?.score??0}</td>
+      <td class="muted">${s?.max??0}</td>
+      <td>${esc(s?.rationale||'—')}</td>
+      <td style="font-family:monospace;font-size:9px;color:#9ca3af;">${esc(s?.sub_breakdown||'—')}</td>
+    </tr>`).join('')}
+    <tr style="border-top:2px solid rgba(255,255,255,0.2);">
+      <td style="font-weight:900;color:${verdictColor};">TOTAL</td>
+      <td style="color:${verdictColor};font-weight:900;font-size:16px;" colspan="2">${total}/100</td>
+      <td colspan="2" style="font-family:monospace;font-size:10px;color:#a855f7;">${scoreVerif}</td>
+    </tr>
   </table>
 
-  <div class="methodology-note" style="margin-top:5mm; font-size:9px; color:var(--muted);"><strong>Methodology:</strong> This report synthesizes data from aggregated market signals, AI predictive estimates, and public company filings. Manual validation of exact revenue figures is recommended prior to boardroom presentation.</div>
-  <div class="page-footer"><span>ABE · Executive Intelligence</span><span>7</span></div>
+  <div class="page-footer">
+    <span>ABE · GTM Strategy Report · ${companyName}</span>
+    <span>Page 2</span>
+  </div>
+</div>
+
+<!-- PAGE 3: GTM Recommendation & Strategy -->
+<div class="page">
+  <div class="header-bar">
+    <div style="font-size:11px;font-weight:700;color:#a855f7;">Step 3 — GTM Recommendation · Step 4 — Target Accounts &amp; GTM Strategy</div>
+    <div class="muted">${companyName}</div>
+  </div>
+
+  <div class="card" style="border:2px solid ${verdictColor};margin-bottom:12px;">
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div class="score-big" style="color:${verdictColor};font-size:28px;">${verdict}</div>
+      <div>
+        <p style="font-weight:700;color:${verdictColor};">${esc(p3.demand_assessment||'—')} Demand · ${esc(p3.icp_assessment||'—')} ICP Fit</p>
+        <p>${esc(p3.verdict_reasoning||'—')}</p>
+      </div>
+    </div>
+    ${arr(p3.conditions).length ? `<div style="margin-top:8px;"><strong style="color:#f59e0b;font-size:10px;">CONDITIONS:</strong> ${arr(p3.conditions).map(c=>`<span class="tag tag-amber">${esc(c)}</span>`).join('')}</div>` : ''}
+    ${p3.what_would_change_verdict ? `<p style="margin-top:6px;font-size:10px;color:#9ca3af;">What would change this: ${esc(p3.what_would_change_verdict)}</p>` : ''}
+  </div>
+
+  <h2>Target Accounts & GTM Strategy</h2>
+  <div class="grid2">
+    <div class="card">
+      <h3>Target Roles</h3>
+      ${arr(p4.target_roles).map(r=>`<span class="tag tag-purple">${esc(r)}</span>`).join('')}
+    </div>
+    <div class="card">
+      <h3>Solution Angle</h3>
+      <p style="font-size:16px;font-weight:900;color:#a855f7;text-transform:uppercase;">${esc(p4.solution_angle||'—')}</p>
+      <p class="muted">${esc(p4.approach_rationale||'')}</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Core Problem</h3>
+    <p>${esc(p4.core_problem||'—')}</p>
+  </div>
+
+  <div class="card">
+    <h3>Solution Pitch</h3>
+    <p>${esc(p4.solution_pitch||'—')}</p>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>Why Now</h3>
+      <p>${esc(p4.why_now||'—')}</p>
+    </div>
+    <div class="card">
+      <h3>Estimated Deal Size</h3>
+      <p style="font-size:18px;font-weight:900;color:#22c55e;">${esc(p4.estimated_deal_size?.range||'—')} <span class="muted">${p4.estimated_deal_size?.is_estimate?'(estimate)':''}</span></p>
+      <p class="muted">${esc(p4.estimated_deal_size?.basis||'')}</p>
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>Sales Approach</h3>
+    <span class="tag tag-purple" style="font-size:11px;padding:5px 12px;">${esc((p4.sales_approach||'—').toUpperCase())}</span>
+    <p style="margin-top:6px;">${esc(p4.approach_rationale||'—')}</p>
+  </div>
+
+  <div class="page-footer">
+    <span>ABE · GTM Strategy Report · ${companyName}</span>
+    <span>Page 3</span>
+  </div>
+</div>
+
+<!-- PAGE 4: Execution Risks & GTM Summary -->
+<div class="page">
+  <div class="header-bar">
+    <div style="font-size:11px;font-weight:700;color:#a855f7;">Step 5 — Execution Risks · Step 6 — GTM Summary &amp; Action Plan</div>
+    <div class="muted">${companyName}</div>
+  </div>
+
+  <h2>Key Risks</h2>
+  ${arr(p5.key_risks).map(r=>`
+    <div class="card" style="border-left:3px solid ${r.impact==='high'?'#ef4444':r.impact==='medium'?'#f59e0b':'#6b7280'};">
+      <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+        <span class="tag ${r.impact==='high'?'tag-amber':''}" style="${r.impact==='high'?'border-color:#ef4444;color:#f87171;':''}">${esc((r.impact||'').toUpperCase())} IMPACT</span>
+        <span class="muted">Source: ${esc(r.source||'—')}</span>
+      </div>
+      <p>${esc(r.risk||'')}</p>
+      ${r.mitigation?`<p style="color:#4ade80;font-size:10px;margin-top:4px;">→ ${esc(r.mitigation)}</p>`:''}
+    </div>`).join('') || '<div class="card"><p class="muted">No risks identified.</p></div>'}
+
+  <div class="grid2" style="margin-top:8px;">
+    <div class="card" style="text-align:center;">
+      <div class="score-big" style="color:${confScore>=70?'#22c55e':confScore>=45?'#f59e0b':'#ef4444'};font-size:36px;">${confScore}</div>
+      <div class="muted">Confidence Score /100</div>
+      <div class="score-bar-wrap" style="margin-top:8px;"><div class="score-bar-fill" style="width:${confScore}%;background:${confScore>=70?'#22c55e':confScore>=45?'#f59e0b':'#ef4444'};"></div></div>
+      <p style="margin-top:6px;font-size:10px;color:#9ca3af;">${esc(p5.confidence_reasoning||'')}</p>
+    </div>
+    <div class="card">
+      <h3>Validation Needed</h3>
+      ${arr(p5.validation_needed).map(v=>`<span class="tag tag-blue">${esc(v)}</span>`).join('') || '<p class="muted">None specified.</p>'}
+    </div>
+  </div>
+
+  ${arr(p6.signal_highlights).length ? `
+  <h2 style="margin-top:12px;">Top Signal Highlights</h2>
+  <div class="card">
+    ${arr(p6.signal_highlights).map(s=>`
+      <div style="margin-bottom:6px;">
+        <span class="tag ${s.type==='demand'?'tag-green':s.type==='timing'?'tag-blue':'tag-purple'}">${esc(s.type||'?')}</span>
+        <span class="tag ${s.strength==='High'?'tag-green':s.strength==='Medium'?'tag-amber':''}">${esc(s.strength||'')}</span>
+        <span style="color:#e5e7eb;">${esc(s.signal)}</span>
+      </div>`).join('')}
+  </div>` : ''}
+
+  <div class="card" style="margin-top:8px;">
+    <h3>Deal Summary</h3>
+    <p>${esc(p6.deal_lens_summary||'—')}</p>
+  </div>
+
+  <div class="card">
+    <h3>Risks Summary</h3>
+    <p>${esc(p6.risks_summary||'—')}</p>
+  </div>
+
+  <div class="card">
+    <h3>Confidence Note</h3>
+    <p>${esc(p6.confidence_note||'—')}</p>
+  </div>
+
+  ${s7?.strategic_hook ? `
+  <div class="card" style="border-color:#a855f7;margin-top:8px;">
+    <h3>Revenue Intelligence Hook (Step 7)</h3>
+    <p style="font-style:italic;color:#c4b5fd;">"${esc(s7.strategic_hook)}"</p>
+  </div>` : ''}
+
+  <div class="page-footer">
+    <span>ABE · GTM Strategy Report · ${companyName} · ${dateStr}</span>
+    <span>Page 4</span>
+  </div>
 </div>
 
 </body>
-</html>
-  `;
+</html>`;
 
-  const iframe = document.createElement('iframe');
-  iframe.style.cssText = 'position:fixed;top:0;left:-9999px;width:210mm;border:none;opacity:0;pointer-events:none;';
-  document.body.appendChild(iframe);
-  iframe.srcdoc = html;
-  
-  await new Promise(resolve => {
-    iframe.onload = resolve;
-    setTimeout(resolve, 5000); 
-  });
-
-  const iDoc = iframe.contentDocument || iframe.contentWindow.document;
-  
-  // Wait for fonts to load
-  await new Promise(r => setTimeout(r, 1500));
+  // Render to PDF
+  const container = document.createElement('div');
+  container.style.cssText = 'position:fixed;top:-10000px;left:0;z-index:-999;width:210mm;';
+  container.innerHTML = htmlContent;
+  document.body.appendChild(container);
 
   try {
     const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true });
-    
-    const pages = iDoc.querySelectorAll('.page');
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pages = container.querySelectorAll('.page');
+
     for (let i = 0; i < pages.length; i++) {
-      if (i > 0) pdf.addPage();
-      
-      const canvas = await window.html2canvas(pages[i], {
-        scale: 2, 
-        useCORS: true, 
-        backgroundColor: '#0B0F1A',
-        width: pages[i].offsetWidth,
-        height: pages[i].offsetHeight
+      const canvas = await html2canvas(pages[i], {
+        scale: 2, useCORS: true, logging: false,
+        backgroundColor: '#0d1120',
+        width: pages[i].offsetWidth, height: pages[i].offsetHeight,
       });
-      
-      const imgData = canvas.toDataURL('image/jpeg', 0.95);
-      
-      // Calculate exact dimensions for A4 (210x297mm)
+      const imgData = canvas.toDataURL('image/jpeg', 0.92);
+      if (i > 0) pdf.addPage();
       pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
     }
-    
-    const filename = `GTM_Enterprise_${companyName.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0,10)}.pdf`;
+
+    const filename = `GTM_Qualification_${state.company.replace(/[^a-zA-Z0-9]/g,'_')}_${new Date().toISOString().slice(0,10)}.pdf`;
     pdf.save(filename);
-    showToast(`✅ Enterprise Report Downloaded: ${filename}`, 'success');
-  } catch(err) {
-    console.error(err);
-    showToast('Error generating PDF', 'error');
+    showToast(`Report downloaded: ${filename}`, 'success');
+  } catch (e) {
+    showToast('PDF generation failed: ' + e.message, 'error');
+    console.error(e);
   } finally {
-    document.body.removeChild(iframe);
-    closeExportModal();
+    document.body.removeChild(container);
   }
 }
 
@@ -4004,8 +3905,8 @@ async function autoSaveToVault() {
       }
       const token = await getAuthToken();
       // Build human-readable report text for direct Supabase visibility
-      const stepLabels = {1:'Market Research',2:'TAM Mapping',3:'ICP Modeling',
-        4:'Account Sourcing',5:'Keyword Generation',6:'Messaging Creation'};
+      const stepLabels = {1:'Market Research & Insights',2:'Market Attractiveness & TAM Analysis',3:'GTM Recommendation',
+        4:'Target Accounts & GTM Strategy',5:'Execution Risks & Considerations',6:'GTM Summary & Action Plan'};
       const reportLines = [`GTM STRATEGY REPORT — ${state.company.toUpperCase()}`,
         `Generated: ${new Date().toLocaleDateString()}`, ''];
       for (let si = 1; si <= 6; si++) {
