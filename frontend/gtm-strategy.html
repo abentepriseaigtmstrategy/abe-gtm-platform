@@ -2981,14 +2981,86 @@ function closeExportModal() {
 
 function downloadExport() {
   exportViaBackend();
-}async function exportViaBackend() {
+}
+
+/**
+ * renderBackendHtmlToPdf
+ * Takes an HTML string returned by /api/export-pdf, injects it into a
+ * hidden container, renders each .page div with html2canvas, and saves
+ * the result as an A4 PDF via jsPDF.
+ */
+async function renderBackendHtmlToPdf(htmlString, filename) {
+  // Ensure jsPDF is loaded
+  if (!window.jspdf) {
+    await new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      s.onload = resolve;
+      s.onerror = () => reject(new Error('Failed to load jsPDF'));
+      document.head.appendChild(s);
+    });
+  }
+  // Ensure html2canvas is loaded
+  if (!window.html2canvas) {
+    await new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+      s.onload = resolve;
+      s.onerror = () => reject(new Error('Failed to load html2canvas'));
+      document.head.appendChild(s);
+    });
+  }
+
+  const container = document.createElement('div');
+  container.style.cssText = 'position:fixed;top:-99999px;left:0;z-index:-1;width:210mm;background:#0d1120;';
+  container.innerHTML = htmlString;
+  document.body.appendChild(container);
+
+  try {
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pages = container.querySelectorAll('.page');
+
+    // If backend HTML has no .page divs, render the whole container as one page
+    const targets = pages.length > 0 ? Array.from(pages) : [container];
+
+    for (let i = 0; i < targets.length; i++) {
+      const canvas = await html2canvas(targets[i], {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#0d1120',
+        width: targets[i].offsetWidth,
+        height: targets[i].offsetHeight,
+      });
+      const imgData = canvas.toDataURL('image/jpeg', 0.92);
+      if (i > 0) pdf.addPage();
+      pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
+    }
+
+    pdf.save(filename);
+  } finally {
+    document.body.removeChild(container);
+  }
+}
+
+async function exportViaBackend() {
   showToast('Generating Enterprise Report via backend...', 'info');
   closeExportModal();
 
+  // Build payload using current phase-based data keys
   const strategy = {
     company_name:        state.company,
     industry:            state.industry || '',
     steps_completed:     Object.values(state.steps).filter(s => s.status === 'complete').length,
+    // Phase keys (new) — also include legacy aliases for backward compat with export-pdf.js
+    phase_1_signals:     state.steps[1]?.data || null,
+    phase_2_scoring:     state.steps[2]?.data || null,
+    phase_3_verdict:     state.steps[3]?.data || null,
+    phase_4_deal_lens:   state.steps[4]?.data || null,
+    phase_5_risks:       state.steps[5]?.data || null,
+    phase_6_final:       state.steps[6]?.data || null,
+    // Legacy aliases so older export-pdf.js versions still work
     step_1_market:       state.steps[1]?.data || null,
     step_2_tam:          state.steps[2]?.data || null,
     step_3_icp:          state.steps[3]?.data || null,
@@ -3008,7 +3080,8 @@ function downloadExport() {
     });
     const data = await res.json();
     if (!res.ok || !data.html) throw new Error(data.error || 'Export failed');
-    await renderBackendHtmlToPdf(data.html, data.filename || ('GTM_Enterprise_' + state.company.replace(/[^a-zA-Z0-9]/g,'_') + '_' + new Date().toISOString().slice(0,10) + '.pdf'));
+    const filename = data.filename || ('GTM_Strategy_' + state.company.replace(/[^a-zA-Z0-9]/g,'_') + '_' + new Date().toISOString().slice(0,10) + '.pdf');
+    await renderBackendHtmlToPdf(data.html, filename);
     showToast('Enterprise Report Downloaded', 'success');
   } catch (err) {
     console.error('Backend PDF export failed:', err);
