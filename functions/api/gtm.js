@@ -11,7 +11,9 @@ import { verifyAuth, corsHeaders, validate, rateLimit, sanitise, errRes, okRes, 
 
 const COST_PER_TOKEN   = 0.0000002;
 const HOURLY_TOKEN_LIMIT = 200_000;
-const STEP_MAX_TOKENS = { 1:1500, 2:1500, 3:1500, 4:1500, 5:2000, 6:2500, 7:2500 };
+// Phase token budgets:
+// P1=Signal Extraction, P2=Scoring, P3=Verdict, P4=Deal Lens, P5=Risks, P6=Final
+const STEP_MAX_TOKENS = { 1:1800, 2:1500, 3:1200, 4:1500, 5:1500, 6:2000, 7:2500 };
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -499,73 +501,72 @@ async function handleRunStep7(body, userId, openaiKey, supabaseUrl, supabaseKey,
 }
 
 // ══════════════════════════════════════════════════════════════════
-// HALLUCINATION GUARD — DATA RICHNESS MEASUREMENT
-// Scores how much real data exists across Steps 1–6.
-// Returns a number 0–100. Used to cap AI confidence_score.
-// Formula: each step contributes proportional weight based on importance to Step 7.
+// DATA RICHNESS MEASUREMENT — Phase-based
+// Measures how much real phase data exists for Step 7 intelligence.
+// Returns 0–100 based on phase completeness.
 // ══════════════════════════════════════════════════════════════════
 function measureDataRichness(steps) {
-  const weights = { 1: 25, 2: 15, 3: 25, 4: 10, 5: 10, 6: 15 }; // must sum to 100
+  // Phase weights for Step 7 (must sum to 100)
+  // P1(signals)=20, P2(scores)=20, P3(verdict)=20, P4(deal)=15, P5(risks)=15, P6(final)=10
+  const weights = { 1: 20, 2: 20, 3: 20, 4: 15, 5: 15, 6: 10 };
   let score = 0;
 
-  // Step 1 — Market Research (weight 25)
+  // Phase 1 — Signal Extraction (weight 20)
   if (steps[1]) {
-    const s1 = steps[1];
+    const p1 = steps[1];
     let pts = 0;
-    if (s1.company_overview)    pts += 6;
-    if (s1.growth_signals)      pts += 7;
-    if (s1.market_position)     pts += 6;
-    if (s1.gtm_relevance_score) pts += 6;
+    if (p1.demand_signals?.length)   pts += 7;
+    if (p1.market_timing?.length)    pts += 7;
+    if (p1.icp_fit?.target_description && p1.icp_fit.target_description !== 'missing data') pts += 6;
     score += Math.min(weights[1], pts);
   }
 
-  // Step 2 — TAM Mapping (weight 15)
+  // Phase 2 — Scoring (weight 20)
   if (steps[2]) {
-    const s2 = steps[2];
+    const p2 = steps[2];
     let pts = 0;
-    if (s2.tam_size_estimate)        pts += 5;
-    if (s2.growth_rate)              pts += 4;
-    if (s2.priority_opportunities)   pts += 6;
+    if (typeof p2.demand_score?.score === 'number')           pts += 5;
+    if (typeof p2.market_timing_score?.score === 'number')    pts += 5;
+    if (typeof p2.icp_fit_score?.score === 'number')          pts += 5;
+    if (typeof p2.data_completeness_score?.score === 'number')pts += 5;
     score += Math.min(weights[2], pts);
   }
 
-  // Step 3 — ICP Modeling (weight 25)
+  // Phase 3 — Verdict (weight 20)
   if (steps[3]) {
-    const s3 = steps[3];
+    const p3 = steps[3];
     let pts = 0;
-    if (s3.primary_icp)           pts += 5;
-    if (s3.core_pain_points)      pts += 6;
-    if (s3.buying_triggers)       pts += 7;
-    if (s3.decision_makers)       pts += 4;
-    if (s3.objections)            pts += 3;
+    if (p3.verdict)          pts += 8;
+    if (p3.verdict_reasoning)pts += 7;
+    if (p3.score_basis)      pts += 5;
     score += Math.min(weights[3], pts);
   }
 
-  // Step 4 — Account Sourcing (weight 10)
+  // Phase 4 — Deal Lens (weight 15)
   if (steps[4]) {
-    const s4 = steps[4];
+    const p4 = steps[4];
     let pts = 0;
-    if (s4.recommended_databases) pts += 5;
-    if (s4.sourcing_playbook)      pts += 5;
+    if (p4.target_roles?.length)  pts += 5;
+    if (p4.core_problem)          pts += 5;
+    if (p4.why_now)               pts += 5;
     score += Math.min(weights[4], pts);
   }
 
-  // Step 5 — Keywords (weight 10)
+  // Phase 5 — Risks (weight 15)
   if (steps[5]) {
-    const s5 = steps[5];
+    const p5 = steps[5];
     let pts = 0;
-    if (s5.primary_keywords)  pts += 5;
-    if (s5.intent_signals)    pts += 5;
+    if (p5.key_risks?.length)      pts += 7;
+    if (typeof p5.confidence_score === 'number') pts += 8;
     score += Math.min(weights[5], pts);
   }
 
-  // Step 6 — Messaging (weight 15)
+  // Phase 6 — Final Output (weight 10)
   if (steps[6]) {
-    const s6 = steps[6];
+    const p6 = steps[6];
     let pts = 0;
-    if (s6.email_1)          pts += 5;
-    if (s6.email_2)          pts += 4;
-    if (s6.linkedin_message) pts += 6;
+    if (p6.executive_brief)        pts += 5;
+    if (p6.recommended_next_action)pts += 5;
     score += Math.min(weights[6], pts);
   }
 
@@ -587,42 +588,51 @@ function buildEvidenceManifest(steps) {
     if (v.trim()) facts.push(`${label}: ${v}`);
   };
 
+  // Phase 1 — Signal Extraction
   if (steps[1]) {
-    add('Company overview',       steps[1].company_overview);
-    add('GTM relevance score',    steps[1].gtm_relevance_score);
-    add('Growth signals',         steps[1].growth_signals);
-    add('Market position',        steps[1].market_position);
-    add('Revenue stage',          steps[1].revenue_stage);
-    add('Tech stack hints',       steps[1].tech_stack_hints);
+    (steps[1].demand_signals||[]).slice(0,5).forEach((s,i)=>add(`Demand signal ${i+1}`, `[${s.type}/${s.strength}] ${s.signal}`));
+    (steps[1].market_timing||[]).slice(0,3).forEach((s,i)=>add(`Market timing signal ${i+1}`, `[${s.category}/${s.strength}] ${s.signal}`));
+    add('ICP target',       steps[1].icp_fit?.target_description);
+    add('ICP fit indicators', (steps[1].icp_fit?.fit_indicators||[]).slice(0,3));
+    add('Missing data',     (steps[1].data_completeness?.missing||[]).slice(0,5));
   }
+  // Phase 2 — Scoring
   if (steps[2]) {
-    add('TAM size',               steps[2].tam_size_estimate);
-    add('Market growth rate',     steps[2].growth_rate);
-    add('Priority opportunities', steps[2].priority_opportunities);
-    add('Market maturity',        steps[2].market_maturity);
-    add('Top market segments',    (steps[2].market_segments||[]).slice(0,3).map(s=>s.name||s));
+    add('Demand score',          `${steps[2].demand_score?.score??0}/40 — ${steps[2].demand_score?.rationale||''}`);
+    add('Market timing score',   `${steps[2].market_timing_score?.score??0}/25`);
+    add('ICP fit score',         `${steps[2].icp_fit_score?.score??0}/20`);
+    add('Data completeness score',`${steps[2].data_completeness_score?.score??0}/15`);
+    add('Total score',           `${steps[2].total_score??0}/100 (${steps[2].score_verification||''})`);
   }
+  // Phase 3 — Verdict
   if (steps[3]) {
-    add('Primary ICP',            steps[3].primary_icp);
-    add('Core pain points',       steps[3].core_pain_points);
-    add('Buying triggers',        steps[3].buying_triggers);
-    add('Decision makers',        steps[3].decision_makers);
-    add('Key objections',         steps[3].objections);
-    add('Deal cycle',             steps[3].deal_cycle);
+    add('Verdict',          steps[3].verdict);
+    add('Verdict reasoning',steps[3].verdict_reasoning);
+    add('Score basis',      steps[3].score_basis);
+    add('Demand assessment',steps[3].demand_assessment);
+    add('ICP assessment',   steps[3].icp_assessment);
+    if (steps[3].conditions?.length) add('Conditions', steps[3].conditions);
   }
+  // Phase 4 — Deal Lens
   if (steps[4]) {
-    add('Recommended databases',  (steps[4].recommended_databases||[]).slice(0,3));
-    add('Sourcing playbook',      steps[4].sourcing_playbook);
+    add('Target roles',     (steps[4].target_roles||[]).join(', '));
+    add('Core problem',     steps[4].core_problem);
+    add('Solution angle',   steps[4].solution_angle);
+    add('Why now',          steps[4].why_now);
+    add('Deal size',        steps[4].estimated_deal_size?.range);
+    add('Sales approach',   steps[4].sales_approach);
   }
+  // Phase 5 — Risks
   if (steps[5]) {
-    add('Primary keywords',       (steps[5].primary_keywords||[]).slice(0,5));
-    add('Intent signals',         steps[5].intent_signals);
+    (steps[5].key_risks||[]).slice(0,3).forEach((r,i)=>add(`Risk ${i+1}`, `[${r.impact}] ${r.risk}`));
+    add('Confidence score', steps[5].confidence_score);
+    add('Validation needed',(steps[5].validation_needed||[]).slice(0,3));
   }
+  // Phase 6 — Final Output
   if (steps[6]) {
-    add('Email 1 angle',          steps[6].email_1?.angle);
-    add('Email 1 subject',        steps[6].email_1?.subject);
-    add('Email 2 angle',          steps[6].email_2?.angle);
-    add('LinkedIn message angle', steps[6].linkedin_message ? steps[6].linkedin_message.slice(0,150) : null);
+    add('Executive brief',  steps[6].executive_brief);
+    add('Deal summary',     steps[6].deal_lens_summary);
+    add('Next action',      steps[6].recommended_next_action);
   }
 
   return facts.length > 0
@@ -862,13 +872,12 @@ function parseStep7(rawText) {
 // ── Prompt builder ───────────────────────────────────────────────
 function buildStepPrompt(step, company, industry, priorSteps, companyProfile) {
   const ind  = industry ? ` in the ${industry} industry` : '';
-  const ctx  = buildContext(step, priorSteps);
-  const base = `You are a world-class B2B GTM strategist. CRITICAL: Return ONLY a valid JSON object. No markdown. No code fences. Start with { end with }.`;
+  const base = `You are a B2B GTM opportunity qualification analyst. CRITICAL: Return ONLY a valid JSON object. No markdown. No code fences. Start with { end with }.`;
 
   // Inject verified profile if available and high confidence
   const hasProfile = companyProfile && companyProfile.extraction_confidence !== 'LOW' && companyProfile.company_overview;
   const profileBlock = hasProfile
-    ? `\nVERIFIED WEBSITE PROFILE (ground truth — use this, do not contradict it):\n${JSON.stringify({
+    ? `\nVERIFIED COMPANY PROFILE (use as ground truth — do not contradict):\n${JSON.stringify({
         overview: companyProfile.company_overview,
         services: companyProfile.services,
         industry: companyProfile.industry,
@@ -878,121 +887,168 @@ function buildStepPrompt(step, company, industry, priorSteps, companyProfile) {
       }, null, 2)}\n`
     : '';
 
+  // ── Build prior phase context for chaining ──
+  const phaseCtx = buildPhaseContext(step, priorSteps);
+
   const prompts = {
+
+    // ════════════════════════════════════════════════
+    // PHASE 1 — SIGNAL EXTRACTION
+    // ════════════════════════════════════════════════
     1:`${base}${profileBlock}
-Perform deep market research on "${company}"${ind}.${hasProfile ? ' Use the verified profile as your primary source.' : ''}
+PHASE 1 — SIGNAL EXTRACTION for "${company}"${ind}.
 
-Score this company as an ABE GTM target (0-100).
-ABE sells AI-powered GTM intelligence and lead orchestration platforms to B2B companies.
-ABE's ideal buyer: IT services firms, SaaS companies, consulting firms, B2B enterprises with sales teams.
+Your ONLY job: extract real, observable business signals. Do NOT score. Do NOT conclude. Do NOT invent.
+If a signal category has no evidence, use "missing data" as the value.
 
-Scoring rules — read carefully:
-- Score based on ACTUAL fit, not general quality. A great company in the wrong sector scores low.
-- Every company must get a UNIQUE score reflecting their specific situation.
-- Never round to 75, 80, 85, 90. Use specific numbers like 67, 73, 82, 91, 44, 28.
-- B2C companies (retail, food, fashion, hospitality, consumer apps): score 5-25
-- Government, NGO, non-profit, education: score 10-30
-- Healthcare/pharma with no IT sales focus: score 20-40
-- Financial services (banks, insurance) with no tech arm: score 30-50
-- IT services, SaaS, tech consulting (small <50 people): score 52-68
-- IT services, SaaS, tech consulting (mid 50-500 people): score 69-84
-- IT services, SaaS, tech consulting (large >500 people): score 85-96
-- Mixed/unclear industry: score 35-55
+Group signals into 4 categories:
+1. DEMAND SIGNALS: hiring, expansion, product launches, partnerships, funding
+2. MARKET TIMING: growth trends, competitive pressure, regulation, technology shifts
+3. ICP FIT: who they sell to, how well they match a B2B sales-team-equipped buyer
+4. DATA COMPLETENESS: what information is available vs missing
 
-Examples of correct scoring:
-- Accenture (large IT consulting): 94
-- A 30-person SaaS startup: 71
-- McDonald's (B2C food): 8
-- H&M (retail fashion): 4
-- A law firm: 38
-- Marriott Hotels: 22
-- Mid-size fintech SaaS: 76
+Rules:
+- Every signal must be a real, observable fact
+- If no evidence exists for a category, set to "missing data"
+- No scoring, no summaries, no conclusions
 
-Never give the same score to different companies. Be specific and honest.
-Also generate:
-- section_context: one sentence describing why market research matters for this company
-- analyst_insight: one actionable insight a strategist would give about this company's GTM positioning
-- swot: a SWOT analysis with arrays of 2-3 bullet strings each for strengths, weaknesses, opportunities, threats — based on the company's actual market position, do NOT use generic placeholders
-- kpi_summary: object with keys gtm_score, tam, cagr, verdict (Go/Watch/No-Go) — derived from data
-Return:{"company_overview":"2-3 sentences","market_position":"competitive position","products_services":"main offerings","gtm_relevance_score":<integer 0-100 based on rubric above>,"gtm_relevance_reasoning":"specific reasoning for this exact score","growth_signals":["s1","s2","s3"],"revenue_stage":"e.g. Series B","employee_count":"range","tech_stack_hints":["hint1"],"section_context":"why this step matters","analyst_insight":"one actionable insight","swot":{"strengths":["s1","s2"],"weaknesses":["w1","w2"],"opportunities":["o1","o2"],"threats":["t1","t2"]},"kpi_summary":{"gtm_score":82,"tam":"$Xb","cagr":"X%","verdict":"Go"}}`,
+Return exact JSON:
+{"demand_signals":[{"signal":"observable fact","type":"hiring|expansion|product_launch|partnership|funding","strength":"High|Medium|Low"}],"market_timing":[{"signal":"observable fact","category":"growth|competition|regulation|trend","strength":"High|Medium|Low"}],"icp_fit":{"target_description":"who they sell to, or missing data","fit_indicators":["evidence of fit"],"mismatches":["evidence of mismatch, or missing data"]},"data_completeness":{"available":["fields with real data"],"missing":["missing data: field name"]},"section_context":"one sentence on why signal extraction matters first","analyst_insight":"one specific observation about signal quality for this company"}`,
 
-    2:`${base}${profileBlock}
-TAM mapping for companies selling TO/partnering with "${company}"${ind}.
-Context: ${ctx}
-Also generate:
-- section_context: one sentence describing why TAM analysis matters for targeting this company
-- analyst_insight: one actionable market-sizing insight specific to this opportunity
-- tam_segments: enhanced market_segments array with name, size, priority, and growth_rate for each segment
-- waterfall: object with tam_value, sam_value, som_value as strings (e.g. "$5.2B")
-Return:{"tam_overview":"market description","tam_size_estimate":"$Xb","sam_estimate":"SAM","growth_rate":"X% CAGR","growth_drivers":"drivers","market_segments":[{"name":"Seg","size":"$Xm","priority":"High","growth_rate":"X%"}],"priority_opportunities":"top opps","market_maturity":"Growth","section_context":"why TAM matters here","analyst_insight":"one actionable insight","waterfall":{"tam_value":"$Xb","sam_value":"$Xb","som_value":"$Xm"}}`,
+    // ════════════════════════════════════════════════
+    // PHASE 2 — SCORING
+    // ════════════════════════════════════════════════
+    2:`${base}
+PHASE 2 — SCORING for "${company}"${ind}.
 
-    3:`${base}${profileBlock}
-Build ICP for companies selling TO "${company}"${ind}.
-Context: ${ctx}
-Also generate:
-- section_context: one sentence on why ICP modeling matters for this account
-- analyst_insight: one strategic recommendation about targeting this persona
-- persona_map: object with primary_role, economic_buyer, and champion — each with title and key_responsibility
-- pain_solution_map: array of objects with operational_friction, business_impact, and recommended_intervention
-Return:{"primary_icp":"persona","secondary_icp":"secondary","firmographics":"size/ARR/industry","buying_triggers":["t1","t2"],"core_pain_points":"3 pains","decision_makers":["VP Sales"],"deal_cycle":"cycle","objections":["obj1"],"section_context":"why ICP matters here","analyst_insight":"one strategic insight","persona_map":{"primary_role":{"title":"CIO","key_responsibility":"..."},"economic_buyer":{"title":"CFO","key_responsibility":"..."},"champion":{"title":"VP Engineering","key_responsibility":"..."}},"pain_solution_map":[{"operational_friction":"...","business_impact":"...","recommended_intervention":"..."}]}`,
+Phase 1 extracted signals:
+${phaseCtx}
 
+Your ONLY job: score the signals. No new assumptions.
+
+Scoring buckets (must sum to total_score exactly):
+- Demand signals:    max 40 points
+- Market timing:     max 25 points
+- ICP fit:           max 20 points
+- Data completeness: max 15 points
+
+Rules:
+- Strong, specific signal = full points
+- Partial/vague signal = proportional points
+- "missing data" = 0 points, no exceptions
+- total_score = exact arithmetic sum
+- Show exact calculation string: "X + Y + Z + W = total"
+
+Return exact JSON:
+{"demand_score":{"score":0,"max":40,"rationale":"specific reason from Phase 1","sub_breakdown":"e.g. hiring: +12, expansion: +10"},"market_timing_score":{"score":0,"max":25,"rationale":"specific reason from Phase 1","sub_breakdown":"e.g. growth trend: +10, competition: +8"},"icp_fit_score":{"score":0,"max":20,"rationale":"specific reason from Phase 1","sub_breakdown":"e.g. target match: +12"},"data_completeness_score":{"score":0,"max":15,"rationale":"fields present vs missing","sub_breakdown":"e.g. 8 of 12 fields present: +10"},"total_score":0,"score_verification":"X + Y + Z + W = total","section_context":"one sentence on why rigorous scoring prevents over-qualifying","analyst_insight":"one insight on scoring gaps and what data would improve it"}`,
+
+    // ════════════════════════════════════════════════
+    // PHASE 3 — VERDICT
+    // ════════════════════════════════════════════════
+    3:`${base}
+PHASE 3 — VERDICT for "${company}"${ind}.
+
+Prior phases:
+${phaseCtx}
+
+Your ONLY job: assign verdict strictly from scores. No opinion overrides.
+
+Verdict rules (follow exactly):
+- GO: total_score >= 70 AND demand is strong AND ICP fit is strong
+- CONDITIONAL GO: total_score 55-69, OR one major fixable gap exists
+- NO GO: total_score < 55 OR demand is weak
+
+verdict must be exactly: "GO", "CONDITIONAL GO", or "NO GO"
+
+Return exact JSON:
+{"verdict":"GO|CONDITIONAL GO|NO GO","verdict_reasoning":"specific reasoning citing scores — no opinion","score_basis":"Total: X/100 (Demand: A/40 · Timing: B/25 · ICP: C/20 · Data: D/15)","demand_assessment":"strong|partial|weak","icp_assessment":"strong|partial|weak","conditions":["condition if CONDITIONAL GO — empty array if GO or NO GO"],"what_would_change_verdict":"single data point that would flip the verdict","section_context":"one sentence on why verdict must follow scores","analyst_insight":"one honest observation about this verdict's strength"}`,
+
+    // ════════════════════════════════════════════════
+    // PHASE 4 — DEAL LENS
+    // ════════════════════════════════════════════════
     4:`${base}
-Account sourcing strategy for "${company}"${ind}.
-Context: ${ctx}
-Also generate:
-- section_context: one sentence on why account sourcing matters for this target
-- analyst_insight: one tactical recommendation about sourcing high-fit accounts
-- account_targets: array of 3-5 sample high-fit accounts with account_name, fit_score (0-100), and actionable_trigger
-Return:{"recommended_databases":["Apollo.io","ZoomInfo"],"filter_criteria":"filters","sourcing_playbook":"steps","exclusion_criteria":"exclusions","estimated_universe":"est","data_enrichment_tips":"tips","section_context":"why sourcing matters here","analyst_insight":"one tactical insight","account_targets":[{"account_name":"Sample Corp","fit_score":88,"actionable_trigger":"trigger"}]}`,
+PHASE 4 — DEAL LENS for "${company}"${ind}.
 
+Prior phases:
+${phaseCtx}
+
+Your job: convert verified signals into practical sales direction.
+
+Rules:
+- Every element must trace back to a Phase 1 signal
+- No generic statements
+- Use exact job titles
+- Clearly label deal size estimates
+- solution_angle must be: cost_saving, growth, efficiency, compliance, or risk_reduction
+
+Return exact JSON:
+{"target_roles":["Exact Title 1","Exact Title 2","Exact Title 3"],"core_problem":"specific evidence-backed problem from signals","solution_angle":"cost_saving|growth|efficiency|compliance|risk_reduction","solution_pitch":"2-3 sentences tied directly to signals — industry-neutral","why_now":"specific reason from market timing or demand signal — not generic","estimated_deal_size":{"range":"$X – $Y","is_estimate":true,"basis":"reasoning: company size, deal type, signals"},"sales_approach":"enterprise|mid_market|partnership|direct","approach_rationale":"why this approach fits based on signals","section_context":"one sentence on why deal lens must come from signals","analyst_insight":"one revenue-specific observation"}`,
+
+    // ════════════════════════════════════════════════
+    // PHASE 5 — RISKS & CONFIDENCE
+    // ════════════════════════════════════════════════
     5:`${base}
-Keywords for "${company}"${ind}.
-Context: ${ctx}
-Also generate:
-- section_context: one sentence on why intent keyword strategy matters for this target
-- analyst_insight: one strategic keyword/intent recommendation
-- keyword_taxonomy: object with early_funnel (problem-aware keywords array) and late_funnel (solution-aware keywords array)
-Return:{"primary_keywords":["kw1","kw2","kw3","kw4","kw5","kw6"],"secondary_keywords":["k1","k2","k3","k4","k5","k6","k7","k8"],"boolean_query":"\"kw\" OR \"kw2\"","linkedin_search_strings":"LI string","intent_signals":["s1","s2","s3"],"content_topics":["t1","t2","t3"],"section_context":"why keywords matter here","analyst_insight":"one strategic insight","keyword_taxonomy":{"early_funnel":["problem keyword 1","problem keyword 2"],"late_funnel":["solution keyword 1","solution keyword 2"]}}`,
+PHASE 5 — RISKS & CONFIDENCE for "${company}"${ind}.
 
+Prior phases:
+${phaseCtx}
+
+Your job: identify genuine uncertainties. Every risk from missing or weak signals.
+
+Rules:
+- Each risk must come from a specific missing or weak signal in Phase 1
+- No generic risks ("market may change")
+- confidence_score is a number 0-100, capped by data_completeness_score from Phase 2
+
+Return exact JSON:
+{"key_risks":[{"risk":"specific risk description","source":"exact missing or weak signal","impact":"high|medium|low","mitigation":"what would resolve this risk"}],"confidence_level":"high|medium|low","confidence_score":0,"confidence_reasoning":"explanation linking confidence to data completeness","validation_needed":["specific action that would validate this opportunity"],"section_context":"one sentence on why data gaps drive confidence not gut feel","analyst_insight":"one honest assessment of the biggest uncertainty"}`,
+
+    // ════════════════════════════════════════════════
+    // PHASE 6 — FINAL OUTPUT
+    // ════════════════════════════════════════════════
     6:`${base}
-Hyper-personalised outreach for "${company}"${ind}. Use ALL prior context.
-Context: ${buildCompressedCtx(priorSteps)}
-Also generate:
-- section_context: one sentence on why enterprise-grade messaging matters for this target
-- analyst_insight: one messaging strategy recommendation
-- messaging_sequence: object with touch_1_label, touch_2_label, touch_3_label describing the 3-email cadence theme
-Return:{"email_1":{"angle":"Pain","subject":"subj","body":"body","cta":"cta"},"email_2":{"angle":"ROI","subject":"s","body":"b","cta":"c"},"email_3":{"angle":"Proof","subject":"s","body":"b","cta":"c"},"follow_up_sequence":"Day 3: action. Day 7: action. Day 14: action.","linkedin_message":"<300 chars","linkedin_follow_up":"<200 chars","section_context":"why messaging matters here","analyst_insight":"one messaging insight","messaging_sequence":{"touch_1_label":"Agitation / Market Signal","touch_2_label":"Hard ROI Metric","touch_3_label":"Heavyweight Proof"}}`,
+PHASE 6 — FINAL OUTPUT for "${company}"${ind}.
+
+ALL prior phases:
+${phaseCtx}
+
+Your job: produce the final structured output. Combine all phases.
+
+Rules:
+- Do NOT change scores or verdicts from prior phases
+- Do NOT add new assumptions
+- Everything must be consistent with prior phases
+- executive_brief: 3-5 sentences, board-ready, no jargon
+- signal_highlights: the 3 strongest real signals from Phase 1
+
+Return exact JSON:
+{"signal_highlights":[{"signal":"top signal 1","type":"demand|timing|icp","strength":"High|Medium|Low"},{"signal":"top signal 2","type":"demand|timing|icp","strength":"High|Medium|Low"},{"signal":"top signal 3","type":"demand|timing|icp","strength":"High|Medium|Low"}],"score_breakdown":{"demand":0,"market_timing":0,"icp_fit":0,"data_completeness":0,"total":0,"verification":"X + Y + Z + W = total"},"verdict":"GO|CONDITIONAL GO|NO GO","deal_lens_summary":"2-sentence summary of who to target, problem, and why now","risks_summary":"2-sentence summary of key risk and resolution","confidence_note":"confidence score and what it means for next steps","executive_brief":"3-5 sentence board-ready opportunity summary","recommended_next_action":"single most important next step","section_context":"one sentence on why final output must be consistent","analyst_insight":"one strategic observation tying the full analysis together"}`,
   };
 
   return prompts[step];
 }
 
-function buildContext(step, steps) {
-  const L = {1:'Market Research',2:'TAM',3:'ICP',4:'Account Sourcing',5:'Keywords'};
+
+// ── Build compressed prior phase context for chaining ──────────
+function buildPhaseContext(step, steps) {
+  const labels = {1:'PHASE 1 — Signal Extraction',2:'PHASE 2 — Scoring',3:'PHASE 3 — Verdict',4:'PHASE 4 — Deal Lens',5:'PHASE 5 — Risks'};
   return Array.from({length:step-1},(_,i)=>i+1)
     .filter(i=>steps[i])
-    .map(i=>`[Step ${i} — ${L[i]}]\n${JSON.stringify(steps[i])}`)
-    .join('\n\n') || 'No prior context.';
+    .map(i=>`[${labels[i]}]\n${JSON.stringify(steps[i])}`)
+    .join('\n\n') || 'No prior phase data.';
 }
 
-function buildCompressedCtx(steps) {
-  const lines = [];
-  const d = n => steps[n];
-  if (d(1)) { lines.push(`COMPANY: ${d(1).company_overview||''}`); lines.push(`GTM SCORE: ${d(1).gtm_relevance_score||''}`); lines.push(`GROWTH: ${(d(1).growth_signals||[]).join(', ')}`); }
-  if (d(2)) { lines.push(`TAM: ${d(2).tam_size_estimate||''} (${d(2).growth_rate||''})`); lines.push(`SEGMENTS: ${(d(2).market_segments||[]).slice(0,3).map(s=>s.name).join(', ')}`); }
-  if (d(3)) { lines.push(`ICP: ${d(3).primary_icp||''}`); lines.push(`PAINS: ${d(3).core_pain_points||''}`); lines.push(`TRIGGERS: ${(d(3).buying_triggers||[]).join(', ')}`); lines.push(`OBJECTIONS: ${(d(3).objections||[]).join(', ')}`); }
-  if (d(4)) { lines.push(`DBs: ${(d(4).recommended_databases||[]).slice(0,3).join(', ')}`); }
-  if (d(5)) { lines.push(`KWS: ${(d(5).primary_keywords||[]).join(', ')}`); lines.push(`BOOLEAN: ${d(5).boolean_query||''}`); }
-  return lines.join('\n');
-}
+// Kept for backward compat if referenced elsewhere
+function buildContext(step, steps) { return buildPhaseContext(step, steps); }
+function buildCompressedCtx(steps) { return buildPhaseContext(6, steps); }
 
 const SCHEMAS = {
-  1:['company_overview','market_position','products_services','gtm_relevance_score','growth_signals','section_context','analyst_insight','swot'],
-  2:['tam_overview','tam_size_estimate','growth_rate','market_segments','priority_opportunities','section_context','analyst_insight'],
-  3:['primary_icp','secondary_icp','firmographics','buying_triggers','core_pain_points','section_context','analyst_insight'],
-  4:['recommended_databases','filter_criteria','sourcing_playbook','exclusion_criteria','section_context','analyst_insight'],
-  5:['primary_keywords','secondary_keywords','boolean_query','linkedin_search_strings','section_context','analyst_insight'],
-  6:['email_1','email_2','email_3','follow_up_sequence','section_context','analyst_insight'],
+  1:['demand_signals','market_timing','icp_fit','data_completeness','section_context','analyst_insight'],
+  2:['demand_score','market_timing_score','icp_fit_score','data_completeness_score','total_score','score_verification','section_context','analyst_insight'],
+  3:['verdict','verdict_reasoning','score_basis','demand_assessment','icp_assessment','section_context','analyst_insight'],
+  4:['target_roles','core_problem','solution_angle','solution_pitch','why_now','estimated_deal_size','sales_approach','section_context','analyst_insight'],
+  5:['key_risks','confidence_level','confidence_score','validation_needed','section_context','analyst_insight'],
+  6:['signal_highlights','score_breakdown','verdict','deal_lens_summary','risks_summary','confidence_note','executive_brief','recommended_next_action','section_context','analyst_insight'],
 };
 
 async function parseWithRetry(rawText, step, originalPrompt, openaiKey) {
