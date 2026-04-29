@@ -3258,7 +3258,9 @@ async function generateProfessionalPDF() {
 <style>
   * { box-sizing:border-box; margin:0; padding:0; }
   body { background:#0d1120; color:#e5e7eb; font-family:'Inter',sans-serif; font-size:13px; line-height:1.65; }
-  .page { width:210mm; min-height:297mm; padding:16mm 18mm 18mm; background:#0d1120; position:relative; page-break-after:always; }
+  html, body { width:210mm; min-height:297mm; }
+  body { background:#0d1120; color:#e5e7eb; font-family:'Inter',sans-serif; font-size:13px; line-height:1.65; overflow-x:hidden; }
+  .page { width:210mm; min-height:297mm; padding:16mm 18mm 18mm; background:#0d1120; position:relative; page-break-after:always; overflow:hidden; }
   .page:last-child { page-break-after:auto; }
   .card { background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07); border-radius:10px; padding:18px 20px; margin-bottom:14px; }
   .gold-rule { height:2px; background:linear-gradient(90deg,#a855f7,#7c3aed,transparent); border-radius:2px; margin:20px 0; }
@@ -3292,18 +3294,16 @@ async function generateProfessionalPDF() {
 
   <div class="gold-rule" style="width:120px;"></div>
 
-  <div style="margin:32px 0;display:flex;gap:40px;justify-content:center;">
-    <div style="text-align:center;">
+  <div style="margin:32px 0;display:flex;gap:12px;flex-wrap:wrap;justify-content:center;max-width:520px;">
+    <div style="flex:1 1 160px;min-width:160px;text-align:center;">
       <div class="mono" style="font-size:42px;font-weight:900;color:${vc.color};">${total}</div>
       <div style="font-size:10px;color:#6b7280;">GTM Score / 100</div>
     </div>
-    <div style="width:1px;background:rgba(255,255,255,0.08);"></div>
-    <div style="text-align:center;">
+    <div style="flex:1 1 160px;min-width:160px;text-align:center;">
       <div class="mono" style="font-size:42px;font-weight:900;color:${vc.color};">${vc.label}</div>
       <div style="font-size:10px;color:#6b7280;">Qualification</div>
     </div>
-    <div style="width:1px;background:rgba(255,255,255,0.08);"></div>
-    <div style="text-align:center;">
+    <div style="flex:1 1 160px;min-width:160px;text-align:center;">
       <div class="mono" style="font-size:42px;font-weight:900;color:#9ca3af;">${confScore}</div>
       <div style="font-size:10px;color:#6b7280;">Confidence</div>
     </div>
@@ -3327,13 +3327,16 @@ async function generateProfessionalPDF() {
 <div class="page">
   ${sectionHeader('ES','Executive Summary & Score Breakdown','Data-backed GTM qualification across 4 dimensions')}
 
-  <!-- Score rings row -->
-  <div style="display:flex;justify-content:space-around;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px 8px;margin-bottom:16px;">
-    ${ring(demand,40,'#22c55e','Demand','Hiring · Expansion · Signals')}
-    ${ring(timing,25,'#60a5fa','Timing','Market · Trends')}
-    ${ring(icp,20,'#a855f7','ICP Fit','Target · Personas')}
-    ${ring(data_c,15,'#f59e0b','Data','Completeness')}
-    ${ring(total,100,vc.color,'TOTAL','GTM Score')}
+  <div class="card">
+    <div class="label">Score Breakdown</div>
+    <table>
+      <tr><th>Dimension</th><th>Score</th><th>Max</th><th>Key Insight</th></tr>
+      <tr><td>Demand Signals</td><td class="mono" style="font-size:16px;font-weight:900;color:#22c55e;">${demand}</td><td>40</td><td>${esc(p2.demand_score?.rationale||'—')}</td></tr>
+      <tr><td>Market Timing</td><td class="mono" style="font-size:16px;font-weight:900;color:#60a5fa;">${timing}</td><td>25</td><td>${esc(p2.market_timing_score?.rationale||'—')}</td></tr>
+      <tr><td>ICP Fit</td><td class="mono" style="font-size:16px;font-weight:900;color:#a855f7;">${icp}</td><td>20</td><td>${esc(p2.icp_fit_score?.rationale||'—')}</td></tr>
+      <tr><td>Data Completeness</td><td class="mono" style="font-size:16px;font-weight:900;color:#f59e0b;">${data_c}</td><td>15</td><td>${esc(p2.data_completeness_score?.rationale||'—')}</td></tr>
+      <tr style="border-top:2px solid rgba(168,85,247,0.4);"><td style="font-weight:900;color:${vc.color};">TOTAL</td><td class="mono" style="font-size:18px;font-weight:900;color:${vc.color};">${total}</td><td colspan="2" style="color:#6b7280;">/100</td></tr>
+    </table>
   </div>
 
   <!-- Score bar chart -->
@@ -3373,7 +3376,7 @@ async function generateProfessionalPDF() {
 
   <div class="footer">
     <span>ABE · GTM Strategy Report · ${co}</span>
-    <span>Page 1</span>
+    <span>Page 2</span>
   </div>
 </div>
 
@@ -3442,7 +3445,7 @@ async function generateProfessionalPDF() {
 
   <div class="footer">
     <span>ABE · GTM Strategy Report · ${co}</span>
-    <span>Page 2</span>
+    <span>Page 3</span>
   </div>
 </div>
 
@@ -3500,17 +3503,17 @@ async function generateProfessionalPDF() {
         <div style="font-size:12px;color:#d1d5db;">${esc(safe(p3.verdict_reasoning,'Verdict based on signal scoring across all four dimensions.'))}</div>
       </div>
     </div>
-    <div style="display:flex;gap:12px;">
-      <div style="flex:1;background:rgba(0,0,0,0.3);border-radius:8px;padding:10px 12px;">
-        <div style="font-size:9px;font-weight:700;color:#9ca3af;margin-bottom:3px;">DEMAND ASSESSMENT</div>
+    <div style="display:flex;flex-direction:column;gap:12px;">
+      <div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:14px;">
+        <div style="font-size:9px;font-weight:700;color:#9ca3af;margin-bottom:6px;">DEMAND ASSESSMENT</div>
         <div style="font-size:13px;font-weight:800;color:${p3.demand_assessment==='strong'?'#22c55e':p3.demand_assessment==='partial'?'#f59e0b':'#ef4444'};">${esc((p3.demand_assessment||'—').toUpperCase())}</div>
       </div>
-      <div style="flex:1;background:rgba(0,0,0,0.3);border-radius:8px;padding:10px 12px;">
-        <div style="font-size:9px;font-weight:700;color:#9ca3af;margin-bottom:3px;">ICP ASSESSMENT</div>
+      <div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:14px;">
+        <div style="font-size:9px;font-weight:700;color:#9ca3af;margin-bottom:6px;">ICP ASSESSMENT</div>
         <div style="font-size:13px;font-weight:800;color:${p3.icp_assessment==='strong'?'#22c55e':p3.icp_assessment==='partial'?'#f59e0b':'#ef4444'};">${esc((p3.icp_assessment||'—').toUpperCase())}</div>
       </div>
-      <div style="flex:1;background:rgba(0,0,0,0.3);border-radius:8px;padding:10px 12px;">
-        <div style="font-size:9px;font-weight:700;color:#9ca3af;margin-bottom:3px;">SCORE BASIS</div>
+      <div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:14px;">
+        <div style="font-size:9px;font-weight:700;color:#9ca3af;margin-bottom:6px;">SCORE BASIS</div>
         <div style="font-size:10px;font-family:'Space Mono',monospace;color:#c4b5fd;">${esc(safe(p3.score_basis,'—'))}</div>
       </div>
     </div>
@@ -3518,7 +3521,7 @@ async function generateProfessionalPDF() {
 
   <div class="footer">
     <span>ABE · GTM Strategy Report · ${co}</span>
-    <span>Page 3</span>
+    <span>Page 4</span>
   </div>
 </div>
 
@@ -3528,18 +3531,20 @@ async function generateProfessionalPDF() {
 <div class="page">
   ${sectionHeader(4,'Target Accounts & GTM Strategy','ICP · Roles · Deal sizing · Sales approach')}
 
-  <table>
-    <tr>
-      <th style="width:33%;">Target Roles</th>
-      <th style="width:33%;">Solution Angle</th>
-      <th style="width:33%;">Sales Approach</th>
-    </tr>
-    <tr>
-      <td>${arr(p4.target_roles).map(r=>`<span class="tag tag-purple">${esc(r)}</span>`).join('') || '—'}</td>
-      <td style="font-weight:800;color:#a855f7;text-transform:uppercase;font-size:13px;">${esc(safe(p4.solution_angle,'—'))}</td>
-      <td style="font-weight:800;color:#60a5fa;text-transform:uppercase;font-size:13px;">${esc(safe(p4.sales_approach,'—'))}</td>
-    </tr>
-  </table>
+  <div class="card">
+    <div class="label">Target Roles</div>
+    ${arr(p4.target_roles).map(r=>`<span class="tag tag-purple">${esc(r)}</span>`).join('') || '<div style="color:#6b7280;font-size:11px;">No target roles specified.</div>'}
+  </div>
+
+  <div class="card">
+    <div class="label">Solution Angle</div>
+    <div style="font-size:13px;color:#e5e7eb;line-height:1.7;">${esc(safe(p4.solution_angle,'—'))}</div>
+  </div>
+
+  <div class="card">
+    <div class="label">Sales Approach</div>
+    <div style="font-size:13px;color:#e5e7eb;line-height:1.7;">${esc(safe(p4.sales_approach,'—'))}</div>
+  </div>
 
   <div class="card">
     <div class="label">Core Problem (Signal-Backed)</div>
@@ -3595,7 +3600,7 @@ async function generateProfessionalPDF() {
 
   <div class="footer">
     <span>ABE · GTM Strategy Report · ${co}</span>
-    <span>Page 4</span>
+    <span>Page 5</span>
   </div>
 </div>
 
@@ -3610,8 +3615,8 @@ async function generateProfessionalPDF() {
   ${div}
 
   <!-- Confidence gauge row -->
-  <div style="display:flex;align-items:flex-start;gap:20px;">
-    <div style="text-align:center;flex-shrink:0;">
+  <div style="display:flex;flex-wrap:wrap;align-items:flex-start;gap:16px;">
+    <div style="text-align:center;flex-shrink:0;min-width:120px;">
       <img src="${gaugeUrl}" alt="Confidence Gauge" style="width:120px;height:120px;object-fit:contain;" onerror="this.style.display='none'"/>
       <div class="mono" style="font-size:28px;font-weight:900;color:${confScore>=70?'#22c55e':confScore>=45?'#f59e0b':'#ef4444'};">${confScore}</div>
       <div style="font-size:9px;color:#6b7280;">Confidence / 100</div>
@@ -3633,7 +3638,7 @@ async function generateProfessionalPDF() {
 
   <div class="footer">
     <span>ABE · GTM Strategy Report · ${co}</span>
-    <span>Page 5</span>
+    <span>Page 6</span>
   </div>
 </div>
 
@@ -3704,7 +3709,7 @@ async function generateProfessionalPDF() {
 
   <div class="footer">
     <span>ABE · GTM Strategy Report · ${co} · ${dateStr}</span>
-    <span>Page 6 · CONFIDENTIAL</span>
+    <span>Page 7 · CONFIDENTIAL</span>
   </div>
 </div>
 
