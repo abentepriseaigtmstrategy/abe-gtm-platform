@@ -3711,38 +3711,101 @@ async function generateProfessionalPDF() {
 </body></html>`;
 
   /* ── Render to PDF ─────────────────────────────────────────── */
+
+  // A4 in pixels at 96 dpi — must be consistent everywhere
+  const A4W = 794;
+  const A4H = 1123;
+
+  // Use position:absolute + left:-2000px (NOT fixed+negative-top).
+  // position:fixed with top:-99999px causes html2canvas to compress the
+  // layout because fixed elements are measured relative to the viewport.
+  // Absolute positioning off the left edge renders the full desktop layout
+  // at the correct width with no visual flash.
   const container = document.createElement('div');
-  container.style.cssText = 'position:fixed;top:-99999px;left:0;z-index:-1;width:794px;';
+  container.style.cssText = [
+    'position:absolute',
+    'top:0',
+    'left:-2000px',
+    `width:${A4W}px`,
+    'background:#0d1120',
+    'overflow:visible',
+    'pointer-events:none',
+    'z-index:-1',
+  ].join(';');
   container.innerHTML = html;
   document.body.appendChild(container);
 
-  // Wait for web fonts + images
-  await new Promise(r => setTimeout(r, 1200));
+  // Force every .page to exact A4 pixel dimensions so html2canvas
+  // captures a consistent frame — no scrollHeight variance, no overflow
+  container.querySelectorAll('.page').forEach(p => {
+    p.style.width       = A4W + 'px';
+    p.style.minHeight   = A4H + 'px';
+    p.style.maxHeight   = 'none';
+    p.style.overflow    = 'hidden';
+    p.style.boxSizing   = 'border-box';
+    p.style.pageBreakAfter = 'always';
+  });
+
+  // 1. Two rAF ticks — lets the browser finish layout/paint
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+
+  // 2. Wait for document fonts (Inter, Space Mono from Google Fonts)
+  try { await document.fonts.ready; } catch (_) {}
+
+  // 3. Wait for every <img> in the container (QuickChart, gauges, etc.)
+  const imgEls = Array.from(container.querySelectorAll('img'));
+  await Promise.all(imgEls.map(img =>
+    img.complete
+      ? Promise.resolve()
+      : new Promise(r => { img.onload = r; img.onerror = r; })
+  ));
+
+  // 4. Small final buffer for any CSS transitions / repaints
+  await new Promise(r => setTimeout(r, 600));
 
   try {
     const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({ orientation:'portrait', unit:'mm', format:'a4' });
-    const pages = container.querySelectorAll('.page');
+    const pdf   = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pages = Array.from(container.querySelectorAll('.page'));
 
     for (let i = 0; i < pages.length; i++) {
       const canvas = await html2canvas(pages[i], {
-        scale: 1.8,
-        useCORS: true,
-        allowTaint: true,
-        logging: false,
+        scale:           2,          // 2× for retina-quality sharpness
+        useCORS:         true,
+        allowTaint:      true,
+        logging:         false,
         backgroundColor: '#0d1120',
-        width: 794,
-        height: pages[i].scrollHeight,
-        windowWidth: 794,
+        width:           A4W,
+        height:          A4H,
+        windowWidth:     A4W,        // Prevents viewport-relative layout
+        windowHeight:    A4H,
+        scrollX:         0,
+        scrollY:         0,
+        x:               0,
+        y:               0,
+        onclone(clonedDoc) {
+          // Re-apply exact dimensions in the cloned document so any
+          // inherited styles from the live page can't bleed in
+          clonedDoc.querySelectorAll('.page').forEach(p => {
+            p.style.width     = A4W + 'px';
+            p.style.height    = A4H + 'px';
+            p.style.minHeight = A4H + 'px';
+            p.style.overflow  = 'hidden';
+          });
+          // Ensure body background matches
+          clonedDoc.body.style.background = '#0d1120';
+          clonedDoc.body.style.margin     = '0';
+          clonedDoc.body.style.padding    = '0';
+        },
       });
-      const imgData = canvas.toDataURL('image/jpeg', 0.93);
+
+      const imgData = canvas.toDataURL('image/jpeg', 0.94);
       if (i > 0) pdf.addPage();
-      // Fit canvas to A4 maintaining aspect, crop to 297mm height
-      const pageH = Math.min(297, (canvas.height / canvas.width) * 210);
-      pdf.addImage(imgData, 'JPEG', 0, 0, 210, pageH);
+      // Always fill the full A4 page — no aspect-ratio guessing
+      pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
     }
 
-    const filename = `GTM_Strategy_${state.company.replace(/[^a-zA-Z0-9]/g,'_')}_${new Date().toISOString().slice(0,10)}.pdf`;
+    const filename = `GTM_Strategy_${state.company.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
     pdf.save(filename);
     showToast('GTM Strategy Report downloaded ✓', 'success');
   } catch (e) {
