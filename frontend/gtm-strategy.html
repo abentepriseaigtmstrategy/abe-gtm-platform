@@ -2980,7 +2980,9 @@ function closeExportModal() {
 }
 
 function downloadExport() {
-  exportViaBackend();
+  // Use the pure client-side A4 renderer instead of backend HTML export.
+  closeExportModal();
+  generateProfessionalPDF();
 }
 
 /**
