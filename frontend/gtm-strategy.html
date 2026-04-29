@@ -700,245 +700,125 @@
       white-space: nowrap;
     }
     .btn-s7-generate:hover { transform: translateY(-1px); box-shadow: 0 6px 20px rgba(217,119,6,0.35); }
-    .btn-s7-generate:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    // NOTE (pre-edit identification):
+    // 1) Left empty gap is caused by the web app's two-column layout wrappers: `.sidebar` + `.main` (page-level flex with a fixed 280px sidebar).
+    // 2) Narrow vertical strips were produced by multi-column grid/flex sections such as `.output-grid`, `.output-grid-3`, `.s7-grid`, and `.summary-panel` which translate poorly to A4 captures.
+    // 3) We'll replace the entire HTML payload assigned to `const html` (the template below) — this is the only change made.
 
-    .s7-body {
-      display: none;
-      padding: 0 32px 32px;
-    }
-    .s7-body.show { display: block; }
-
-    .s7-grid {
-      display: grid;
-      grid-template-columns: repeat(2, 1fr);
-      gap: 16px;
-      margin-top: 24px;
-    }
-    @media (max-width: 900px) { .s7-grid { grid-template-columns: 1fr; } }
-
-    .s7-card {
-      background: rgba(0,0,0,0.25);
-      border: 1px solid rgba(255,255,255,0.06);
-      border-radius: 14px;
-      padding: 20px;
-    }
-    .s7-card-full { grid-column: 1 / -1; }
-
-    .s7-card-label {
-      font-size: 8px; font-weight: 900; text-transform: uppercase;
-      letter-spacing: 0.22em; color: var(--muted); margin-bottom: 12px;
-    }
-    .s7-card-value { font-size: 12px; color: #d1d5db; line-height: 1.7; }
-
-    /* Signal pills */
-    .s7-signals { display: flex; flex-direction: column; gap: 10px; }
-    .s7-signal {
-      display: flex; align-items: flex-start; gap: 12px;
-      padding: 12px 14px;
-      background: rgba(255,255,255,0.03);
-      border: 1px solid rgba(255,255,255,0.06);
-      border-radius: 10px;
-    }
-    .s7-signal-type {
-      font-size: 8px; font-weight: 900; text-transform: uppercase;
-      letter-spacing: 0.15em; padding: 3px 8px; border-radius: 20px;
-      white-space: nowrap; flex-shrink: 0; margin-top: 2px;
-    }
-    .sig-High   { background: rgba(34,197,94,0.12);  color: #86efac; border: 1px solid rgba(34,197,94,0.25); }
-    .sig-Medium { background: rgba(245,158,11,0.12); color: #fcd34d; border: 1px solid rgba(245,158,11,0.25); }
-    .sig-Low    { background: rgba(107,114,128,0.12);color: #9ca3af; border: 1px solid rgba(107,114,128,0.25); }
-    .s7-signal-desc { font-size: 11px; color: #d1d5db; line-height: 1.6; }
-
-    /* MCC View */
-    .s7-mcc { display: grid; grid-template-columns: repeat(3,1fr); gap: 12px; }
-    @media (max-width: 700px) { .s7-mcc { grid-template-columns: 1fr; } }
-    .s7-mcc-cell {
-      background: rgba(0,0,0,0.3); border-radius: 10px; padding: 14px;
-      border-left: 3px solid;
-    }
-    .s7-mcc-cell.market   { border-color: #3b82f6; }
-    .s7-mcc-cell.client   { border-color: #a855f7; }
-    .s7-mcc-cell.competitor { border-color: #f59e0b; }
-    .s7-mcc-label { font-size: 7px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.2em; margin-bottom: 6px; }
-    .s7-mcc-cell.market   .s7-mcc-label { color: #93c5fd; }
-    .s7-mcc-cell.client   .s7-mcc-label { color: #c4b5fd; }
-    .s7-mcc-cell.competitor .s7-mcc-label { color: #fcd34d; }
-    .s7-mcc-text { font-size: 11px; color: #d1d5db; line-height: 1.6; }
-
-    /* Go/No-Go badge */
-    .s7-gng-badge {
-      display: inline-block; padding: 8px 20px; border-radius: 30px;
-      font-size: 12px; font-weight: 900; text-transform: uppercase;
-      letter-spacing: 0.12em; margin-bottom: 10px;
-    }
-    .gng-Go    { background: rgba(34,197,94,0.15);  color: #4ade80; border: 1px solid rgba(34,197,94,0.3); }
-    .gng-Watch { background: rgba(245,158,11,0.15); color: #fbbf24; border: 1px solid rgba(245,158,11,0.3); }
-    .gng-NoGo  { background: rgba(239,68,68,0.15);  color: #f87171; border: 1px solid rgba(239,68,68,0.3); }
-
-    /* Confidence meter */
-    .s7-confidence-bar-wrap {
-      height: 8px; background: rgba(255,255,255,0.07);
-      border-radius: 8px; overflow: hidden; margin: 10px 0;
-    }
-    .s7-confidence-bar-fill {
-      height: 100%; border-radius: 8px; transition: width 1s ease;
-    }
-    .s7-score-num {
-      font-size: 32px; font-weight: 900; font-family: 'Space Mono', monospace;
-    }
-
-    /* Strategic hook */
-    .s7-hook {
-      font-size: 14px; font-weight: 700; color: white;
-      line-height: 1.5; padding: 14px 18px;
-      background: rgba(168,85,247,0.07);
-      border: 1px solid rgba(168,85,247,0.2);
-      border-radius: 10px; position: relative;
-    }
-    .s7-hook::before {
-      content: '"';
-      font-size: 40px; color: rgba(168,85,247,0.3);
-      position: absolute; top: 2px; left: 12px; line-height: 1;
-      font-family: Georgia, serif;
-    }
-    .s7-hook span { position: relative; z-index: 1; }
-
-    /* Executive brief */
-    .s7-brief {
-      font-size: 12px; line-height: 1.8; color: #e5e7eb;
-      padding: 16px 20px;
-      background: rgba(255,255,255,0.03);
-      border-radius: 10px;
-      border: 1px solid rgba(255,255,255,0.07);
-    }
-
-    /* Sidebar Step 7 nav item special styling */
-    #step-nav-7 { border-top: 1px dashed rgba(251,191,36,0.15); margin-top: 8px; padding-top: 8px; }
-    #step-nav-7 .step-num { background: rgba(251,191,36,0.1); border: 1px solid rgba(251,191,36,0.25); color: #fbbf24; font-size: 7px; letter-spacing: 0.05em; }
-    #step-nav-7 .step-name { color: #fbbf24; }
-    #step-nav-7.active { border-left-color: #fbbf24; background: rgba(251,191,36,0.05); }
-    .s7-optional-pill {
-      font-size: 6px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em;
-      background: rgba(251,191,36,0.1); color: #fbbf24; border: 1px solid rgba(251,191,36,0.2);
-      padding: 2px 6px; border-radius: 4px; margin-left: 4px; vertical-align: middle;
-    }
+    const html = `<!DOCTYPE html>
+  <html><head><meta charset="UTF-8">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{background:#0d1120;color:#e5e7eb;font-family:'Inter',sans-serif;font-size:13px;line-height:1.6;width:794px}
+    /* Fixed A4 page box (pixels at 96dpi) */
+    .page{width:794px;height:1123px;padding:48px 54px 80px;background:#0d1120;position:relative;overflow:hidden}
+    .section-title{font-size:18px;font-weight:800;color:#ffffff;margin-bottom:8px}
+    .section-sub{font-size:11px;color:#9ca3af;margin-bottom:14px}
+    .card{background:rgba(255,255,255,0.03);border:1px solid rgba(255,255,255,0.06);border-radius:8px;padding:12px;margin-bottom:12px}
+    table.full{width:100%;border-collapse:collapse;font-size:11px;margin:8px 0}
+    table.full td,table.full th{padding:8px;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:top}
+    .label{font-size:9px;font-weight:800;color:#a855f7;text-transform:uppercase;letter-spacing:.12em;margin-bottom:6px;display:block}
+    .mono{font-family:'Space Mono',monospace}
+    .kpi-row td{vertical-align:middle;text-align:center}
+    .footer{position:absolute;left:54px;right:54px;bottom:20px;font-size:9px;color:#6b7280;font-family:'Space Mono',monospace}
+    img.responsive{max-width:100%;height:auto;display:block}
   </style>
-</head>
-<body>
+  </head><body>
 
-<!-- ── AUTH GUARD ── -->
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-<script src="auth-guard.js"></script>
-  <script src="tour.js"></script>
-
-<!-- ── TOP NAV ── -->
-<nav id="topnav">
-  <a href="index.html" class="nav-brand">
-    <div class="nav-mark">ABE</div>
-    <div class="nav-brand-text">
-      <div class="nav-brand-name">AI Revenue Infrastructure</div>
-      <div class="nav-brand-sub">Enterprise GTM Platform</div>
+  <!-- PAGE 1: COVER (full-width, centered) -->
+  <div class="page" style="text-align:center">
+    <div style="padding-top:60px">
+      <div style="width:72px;height:72px;margin:0 auto 18px;background:linear-gradient(135deg,#a855f7,#7c3aed);border-radius:16px;display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-weight:900;color:#fff;font-size:20px">ABE</div>
+      <div style="font-size:10px;color:#a855f7;font-weight:800;letter-spacing:.25em;text-transform:uppercase;margin-bottom:12px">GTM Strategy Report</div>
+      <div style="font-size:34px;font-weight:900;color:#fff;margin-bottom:6px">${co}</div>
+      ${ind?`<div style="font-size:12px;color:#9ca3af;margin-bottom:6px">${ind}</div>`:''}
+      <div style="font-size:11px;color:#9ca3af;margin-top:14px;max-width:620px;margin-left:auto;margin-right:auto">${esc(safe(p6.executive_brief,p3.verdict_reasoning||'GTM qualification report generated by ABE AI platform.'))}</div>
     </div>
-  </a>
 
-  <div class="nav-center">
-    <a href="index.html" class="nav-tab">Home</a>
-    <a href="dashboard.html" class="nav-tab">Command Centre</a>
-    <button class="nav-tab active active-accent">GTM Strategy</button>
-    <a href="vault.html" class="nav-tab">Strategy Vault</a>
-    <a href="dashboard.html" onclick="sessionStorage.setItem('dash_view','saved');return true;" class="nav-tab">Repository</a>
+    <div style="margin:28px auto 18px;max-width:620px">
+      <table class="full kpi-row" style="background:rgba(255,255,255,0.02);border-radius:8px">
+        <tr>
+          <td style="width:33%"><div class="mono" style="font-size:28px;font-weight:900;color:${vc.color}">${total}</div><div style="font-size:10px;color:#6b7280">GTM Score</div></td>
+          <td style="width:34%"><div class="mono" style="font-size:22px;font-weight:900;color:${vc.color}">${vc.label}</div><div style="font-size:10px;color:#6b7280">Qualification</div></td>
+          <td style="width:33%"><div class="mono" style="font-size:28px;font-weight:900;color:#9ca3af">${confScore}</div><div style="font-size:10px;color:#6b7280">Confidence</div></td>
+        </tr>
+      </table>
+    </div>
+
+    <div class="footer">CLASSIFICATION: CONFIDENTIAL — ${dateStr}</div>
   </div>
 
-  <div class="nav-right">
-    <div style="display:flex;align-items:center;gap:8px;">
-      <div class="status-dot"></div>
-      <span class="status-label">Systems Nominal</span>
+  <!-- PAGE 2: EXECUTIVE SUMMARY -->
+  <div class="page">
+    <div class="section-title">Executive Summary & Score Breakdown</div>
+    <div class="section-sub">Data-backed GTM qualification across 4 dimensions</div>
+
+    <div class="card">
+      <div class="label">Score Distribution</div>
+      <img class="responsive" src="${barChartUrl}" alt="Score Chart"/>
+      <div class="mono" style="font-size:10px;color:#9ca3af;margin-top:8px">${esc(p2.score_verification || (demand+' + '+timing+' + '+icp+' + '+data_c+' = '+total))}</div>
     </div>
-    <!-- Cloud save status indicator -->
-    <div id="gtm-cloud-status" style="
-      display:none;align-items:center;gap:6px;
-      background:rgba(168,85,247,0.08);
-      border:1px solid rgba(168,85,247,0.2);
-      border-radius:8px;padding:5px 10px;
-      font-size:9px;font-weight:800;
-      text-transform:uppercase;letter-spacing:.08em;
-      color:#a855f7;transition:all .3s;">
-      <span id="gtm-cloud-icon">☁️</span>
-      <span id="gtm-cloud-label">Saving to Cloud...</span>
+
+    <div class="card" style="border-left:4px solid ${vc.color};">
+      <div style="font-size:16px;font-weight:900;color:${vc.color};margin-bottom:6px">${vc.label} — Total: ${total}/100</div>
+      <div style="font-size:12px;color:#d1d5db;margin-bottom:8px">${esc(safe(p3.verdict_reasoning,'—'))}</div>
+      ${arr(p3.conditions).length? `<div style="font-size:11px;color:#fbbf24">Conditions: ${arr(p3.conditions).map(c=>esc(c)).join(' · ')}</div>` : ''}
     </div>
-    <button onclick="history.back()" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#6b7280;border-radius:8px;padding:6px 12px;font-size:10px;cursor:pointer;font-weight:700;margin-right:4px">← Back</button>
-    <button class="btn btn-outline btn-sm" onclick="openApiModal()">⚙ Config</button>
-    <button class="btn btn-outline btn-sm" onclick="handleSignOut()" style="color:#9ca3af;">Sign Out</button>
+
+    <div class="card">
+      <div class="label">Score Basis</div>
+      <table class="full">
+        <tr><th>Category</th><th style="width:80px">Score</th><th style="width:60px">Max</th><th>Rationale</th></tr>
+        ${[['Demand',p2.demand_score,40],['Timing',p2.market_timing_score,25],['ICP Fit',p2.icp_fit_score,20],['Data',p2.data_completeness_score,15]].map(([label,obj,max])=>`<tr><td style="font-weight:700;color:#c4b5fd">${label}</td><td class="mono" style="font-weight:900">${obj?.score??0}</td><td>${max}</td><td>${esc(obj?.rationale||'—')}${obj?.sub_breakdown?`<div style="font-family:Space Mono,monospace;color:#a855f7;font-size:10px;margin-top:6px">${esc(obj.sub_breakdown)}</div>`:''}</td></tr>`).join('')}
+        <tr style="border-top:2px solid rgba(255,255,255,0.04)"><td style="font-weight:900">TOTAL</td><td class="mono" style="font-weight:900">${total}</td><td>100</td><td class="mono" style="color:#a855f7">${esc(p2.score_verification||'—')}</td></tr>
+      </table>
+    </div>
+
+    <div class="footer">ABE · GTM Strategy Report · ${co} · Page 2</div>
   </div>
 
-  <button id="mobile-menu-btn" onclick="toggleMobileNav()" aria-label="Menu">
-    <span></span><span></span><span></span>
-  </button>
-</nav>
-<div id="mobile-nav-drawer">
-  <a href="index.html">Home</a>
-  <a href="dashboard.html">Command Centre</a>
-  <button class="active-mobile" style="color:#a855f7;background:rgba(168,85,247,0.1)">GTM Strategy</button>
-  <a href="vault.html">Strategy Vault</a>
-  <a href="dashboard.html">Repository</a>
-  <button onclick="handleSignOut()" style="color:#ef4444;">Sign Out</button>
-</div>
+  <!-- PAGES 3-8: STEPS 1–6 — each step is a full page with header + stacked content -->
+  ${[1,2,3,4,5,6].map(i=>{
+      const stepTitle = {1:'Market Research & Insights',2:'Market Attractiveness & TAM Analysis',3:'GTM Recommendation',4:'Target Accounts & GTM Strategy',5:'Execution Risks & Considerations',6:'GTM Summary & Action Plan'}[i];
+      const stepData = [p1,p2,p3,p4,p5,p6][i-1]||{};
+      const rows = Object.entries(stepData).map(([k,v])=>`<tr><td style="width:32%;font-weight:700;color:#a855f7">${esc(k)}</td><td><pre style="font-family:Space Mono,monospace;color:#d1d5db;background:transparent;border:none;padding:0;margin:0;white-space:pre-wrap">${esc(typeof v==='object'?JSON.stringify(v, null, 2):v)}</pre></td></tr>`).join('');
+      return `
+      <div class="page">
+        <div class="section-title">Step ${String(i).padStart(2,'0')} — ${stepTitle}</div>
+        <div class="section-sub">${i===1? 'Demand signals · Market timing · ICP fit · Data completeness' : i===2? 'Scoring & TAM' : i===3? 'Verdict & Score Basis' : i===4? 'Target roles, pitch & deal lens' : i===5? 'Key risks & validation' : 'Executive brief & recommended actions'}</div>
+        <div class="card">
+          <div class="label">Key data (structured)</div>
+          <table class="full">
+            ${rows || '<tr><td>No data available</td></tr>'}
+          </table>
+        </div>
+        <div class="footer">ABE · GTM Strategy Report · ${co} · Page ${2+i}</div>
+      </div>`
+    }).join('')}
 
-<!-- ── MAIN PAGE ── -->
-<div class="page">
-
-  <!-- ── SIDEBAR ── -->
-  <aside class="sidebar">
-    <div style="padding: 0 24px 20px;">
-      <div class="sidebar-section-title">Workflow Pipeline</div>
-    </div>
-
-    <div id="step-nav-1" class="step-nav-item active" onclick="scrollToStep(1)">
-      <div class="step-num" id="snnum-1">01</div>
-      <div class="step-info">
-        <div class="step-name">Market Research & Insights</div>
-        <div class="step-desc">Company · Market · Signals</div>
+  <!-- OPTIONAL PAGE: STEP 7 (Revenue Intelligence) -->
+  ${s7 && Object.keys(s7).length ? `
+    <div class="page">
+      <div class="section-title">Step 07 — Revenue Intelligence Enhancement</div>
+      <div class="section-sub">Signal synthesis, strategic hook, and go/no-go rationale</div>
+      <div class="card">
+        <div class="label">Executive Brief</div>
+        <div style="font-size:12px;color:#d1d5db">${esc(s7.executive_brief||'—')}</div>
       </div>
-    </div>
-
-    <div id="step-nav-2" class="step-nav-item locked" onclick="scrollToStep(2)">
-      <div class="step-num" id="snnum-2">02</div>
-      <div class="step-info">
-        <div class="step-name">Market Attractiveness & TAM</div>
-        <div class="step-desc">Company · Market · Signals</div>
+      <div class="card">
+        <div class="label">Strategic Hook</div>
+        <div style="font-size:12px;color:#4ade80">${esc(s7.strategic_hook||'—')}</div>
       </div>
-    </div>
-
-    <div id="step-nav-3" class="step-nav-item locked" onclick="scrollToStep(3)">
-      <div class="step-num" id="snnum-3">03</div>
-      <div class="step-info">
-        <div class="step-name">GTM Recommendation</div>
-        <div class="step-desc">Strategy Direction · Priority</div>
+      <div class="card">
+        <div class="label">Signals Summary</div>
+        <pre style="font-family:Space Mono,monospace;color:#d1d5db;background:transparent;border:none;padding:0;margin:0;white-space:pre-wrap;">${esc(JSON.stringify(s7, null, 2))}</pre>
       </div>
+      <div class="footer">ABE · GTM Strategy Report · ${co} · Step 7</div>
     </div>
+  ` : ''}
 
-    <div id="step-nav-4" class="step-nav-item locked" onclick="scrollToStep(4)">
-      <div class="step-num" id="snnum-4">04</div>
-      <div class="step-info">
-        <div class="step-name">Target Accounts & GTM Strategy</div>
-        <div class="step-desc">ICP · Approach · Deal Size</div>
-      </div>
-    </div>
-
-    <div id="step-nav-5" class="step-nav-item locked" onclick="scrollToStep(5)">
-      <div class="step-num" id="snnum-5">05</div>
-      <div class="step-info">
-        <div class="step-name">Execution Risks & Considerations</div>
-        <div class="step-desc">Risks · Gaps · Confidence</div>
-      </div>
-    </div>
-
-    <div id="step-nav-6" class="step-nav-item locked" onclick="scrollToStep(6)">
-      <div class="step-num" id="snnum-6">06</div>
-      <div class="step-info">
-        <div class="step-name">GTM Summary & Action Plan</div>
-        <div class="step-desc">Summary · Score · Action Plan</div>
+  </body></html>`;
       </div>
     </div>
 
