@@ -3234,188 +3234,240 @@ async function generateProfessionalPDF() {
     </div>`;
   }).join('') || '<p style="color:#6b7280;">No critical risks identified at this time.</p>';
 
-  /* ── Section header helper ───────────────────────────────────── */
-  const sectionHeader = (num, title, subtitle) => `
-    <div style="display:flex;align-items:flex-start;gap:16px;margin:0 0 20px;">
-      <div style="background:linear-gradient(135deg,#a855f7,#7c3aed);border-radius:10px;padding:10px 14px;flex-shrink:0;">
-        <div style="font-size:11px;font-weight:900;color:white;font-family:'Space Mono',monospace;letter-spacing:.05em;">${String(num).padStart(2,'0')}</div>
-      </div>
-      <div>
-        <div style="font-size:18px;font-weight:800;color:white;letter-spacing:-.01em;">${esc(title)}</div>
-        ${subtitle ? `<div style="font-size:11px;color:#9ca3af;margin-top:2px;">${esc(subtitle)}</div>` : ''}
-      </div>
-    </div>`;
+  /* ── Section header — block only, no flex ──────────────────── */
+  const sectionHeader = (num, title, subtitle) =>
+    `<div style="margin-bottom:18px;padding-bottom:14px;border-bottom:2px solid rgba(168,85,247,0.25);">` +
+    `<span style="display:inline-block;background:linear-gradient(135deg,#a855f7,#7c3aed);` +
+    `border-radius:6px;padding:4px 10px;font-family:'Space Mono',monospace;font-size:10px;` +
+    `font-weight:900;color:white;margin-right:10px;vertical-align:middle;">${String(num).padStart(2,'0')}</span>` +
+    `<span style="font-size:17px;font-weight:800;color:white;letter-spacing:-.01em;vertical-align:middle;">${esc(title)}</span>` +
+    (subtitle ? `<div style="font-size:11px;color:#9ca3af;margin-top:5px;padding-left:4px;">${esc(subtitle)}</div>` : '') +
+    `</div>`;
 
   /* ── Divider ─────────────────────────────────────────────────── */
-  const div = `<div style="height:1px;background:linear-gradient(90deg,#a855f766,transparent);margin:24px 0;"></div>`;
+  const div = `<div style="height:1px;background:linear-gradient(90deg,rgba(168,85,247,0.35),transparent);margin:20px 0;"></div>`;
 
-  /* ══════════════════════════════════════════════════════════════
-     BUILD HTML DOCUMENT — single-column, A4-safe
-  ══════════════════════════════════════════════════════════════ */
+  /* ── Footer — absolute + inner table (no flex/float) ─────────── */
+  const footer = (left, right) =>
+    `<div style="position:absolute;bottom:20px;left:54px;right:54px;">` +
+    `<div style="height:1px;background:rgba(255,255,255,0.06);margin-bottom:7px;"></div>` +
+    `<table style="width:100%;border:none;border-collapse:collapse;"><tr>` +
+    `<td style="padding:0;font-size:8px;color:#4b5563;font-family:'Space Mono',monospace;border:none;">${esc(left)}</td>` +
+    `<td style="padding:0;font-size:8px;color:#4b5563;font-family:'Space Mono',monospace;border:none;text-align:right;">${esc(right)}</td>` +
+    `</tr></table></div>`;
+
+  /* ═══════════════════════════════════════════════════════════════
+     HTML TEMPLATE — A4-safe, zero flex/grid, explicit pixel widths
+  ═══════════════════════════════════════════════════════════════ */
   const html = `<!DOCTYPE html>
 <html><head><meta charset="UTF-8">
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
   * { box-sizing:border-box; margin:0; padding:0; }
-  body { background:#0d1120; color:#e5e7eb; font-family:'Inter',sans-serif; font-size:13px; line-height:1.65; }
-  .page { width:210mm; min-height:297mm; padding:16mm 18mm 18mm; background:#0d1120; position:relative; page-break-after:always; }
-  .page:last-child { page-break-after:auto; }
-  .card { background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07); border-radius:10px; padding:18px 20px; margin-bottom:14px; }
-  .gold-rule { height:2px; background:linear-gradient(90deg,#a855f7,#7c3aed,transparent); border-radius:2px; margin:20px 0; }
-  .label { font-size:9px; font-weight:700; color:#a855f7; text-transform:uppercase; letter-spacing:.12em; margin-bottom:6px; }
+  /* body width locked to 794px — same as container and html2canvas windowWidth */
+  body  { background:#0d1120; color:#e5e7eb; font-family:'Inter',sans-serif;
+          font-size:13px; line-height:1.65; width:794px; }
+  /* page: explicit px — NOT mm — so browser DPI never mismatches the capture */
+  .page { width:794px; min-height:1123px; padding:48px 54px 80px;
+          background:#0d1120; position:relative; overflow:hidden; }
+  .card { background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07);
+          border-radius:10px; padding:16px 18px; margin-bottom:12px; }
+  .label{ font-size:9px; font-weight:700; color:#a855f7; text-transform:uppercase;
+          letter-spacing:.12em; margin-bottom:6px; display:block; }
   .mono { font-family:'Space Mono',monospace; }
-  table { width:100%; border-collapse:collapse; font-size:11px; border-radius:8px; overflow:hidden; border:1px solid rgba(255,255,255,0.08); margin:10px 0; }
-  th { background:rgba(168,85,247,0.12); color:#c4b5fd; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; padding:10px 12px; text-align:left; border-bottom:2px solid rgba(168,85,247,0.3); }
-  td { padding:10px 12px; border-bottom:1px solid rgba(255,255,255,0.05); color:#d1d5db; vertical-align:top; }
-  tr:last-child td { border-bottom:none; }
-  .tag { display:inline-block; padding:3px 9px; border-radius:20px; font-size:9px; font-weight:700; margin:2px; }
-  .tag-green  { background:rgba(34,197,94,.12); color:#4ade80; border:1px solid rgba(34,197,94,.2); }
-  .tag-blue   { background:rgba(96,165,250,.12); color:#60a5fa; border:1px solid rgba(96,165,250,.2); }
-  .tag-purple { background:rgba(168,85,247,.12); color:#c4b5fd; border:1px solid rgba(168,85,247,.2); }
-  .tag-amber  { background:rgba(245,158,11,.12); color:#fbbf24; border:1px solid rgba(245,158,11,.2); }
-  .footer { position:absolute; bottom:12mm; left:18mm; right:18mm; display:flex; justify-content:space-between; font-size:8px; color:#374151; border-top:1px solid rgba(255,255,255,0.05); padding-top:6px; font-family:'Space Mono',monospace; }
+  /* dt = data table — all side-by-side content uses this, never flex */
+  table.dt { width:100%; border-collapse:collapse; font-size:11px;
+             border:1px solid rgba(255,255,255,0.08); margin:10px 0; }
+  table.dt th { background:rgba(168,85,247,0.12); color:#c4b5fd; font-size:9px;
+                font-weight:700; text-transform:uppercase; letter-spacing:.1em;
+                padding:9px 12px; text-align:left;
+                border-bottom:2px solid rgba(168,85,247,0.3); }
+  table.dt td { padding:9px 12px; border-bottom:1px solid rgba(255,255,255,0.05);
+                color:#d1d5db; vertical-align:top; }
+  table.dt tr:last-child td { border-bottom:none; }
+  /* utility table — invisible structure only */
+  table.ut { width:100%; border-collapse:collapse; }
+  table.ut td { padding:0; border:none; vertical-align:top; }
+  .tag { display:inline-block; padding:3px 8px; border-radius:20px;
+         font-size:9px; font-weight:700; margin:2px 2px 2px 0; }
+  .tg  { background:rgba(34,197,94,.12);  color:#4ade80; border:1px solid rgba(34,197,94,.2); }
+  .tb  { background:rgba(96,165,250,.12); color:#60a5fa; border:1px solid rgba(96,165,250,.2); }
+  .tp  { background:rgba(168,85,247,.12); color:#c4b5fd; border:1px solid rgba(168,85,247,.2); }
+  .ta  { background:rgba(245,158,11,.12); color:#fbbf24; border:1px solid rgba(245,158,11,.2); }
 </style>
 </head><body>
 
-<!-- ═══════════════════════════════════════════════
-     PAGE 1 — COVER
-═══════════════════════════════════════════════ -->
-<div class="page" style="display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;">
-  <div style="margin-bottom:48px;">
-    <div style="width:72px;height:72px;background:linear-gradient(135deg,#a855f7,#7c3aed);border-radius:18px;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;box-shadow:0 20px 60px rgba(168,85,247,.4);">
-      <span style="font-family:'Space Mono',monospace;font-size:20px;font-weight:900;color:white;">ABE</span>
+<!-- ═══════════════════════ PAGE 1 — COVER ══════════════════════════ -->
+<div class="page" style="text-align:center;">
+  <div style="padding-top:60px;">
+    <!-- Logo -->
+    <div style="width:72px;height:72px;background:linear-gradient(135deg,#a855f7,#7c3aed);
+         border-radius:18px;margin:0 auto 20px;
+         box-shadow:0 20px 40px rgba(168,85,247,.35);">
+      <div style="padding-top:18px;font-family:'Space Mono',monospace;
+           font-size:20px;font-weight:900;color:white;">ABE</div>
     </div>
-    <div style="font-size:9px;font-weight:700;color:#a855f7;letter-spacing:.25em;text-transform:uppercase;margin-bottom:12px;">GTM Strategy Report</div>
-    <div style="font-size:40px;font-weight:900;color:white;letter-spacing:-.02em;line-height:1.1;margin-bottom:8px;">${co}</div>
-    ${ind ? `<div style="font-size:14px;color:#9ca3af;">${ind}</div>` : ''}
+    <div style="font-size:9px;font-weight:700;color:#a855f7;letter-spacing:.25em;
+         text-transform:uppercase;margin-bottom:16px;">GTM Strategy Report</div>
+    <div style="font-size:38px;font-weight:900;color:white;letter-spacing:-.02em;
+         line-height:1.1;margin-bottom:10px;">${co}</div>
+    ${ind ? `<div style="font-size:14px;color:#9ca3af;margin-bottom:4px;">${ind}</div>` : ''}
   </div>
 
-  <div class="gold-rule" style="width:120px;"></div>
+  <div style="height:2px;background:linear-gradient(90deg,transparent,#a855f7,transparent);
+       margin:32px auto;width:200px;border-radius:2px;"></div>
 
-  <div style="margin:32px 0;display:flex;gap:40px;justify-content:center;">
-    <div style="text-align:center;">
-      <div class="mono" style="font-size:42px;font-weight:900;color:${vc.color};">${total}</div>
-      <div style="font-size:10px;color:#6b7280;">GTM Score / 100</div>
-    </div>
-    <div style="width:1px;background:rgba(255,255,255,0.08);"></div>
-    <div style="text-align:center;">
-      <div class="mono" style="font-size:42px;font-weight:900;color:${vc.color};">${vc.label}</div>
-      <div style="font-size:10px;color:#6b7280;">Qualification</div>
-    </div>
-    <div style="width:1px;background:rgba(255,255,255,0.08);"></div>
-    <div style="text-align:center;">
-      <div class="mono" style="font-size:42px;font-weight:900;color:#9ca3af;">${confScore}</div>
-      <div style="font-size:10px;color:#6b7280;">Confidence</div>
-    </div>
+  <!-- KPI row — fixed table, no flex -->
+  <table class="ut" style="width:360px;margin:0 auto 32px;">
+    <tr>
+      <td style="text-align:center;padding:0 8px;">
+        <div class="mono" style="font-size:40px;font-weight:900;color:${vc.color};">${total}</div>
+        <div style="font-size:10px;color:#6b7280;">GTM Score / 100</div>
+      </td>
+      <td style="width:1px;background:rgba(255,255,255,0.08);padding:0;"></td>
+      <td style="text-align:center;padding:0 8px;">
+        <div class="mono" style="font-size:${vc.label.length>2?'22':'38'}px;font-weight:900;
+             color:${vc.color};line-height:1.2;">${vc.label}</div>
+        <div style="font-size:10px;color:#6b7280;">Qualification</div>
+      </td>
+      <td style="width:1px;background:rgba(255,255,255,0.08);padding:0;"></td>
+      <td style="text-align:center;padding:0 8px;">
+        <div class="mono" style="font-size:40px;font-weight:900;color:#9ca3af;">${confScore}</div>
+        <div style="font-size:10px;color:#6b7280;">Confidence</div>
+      </td>
+    </tr>
+  </table>
+
+  <div style="height:2px;background:linear-gradient(90deg,transparent,#a855f7,transparent);
+       margin:0 auto 32px;width:200px;border-radius:2px;"></div>
+
+  <div style="max-width:500px;margin:0 auto;">
+    <div style="font-size:13px;color:#d1d5db;line-height:1.8;">${esc(safe(p6.executive_brief,
+      p3.verdict_reasoning || 'GTM qualification report generated by ABE AI platform.'))}</div>
   </div>
 
-  <div class="gold-rule" style="width:120px;"></div>
-
-  <div style="margin-top:32px;max-width:400px;">
-    <div style="font-size:13px;color:#d1d5db;line-height:1.8;">${esc(safe(p6.executive_brief, p3.verdict_reasoning || 'GTM qualification report generated by ABE AI Revenue Infrastructure platform.'))}</div>
-  </div>
-
-  <div style="position:absolute;bottom:18mm;left:18mm;right:18mm;display:flex;justify-content:space-between;align-items:center;">
-    <div style="font-size:8px;color:#374151;font-family:'Space Mono',monospace;">CLASSIFICATION: CONFIDENTIAL — NOT FOR EXTERNAL DISTRIBUTION</div>
-    <div style="font-size:8px;color:#374151;font-family:'Space Mono',monospace;">${dateStr}</div>
-  </div>
+  ${footer('CLASSIFICATION: CONFIDENTIAL — NOT FOR EXTERNAL DISTRIBUTION', dateStr)}
 </div>
 
-<!-- ═══════════════════════════════════════════════
-     PAGE 2 — SCORE SUMMARY + EXEC BRIEF
-═══════════════════════════════════════════════ -->
+<!-- ═══════════════════ PAGE 2 — EXEC SUMMARY ══════════════════════ -->
 <div class="page">
   ${sectionHeader('ES','Executive Summary & Score Breakdown','Data-backed GTM qualification across 4 dimensions')}
 
-  <!-- Score rings row -->
-  <div style="display:flex;justify-content:space-around;background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.06);border-radius:12px;padding:16px 8px;margin-bottom:16px;">
-    ${ring(demand,40,'#22c55e','Demand','Hiring · Expansion · Signals')}
-    ${ring(timing,25,'#60a5fa','Timing','Market · Trends')}
-    ${ring(icp,20,'#a855f7','ICP Fit','Target · Personas')}
-    ${ring(data_c,15,'#f59e0b','Data','Completeness')}
-    ${ring(total,100,vc.color,'TOTAL','GTM Score')}
+  <!-- Score rings — fixed 5-cell table, no flex -->
+  <div style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.06);
+       border-radius:12px;padding:12px 6px;margin-bottom:16px;">
+    <table class="ut" style="width:100%;table-layout:fixed;">
+      <tr>
+        ${[
+          [demand,  40, '#22c55e','Demand',  'Hiring & Expansion'],
+          [timing,  25, '#60a5fa','Timing',  'Market & Trends'],
+          [icp,     20, '#a855f7','ICP Fit', 'Target Personas'],
+          [data_c,  15, '#f59e0b','Data',    'Completeness'],
+          [total,  100, vc.color, 'TOTAL',   'GTM Score'],
+        ].map(([val,max,col,lbl,sub]) => {
+          const pct = Math.min(val/max,1);
+          const r=32; const circ=2*Math.PI*r;
+          return `<td style="text-align:center;padding:8px 4px;">
+            <svg width="80" height="80" viewBox="0 0 80 80" style="display:block;margin:0 auto;">
+              <circle cx="40" cy="40" r="${r}" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="7"/>
+              <circle cx="40" cy="40" r="${r}" fill="none" stroke="${col}" stroke-width="7"
+                stroke-dasharray="${circ*pct} ${circ}" stroke-linecap="round"
+                transform="rotate(-90 40 40)"/>
+              <text x="40" y="38" text-anchor="middle" fill="${col}"
+                font-family="Space Mono,monospace" font-size="15" font-weight="900">${val}</text>
+              <text x="40" y="52" text-anchor="middle" fill="#6b7280"
+                font-family="sans-serif" font-size="9">/${max}</text>
+            </svg>
+            <div style="font-size:10px;font-weight:700;color:${col};margin-top:3px;">${lbl}</div>
+            <div style="font-size:8px;color:#6b7280;">${sub}</div>
+          </td>`;
+        }).join('')}
+      </tr>
+    </table>
   </div>
 
   <!-- Score bar chart -->
-  <div class="card" style="text-align:center;padding:14px;">
-    <div class="label" style="text-align:left;">Score Distribution</div>
-    <img src="${barChartUrl}" alt="Score Chart" style="width:100%;max-height:160px;object-fit:contain;border-radius:6px;" onerror="this.style.display='none'"/>
-    <div style="font-family:'Space Mono',monospace;font-size:9px;color:#6b7280;margin-top:8px;">${esc(p2.score_verification || demand + ' + ' + timing + ' + ' + icp + ' + ' + data_c + ' = ' + total)}</div>
+  <div class="card" style="padding:14px;text-align:center;">
+    <span class="label" style="text-align:left;display:block;">Score Distribution</span>
+    <img src="${barChartUrl}" alt="Score Chart"
+         style="width:100%;max-height:160px;display:block;margin:0 auto;border-radius:6px;"
+         onerror="this.style.display='none'"/>
+    <div class="mono" style="font-size:9px;color:#6b7280;margin-top:8px;">${esc(p2.score_verification ||
+      demand+' + '+timing+' + '+icp+' + '+data_c+' = '+total)}</div>
   </div>
 
   ${div}
 
-  <!-- Verdict block -->
-  <div style="border:2px solid ${vc.border};background:${vc.bg};border-radius:12px;padding:18px 20px;margin-bottom:14px;">
-    <div style="display:flex;align-items:center;gap:16px;">
-      <div class="mono" style="font-size:32px;font-weight:900;color:${vc.color};">${vc.label}</div>
-      <div style="flex:1;">
-        <div style="font-size:11px;font-weight:700;color:${vc.color};text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">
-          ${esc(p3.demand_assessment||'—').toUpperCase()} DEMAND · ${esc(p3.icp_assessment||'—').toUpperCase()} ICP FIT
-        </div>
-        <div style="font-size:12px;color:#d1d5db;">${esc(safe(p3.verdict_reasoning,'—'))}</div>
-      </div>
+  <!-- Verdict block — no flex -->
+  <div style="border:2px solid ${vc.border};background:${vc.bg};
+       border-radius:12px;padding:18px 20px;margin-bottom:12px;">
+    <div style="margin-bottom:10px;">
+      <span class="mono" style="font-size:26px;font-weight:900;color:${vc.color};
+            display:inline-block;margin-right:14px;vertical-align:middle;">${vc.label}</span>
+      <span style="font-size:10px;font-weight:700;color:${vc.color};
+            text-transform:uppercase;letter-spacing:.08em;vertical-align:middle;">
+        ${esc(p3.demand_assessment||'—').toUpperCase()} DEMAND · ${esc(p3.icp_assessment||'—').toUpperCase()} ICP FIT
+      </span>
     </div>
+    <div style="font-size:12px;color:#d1d5db;margin-bottom:10px;">${esc(safe(p3.verdict_reasoning,'—'))}</div>
     ${arr(p3.conditions).length ? `
-    <div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.08);">
-      <div style="font-size:10px;font-weight:700;color:#f59e0b;margin-bottom:6px;">CONDITIONS TO SATISFY:</div>
-      ${arr(p3.conditions).map(c=>`<div style="font-size:11px;color:#fbbf24;margin-bottom:3px;">› ${esc(c)}</div>`).join('')}
-    </div>` : ''}
+      <div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:10px;margin-top:4px;">
+        <span style="font-size:10px;font-weight:700;color:#f59e0b;">CONDITIONS: </span>
+        ${arr(p3.conditions).map(c=>`<div style="font-size:11px;color:#fbbf24;margin-top:3px;">› ${esc(c)}</div>`).join('')}
+      </div>` : ''}
   </div>
 
+  <!-- Score basis & what would change — stacked cards, no flex -->
   <div class="card">
-    <div class="label">Score Basis</div>
-    <div class="mono" style="font-size:11px;color:#c4b5fd;">${esc(safe(p3.score_basis,'—'))}</div>
-    <div style="margin-top:10px;font-size:11px;color:#9ca3af;border-top:1px solid rgba(255,255,255,0.06);padding-top:8px;">
-      <strong style="color:#e5e7eb;">What would change this verdict:</strong> ${esc(safe(p3.what_would_change_verdict,'—'))}
+    <span class="label">Score Basis</span>
+    <div class="mono" style="font-size:11px;color:#c4b5fd;margin-bottom:8px;">${esc(safe(p3.score_basis,'—'))}</div>
+    <div style="font-size:11px;color:#9ca3af;border-top:1px solid rgba(255,255,255,0.06);padding-top:8px;">
+      <strong style="color:#e5e7eb;">What would change this: </strong>${esc(safe(p3.what_would_change_verdict,'—'))}
     </div>
   </div>
 
-  <div class="footer">
-    <span>ABE · GTM Strategy Report · ${co}</span>
-    <span>Page 1</span>
-  </div>
+  ${footer('ABE · GTM Strategy Report · '+co, 'Page 1')}
 </div>
 
-<!-- ═══════════════════════════════════════════════
-     PAGE 3 — MARKET RESEARCH & DEMAND SIGNALS
-═══════════════════════════════════════════════ -->
+<!-- ═══════════════════ PAGE 3 — MARKET RESEARCH ════════════════════ -->
 <div class="page">
   ${sectionHeader(1,'Market Research & Insights','Demand signals · Market timing · ICP fit · Data completeness')}
 
-  <div class="label">Market Demand Signals</div>
-  <div class="card" style="padding:14px 16px;">
+  <span class="label">Market Demand Signals</span>
+  <div class="card" style="padding:12px 16px;">
     ${demandSignals.length ? demandSignals.map(s => {
-      const sColor = s.strength==='High' ? '#22c55e' : s.strength==='Medium' ? '#f59e0b' : '#6b7280';
-      return `<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
-        <div style="width:6px;height:6px;border-radius:50%;background:${sColor};margin-top:5px;flex-shrink:0;"></div>
-        <div style="flex:1;">
-          <span style="font-size:11px;color:#e5e7eb;">${esc(s.signal)}</span>
-          <span class="tag tag-${s.strength==='High'?'green':s.strength==='Medium'?'amber':''}" style="margin-left:6px;">${esc(s.type||'')}</span>
-        </div>
-        <span style="font-size:9px;font-weight:700;color:${sColor};">${esc(s.strength||'')}</span>
+      const sc = s.strength==='High'?'#22c55e':s.strength==='Medium'?'#f59e0b':'#6b7280';
+      const tc = s.strength==='High'?'tg':s.strength==='Medium'?'ta':'';
+      return `<div style="padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
+        <span style="display:inline-block;width:7px;height:7px;border-radius:50%;
+              background:${sc};margin-right:8px;vertical-align:middle;"></span>
+        <span style="font-size:11px;color:#e5e7eb;">${esc(s.signal)}</span>
+        <span class="tag ${tc}" style="margin-left:6px;">${esc(s.type||'')}</span>
+        <span style="float:right;font-size:9px;font-weight:700;color:${sc};margin-top:2px;">${esc(s.strength||'')}</span>
       </div>`;
     }).join('') : '<div style="color:#6b7280;font-size:11px;">No demand signals extracted.</div>'}
   </div>
 
   ${div}
 
-  <div class="label">Market Timing & Trends</div>
-  <div class="card" style="padding:14px 16px;">
+  <span class="label">Market Timing & Trends</span>
+  <div class="card" style="padding:12px 16px;">
     ${timingSignals.length ? timingSignals.map(s => {
-      const sColor = s.strength==='High' ? '#60a5fa' : s.strength==='Medium' ? '#f59e0b' : '#6b7280';
-      return `<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
-        <div style="width:6px;height:6px;border-radius:50%;background:${sColor};margin-top:5px;flex-shrink:0;"></div>
-        <div style="flex:1;"><span style="font-size:11px;color:#e5e7eb;">${esc(s.signal)}</span><span class="tag tag-blue" style="margin-left:6px;">${esc(s.category||'')}</span></div>
-        <span style="font-size:9px;font-weight:700;color:${sColor};">${esc(s.strength||'')}</span>
+      const sc = s.strength==='High'?'#60a5fa':s.strength==='Medium'?'#f59e0b':'#6b7280';
+      return `<div style="padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
+        <span style="display:inline-block;width:7px;height:7px;border-radius:50%;
+              background:${sc};margin-right:8px;vertical-align:middle;"></span>
+        <span style="font-size:11px;color:#e5e7eb;">${esc(s.signal)}</span>
+        <span class="tag tb" style="margin-left:6px;">${esc(s.category||'')}</span>
+        <span style="float:right;font-size:9px;font-weight:700;color:${sc};margin-top:2px;">${esc(s.strength||'')}</span>
       </div>`;
     }).join('') : '<div style="color:#6b7280;font-size:11px;">No market timing signals extracted.</div>'}
   </div>
 
   ${div}
 
-  <!-- ICP Fit + Data side by side (safe 2-col) -->
-  <table>
+  <!-- ICP Fit + Data Completeness — 2-col table -->
+  <table class="dt">
     <tr>
       <th style="width:50%;">ICP Fit Assessment</th>
       <th style="width:50%;">Data Completeness</th>
@@ -3427,64 +3479,55 @@ async function generateProfessionalPDF() {
         ${arr(icpFit.mismatches).filter(m=>m&&m!=='missing data').map(m=>`<div style="font-size:10px;color:#f87171;margin-bottom:3px;">⚠ ${esc(m)}</div>`).join('')}
       </td>
       <td>
-        ${arr(p1.data_completeness?.available).map(a=>`<div style="font-size:10px;color:#4ade80;margin-bottom:3px;">✓ ${esc(a)}</div>`).join('') || '<div style="font-size:10px;color:#6b7280;">No data available fields listed</div>'}
-        <div style="margin-top:8px;">
-          ${arr(p1.data_completeness?.missing).filter(m=>m&&m!=='missing data').map(m=>`<div style="font-size:10px;color:#f87171;margin-bottom:3px;">✗ ${esc(m)}</div>`).join('') || ''}
-        </div>
+        ${arr(p1.data_completeness?.available).map(a=>`<div style="font-size:10px;color:#4ade80;margin-bottom:3px;">✓ ${esc(a)}</div>`).join('') || '<div style="font-size:10px;color:#6b7280;">No available fields listed</div>'}
+        ${arr(p1.data_completeness?.missing).filter(m=>m&&m!=='missing data').map(m=>`<div style="font-size:10px;color:#f87171;margin-bottom:3px;margin-top:2px;">✗ ${esc(m)}</div>`).join('')}
       </td>
     </tr>
   </table>
 
   <div class="card" style="border-left:3px solid #a855f7;">
-    <div class="label">Analyst Insight</div>
+    <span class="label">Analyst Insight</span>
     <div style="font-size:12px;color:#d1d5db;font-style:italic;">"${esc(safe(p1.analyst_insight,'No analyst insight available.'))}"</div>
   </div>
 
-  <div class="footer">
-    <span>ABE · GTM Strategy Report · ${co}</span>
-    <span>Page 2</span>
-  </div>
+  ${footer('ABE · GTM Strategy Report · '+co, 'Page 2')}
 </div>
 
-<!-- ═══════════════════════════════════════════════
-     PAGE 4 — TAM ANALYSIS / SCORING DETAIL
-═══════════════════════════════════════════════ -->
+<!-- ═══════════════════ PAGE 4 — TAM & SCORING ══════════════════════ -->
 <div class="page">
   ${sectionHeader(2,'Market Attractiveness & TAM Analysis','Demand · Timing · ICP Fit · Data Quality scoring')}
 
-  <table>
+  <!-- Score detail table -->
+  <table class="dt">
     <tr>
-      <th>Category</th>
-      <th>Score</th>
-      <th>Max</th>
+      <th style="width:28%;">Category</th>
+      <th style="width:10%;">Score</th>
+      <th style="width:8%;">Max</th>
       <th>Rationale</th>
     </tr>
     ${[
-      ['📈 Demand Signals',   p2.demand_score,           40, '#22c55e'],
-      ['⏱ Market Timing',    p2.market_timing_score,    25, '#60a5fa'],
-      ['🎯 ICP Fit',         p2.icp_fit_score,          20, '#a855f7'],
-      ['📋 Data Completeness',p2.data_completeness_score,15, '#f59e0b'],
+      ['Demand Signals',   p2.demand_score,           40, '#22c55e'],
+      ['Market Timing',    p2.market_timing_score,    25, '#60a5fa'],
+      ['ICP Fit',          p2.icp_fit_score,          20, '#a855f7'],
+      ['Data Completeness',p2.data_completeness_score,15, '#f59e0b'],
     ].map(([label,obj,max,col]) => `
     <tr>
       <td style="font-weight:700;color:${col};">${esc(label)}</td>
-      <td style="font-family:'Space Mono',monospace;font-size:16px;font-weight:900;color:${col};">${obj?.score??0}</td>
+      <td class="mono" style="font-size:18px;font-weight:900;color:${col};">${obj?.score??0}</td>
       <td style="color:#6b7280;">${max}</td>
       <td style="font-size:11px;">${esc(obj?.rationale||'—')}
-        ${obj?.sub_breakdown ? `<div style="margin-top:4px;font-size:9px;font-family:'Space Mono',monospace;color:#a855f7;">${esc(obj.sub_breakdown)}</div>` : ''}
+        ${obj?.sub_breakdown?`<div style="margin-top:4px;font-size:9px;font-family:'Space Mono',monospace;color:#a855f7;">${esc(obj.sub_breakdown)}</div>`:''}
       </td>
     </tr>`).join('')}
     <tr style="border-top:2px solid rgba(168,85,247,0.4);">
       <td style="font-weight:900;color:${vc.color};font-size:13px;">TOTAL</td>
-      <td style="font-family:'Space Mono',monospace;font-size:22px;font-weight:900;color:${vc.color};" colspan="2">${total}/100</td>
-      <td style="font-family:'Space Mono',monospace;font-size:10px;color:#a855f7;">${esc(p2.score_verification||'—')}</td>
+      <td class="mono" style="font-size:24px;font-weight:900;color:${vc.color};" colspan="2">${total}/100</td>
+      <td class="mono" style="font-size:10px;color:#a855f7;">${esc(p2.score_verification||'—')}</td>
     </tr>
   </table>
 
-  ${div}
-
-  <!-- Analyst insights from scoring -->
   <div class="card" style="border-left:3px solid #60a5fa;">
-    <div class="label">Scoring Analyst Note</div>
+    <span class="label">Scoring Analyst Note</span>
     <div style="font-size:12px;color:#d1d5db;font-style:italic;">"${esc(safe(p2.analyst_insight,'—'))}"</div>
   </div>
 
@@ -3492,66 +3535,85 @@ async function generateProfessionalPDF() {
 
   ${sectionHeader(3,'GTM Recommendation','Score-based qualification decision')}
 
-  <div style="border:2px solid ${vc.border};background:${vc.bg};border-radius:12px;padding:20px 22px;margin-bottom:14px;">
-    <div style="display:flex;align-items:center;gap:20px;margin-bottom:14px;">
-      <div class="mono" style="font-size:36px;font-weight:900;color:${vc.color};border-right:2px solid ${vc.border}22;padding-right:20px;">${vc.label}</div>
-      <div>
-        <div style="font-size:10px;font-weight:700;color:${vc.color};letter-spacing:.1em;margin-bottom:4px;">TOTAL SCORE: ${total}/100</div>
-        <div style="font-size:12px;color:#d1d5db;">${esc(safe(p3.verdict_reasoning,'Verdict based on signal scoring across all four dimensions.'))}</div>
-      </div>
+  <div style="border:2px solid ${vc.border};background:${vc.bg};
+       border-radius:12px;padding:18px 20px;margin-bottom:12px;">
+    <!-- Verdict label + score — stacked, no flex -->
+    <div style="margin-bottom:12px;">
+      <span class="mono" style="font-size:28px;font-weight:900;color:${vc.color};
+            vertical-align:middle;margin-right:12px;">${vc.label}</span>
+      <span style="font-size:11px;font-weight:700;color:${vc.color};vertical-align:middle;">
+        TOTAL: ${total}/100
+      </span>
     </div>
-    <div style="display:flex;gap:12px;">
-      <div style="flex:1;background:rgba(0,0,0,0.3);border-radius:8px;padding:10px 12px;">
-        <div style="font-size:9px;font-weight:700;color:#9ca3af;margin-bottom:3px;">DEMAND ASSESSMENT</div>
-        <div style="font-size:13px;font-weight:800;color:${p3.demand_assessment==='strong'?'#22c55e':p3.demand_assessment==='partial'?'#f59e0b':'#ef4444'};">${esc((p3.demand_assessment||'—').toUpperCase())}</div>
-      </div>
-      <div style="flex:1;background:rgba(0,0,0,0.3);border-radius:8px;padding:10px 12px;">
-        <div style="font-size:9px;font-weight:700;color:#9ca3af;margin-bottom:3px;">ICP ASSESSMENT</div>
-        <div style="font-size:13px;font-weight:800;color:${p3.icp_assessment==='strong'?'#22c55e':p3.icp_assessment==='partial'?'#f59e0b':'#ef4444'};">${esc((p3.icp_assessment||'—').toUpperCase())}</div>
-      </div>
-      <div style="flex:1;background:rgba(0,0,0,0.3);border-radius:8px;padding:10px 12px;">
-        <div style="font-size:9px;font-weight:700;color:#9ca3af;margin-bottom:3px;">SCORE BASIS</div>
-        <div style="font-size:10px;font-family:'Space Mono',monospace;color:#c4b5fd;">${esc(safe(p3.score_basis,'—'))}</div>
-      </div>
+    <div style="font-size:12px;color:#d1d5db;margin-bottom:14px;">
+      ${esc(safe(p3.verdict_reasoning,'Verdict based on signal scoring across all four dimensions.'))}
     </div>
+    <!-- Assessment cells — 3-col table, no flex -->
+    <table class="ut" style="width:100%;table-layout:fixed;">
+      <tr>
+        <td style="padding:0 4px 0 0;">
+          <div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:10px 12px;">
+            <div style="font-size:9px;font-weight:700;color:#9ca3af;margin-bottom:3px;">DEMAND ASSESSMENT</div>
+            <div style="font-size:13px;font-weight:800;color:${p3.demand_assessment==='strong'?'#22c55e':p3.demand_assessment==='partial'?'#f59e0b':'#ef4444'};">
+              ${esc((p3.demand_assessment||'—').toUpperCase())}
+            </div>
+          </div>
+        </td>
+        <td style="padding:0 4px;">
+          <div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:10px 12px;">
+            <div style="font-size:9px;font-weight:700;color:#9ca3af;margin-bottom:3px;">ICP ASSESSMENT</div>
+            <div style="font-size:13px;font-weight:800;color:${p3.icp_assessment==='strong'?'#22c55e':p3.icp_assessment==='partial'?'#f59e0b':'#ef4444'};">
+              ${esc((p3.icp_assessment||'—').toUpperCase())}
+            </div>
+          </div>
+        </td>
+        <td style="padding:0 0 0 4px;">
+          <div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:10px 12px;">
+            <div style="font-size:9px;font-weight:700;color:#9ca3af;margin-bottom:3px;">SCORE BASIS</div>
+            <div class="mono" style="font-size:9px;color:#c4b5fd;word-break:break-word;">
+              ${esc(safe(p3.score_basis,'—'))}
+            </div>
+          </div>
+        </td>
+      </tr>
+    </table>
   </div>
 
-  <div class="footer">
-    <span>ABE · GTM Strategy Report · ${co}</span>
-    <span>Page 3</span>
-  </div>
+  ${footer('ABE · GTM Strategy Report · '+co, 'Page 3')}
 </div>
 
-<!-- ═══════════════════════════════════════════════
-     PAGE 5 — GTM STRATEGY / DEAL LENS
-═══════════════════════════════════════════════ -->
+<!-- ═══════════════════ PAGE 5 — GTM STRATEGY ═══════════════════════ -->
 <div class="page">
   ${sectionHeader(4,'Target Accounts & GTM Strategy','ICP · Roles · Deal sizing · Sales approach')}
 
-  <table>
+  <!-- Roles / Angle / Approach — 3-col table -->
+  <table class="dt">
     <tr>
-      <th style="width:33%;">Target Roles</th>
-      <th style="width:33%;">Solution Angle</th>
-      <th style="width:33%;">Sales Approach</th>
+      <th style="width:40%;">Target Roles</th>
+      <th style="width:30%;">Solution Angle</th>
+      <th style="width:30%;">Sales Approach</th>
     </tr>
     <tr>
-      <td>${arr(p4.target_roles).map(r=>`<span class="tag tag-purple">${esc(r)}</span>`).join('') || '—'}</td>
-      <td style="font-weight:800;color:#a855f7;text-transform:uppercase;font-size:13px;">${esc(safe(p4.solution_angle,'—'))}</td>
-      <td style="font-weight:800;color:#60a5fa;text-transform:uppercase;font-size:13px;">${esc(safe(p4.sales_approach,'—'))}</td>
+      <td>${arr(p4.target_roles).map(r=>`<span class="tag tp">${esc(r)}</span>`).join('') || '—'}</td>
+      <td style="font-weight:800;color:#a855f7;text-transform:uppercase;font-size:13px;">
+        ${esc(safe(p4.solution_angle,'—'))}</td>
+      <td style="font-weight:800;color:#60a5fa;text-transform:uppercase;font-size:13px;">
+        ${esc(safe(p4.sales_approach,'—'))}</td>
     </tr>
   </table>
 
   <div class="card">
-    <div class="label">Core Problem (Signal-Backed)</div>
-    <div style="font-size:13px;color:#e5e7eb;line-height:1.7;">${esc(safe(p4.core_problem,'—'))}</div>
+    <span class="label">Core Problem (Signal-Backed)</span>
+    <div style="font-size:12px;color:#e5e7eb;line-height:1.7;">${esc(safe(p4.core_problem,'—'))}</div>
   </div>
 
   <div class="card" style="border-left:3px solid #a855f7;">
-    <div class="label">Solution Pitch</div>
-    <div style="font-size:13px;color:#d1d5db;line-height:1.7;font-style:italic;">${esc(safe(p4.solution_pitch,'—'))}</div>
+    <span class="label">Solution Pitch</span>
+    <div style="font-size:12px;color:#d1d5db;line-height:1.7;font-style:italic;">${esc(safe(p4.solution_pitch,'—'))}</div>
   </div>
 
-  <table>
+  <!-- Why now / Deal size — 2-col table -->
+  <table class="dt">
     <tr>
       <th style="width:50%;">Why Now</th>
       <th style="width:50%;">Estimated Deal Size</th>
@@ -3559,49 +3621,43 @@ async function generateProfessionalPDF() {
     <tr>
       <td style="font-size:12px;">${esc(safe(p4.why_now,'—'))}</td>
       <td>
-        <div style="font-size:20px;font-weight:900;color:#22c55e;font-family:'Space Mono',monospace;">${esc(safe(p4.estimated_deal_size?.range,'—'))}</div>
-        ${p4.estimated_deal_size?.is_estimate ? '<div style="font-size:9px;color:#6b7280;">(Estimate)</div>' : ''}
+        <div class="mono" style="font-size:20px;font-weight:900;color:#22c55e;">${esc(safe(p4.estimated_deal_size?.range,'—'))}</div>
+        ${p4.estimated_deal_size?.is_estimate?'<div style="font-size:9px;color:#6b7280;">(Estimate)</div>':''}
         <div style="font-size:10px;color:#9ca3af;margin-top:4px;">${esc(safe(p4.estimated_deal_size?.basis,''))}</div>
       </td>
     </tr>
   </table>
 
-  ${p4.approach_rationale ? `<div class="card"><div class="label">Approach Rationale</div><div style="font-size:12px;color:#d1d5db;">${esc(p4.approach_rationale)}</div></div>` : ''}
+  ${p4.approach_rationale?`<div class="card"><span class="label">Approach Rationale</span>
+    <div style="font-size:12px;color:#d1d5db;">${esc(p4.approach_rationale)}</div></div>`:''}
 
   ${div}
 
-  <!-- SWOT Analysis -->
-  <div style="margin-bottom:8px;">
-    <div class="label" style="font-size:11px;">SWOT Analysis — Derived from Market Signals</div>
-  </div>
-  <table>
+  <!-- SWOT — 2x2 table -->
+  <span class="label" style="font-size:10px;">SWOT Analysis — Derived from Market Signals</span>
+  <table class="dt">
     <tr>
-      <th style="background:rgba(34,197,94,0.1);color:#4ade80;border-bottom-color:#22c55e;width:50%;">💪 Strengths</th>
-      <th style="background:rgba(239,68,68,0.1);color:#f87171;border-bottom-color:#ef4444;width:50%;">⚠ Weaknesses</th>
+      <th style="width:50%;background:rgba(34,197,94,0.08);color:#4ade80;border-bottom-color:#22c55e45;">Strengths</th>
+      <th style="width:50%;background:rgba(239,68,68,0.08);color:#f87171;border-bottom-color:#ef444445;">Weaknesses</th>
     </tr>
     <tr>
-      <td style="vertical-align:top;">${swotRow(swotS.length ? swotS : ['Strong demand signal presence','Clear ICP target identified'])}</td>
-      <td style="vertical-align:top;">${swotRow(swotW.length ? swotW : ['Data completeness gaps noted','Validation still required'])}</td>
+      <td>${swotRow(swotS.length?swotS:['Strong demand signal presence','Clear ICP target identified'])}</td>
+      <td>${swotRow(swotW.length?swotW:['Data completeness gaps noted','Validation still required'])}</td>
     </tr>
     <tr>
-      <th style="background:rgba(96,165,250,0.1);color:#60a5fa;border-bottom-color:#3b82f6;border-top:1px solid rgba(255,255,255,0.06);">🚀 Opportunities</th>
-      <th style="background:rgba(245,158,11,0.1);color:#fbbf24;border-bottom-color:#f59e0b;border-top:1px solid rgba(255,255,255,0.06);">🔴 Threats</th>
+      <th style="background:rgba(96,165,250,0.08);color:#60a5fa;border-top:1px solid rgba(255,255,255,0.06);border-bottom-color:#3b82f645;">Opportunities</th>
+      <th style="background:rgba(245,158,11,0.08);color:#fbbf24;border-top:1px solid rgba(255,255,255,0.06);border-bottom-color:#f59e0b45;">Threats</th>
     </tr>
     <tr>
-      <td style="vertical-align:top;">${swotRow(swotO.length ? swotO : ['Favourable market timing signals','Growing demand in target segment'])}</td>
-      <td style="vertical-align:top;">${swotRow(swotT.length ? swotT : ['Execution risks identified','Competitive pressure possible'])}</td>
+      <td>${swotRow(swotO.length?swotO:['Favourable market timing signals','Growing demand in target segment'])}</td>
+      <td>${swotRow(swotT.length?swotT:['Execution risks identified','Competitive pressure possible'])}</td>
     </tr>
   </table>
 
-  <div class="footer">
-    <span>ABE · GTM Strategy Report · ${co}</span>
-    <span>Page 4</span>
-  </div>
+  ${footer('ABE · GTM Strategy Report · '+co, 'Page 4')}
 </div>
 
-<!-- ═══════════════════════════════════════════════
-     PAGE 6 — EXECUTION RISKS + CONFIDENCE
-═══════════════════════════════════════════════ -->
+<!-- ═══════════════════ PAGE 6 — RISKS & CONFIDENCE ════════════════ -->
 <div class="page">
   ${sectionHeader(5,'Execution Risks & Considerations','Derived from missing and weak signals only')}
 
@@ -3609,49 +3665,59 @@ async function generateProfessionalPDF() {
 
   ${div}
 
-  <!-- Confidence gauge row -->
-  <div style="display:flex;align-items:flex-start;gap:20px;">
-    <div style="text-align:center;flex-shrink:0;">
-      <img src="${gaugeUrl}" alt="Confidence Gauge" style="width:120px;height:120px;object-fit:contain;" onerror="this.style.display='none'"/>
-      <div class="mono" style="font-size:28px;font-weight:900;color:${confScore>=70?'#22c55e':confScore>=45?'#f59e0b':'#ef4444'};">${confScore}</div>
-      <div style="font-size:9px;color:#6b7280;">Confidence / 100</div>
-    </div>
-    <div style="flex:1;">
-      <div class="label">Confidence Reasoning</div>
-      <div style="font-size:12px;color:#d1d5db;margin-bottom:12px;">${esc(safe(p5.confidence_reasoning,'Confidence derived from data completeness and signal strength.'))}</div>
-      <div class="label">Validation Required</div>
-      ${arr(p5.validation_needed).map(v=>`<span class="tag tag-blue" style="margin-bottom:4px;">${esc(v)}</span>`).join('') || '<span style="color:#6b7280;font-size:11px;">None specified</span>'}
-    </div>
+  <!-- Confidence — stacked block, no flex sidebar -->
+  <div class="card">
+    <table class="ut" style="width:100%;table-layout:fixed;">
+      <tr>
+        <!-- Gauge cell — fixed width -->
+        <td style="width:130px;text-align:center;vertical-align:top;padding-right:16px;">
+          <img src="${gaugeUrl}" alt="Confidence Gauge"
+               style="width:110px;height:110px;display:block;margin:0 auto;"
+               onerror="this.style.display='none'"/>
+          <div class="mono" style="font-size:26px;font-weight:900;
+               color:${confScore>=70?'#22c55e':confScore>=45?'#f59e0b':'#ef4444'};
+               margin-top:4px;">${confScore}</div>
+          <div style="font-size:9px;color:#6b7280;">Confidence / 100</div>
+        </td>
+        <!-- Text cell — takes remaining width -->
+        <td style="vertical-align:top;">
+          <span class="label">Confidence Reasoning</span>
+          <div style="font-size:12px;color:#d1d5db;margin-bottom:12px;">
+            ${esc(safe(p5.confidence_reasoning,'Confidence derived from data completeness and signal strength.'))}
+          </div>
+          <span class="label">Validation Required</span>
+          <div>
+            ${arr(p5.validation_needed).map(v=>`<span class="tag tb" style="margin-bottom:4px;">${esc(v)}</span>`).join('') || '<span style="color:#6b7280;font-size:11px;">None specified</span>'}
+          </div>
+        </td>
+      </tr>
+    </table>
   </div>
-
-  ${div}
 
   <div class="card" style="border-left:3px solid #ef4444;">
-    <div class="label">Risk Analyst Note</div>
-    <div style="font-size:12px;color:#d1d5db;font-style:italic;">"${esc(safe(p5.analyst_insight,'No specific analyst note available.'))}"</div>
+    <span class="label">Risk Analyst Note</span>
+    <div style="font-size:12px;color:#d1d5db;font-style:italic;">
+      "${esc(safe(p5.analyst_insight,'No specific analyst note available.'))}"
+    </div>
   </div>
 
-  <div class="footer">
-    <span>ABE · GTM Strategy Report · ${co}</span>
-    <span>Page 5</span>
-  </div>
+  ${footer('ABE · GTM Strategy Report · '+co, 'Page 5')}
 </div>
 
-<!-- ═══════════════════════════════════════════════
-     PAGE 7 — FINAL OUTPUT / ACTION PLAN
-═══════════════════════════════════════════════ -->
+<!-- ═══════════════════ PAGE 7 — ACTION PLAN ═══════════════════════ -->
 <div class="page">
   ${sectionHeader(6,'GTM Summary & Action Plan','Complete synthesised strategy output')}
 
-  <!-- Signal highlights -->
-  <div class="label">Top Market Signals</div>
-  <div class="card" style="padding:14px 16px;margin-bottom:14px;">
+  <!-- Signal highlights — block rows, no flex -->
+  <span class="label">Top Market Signals</span>
+  <div class="card" style="padding:12px 16px;margin-bottom:12px;">
     ${arr(p6.signal_highlights).map(s => {
-      const t = s.type?.toLowerCase();
-      const cls = t==='demand' ? 'tag-green' : t==='timing' ? 'tag-blue' : 'tag-purple';
-      return `<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
-        <span class="tag ${cls}">${esc(s.type||'')}</span>
-        <span class="tag ${s.strength==='High'?'tag-green':s.strength==='Medium'?'tag-amber':''}">${esc(s.strength||'')}</span>
+      const t = (s.type||'').toLowerCase();
+      const tc = t==='demand'?'tg':t==='timing'?'tb':'tp';
+      const sc = s.strength==='High'?'tg':s.strength==='Medium'?'ta':'';
+      return `<div style="padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
+        <span class="tag ${tc}">${esc(s.type||'')}</span>
+        <span class="tag ${sc}" style="margin-right:6px;">${esc(s.strength||'')}</span>
         <span style="font-size:12px;color:#e5e7eb;">${esc(s.signal||'')}</span>
       </div>`;
     }).join('') || '<div style="color:#6b7280;font-size:11px;">Run all phases to populate signal highlights.</div>'}
@@ -3660,52 +3726,59 @@ async function generateProfessionalPDF() {
   ${div}
 
   <div class="card">
-    <div class="label">GTM Strategy Summary</div>
+    <span class="label">GTM Strategy Summary</span>
     <div style="font-size:12px;color:#d1d5db;line-height:1.75;">${esc(safe(p6.deal_lens_summary,'—'))}</div>
   </div>
 
   <div class="card">
-    <div class="label">Risk Summary</div>
+    <span class="label">Risk Summary</span>
     <div style="font-size:12px;color:#d1d5db;line-height:1.75;">${esc(safe(p6.risks_summary,'—'))}</div>
   </div>
 
   <div class="card">
-    <div class="label">Confidence Note</div>
+    <span class="label">Confidence Note</span>
     <div style="font-size:12px;color:#d1d5db;">${esc(safe(p6.confidence_note,'—'))}</div>
   </div>
 
   ${div}
 
   <!-- Next action callout -->
-  <div style="background:linear-gradient(135deg,rgba(168,85,247,0.15),rgba(124,58,237,0.1));border:1px solid rgba(168,85,247,0.3);border-radius:12px;padding:20px 22px;">
-    <div style="font-size:9px;font-weight:700;color:#a855f7;letter-spacing:.15em;text-transform:uppercase;margin-bottom:8px;">Recommended Next Action</div>
-    <div style="font-size:15px;font-weight:700;color:white;line-height:1.6;">→ ${esc(safe(p6.recommended_next_action, s7?.next_steps?.[0] || 'Complete all 6 phases to generate a recommended next action.'))}</div>
+  <div style="background:linear-gradient(135deg,rgba(168,85,247,0.15),rgba(124,58,237,0.08));
+       border:1px solid rgba(168,85,247,0.3);border-radius:12px;padding:20px 22px;">
+    <span class="label" style="font-size:10px;letter-spacing:.18em;">Recommended Next Action</span>
+    <div style="font-size:14px;font-weight:700;color:white;line-height:1.6;">
+      → ${esc(safe(p6.recommended_next_action, s7?.next_steps?.[0] || 'Complete all 6 phases to generate a recommended next action.'))}
+    </div>
   </div>
 
-  ${s7?.strategic_hook ? `
-  ${div}
+  ${s7?.strategic_hook ? `${div}
   <div class="card" style="border-left:3px solid #22c55e;">
-    <div class="label">Revenue Intelligence — Strategic Hook (Step 7)</div>
+    <span class="label">Revenue Intelligence — Strategic Hook (Step 7)</span>
     <div style="font-size:12px;color:#4ade80;font-style:italic;">"${esc(s7.strategic_hook)}"</div>
-    ${s7.why_now ? `<div style="font-size:11px;color:#9ca3af;margin-top:8px;">Why now: ${esc(s7.why_now)}</div>` : ''}
+    ${s7.why_now?`<div style="font-size:11px;color:#9ca3af;margin-top:8px;">Why now: ${esc(s7.why_now)}</div>`:''}
   </div>` : ''}
 
-  <!-- Final score summary bar -->
-  <div style="margin-top:16px;background:rgba(0,0,0,0.4);border-radius:10px;padding:14px 16px;display:flex;align-items:center;gap:16px;">
-    <div class="mono" style="font-size:36px;font-weight:900;color:${vc.color};">${total}</div>
-    <div style="flex:1;">
-      <div style="height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;margin-bottom:6px;">
-        <div style="height:100%;width:${total}%;background:linear-gradient(90deg,${vc.color},${vc.color}99);border-radius:3px;"></div>
-      </div>
-      <div style="font-size:10px;color:#9ca3af;">GTM Score · ${vc.label} · Confidence ${confScore}/100</div>
-    </div>
-    <div class="mono" style="font-size:18px;font-weight:900;color:${vc.color};padding-left:16px;border-left:2px solid ${vc.border}22;">${vc.label}</div>
+  <!-- Final score bar — table, no flex -->
+  <div style="margin-top:16px;background:rgba(0,0,0,0.4);border-radius:10px;padding:14px 16px;">
+    <table class="ut" style="width:100%;table-layout:fixed;">
+      <tr>
+        <td style="width:70px;vertical-align:middle;">
+          <div class="mono" style="font-size:34px;font-weight:900;color:${vc.color};">${total}</div>
+        </td>
+        <td style="vertical-align:middle;padding:0 16px;">
+          <div style="height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;margin-bottom:6px;">
+            <div style="height:100%;width:${total}%;background:${vc.color};border-radius:3px;"></div>
+          </div>
+          <div style="font-size:10px;color:#9ca3af;">GTM Score · ${vc.label} · Confidence ${confScore}/100</div>
+        </td>
+        <td style="width:140px;text-align:right;vertical-align:middle;">
+          <div class="mono" style="font-size:${vc.label.length>2?'14':'18'}px;font-weight:900;color:${vc.color};">${vc.label}</div>
+        </td>
+      </tr>
+    </table>
   </div>
 
-  <div class="footer">
-    <span>ABE · GTM Strategy Report · ${co} · ${dateStr}</span>
-    <span>Page 6 · CONFIDENTIAL</span>
-  </div>
+  ${footer('ABE · GTM Strategy Report · '+co+' · '+dateStr, 'Page 6 · CONFIDENTIAL')}
 </div>
 
 </body></html>`;
