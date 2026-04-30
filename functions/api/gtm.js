@@ -81,14 +81,26 @@ async function handleRunStep(body, userId, openaiKey, supabaseUrl, supabaseKey, 
     }
   }
 
-  // Check KV step cache (company+step)
-  const stepCacheKey = `step:${await hash(company.toLowerCase())}:${step}`;
+  // Attempt to resolve a trusted company profile from the request or historical enrichment data.
+  const resolvedProfile = await resolveCompanyProfile(
+    sanitise(company, 200),
+    company_profile || null,
+    userId,
+    supabaseUrl,
+    supabaseKey
+  );
+
+  // Check KV step cache (company+step+evidence)
+  const evidenceFingerprint = resolvedProfile
+    ? await hash(JSON.stringify({ name: resolvedProfile.company_name || '', url: resolvedProfile._meta?.website_url || '' }))
+    : 'none';
+  const stepCacheKey = `step:${await hash(company.toLowerCase())}:${step}:${evidenceFingerprint}`;
   const stepCached   = await kv.get(env, stepCacheKey);
   if (stepCached) {
     return okRes({ data: stepCached, tokens: 0, duration_ms: 0, step, _cached: true }, cors);
   }
 
-  const prompt = buildStepPrompt(step, sanitise(company, 200), industry || '', prior_steps || {}, company_profile || null);
+  const prompt = buildStepPrompt(step, sanitise(company, 200), industry || '', prior_steps || {}, resolvedProfile);
   const t0     = Date.now();
 
   let rawText, tokensUsed;
@@ -122,10 +134,13 @@ async function handleRunStep(body, userId, openaiKey, supabaseUrl, supabaseKey, 
   let parsed = await parseWithRetry(rawText, step, prompt, openaiKey);
   if (!parsed) return errRes('AI returned unparseable response after retry', 422, cors);
 
+  // Attach safe RAG metadata without changing existing payload fields
+  const stepData = augmentStepOutput(parsed, resolvedProfile);
+
   const duration = Date.now() - t0;
 
   // Cache in KV (1hr TTL for steps)
-  await kv.put(env, stepCacheKey, parsed, 3600);
+  await kv.put(env, stepCacheKey, stepData, 3600);
 
   // Log + rate limit update (non-blocking)
   if (supabaseUrl && supabaseKey) {
@@ -133,7 +148,7 @@ async function handleRunStep(body, userId, openaiKey, supabaseUrl, supabaseKey, 
     bumpHourlyTokens(userId, tokensUsed, supabaseUrl, supabaseKey);
   }
 
-  return okRes({ data: parsed, tokens: tokensUsed, duration_ms: duration, step }, cors);
+  return okRes({ data: stepData, tokens: tokensUsed, duration_ms: duration, step }, cors);
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -199,6 +214,40 @@ async function handleSaveStrategy(body, userId, supabaseUrl, supabaseKey, env, c
   }
 
   return okRes({ strategy_id: strategyId, cache_key: cacheKey, status, steps_completed: stepsCompleted }, cors);
+}
+
+async function resolveCompanyProfile(company, providedProfile, userId, supabaseUrl, supabaseKey) {
+  const hasProvided = providedProfile && providedProfile.extraction_confidence !== 'LOW' && providedProfile.company_overview;
+  if (hasProvided) return providedProfile;
+
+  if (!company || !supabaseUrl || !supabaseKey) return providedProfile || null;
+
+  try {
+    const encodedName = encodeURIComponent(company).replace(/%2A/g, '*');
+    const enrichmentQuery = `?user_id=eq.${userId}&company_name=ilike.*${encodedName}*&source=eq.website&limit=1`;
+    const enrichmentRes = await sbFetch(supabaseUrl, supabaseKey, 'company_enrichment', 'GET', null, enrichmentQuery);
+    if (enrichmentRes.ok) {
+      const rows = await enrichmentRes.json();
+      if (Array.isArray(rows) && rows.length > 0) {
+        const payload = rows[0]?.payload;
+        if (payload && typeof payload === 'object') return payload;
+      }
+    }
+
+    const strategyQuery = `?user_id=eq.${userId}&company_name=ilike.*${encodedName}*&select=scraped_profile&limit=1`;
+    const strategyRes = await sbFetch(supabaseUrl, supabaseKey, 'strategies', 'GET', null, strategyQuery);
+    if (!strategyRes.ok) return providedProfile || null;
+    const strategyRows = await strategyRes.json();
+    if (Array.isArray(strategyRows) && strategyRows.length > 0) {
+      const scraped = strategyRows[0]?.scraped_profile;
+      if (scraped && typeof scraped === 'object') return scraped;
+    }
+
+    return providedProfile || null;
+  } catch (e) {
+    console.error('[resolveCompanyProfile]', e.message);
+    return providedProfile || null;
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -872,12 +921,13 @@ function parseStep7(rawText) {
 // ── Prompt builder ───────────────────────────────────────────────
 function buildStepPrompt(step, company, industry, priorSteps, companyProfile) {
   const ind  = industry ? ` in the ${industry} industry` : '';
-  const base = `You are a B2B GTM opportunity qualification analyst. CRITICAL: Return ONLY a valid JSON object. No markdown. No code fences. Start with { end with }.`;
+  const sourceInstructions = `\nSOURCE ATTRIBUTION: include these metadata fields in your JSON output exactly as named: _source_context, _profile_source, _confidence_basis, _rag_enabled, _missing_evidence. If verified profile evidence is present, _profile_source must be "verified_company_profile". If verified evidence is missing, _profile_source must be "ai_estimate_validate_manually" and all source-backed facts should be avoided unless they come from the AI estimate context.`;
+  const base = `You are a B2B GTM opportunity qualification analyst. CRITICAL: Return ONLY a valid JSON object. No markdown. No code fences. Start with { end with }. Use verified TRUTH LAYER evidence first. If verified evidence is missing, mark the output as an AI estimate and do not invent source-backed facts.${sourceInstructions}`;
 
   // Inject verified profile if available and high confidence
   const hasProfile = companyProfile && companyProfile.extraction_confidence !== 'LOW' && companyProfile.company_overview;
   const profileBlock = hasProfile
-    ? `\nVERIFIED COMPANY PROFILE (use as ground truth — do not contradict):\n${JSON.stringify({
+    ? `\nTRUTH LAYER: VERIFIED COMPANY PROFILE (use as ground truth — do not contradict):\n${JSON.stringify({
         overview: companyProfile.company_overview,
         services: companyProfile.services,
         industry: companyProfile.industry,
@@ -885,7 +935,7 @@ function buildStepPrompt(step, company, industry, priorSteps, companyProfile) {
         tech_stack: companyProfile.tech_stack_hints,
         value_props: companyProfile.value_propositions,
       }, null, 2)}\n`
-    : '';
+    : `\nTRUTH LAYER: NO VERIFIED COMPANY PROFILE AVAILABLE. This is an AI estimate and must be validated manually. Do not invent source-backed facts.\n`;
 
   // ── Build prior phase context for chaining ──
   const phaseCtx = buildPhaseContext(step, priorSteps);
@@ -1103,6 +1153,37 @@ async function parseWithRetry(rawText, step, originalPrompt, openaiKey) {
     const raw = d.choices?.[0]?.message?.content || '{}';
     return parse(raw) || parsed;
   } catch { return parsed; }
+}
+
+function augmentStepOutput(data, companyProfile) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return data;
+
+  const hasVerified = companyProfile && companyProfile.extraction_confidence !== 'LOW' && companyProfile.company_overview;
+  const profileSource = hasVerified ? 'verified_company_profile' : 'ai_estimate_validate_manually';
+  const confidenceFactor = hasVerified ? 1.0 : 0.85;
+  const confidenceBasis = hasVerified
+    ? 'Verified website profile evidence'
+    : 'AI-only estimate with 0.85x confidence penalty applied';
+  const sourceContext = hasVerified
+    ? 'Verified profile evidence is available and should be used first.'
+    : 'No verified profile evidence available; output is an AI estimate and should be validated manually.';
+  const missingEvidence = hasVerified ? 'none' : 'verified company profile';
+
+  const output = { ...data };
+
+  if (typeof output.confidence_score === 'number') {
+    output.confidence_score = Math.round(output.confidence_score * confidenceFactor);
+  } else if (typeof output.confidence_score === 'string' && !Number.isNaN(Number(output.confidence_score))) {
+    output.confidence_score = Math.round(Number(output.confidence_score) * confidenceFactor);
+  }
+
+  output._source_context = sourceContext;
+  output._profile_source = profileSource;
+  output._confidence_basis = confidenceBasis;
+  output._rag_enabled = true;
+  output._missing_evidence = missingEvidence;
+
+  return output;
 }
 
 // ── Score batch ──────────────────────────────────────────────────
