@@ -67,11 +67,12 @@ export function buildReportHTML(strategy) {
     html,body{min-height:100%;background:#080d1a;color:var(--text);font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;font-size:11px;line-height:1.6;}
     body{margin:0;padding:0;}
     #root{width:210mm;margin:0 auto;padding:0;}
-    .page{width:210mm;min-height:297mm;padding:20mm;box-sizing:border-box;position:relative;background:linear-gradient(180deg,rgba(7,13,26,.98),rgba(14,21,39,.98));border:1px solid rgba(255,255,255,.06);border-radius:12px;overflow:hidden;page-break-after:always;break-after:page;}
-    .page:last-child{page-break-after:auto;}
-    .page::before{content:'';position:absolute;inset:0;background-image:linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px),linear-gradient(180deg,rgba(255,255,255,.02) 1px,transparent 1px);background-size:48px 48px;opacity:.16;pointer-events:none;}
-    .page-content{position:relative;z-index:1;display:flex;flex-direction:column;gap:18px;}
+    .page.pdf-page{width:210mm;padding:20mm;box-sizing:border-box;position:relative;background:linear-gradient(180deg,rgba(7,13,26,.98),rgba(14,21,39,.98));border:1px solid rgba(255,255,255,.06);border-radius:12px;overflow:hidden;page-break-after:always;break-after:page;}
+    .page.pdf-page:last-child{page-break-after:auto;}
+    .page.pdf-page::before{content:'';position:absolute;inset:0;background-image:linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px),linear-gradient(180deg,rgba(255,255,255,.02) 1px,transparent 1px);background-size:48px 48px;opacity:.16;pointer-events:none;}
+    .page-content{position:relative;z-index:1;display:flex;flex-direction:column;gap:16px;}
     .header,.footer{position:relative;z-index:1;display:flex;justify-content:space-between;align-items:center;gap:12px;color:var(--muted);font-size:9px;}
+    .panel-copy,.section-subtitle,.hero-copy,.metric-card-note,.mcc-value,.segment-value,.persona-detail,.timeline-step-meta,.appendix-copy{line-height:1.7;letter-spacing:.01em;white-space:pre-wrap;overflow-wrap:break-word;word-break:break-word;}
     .header{margin-bottom:14px;}
     .footer{margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.08);}
     .header-brand{display:flex;align-items:center;gap:12px;}
@@ -248,7 +249,7 @@ export function buildReportHTML(strategy) {
   }
 
   function renderPage(section, page, content) {
-    return `<div class="page">${renderHeader(section)}<div class="page-content">${content}</div>${renderFooter(section, page)}</div>`;
+    return `<div class="page pdf-page">${renderHeader(section)}<div class="page-content">${content}</div>${renderFooter(section, page)}</div>`;
   }
 
   function renderHeader(section) {
@@ -391,6 +392,19 @@ export function buildReportHTML(strategy) {
   }
 
   function renderTAMPage() {
+    const segmentDetails = asArray(s2.market_segments || s2.segment_list || s2.target_segments).slice(0,3);
+    const segmentCards = segmentDetails.length
+      ? segmentDetails.map((item, idx) => {
+          const label = typeof item === 'object' ? item.name || item.segment_name || `Segment ${idx + 1}` : `Segment ${idx + 1}`;
+          const value = typeof item === 'object'
+            ? safe(item.size || item.market_size || item.est_size || item.description || item.summary || item.name || item.segment_name)
+            : String(item);
+          const note = typeof item === 'object'
+            ? safe(item.priority || item.growth || item.rationale || 'Market segment details')
+            : 'Market segment snapshot';
+          return renderSegmentCard(label, value || 'Not available', note);
+        }).join('')
+      : `${renderSegmentCard('Primary market segment', safe(s2.primary_segment || s2.market_segment || 'Not available'), 'Core segment definition')}${renderSegmentCard('Secondary market segment', safe(s2.secondary_segment || s2.segment_priority || 'Not available'), 'Segment priority')}${renderSegmentCard('Market insight', safe(s2.segment_insight || s2.market_insight || 'Not available'), 'Key takeaway')}`;
     return renderPage('TAM Mapping', 4, `
       <div class="kpi-strip">
         ${renderMetricCard('TAM', tam, 'Total Addressable Market', 'tam')}
@@ -406,9 +420,7 @@ export function buildReportHTML(strategy) {
       </div>
       <div class="panel"><div class="section-title">Market sizing formula</div><div class="panel-copy">Global TAM × eligible geography × service-line fit × win-rate assumptions = SOM. Validate definitions before external presentations.</div></div>
       <div class="segment-grid">
-        ${renderSegmentCard('Primary market segment', safe(s2.primary_segment || s2.market_segment || 'Not available'))}
-        ${renderSegmentCard('Secondary market segment', safe(s2.secondary_segment || s2.segment_priority || 'Not available'))}
-        ${renderSegmentCard('Market insight', safe(s2.segment_insight || s2.market_insight || 'Not available'))}
+        ${segmentCards}
       </div>
     `);
   }
@@ -514,11 +526,16 @@ export function buildReportHTML(strategy) {
       { label: 'ICP Fit', value: normalizeScore(s7.icp_fit_score || s7.icp_fit || confidenceScore * 0.85) },
       { label: 'Data Completeness', value: normalizeScore(s7.data_quality_score || s7.data_completeness || confidenceScore * 0.75) },
     ];
+    const interpretation = confidenceScore >= 75
+      ? 'Signals are strong and the GTM narrative is ready for executive review.'
+      : confidenceScore >= 50
+        ? 'Moderate confidence; validate account targets and message fit before scaling execution.'
+        : 'Low confidence; confirm ICP alignment and data quality before active pursuit.';
     return renderPage('Confidence Matrix', 10, `
       <div class="panel"><div class="section-title">Weighted Confidence Matrix</div><div class="panel-copy">Visual assessment of signal veracity, timing, ICP fit and data completeness.</div></div>
       <div class="grid2">
         <div>${matrix.map(item => renderProgressBar(item.value, item.label, 100)).join('')}</div>
-        <div class="panel">${renderProgressBar(confidenceScore, 'Overall fidelity', 100)}<div class="panel-copy" style="margin-top:12px;">Confidence is algorithmic and capped by the quality of underlying data.</div></div>
+        <div class="panel">${renderProgressBar(confidenceScore, 'Overall fidelity', 100)}<div class="panel-copy" style="margin-top:12px;">${esc(interpretation)}</div></div>
       </div>
     `);
   }
@@ -537,11 +554,11 @@ export function buildReportHTML(strategy) {
   }
 
   function renderWaterfallRow(label, value, width) {
-    return `<div class="waterfall-row"><div class="waterfall-label">${esc(label)}</div><div class="waterfall-bar"><div class="waterfall-fill" style="width:${width}%;"></div></div><div class="waterfall-value">${esc(value || '—')}</div></div>`;
+    return `<div class="waterfall-row"><div class="waterfall-label">${esc(label)}</div><div style="display:flex;align-items:center;gap:10px;"><div class="waterfall-bar" style="position:relative;"><div class="waterfall-fill" style="width:${width}%;"></div><span style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:9px;font-weight:700;color:var(--white);">${esc(width + '%')}</span></div><div class="waterfall-value">${esc(value || '—')}</div></div></div>`;
   }
 
-  function renderSegmentCard(title, value) {
-    return `<div class="segment-card"><div class="segment-label">${esc(title)}</div><div class="segment-value">${esc(value)}</div></div>`;
+  function renderSegmentCard(title, value, note = '') {
+    return `<div class="segment-card"><div class="segment-label">${esc(title)}</div><div class="segment-value">${esc(value)}</div>${note ? `<div class="metric-card-note">${esc(note)}</div>` : ''}</div>`;
   }
 
   function renderPipelineStep(title, value) {
@@ -549,8 +566,10 @@ export function buildReportHTML(strategy) {
   }
 
   function renderAccountCard(account, index) {
+    const placeholders = ['Tier-1 enterprise prospect', 'High-growth SaaS account', 'Regional operations-heavy buyer'];
     if (!account) {
-      return `<div class="segment-card"><div class="segment-label">Account analog ${index}</div><div class="segment-value">No account analog supplied.</div></div>`;
+      const demoLabel = placeholders[index - 1] || `Demo account ${index}`;
+      return `<div class="segment-card"><div class="segment-label">Account analog ${index}</div><div class="segment-value">${esc(mode.isDemo ? `${demoLabel} — demo / anonymized target account.` : 'Account analog not supplied.')}</div>${mode.isDemo ? `<div class="metric-card-note">Demo account placeholders are illustrative only; replace with real targets for live campaigns.</div>` : ''}</div>`;
     }
     const fit = normalizeScore(account.fit_score || account.fit || account.score) || 0;
     return `<div class="segment-card"><div class="segment-label">${esc(account.account_name || `Target account ${index}`)}</div><div class="segment-value">${esc(account.actionable_trigger || account.trigger || 'Account insight not available.')}</div><div style="margin-top:14px;">${renderProgressBar(fit, 'Fit score')}</div></div>`;
