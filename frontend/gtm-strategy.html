@@ -2625,7 +2625,7 @@ async function runStep(n) {
 
   try {
     const prompt = getPrompt(n);
-    const { data, tokens } = await callAPI(n, prompt);
+    const { data, tokens } = await window.callAPI(n, prompt);
 
     state.steps[n].status = 'complete';
     state.steps[n].data   = data;
