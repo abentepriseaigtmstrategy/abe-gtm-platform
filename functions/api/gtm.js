@@ -39,14 +39,17 @@ export async function onRequestPost(context) {
   if (errors.length) return errRes(errors[0], 400, cors);
 
   // ── Per-user rate limiting ──────────────────────────────────────
-  if (!await rateLimit(`gtm:${user.id}`, env, 60, 60_000)) {
-    return errRes('Rate limit reached. Please wait before making more requests.', 429, cors);
+  if (body.action !== 'run_demo_step') {
+    if (!await rateLimit(`gtm:${user.id}`, env, 60, 60_000)) {
+      return errRes('Rate limit reached. Please wait before making more requests.', 429, cors);
+    }
   }
 
   const userId = user.id;
 
   switch (body.action) {
     case 'run_step':        return handleRunStep(body, userId, openaiKey, supabaseUrl, supabaseKey, env, cors);
+    case 'run_demo_step':   return handleRunDemoStep(body, userId, supabaseUrl, supabaseKey, env, cors);
     case 'save_strategy':   return handleSaveStrategy(body, userId, supabaseUrl, supabaseKey, env, cors);
     case 'get_vault':       return handleGetVault(body, userId, supabaseUrl, supabaseKey, cors);
     case 'get_strategy':    return handleGetStrategy(body, userId, supabaseUrl, supabaseKey, env, cors);
@@ -149,6 +152,237 @@ async function handleRunStep(body, userId, openaiKey, supabaseUrl, supabaseKey, 
   }
 
   return okRes({ data: stepData, tokens: tokensUsed, duration_ms: duration, step }, cors);
+}
+
+async function handleRunDemoStep(body, userId, supabaseUrl, supabaseKey, env, cors) {
+  const errors = validate({
+    step:    'number|required',
+    company: 'string|required',
+  }, body);
+  if (errors.length) return errRes(errors[0], 400, cors);
+
+  const { step, company, industry, prior_steps } = body;
+  if (step < 1 || step > 7) return errRes('Step must be 1–7', 400, cors);
+  if (step === 7 && (!prior_steps || !prior_steps[1] || !prior_steps[6])) {
+    return errRes('Demo Step 7 requires completed Steps 1 and 6.', 400, cors);
+  }
+
+  const data = buildDemoStepOutput(step, sanitise(company, 200), sanitise(industry || '', 100), prior_steps || {});
+  return okRes({ data, tokens: 0, duration_ms: 0, step }, cors);
+}
+
+function buildDemoStepOutput(step, company, industry, priorSteps) {
+  switch (step) {
+    case 1: return buildDemoStep1(company, industry);
+    case 2: return buildDemoStep2(company, industry);
+    case 3: return buildDemoStep3(company, industry);
+    case 4: return buildDemoStep4(company, industry);
+    case 5: return buildDemoStep5(company, industry);
+    case 6: return buildDemoStep6(company, industry);
+    case 7: return buildDemoStep7(company, industry, priorSteps);
+    default: return {};
+  }
+}
+
+function makeDemoAnchorText(company, industry) {
+  const name = company ? company.trim().split(/\s+/)[0] : 'Company';
+  const sector = industry ? industry.trim() : 'B2B market';
+  return `${name} ${sector}`;
+}
+
+function applyDemoMetadata(output, step) {
+  const sourceText = 'demo_mode_simulated';
+  const demoMeta = {
+    demo_mode: true,
+    _do_not_use_for_decisioning: true,
+    _rag_enabled: false,
+    _profile_source: sourceText,
+    _source_context: 'Demo mode – simulated. No live data used.',
+    _confidence_basis: 'Demo estimate only. Validate with live mode.',
+    _missing_evidence: 'Live website/company/source evidence not used.',
+    _evidence_summary: 'Demo mode output generated from deterministic templates.',
+    _ai_estimate_fields: ['all fields'],
+    _verified_fields: [],
+    _demo_footer: 'This report was generated in demo mode. No live data was used. For production reports, enable live AI mode.',
+  };
+  Object.assign(output, demoMeta);
+
+  switch (step) {
+    case 1:
+      output._source_demand_signals = sourceText;
+      output._source_market_timing = sourceText;
+      output._source_icp_fit = sourceText;
+      output._source_data_completeness = sourceText;
+      break;
+    case 2:
+      output._source_demand_score = sourceText;
+      output._source_market_timing_score = sourceText;
+      output._source_icp_fit_score = sourceText;
+      output._source_data_completeness_score = sourceText;
+      output._source_total_score = sourceText;
+      output._source_score_verification = sourceText;
+      break;
+    case 3:
+      output._source_verdict = sourceText;
+      output._source_verdict_reasoning = sourceText;
+      output._source_score_basis = sourceText;
+      output._source_demand_assessment = sourceText;
+      output._source_icp_assessment = sourceText;
+      break;
+    case 4:
+      output._source_target_roles = sourceText;
+      output._source_core_problem = sourceText;
+      output._source_solution_angle = sourceText;
+      output._source_solution_pitch = sourceText;
+      output._source_why_now = sourceText;
+      output._source_estimated_deal_size = sourceText;
+      output._source_sales_approach = sourceText;
+      break;
+    case 5:
+      output._source_key_risks = sourceText;
+      output._source_confidence_level = sourceText;
+      output._source_confidence_score = sourceText;
+      output._source_validation_needed = sourceText;
+      break;
+    case 6:
+      output._source_signal_highlights = sourceText;
+      output._source_score_breakdown = sourceText;
+      output._source_verdict = sourceText;
+      output._source_deal_lens_summary = sourceText;
+      output._source_risks_summary = sourceText;
+      output._source_confidence_note = sourceText;
+      output._source_executive_brief = sourceText;
+      output._source_recommended_next_action = sourceText;
+      break;
+    case 7:
+      output._source_signal_summary = sourceText;
+      output._source_why_now_analysis = sourceText;
+      output._source_mcc_view = sourceText;
+      output._source_strategic_hook = sourceText;
+      output._source_persona_priority = sourceText;
+      output._source_go_no_go = sourceText;
+      output._source_confidence_score = sourceText;
+      output._source_executive_brief = sourceText;
+      break;
+    default:
+      break;
+  }
+  return output;
+}
+
+function buildDemoStep1(company, industry) {
+  const anchor = makeDemoAnchorText(company, industry);
+  const output = {
+    demand_signals: [
+      `Stable inbound demand for ${anchor}`,
+      'Moderate search interest from enterprise buyers',
+    ],
+    market_timing: [
+      'Market warming toward revenue acceleration tools',
+      'Buying cycles shortening due to remote work adoption',
+    ],
+    icp_fit: {
+      target_description: `Midsize B2B revenue teams seeking to automate pipeline generation and sales follow-up in ${industry || 'their sector'}.`,
+      product_fit: `Good fit for companies with recurring revenue models and complex sales motions.`,
+    },
+    data_completeness: {
+      completeness: 'partial',
+      missing: ['verified customer case studies', 'live website signal extraction'],
+    },
+    analyst_insight: `Demo mode indicates ${company} is positioned for conditional scaling in this market. Validate with live data before action. [DEMO MODE – illustrative only]`,
+  };
+  return applyDemoMetadata(output, 1);
+}
+
+function buildDemoStep2(company, industry) {
+  const output = {
+    demand_score: { score: 67, rationale: 'Moderate demand signals balanced by unclear market differentiation.' },
+    market_timing_score: { score: 63, rationale: 'Market is receptive but not yet saturated, with timing advantages for execution.' },
+    icp_fit_score: { score: 70, rationale: 'Defined buyer profile and product-market fit are plausible from demo data.' },
+    data_completeness_score: { score: 58, rationale: 'Missing some verified evidence; use live mode for confirmation.' },
+    total_score: 65,
+    score_verification: 'Demo estimates only; confirm with live company intelligence.',
+    analyst_insight: `Demo mode TAM and score modeling for ${company} suggests a conditional opportunity. [DEMO MODE – illustrative only]`,
+  };
+  return applyDemoMetadata(output, 2);
+}
+
+function buildDemoStep3(company, industry) {
+  const output = {
+    verdict: 'CONDITIONAL GO',
+    verdict_reasoning: `The ${industry || 'industry'} environment appears viable if execution accelerates and live market signals are verified.`,
+    score_basis: 'Based on demo-mode market signals, ICP fit, and score aggregation.',
+    demand_assessment: 'Demand is present but requires confirmation through customer research.',
+    icp_assessment: 'A mid-market ICP shows promise, but needs validation on willingness to pay.',
+    analyst_insight: `Demo mode recommendation is conditional; do not use for real decisions without live AI mode. [DEMO MODE – illustrative only]`,
+  };
+  return applyDemoMetadata(output, 3);
+}
+
+function buildDemoStep4(company, industry) {
+  const output = {
+    target_roles: ['Head of Revenue', 'VP of Sales', 'Director of Business Operations'],
+    core_problem: `Revenue teams in ${industry || 'the sector'} need better lead-to-revenue orchestration.`,
+    solution_angle: 'Align revenue operations and GTM motions through predictable pipeline generation.',
+    solution_pitch: `Use ${company} to reduce sales cycle friction and improve pipeline conversion.`,
+    why_now: 'Growing pressure on revenue teams to hit targets with fewer qualified leads.',
+    estimated_deal_size: 'USD 120k–220k ARR per account',
+    sales_approach: 'Target high-fit accounts with a multi-touch consultative outreach sequence.',
+    analyst_insight: `Demo mode GTM strategy is illustrative and should be refined with live customer data. [DEMO MODE – illustrative only]`,
+  };
+  return applyDemoMetadata(output, 4);
+}
+
+function buildDemoStep5(company, industry) {
+  const output = {
+    key_risks: [
+      'Go-to-market differentiation may be unclear without customer validation.',
+      'Sales cycle could lengthen if ICP priorities change mid-funnel.',
+      'Marketing assets may require stronger proof points for enterprise buyers.',
+    ],
+    confidence_level: 'Medium',
+    confidence_score: 62,
+    validation_needed: 'Live customer interviews and website signal validation are required before scaling.',
+    analyst_insight: `Demo mode risk assessment highlights moderate execution risk. [DEMO MODE – illustrative only]`,
+  };
+  return applyDemoMetadata(output, 5);
+}
+
+function buildDemoStep6(company, industry) {
+  const output = {
+    signal_highlights: ['Buyer interest is moderate', 'Market timing is improving', 'ICP fit appears reasonable'],
+    score_breakdown: 'Balanced strengths in ICP fit and timing, tempered by incomplete evidence.',
+    verdict: 'CONDITIONAL GO',
+    deal_lens_summary: 'The opportunity is viable with selective account focus and stronger proof points.',
+    risks_summary: 'Main risks are missing evidence and execution cadence.',
+    confidence_note: 'Demo mode confidence is illustrative only and should be validated live.',
+    executive_brief: `Demo summary for ${company}: conditional market opportunity with a need for live validation and stronger evidence before committing resources.`,
+    recommended_next_action: 'Validate ICP and demand with customer conversations before investing in full GTM execution.',
+    analyst_insight: `Demo mode summary is illustrative only. Do not use for live decisioning. [DEMO MODE – illustrative only]`,
+  };
+  return applyDemoMetadata(output, 6);
+}
+
+function buildDemoStep7(company, industry, priorSteps) {
+  const output = {
+    signal_summary: [
+      { signal_type: 'market_timing', signal_description: `Timing for ${industry || 'this sector'} is cautious yet opportunistic.`, strength: 'Medium' },
+      { signal_type: 'growth', signal_description: 'Industry growth is steady but requires validation.', strength: 'Medium' },
+    ],
+    why_now_analysis: 'Market conditions are moving toward revenue acceleration tools, but proof points remain illustrative.',
+    mcc_view: {
+      market: 'Market is maturing with stronger buyer scrutiny.',
+      client: 'Client priorities center on predictable revenue growth.',
+      competitor: 'Competitor activity is moderate and centered on differentiation.',
+    },
+    strategic_hook: `Use ${company} to position for more predictable revenue outcomes in ${industry || 'its target market'}.`,
+    persona_priority: { persona: 'Revenue Operations Leader', reason: 'Focuses on predictable pipeline and sales execution.' },
+    go_no_go: { recommendation: 'Watch', reason: 'Requires live evidence and customer validation before a full go decision.' },
+    confidence_score: 58,
+    executive_brief: `Demo mode revenue intelligence suggests a Watch recommendation. Validate with live data before taking action.`,
+    analyst_insight: `Demo mode intelligence is illustrative only. [DEMO MODE – illustrative only]`,
+  };
+  return applyDemoMetadata(output, 7);
 }
 
 // ══════════════════════════════════════════════════════════════════
