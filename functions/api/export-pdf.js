@@ -72,7 +72,8 @@ export function buildReportHTML(strategy) {
     .page.pdf-page::before{content:'';position:absolute;inset:0;background-image:linear-gradient(90deg,rgba(255,255,255,.03) 1px,transparent 1px),linear-gradient(180deg,rgba(255,255,255,.02) 1px,transparent 1px);background-size:48px 48px;opacity:.16;pointer-events:none;}
     .page-content{position:relative;z-index:1;display:flex;flex-direction:column;gap:16px;}
     .header,.footer{position:relative;z-index:1;display:flex;justify-content:space-between;align-items:center;gap:12px;color:var(--muted);font-size:9px;}
-    .panel-copy,.section-subtitle,.hero-copy,.metric-card-note,.mcc-value,.segment-value,.persona-detail,.timeline-step-meta,.appendix-copy{line-height:1.7;letter-spacing:.01em;white-space:pre-wrap;overflow-wrap:break-word;word-break:break-word;}
+    .panel-copy,.section-subtitle,.hero-copy,.metric-card-note,.mcc-value,.segment-value,.persona-detail,.timeline-step-meta,.appendix-copy{line-height:1.7;letter-spacing:normal;white-space:normal;overflow-wrap:normal;word-break:normal;}
+    .break-anywhere{overflow-wrap:anywhere;word-break:break-word;}
     .header{margin-bottom:14px;}
     .footer{margin-top:14px;padding-top:14px;border-top:1px solid rgba(255,255,255,.08);}
     .header-brand{display:flex;align-items:center;gap:12px;}
@@ -92,8 +93,8 @@ export function buildReportHTML(strategy) {
     .pill-accent{color:var(--accent);border-color:rgba(168,85,247,.18);}
     .pill-green{color:var(--green);border-color:rgba(34,197,94,.18);}
     .panel{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:22px;}
-    .panel-strong{font-size:13px;font-weight:800;color:var(--white);margin-bottom:12px;line-height:1.4;}
-    .panel-copy{font-size:11px;color:var(--muted);line-height:1.7;}
+    .panel-strong{font-size:13px;font-weight:800;color:var(--white);margin-bottom:12px;line-height:1.4;letter-spacing:normal;}
+    .panel-copy{font-size:11px;color:var(--muted);line-height:1.7;letter-spacing:normal;white-space:normal;overflow-wrap:normal;word-break:normal;}
     .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
     .grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;}
     .grid4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;}
@@ -114,6 +115,9 @@ export function buildReportHTML(strategy) {
     .progress-row{display:flex;justify-content:space-between;align-items:center;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.14em;}
     .progress-track{height:10px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;}
     .progress-fill{height:100%;border-radius:999px;background:linear-gradient(90deg,var(--accent-soft),var(--accent));}
+    .confidence-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
+    .confidence-summary{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:18px;display:flex;flex-direction:column;gap:12px;}
+    .confidence-summary h3{font-size:12px;font-weight:700;color:var(--white);margin:0 0 8px;}
     .swot-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;}
     .swot-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:18px;display:flex;flex-direction:column;gap:14px;}
     .swot-card-title{display:flex;align-items:center;gap:10px;font-size:11px;text-transform:uppercase;color:var(--muted);letter-spacing:.14em;font-weight:700;}
@@ -130,7 +134,9 @@ export function buildReportHTML(strategy) {
     .waterfall-value{font-size:11px;color:var(--text);text-align:right;}
     .segment-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;}
     .segment-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:18px;}
-    .segment-label{font-size:10px;text-transform:uppercase;color:var(--muted);letter-spacing:.14em;margin-bottom:8px;}
+    .segment-card-header{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+    .segment-card-icon{width:20px;height:20px;color:var(--accent);flex-shrink:0;}
+    .segment-label{font-size:10px;text-transform:uppercase;color:var(--muted);letter-spacing:.14em;margin:0;}
     .segment-value{font-size:12px;color:var(--text);line-height:1.7;}
     .persona-block{display:grid;grid-template-columns:1.2fr .8fr;gap:16px;}
     .persona-card{background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:18px;padding:22px;display:grid;gap:14px;}
@@ -533,9 +539,9 @@ export function buildReportHTML(strategy) {
         : 'Low confidence; confirm ICP alignment and data quality before active pursuit.';
     return renderPage('Confidence Matrix', 10, `
       <div class="panel"><div class="section-title">Weighted Confidence Matrix</div><div class="panel-copy">Visual assessment of signal veracity, timing, ICP fit and data completeness.</div></div>
-      <div class="grid2">
+      <div class="confidence-grid">
         <div>${matrix.map(item => renderProgressBar(item.value, item.label, 100)).join('')}</div>
-        <div class="panel">${renderProgressBar(confidenceScore, 'Overall fidelity', 100)}<div class="panel-copy" style="margin-top:12px;">${esc(interpretation)}</div></div>
+        <div class="confidence-summary"><h3>Confidence interpretation</h3>${renderProgressBar(confidenceScore, 'Overall fidelity', 100)}<div class="panel-copy">${esc(interpretation)}</div></div>
       </div>
     `);
   }
@@ -554,29 +560,32 @@ export function buildReportHTML(strategy) {
   }
 
   function renderWaterfallRow(label, value, width) {
-    return `<div class="waterfall-row"><div class="waterfall-label">${esc(label)}</div><div style="display:flex;align-items:center;gap:10px;"><div class="waterfall-bar" style="position:relative;"><div class="waterfall-fill" style="width:${width}%;"></div><span style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:9px;font-weight:700;color:var(--white);">${esc(width + '%')}</span></div><div class="waterfall-value">${esc(value || '—')}</div></div></div>`;
+    return `<div class="waterfall-row"><div><div class="waterfall-label">${esc(label)}</div><div class="waterfall-value">${esc(value || '—')}</div></div><div style="display:flex;align-items:center;gap:10px;"><div class="waterfall-bar" style="position:relative;"><div class="waterfall-fill" style="width:${width}%;"></div><span style="position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:9px;font-weight:700;color:var(--white);">${esc(width + '%')}</span></div></div></div>`;
   }
 
-  function renderSegmentCard(title, value, note = '') {
-    return `<div class="segment-card"><div class="segment-label">${esc(title)}</div><div class="segment-value">${esc(value)}</div>${note ? `<div class="metric-card-note">${esc(note)}</div>` : ''}</div>`;
+  function renderSegmentCard(title, value, note = '', iconName = 'segment') {
+    const valueClass = typeof value === 'string' && value.length > 100 ? ' break-anywhere' : '';
+    return `<div class="segment-card"><div class="segment-card-header">${renderSvgIcon(iconName)}<div class="segment-label">${esc(title)}</div></div><div class="segment-value${valueClass}">${esc(value)}</div>${note ? `<div class="metric-card-note">${esc(note)}</div>` : ''}</div>`;
   }
 
   function renderPipelineStep(title, value) {
-    return `<div class="segment-card"><div class="segment-label">${esc(title)}</div><div class="segment-value">${esc(value)}</div></div>`;
+    const valueClass = typeof value === 'string' && value.length > 100 ? ' break-anywhere' : '';
+    return `<div class="segment-card"><div class="segment-card-header">${renderSvgIcon('pipeline')}<div class="segment-label">${esc(title)}</div></div><div class="segment-value${valueClass}">${esc(value)}</div></div>`;
   }
 
   function renderAccountCard(account, index) {
-    const placeholders = ['Tier-1 enterprise prospect', 'High-growth SaaS account', 'Regional operations-heavy buyer'];
+    const placeholders = ['High-fit enterprise prospect', 'Strategic market account', 'Growth-ready target account'];
     if (!account) {
       const demoLabel = placeholders[index - 1] || `Demo account ${index}`;
-      return `<div class="segment-card"><div class="segment-label">Account analog ${index}</div><div class="segment-value">${esc(mode.isDemo ? `${demoLabel} — demo / anonymized target account.` : 'Account analog not supplied.')}</div>${mode.isDemo ? `<div class="metric-card-note">Demo account placeholders are illustrative only; replace with real targets for live campaigns.</div>` : ''}</div>`;
+      return `<div class="segment-card"><div class="segment-card-header">${renderSvgIcon('pipeline')}<div class="segment-label">Account analog ${index}</div></div><div class="segment-value">${esc(mode.isDemo ? `${demoLabel} — demo / anonymized target account.` : 'Account analog not supplied.')}</div>${mode.isDemo ? `<div class="metric-card-note">Demo account placeholders are illustrative only; replace with real targets for live campaigns.</div>` : ''}</div>`;
     }
     const fit = normalizeScore(account.fit_score || account.fit || account.score) || 0;
-    return `<div class="segment-card"><div class="segment-label">${esc(account.account_name || `Target account ${index}`)}</div><div class="segment-value">${esc(account.actionable_trigger || account.trigger || 'Account insight not available.')}</div><div style="margin-top:14px;">${renderProgressBar(fit, 'Fit score')}</div></div>`;
+    return `<div class="segment-card"><div class="segment-card-header">${renderSvgIcon('pipeline')}<div class="segment-label">${esc(account.account_name || `Target account ${index}`)}</div></div><div class="segment-value">${esc(account.actionable_trigger || account.trigger || 'Account insight not available.')}</div><div style="margin-top:14px;">${renderProgressBar(fit, 'Fit score')}</div></div>`;
   }
 
   function renderFunnelStep(label, value) {
-    return `<div class="segment-card"><div class="segment-label">${esc(label)}</div><div class="segment-value">${esc(value)}</div></div>`;
+    const valueClass = typeof value === 'string' && value.length > 100 ? ' break-anywhere' : '';
+    return `<div class="segment-card"><div class="segment-card-header">${renderSvgIcon('funnel')}<div class="segment-label">${esc(label)}</div></div><div class="segment-value${valueClass}">${esc(value)}</div></div>`;
   }
 
   function renderTimelineStep(step, label, data, fallbackAngle) {
