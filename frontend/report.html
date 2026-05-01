@@ -188,6 +188,15 @@
     .cm-table .num { font-family:'Space Mono',monospace; text-align:right; color:var(--accent); font-weight:700; }
     /* ── SOURCE NOTES ── */
     .src-note { font-size:9px; color:var(--faint); font-style:italic; margin:4px 0 10px; }
+    .truth-card { background:rgba(31,41,55,.75); border:1px solid rgba(168,85,247,.18); border-radius:16px; padding:18px 20px; margin-bottom:20px; }
+    .truth-card .truth-row { display:grid; grid-template-columns:1fr auto; gap:12px; align-items:flex-start; margin-bottom:12px; }
+    .truth-card .truth-row:last-child { margin-bottom:0; }
+    .truth-card .truth-label { font-size:10px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); }
+    .truth-card .truth-value { font-size:12px; color:var(--text); line-height:1.6; }
+    .truth-badges { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+    .truth-badge { padding:6px 12px; border-radius:999px; font-size:10px; font-weight:800; letter-spacing:.15em; text-transform:uppercase; border:1px solid transparent; }
+    .truth-badge-verified { background:rgba(34,197,94,.12); color:var(--green); border-color:rgba(34,197,94,.24); }
+    .truth-badge-warning  { background:rgba(245,158,11,.12); color:var(--amber); border-color:rgba(245,158,11,.24); }
     /* ── APPENDIX ── */
     .appendix-table { width:100%; border-collapse:collapse; font-size:11px; margin:8px 0 16px; }
     .appendix-table th { text-align:left; color:var(--muted); font-weight:700; font-size:8px; text-transform:uppercase; letter-spacing:.1em; padding:8px 10px; border-bottom:1px solid var(--border); }
@@ -336,6 +345,55 @@ function callout(text, type='') {
 function srcNote(text) {
   if (!text) return '';
   return `<div class="src-note">Source: ${esc(text)} — validate manually</div>`;
+}
+
+function renderTruthLayer(r) {
+  const stepKeys = [
+    {label:'Step 1', data:r.step_1_market || (r.full_report && r.full_report.step_1_market) || {}},
+    {label:'Step 2', data:r.step_2_tam || (r.full_report && r.full_report.step_2_tam) || {}},
+    {label:'Step 3', data:r.step_3_icp || (r.full_report && r.full_report.step_3_icp) || {}},
+    {label:'Step 4', data:r.step_4_sourcing || (r.full_report && r.full_report.step_4_sourcing) || {}},
+    {label:'Step 5', data:r.step_5_keywords || (r.full_report && r.full_report.step_5_keywords) || {}},
+    {label:'Step 6', data:r.step_6_messaging || (r.full_report && r.full_report.step_6_messaging) || {}},
+    {label:'Step 7', data:r.step_7_intelligence || (r.full_report && r.full_report.step_7_intelligence) || {}},
+  ];
+
+  const truthSteps = stepKeys.filter(({data}) => data && typeof data === 'object' && (
+    '_rag_enabled' in data || '_profile_source' in data || '_confidence_basis' in data || '_source_context' in data || '_missing_evidence' in data
+  ));
+
+  if (!truthSteps.length) {
+    return `<div class="truth-card"><div class="truth-row"><div class="truth-label">Truth Layer / Evidence Status</div><div class="truth-value">Evidence metadata not available for this report.</div></div></div>`;
+  }
+
+  const verifiedSteps = truthSteps.filter(({data}) => String(data._profile_source) === 'verified_company_profile');
+  const aiSteps = truthSteps.filter(({data}) => String(data._profile_source) === 'ai_estimate_validate_manually');
+  const otherSteps = truthSteps.filter(({data}) => !['verified_company_profile','ai_estimate_validate_manually'].includes(String(data._profile_source)));
+
+  const uniqueSources = Array.from(new Set(truthSteps.map(({data}) => safe(data._profile_source))).values()).filter(Boolean);
+  const missingEvidence = Array.from(new Set(truthSteps.map(({data}) => safe(data._missing_evidence)).filter(Boolean))).join(', ');
+  const sourceContext = truthSteps.map(({data}) => safe(data._source_context)).filter(Boolean).slice(0,2).join(' · ');
+
+  const badge = verifiedSteps.length
+    ? `<span class="truth-badge truth-badge-verified">Verified company profile used</span>`
+    : `<span class="truth-badge truth-badge-warning">AI estimate — validate manually</span>`;
+
+  const summary = truthSteps.length > 1
+    ? `Verified steps: ${verifiedSteps.length}, AI-estimated steps: ${aiSteps.length}${otherSteps.length ? `, Other: ${otherSteps.length}` : ''}`
+    : `${truthSteps[0].label} metadata available`;
+
+  const profileSource = uniqueSources.length === 1 ? uniqueSources[0] : uniqueSources.join(' · ');
+  const ragEnabled = truthSteps.some(({data}) => data._rag_enabled === true) ? 'Yes' : 'No';
+
+  return `<div class="truth-card">
+    <div class="truth-row"><div class="truth-label">Truth Layer / Evidence Status</div><div class="truth-value">${esc(summary)}</div></div>
+    <div class="truth-row"><div class="truth-label">RAG enabled</div><div class="truth-value">${esc(ragEnabled)}</div></div>
+    <div class="truth-row"><div class="truth-label">Profile source</div><div class="truth-value">${esc(profileSource)}</div></div>
+    <div class="truth-row"><div class="truth-label">Confidence basis</div><div class="truth-value">${esc(truthSteps[0].data._confidence_basis || truthSteps[0].data._confidence_basis || '')}</div></div>
+    ${missingEvidence ? `<div class="truth-row"><div class="truth-label">Missing evidence</div><div class="truth-value">${esc(missingEvidence)}</div></div>` : ''}
+    ${sourceContext ? `<div class="truth-row"><div class="truth-label">Source context</div><div class="truth-value">${esc(sourceContext)}</div></div>` : ''}
+    <div class="truth-badges">${badge}</div>
+  </div>`;
 }
 
 // ── ICP Placeholder Repair ──
@@ -690,6 +748,13 @@ function renderReport(r) {
       <div class="sec-context">Macro-opportunity assessment and strategic positioning rationale.</div>
       ${renderExecSummary(r, s1, s2)}
     </div>` : '',
+
+    // Truth Layer / Evidence Status
+    `<div class="section">
+      <div class="sec-header"><div class="sec-num">TL</div><div class="sec-title">Truth Layer / Evidence Status</div></div>
+      <div class="sec-context">Provenance metadata from the GTM step outputs. Displays whether the report is backed by verified profile data or AI estimate fallback.</div>
+      ${renderTruthLayer(r)}
+    </div>`,
 
     // Step 1 — Market Research
     sectionWrap('01', 'Market Research & SWOT', 'Deconstructs positioning and isolates macro triggers. Identifies why a prospect would buy right now.', [
