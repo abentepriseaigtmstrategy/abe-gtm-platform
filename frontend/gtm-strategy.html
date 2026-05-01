@@ -3041,12 +3041,6 @@ async function downloadExport() {
     return;
   }
 
-  const popup = window.open('', '_blank');
-  if (!popup) {
-    showToast('Please allow pop-ups to open the report viewer.', 'error');
-    return;
-  }
-
   showToast('Saving strategy. Opening report viewer for PDF export...', 'info');
 
   try {
@@ -3080,10 +3074,9 @@ async function downloadExport() {
 
     state.strategyId = data.strategy_id;
     const url = `report.html?id=${encodeURIComponent(data.strategy_id)}`;
-    popup.location.href = url;
     showToast('Strategy saved. Opening report viewer for PDF export.', 'success');
+    window.location.href = url;
   } catch (err) {
-    popup.close?.();
     showToast(`Strategy save failed: ${err.message}`, 'error');
   }
 }
