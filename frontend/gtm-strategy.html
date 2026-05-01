@@ -1812,8 +1812,7 @@ const STEP_META = {
   const demoToggle = document.getElementById('demo-toggle');
   if (demoToggle) demoToggle.checked = state.demoMode;
   setDemoMode(state.demoMode);
-    addLog('INFO', 0, `Session restored — company: "${state.company}", steps completed: ${Object.values(state.steps).filter(s=>s.status==='complete').length}`);
-  }
+  addLog('INFO', 0, `Session restored — company: "${state.company}", steps completed: ${Object.values(state.steps).filter(s=>s.status==='complete').length}`);
 })();
 
 /* ═══════════════════════════════════════════
