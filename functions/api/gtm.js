@@ -727,13 +727,18 @@ function buildDemoStep4(company, industry) {
     sourcing_playbook: `Target high-fit ${profile.industryLabel} accounts with curated outreach to partnerships and revenue leaders.`,
     data_enrichment: 'Append firmographics, technographics, funding status, and hiring signals to each account profile.',
     high_fit_account_analogs: profile.account_analogs,
-    target_roles: profile.target_roles,
+    target_roles: Array.isArray(profile.target_roles) ? profile.target_roles : [profile.target_roles].filter(Boolean),
     core_problem: profile.core_problem,
     solution_angle: profile.solution_angle,
     solution_pitch: `Use ${company} to shorten cycles and improve ${profile.industryLabel} revenue coordination.`,
     why_now: 'Market pressure is driving buyers to fix pipeline efficiency and forecast predictability now.',
-    estimated_deal_size: 'USD 120k–220k ARR per account',
+    estimated_deal_size: {
+      range: 'USD 120k–220k ARR per account',
+      basis: 'Derived from similar GTM motions in comparable accounts and buyer intent velocity.',
+      is_estimate: true,
+    },
     sales_approach: 'Land with one reference account, then expand through account-based marketing and sales enablement.',
+    approach_rationale: `Prioritise high-fit buyers with clear commercial pain, then use a reference-led expansion motion to accelerate pipeline conversion.`,
     analyst_insight: `Demo mode account sourcing is illustrative only; validate with real prospect data and market intent. [DEMO MODE – illustrative only]`,
   };
   return applyDemoMetadata(output, 4);
@@ -750,12 +755,29 @@ function buildDemoStep5(company, industry) {
     linkedin_search_string: `"${profile.target_roles[0]}" AND "${profile.keyword_focus.split(',')[0]}"`,
     content_topics: [profile.keyword_focus, 'commercial performance', 'strategy-to-execution alignment'],
     key_risks: [
-      'Demo keywords may not reflect actual customer language in this vertical.',
-      'Intent signals are illustrative and require live validation.',
-      'Performance could differ if buyer priorities shift rapidly.',
+      {
+        risk: 'Demo keywords may not reflect actual customer language in this vertical.',
+        source: 'Assumed keyword trends from analogous GTM plays',
+        impact: 'medium',
+        mitigation: 'Validate with live customer discovery and search query analysis.',
+      },
+      {
+        risk: 'Intent signals are illustrative and require live validation.',
+        source: 'Demo-mode signal synthesis',
+        impact: 'high',
+        mitigation: 'Confirm with real buyer intent data and sales activity metrics.',
+      },
+      {
+        risk: 'Performance could differ if buyer priorities shift rapidly.',
+        source: 'Market volatility assumptions',
+        impact: 'medium',
+        mitigation: 'Monitor buyer feedback and adjust messaging weekly.',
+      },
     ],
     validation_needed: ['Customer interviews', 'CRO alignment', 'Pipeline health review'],
+    confidence_level: 'medium',
     confidence_score: 62,
+    confidence_reasoning: 'Demo confidence is driven by moderate data completeness assumptions and illustrative signal strength.',
     analyst_insight: `Demo mode keyword and intent guidance is illustrative and should be validated with live account data. [DEMO MODE – illustrative only]`,
   };
   return applyDemoMetadata(output, 5);
