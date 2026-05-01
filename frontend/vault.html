@@ -238,6 +238,8 @@
     .status-complete    { background: rgba(34,197,94,0.1); color: var(--green); border: 1px solid rgba(34,197,94,0.2); }
     .status-in_progress { background: rgba(245,158,11,0.1); color: var(--amber); border: 1px solid rgba(245,158,11,0.2); }
     .status-archived    { background: rgba(107,114,128,0.1); color: var(--muted); border: 1px solid rgba(107,114,128,0.2); }
+    .status-demo        { background: rgba(168,85,247,0.12); color: #a855f7; border: 1px solid rgba(168,85,247,0.25); }
+    .status-live        { background: rgba(34,197,94,0.12); color: #22c55e; border: 1px solid rgba(34,197,94,0.2); }
 
     /* LOADING / EMPTY */
     #loading-grid { text-align: center; padding: 80px 20px; }
@@ -539,6 +541,29 @@ async function loadVault() {
   }
 }
 
+function getStrategyModeBadge(s) {
+  const isDemo = !!(
+    s?.full_report?.demo_mode === true ||
+    s?.scraped_profile?.demo_mode === true ||
+    s?.step_1_market?.demo_mode === true ||
+    s?.step_2_tam?.demo_mode === true ||
+    s?.step_3_icp?.demo_mode === true ||
+    s?.step_4_sourcing?.demo_mode === true ||
+    s?.step_5_keywords?.demo_mode === true ||
+    s?.step_6_messaging?.demo_mode === true ||
+    s?.step_7_intelligence?.demo_mode === true
+  );
+  if (isDemo) return { label: 'DEMO', class: 'status-demo' };
+  const isLive = !!(
+    s?.report_mode === 'live' ||
+    s?.scraped_profile?.report_mode === 'live' ||
+    s?.full_report?.report_mode === 'live' ||
+    (s?.steps_completed >= 6 && s?.status === 'complete')
+  );
+  if (isLive) return { label: 'LIVE', class: 'status-live' };
+  return null;
+}
+
 function refreshVault() { loadVault(); showToast('Refreshing…'); }
 
 /* ─────────────────────────────────────────────────────────────────
@@ -566,6 +591,7 @@ function renderVault(strategies) {
     const statusKey  = (s.status || 'in_progress').replace(' ', '_');
     const inLM       = localStorage.getItem('vault_in_lm_' + s.id) === '1';
     const isSelected = _vaultSelected.has(s.id);
+    const modeBadge  = getStrategyModeBadge(s);
 
     return `
     <div class="vault-card${isSelected ? ' selected' : ''}" id="vcard-${s.id}" onclick="openDrawer('${s.id}')">
@@ -577,6 +603,7 @@ function renderVault(strategies) {
         <div>
           <div class="vault-company">${esc(s.company_name)}</div>
           <div class="vault-industry">${esc(s.industry || 'General Market')}</div>
+          ${modeBadge ? `<div style="margin-top:6px;"><span class="status-badge ${modeBadge.class}">${modeBadge.label}</span></div>` : ''}
           ${inLM ? `<div class="vault-in-lm">✓ In Lead Manager</div>` : ''}
         </div>
         <div style="text-align:right;">
