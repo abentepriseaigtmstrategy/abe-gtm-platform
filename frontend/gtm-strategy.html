@@ -2980,8 +2980,6 @@ function closeExportModal() {
 }
 
 function downloadExport() {
-  // Use the pure client-side A4 renderer instead of backend HTML export.
-  closeExportModal();
   generateProfessionalPDF();
 }
 
@@ -2992,7 +2990,10 @@ function downloadExport() {
  * the result as an A4 PDF via jsPDF.
  */
 async function renderBackendHtmlToPdf(htmlString, filename) {
-  // Ensure jsPDF is loaded
+  const A4W = 794;
+  const A4H = 1123;
+
+  // Load jsPDF
   if (!window.jspdf) {
     await new Promise((resolve, reject) => {
       const s = document.createElement('script');
@@ -3002,7 +3003,7 @@ async function renderBackendHtmlToPdf(htmlString, filename) {
       document.head.appendChild(s);
     });
   }
-  // Ensure html2canvas is loaded
+  // Load html2canvas
   if (!window.html2canvas) {
     await new Promise((resolve, reject) => {
       const s = document.createElement('script');
@@ -3013,36 +3014,72 @@ async function renderBackendHtmlToPdf(htmlString, filename) {
     });
   }
 
-  const container = document.createElement('div');
-  container.style.cssText = 'position:fixed;top:-99999px;left:0;z-index:-1;width:210mm;background:#0d1120;';
-  container.innerHTML = htmlString;
-  document.body.appendChild(container);
+  // Sandboxed iframe — completely isolated from app CSS/layout
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'position:fixed;top:0;left:-9999px;width:0;height:0;overflow:hidden;';
+  document.body.appendChild(wrapper);
+
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = `width:${A4W}px;height:${A4H}px;border:none;background:#0d1120;`;
+  iframe.setAttribute('scrolling', 'no');
+  wrapper.appendChild(iframe);
+
+  iframe.contentDocument.open();
+  iframe.contentDocument.write(htmlString);
+  iframe.contentDocument.close();
+
+  const iframeDoc = iframe.contentDocument;
+
+  // Lock every .page to exact A4 dimensions
+  Array.from(iframeDoc.querySelectorAll('.page')).forEach(p => {
+    p.style.width     = A4W + 'px';
+    p.style.height    = A4H + 'px';
+    p.style.minHeight = A4H + 'px';
+    p.style.maxHeight = A4H + 'px';
+    p.style.overflow  = 'hidden';
+    p.style.boxSizing = 'border-box';
+  });
+
+  // Wait for layout, fonts, images
+  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
+  try { await iframeDoc.fonts.ready; } catch (_) {}
+  await Promise.all(Array.from(iframeDoc.querySelectorAll('img')).map(img =>
+    img.complete ? Promise.resolve() : new Promise(r => { img.onload = r; img.onerror = r; })
+  ));
+  await new Promise(r => setTimeout(r, 800));
 
   try {
     const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const pages = container.querySelectorAll('.page');
-
-    // If backend HTML has no .page divs, render the whole container as one page
-    const targets = pages.length > 0 ? Array.from(pages) : [container];
+    const pdf   = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pages = Array.from(iframeDoc.querySelectorAll('.page'));
+    const targets = pages.length > 0 ? pages : [iframeDoc.body];
 
     for (let i = 0; i < targets.length; i++) {
+      iframe.style.width  = A4W + 'px';
+      iframe.style.height = A4H + 'px';
       const canvas = await html2canvas(targets[i], {
-        scale: 2,
-        useCORS: true,
-        logging: false,
+        windowWidth:     A4W,
+        windowHeight:    A4H,
+        width:           A4W,
+        height:          A4H,
+        scale:           2,
+        useCORS:         true,
+        allowTaint:      true,
+        logging:         false,
         backgroundColor: '#0d1120',
-        width: targets[i].offsetWidth,
-        height: targets[i].offsetHeight,
+        scrollX:         0,
+        scrollY:         0,
+        x:               0,
+        y:               0,
       });
-      const imgData = canvas.toDataURL('image/jpeg', 0.92);
+      const imgData = canvas.toDataURL('image/jpeg', 0.94);
       if (i > 0) pdf.addPage();
       pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
     }
 
     pdf.save(filename);
   } finally {
-    document.body.removeChild(container);
+    document.body.removeChild(wrapper);
   }
 }
 
@@ -3220,236 +3257,256 @@ async function generateProfessionalPDF() {
   const swotT = arr(p5.key_risks).filter(r=>r.impact==='high').map(r=>r.risk).slice(0,3);
 
   const swotRow = (items) => items.length
-    ? items.map(i=>`<div class="list-line"><span class="bullet">›</span>${esc(i)}</div>`).join('')
+    ? items.map(i=>`<div style="margin-bottom:6px;display:flex;gap:6px;"><span style="color:#a855f7;flex-shrink:0;">›</span><span>${esc(i)}</span></div>`).join('')
     : '<div style="color:#6b7280;font-size:11px;">No data available</div>';
 
   /* ── Risk cards ─────────────────────────────────────────────── */
   const riskCards = arr(p5.key_risks).map(r => {
     const ic = r.impact === 'high' ? '#ef4444' : r.impact === 'medium' ? '#f59e0b' : '#6b7280';
-    return `<div class="card compact" style="border-left:3px solid ${ic};background:${ic}08;">
-      <div style="font-size:10px;font-weight:800;color:${ic};text-transform:uppercase;letter-spacing:.08em;">⚠ ${esc(r.impact||'')} Impact</div>
-      <div style="font-size:9px;color:#6b7280;margin-bottom:6px;">Source: ${esc(r.source||'')}</div>
+    return `<div style="border:1px solid ${ic}22;border-left:3px solid ${ic};background:${ic}08;border-radius:8px;padding:14px 16px;margin-bottom:10px;">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+        <span style="font-size:10px;font-weight:800;color:${ic};text-transform:uppercase;letter-spacing:.08em;">⚠ ${esc(r.impact||'')} Impact</span>
+        <span style="font-size:9px;color:#6b7280;">Source: ${esc(r.source||'')}</span>
+      </div>
       <div style="font-size:12px;color:#e5e7eb;margin-bottom:6px;">${esc(r.risk||'')}</div>
       ${r.mitigation ? `<div style="font-size:10px;color:#4ade80;">→ ${esc(r.mitigation)}</div>` : ''}
     </div>`;
   }).join('') || '<p style="color:#6b7280;">No critical risks identified at this time.</p>';
 
-  /* ── Section header helper ───────────────────────────────────── */
-  const sectionHeader = (num, title, subtitle) => `
-    <div class="doc-header">
-      <div class="doc-brand">ABE GTM STRATEGY REPORT</div>
-      <div class="doc-meta">${co} · ${dateStr}</div>
-    </div>
-    <div class="section-title">
-      <div class="section-num">${String(num).padStart(2,'0')}</div>
-      <h1>${esc(title)}</h1>
-      ${subtitle ? `<p>${esc(subtitle)}</p>` : ''}
-    </div>`;
-
-  const subHeader = (num, title, subtitle) => `
-    <div class="section-title" style="margin-top:18px;">
-      <div class="section-num">${String(num).padStart(2,'0')}</div>
-      <h1 style="font-size:18px;">${esc(title)}</h1>
-      ${subtitle ? `<p>${esc(subtitle)}</p>` : ''}
-    </div>`;
-
-  const footer = (page) => `
-    <div class="footer">
-      <span>ABE · GTM Strategy Report · ${co}</span>
-      <span>${page}</span>
-    </div>`;
-
-  const bar = (val, max, color) => {
-    const pct = Math.max(0, Math.min(100, Math.round((Number(val || 0) / max) * 100)));
-    return `<div class="bar"><div style="width:${pct}%;background:${color};"></div></div>`;
-  };
-
-  const signalRows = (signals, typeColor) => signals.length ? signals.map(s => {
-    const strength = s.strength || '—';
-    const sColor = strength === 'High' ? '#22c55e' : strength === 'Medium' ? '#f59e0b' : '#6b7280';
-    return `<tr>
-      <td style="width:62%;font-size:11px;color:#e5e7eb;">${esc(s.signal)}</td>
-      <td style="width:22%;"><span class="tag" style="border-color:${typeColor}55;color:${typeColor};background:${typeColor}18;">${esc(s.type || s.category || 'Signal')}</span></td>
-      <td style="width:16%;font-weight:800;color:${sColor};font-size:10px;">${esc(strength)}</td>
-    </tr>`;
-  }).join('') : '<tr><td colspan="3" style="color:#6b7280;font-size:11px;">No signals extracted.</td></tr>';
+  /* ── Section header — block only, no flex ──────────────────── */
+  const sectionHeader = (num, title, subtitle) =>
+    `<div style="margin-bottom:18px;padding-bottom:14px;border-bottom:2px solid rgba(168,85,247,0.25);">` +
+    `<span style="display:inline-block;background:linear-gradient(135deg,#a855f7,#7c3aed);` +
+    `border-radius:6px;padding:4px 10px;font-family:'Space Mono',monospace;font-size:10px;` +
+    `font-weight:900;color:white;margin-right:10px;vertical-align:middle;">${String(num).padStart(2,'0')}</span>` +
+    `<span style="font-size:17px;font-weight:800;color:white;letter-spacing:-.01em;vertical-align:middle;">${esc(title)}</span>` +
+    (subtitle ? `<div style="font-size:11px;color:#9ca3af;margin-top:5px;padding-left:4px;">${esc(subtitle)}</div>` : '') +
+    `</div>`;
 
   /* ── Divider ─────────────────────────────────────────────────── */
-  const div = `<div style="height:1px;background:linear-gradient(90deg,#a855f766,transparent);margin:24px 0;"></div>`;
+  const div = `<div style="height:1px;background:linear-gradient(90deg,rgba(168,85,247,0.35),transparent);margin:20px 0;"></div>`;
 
-  /* ══════════════════════════════════════════════════════════════
-     BUILD HTML DOCUMENT — single-column, A4-safe
-  ══════════════════════════════════════════════════════════════ */
+  /* ── Footer — absolute + inner table (no flex/float) ─────────── */
+  const footer = (left, right) =>
+    `<div style="position:absolute;bottom:20px;left:54px;right:54px;">` +
+    `<div style="height:1px;background:rgba(255,255,255,0.06);margin-bottom:7px;"></div>` +
+    `<table style="width:100%;border:none;border-collapse:collapse;"><tr>` +
+    `<td style="padding:0;font-size:8px;color:#4b5563;font-family:'Space Mono',monospace;border:none;">${esc(left)}</td>` +
+    `<td style="padding:0;font-size:8px;color:#4b5563;font-family:'Space Mono',monospace;border:none;text-align:right;">${esc(right)}</td>` +
+    `</tr></table></div>`;
+
+  /* ═══════════════════════════════════════════════════════════════
+     HTML TEMPLATE — A4-safe, zero flex/grid, explicit pixel widths
+  ═══════════════════════════════════════════════════════════════ */
   const html = `<!DOCTYPE html>
 <html><head><meta charset="UTF-8">
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
   * { box-sizing:border-box; margin:0; padding:0; }
-  html, body { width:794px; min-height:1123px; background:#0d1120; overflow-x:hidden; }
-  body { color:#e5e7eb; font-family:'Inter',sans-serif; font-size:12px; line-height:1.55; }
-  .page { width:794px; height:1123px; min-height:1123px; padding:58px 68px 76px; background:#0d1120; position:relative; page-break-after:always; overflow:hidden; }
-  .page:last-child { page-break-after:auto; }
-  .doc-header { width:100%; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:10px; margin-bottom:18px; }
-  .doc-brand { font-family:'Space Mono',monospace; font-size:9px; font-weight:900; color:#a855f7; letter-spacing:.18em; text-transform:uppercase; }
-  .doc-meta { margin-top:3px; font-size:9px; color:#6b7280; font-family:'Space Mono',monospace; }
-  .section-title { width:100%; margin:0 0 18px; padding-bottom:14px; border-bottom:1px solid rgba(168,85,247,0.22); }
-  .section-num { display:inline-block; font-family:'Space Mono',monospace; font-size:10px; font-weight:900; color:white; background:#7c3aed; border-radius:6px; padding:5px 9px; margin-bottom:9px; }
-  .section-title h1 { font-size:21px; line-height:1.2; font-weight:900; color:white; letter-spacing:0; }
-  .section-title p { font-size:11px; color:#9ca3af; margin-top:4px; }
-  .card { width:100%; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07); border-radius:8px; padding:14px 16px; margin-bottom:12px; }
-  .card.compact { padding:12px 14px; }
-  .gold-rule { height:2px; background:linear-gradient(90deg,#a855f7,#7c3aed,transparent); border-radius:2px; margin:20px auto; }
-  .label { font-size:9px; font-weight:700; color:#a855f7; text-transform:uppercase; letter-spacing:.12em; margin-bottom:6px; }
+  /* body width locked to 794px — same as container and html2canvas windowWidth */
+  body  { background:#0d1120; color:#e5e7eb; font-family:'Inter',sans-serif;
+          font-size:13px; line-height:1.65; width:794px; }
+  /* page: explicit px — NOT mm — so browser DPI never mismatches the capture */
+  .page { width:794px; min-height:1123px; padding:48px 54px 80px;
+          background:#0d1120; position:relative; overflow:hidden; }
+  .card { background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07);
+          border-radius:10px; padding:16px 18px; margin-bottom:12px; }
+  .label{ font-size:9px; font-weight:700; color:#a855f7; text-transform:uppercase;
+          letter-spacing:.12em; margin-bottom:6px; display:block; }
   .mono { font-family:'Space Mono',monospace; }
-  table { width:100%; max-width:100%; table-layout:fixed; border-collapse:collapse; font-size:11px; border-radius:8px; overflow:hidden; border:1px solid rgba(255,255,255,0.08); margin:9px 0 13px; }
-  th { background:rgba(168,85,247,0.12); color:#c4b5fd; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; padding:8px 10px; text-align:left; border-bottom:2px solid rgba(168,85,247,0.3); }
-  td { padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.05); color:#d1d5db; vertical-align:top; overflow-wrap:anywhere; }
-  tr:last-child td { border-bottom:none; }
-  .tag { display:inline-block; padding:3px 9px; border-radius:20px; font-size:9px; font-weight:700; margin:2px; }
-  .tag-green  { background:rgba(34,197,94,.12); color:#4ade80; border:1px solid rgba(34,197,94,.2); }
-  .tag-blue   { background:rgba(96,165,250,.12); color:#60a5fa; border:1px solid rgba(96,165,250,.2); }
-  .tag-purple { background:rgba(168,85,247,.12); color:#c4b5fd; border:1px solid rgba(168,85,247,.2); }
-  .tag-amber  { background:rgba(245,158,11,.12); color:#fbbf24; border:1px solid rgba(245,158,11,.2); }
-  .bar { width:100%; height:7px; background:rgba(255,255,255,0.07); border-radius:4px; overflow:hidden; margin-top:5px; }
-  .bar div { height:100%; border-radius:4px; }
-  .list-line { font-size:10px; color:#d1d5db; margin:0 0 6px; padding-left:13px; position:relative; }
-  .bullet { position:absolute; left:0; color:#a855f7; }
-  .footer { position:absolute; bottom:45px; left:68px; right:68px; display:table; width:658px; font-size:8px; color:#374151; border-top:1px solid rgba(255,255,255,0.05); padding-top:6px; font-family:'Space Mono',monospace; }
-  .footer span { display:table-cell; width:50%; }
-  .footer span:last-child { text-align:right; }
-  .cover-page { text-align:center; padding-top:180px; }
-  .cover-logo { width:72px; height:72px; background:linear-gradient(135deg,#a855f7,#7c3aed); border-radius:18px; margin:0 auto 20px; box-shadow:0 20px 60px rgba(168,85,247,.4); font-family:'Space Mono',monospace; font-size:20px; font-weight:900; color:white; line-height:72px; }
-  .metric-table td { text-align:center; border-bottom:none; }
-  .metric-value { font-family:'Space Mono',monospace; font-size:34px; line-height:1; font-weight:900; }
-  .metric-label { font-size:9px; color:#6b7280; margin-top:6px; text-transform:uppercase; letter-spacing:.08em; }
+  /* dt = data table — all side-by-side content uses this, never flex */
+  table.dt { width:100%; border-collapse:collapse; font-size:11px;
+             border:1px solid rgba(255,255,255,0.08); margin:10px 0; }
+  table.dt th { background:rgba(168,85,247,0.12); color:#c4b5fd; font-size:9px;
+                font-weight:700; text-transform:uppercase; letter-spacing:.1em;
+                padding:9px 12px; text-align:left;
+                border-bottom:2px solid rgba(168,85,247,0.3); }
+  table.dt td { padding:9px 12px; border-bottom:1px solid rgba(255,255,255,0.05);
+                color:#d1d5db; vertical-align:top; }
+  table.dt tr:last-child td { border-bottom:none; }
+  /* utility table — invisible structure only */
+  table.ut { width:100%; border-collapse:collapse; }
+  table.ut td { padding:0; border:none; vertical-align:top; }
+  .tag { display:inline-block; padding:3px 8px; border-radius:20px;
+         font-size:9px; font-weight:700; margin:2px 2px 2px 0; }
+  .tg  { background:rgba(34,197,94,.12);  color:#4ade80; border:1px solid rgba(34,197,94,.2); }
+  .tb  { background:rgba(96,165,250,.12); color:#60a5fa; border:1px solid rgba(96,165,250,.2); }
+  .tp  { background:rgba(168,85,247,.12); color:#c4b5fd; border:1px solid rgba(168,85,247,.2); }
+  .ta  { background:rgba(245,158,11,.12); color:#fbbf24; border:1px solid rgba(245,158,11,.2); }
 </style>
 </head><body>
 
-<!-- ═══════════════════════════════════════════════
-     PAGE 1 — COVER
-═══════════════════════════════════════════════ -->
-<div class="page cover-page">
-  <div style="margin-bottom:48px;">
-    <div class="cover-logo">ABE</div>
-    <div style="font-size:9px;font-weight:700;color:#a855f7;letter-spacing:.25em;text-transform:uppercase;margin-bottom:12px;">GTM Strategy Report</div>
-    <div style="font-size:40px;font-weight:900;color:white;letter-spacing:-.02em;line-height:1.1;margin-bottom:8px;">${co}</div>
-    ${ind ? `<div style="font-size:14px;color:#9ca3af;">${ind}</div>` : ''}
+<!-- ═══════════════════════ PAGE 1 — COVER ══════════════════════════ -->
+<div class="page" style="text-align:center;">
+  <div style="padding-top:60px;">
+    <!-- Logo -->
+    <div style="width:72px;height:72px;background:linear-gradient(135deg,#a855f7,#7c3aed);
+         border-radius:18px;margin:0 auto 20px;
+         box-shadow:0 20px 40px rgba(168,85,247,.35);">
+      <div style="padding-top:18px;font-family:'Space Mono',monospace;
+           font-size:20px;font-weight:900;color:white;">ABE</div>
+    </div>
+    <div style="font-size:9px;font-weight:700;color:#a855f7;letter-spacing:.25em;
+         text-transform:uppercase;margin-bottom:16px;">GTM Strategy Report</div>
+    <div style="font-size:38px;font-weight:900;color:white;letter-spacing:-.02em;
+         line-height:1.1;margin-bottom:10px;">${co}</div>
+    ${ind ? `<div style="font-size:14px;color:#9ca3af;margin-bottom:4px;">${ind}</div>` : ''}
   </div>
 
-  <div class="gold-rule" style="width:120px;"></div>
+  <div style="height:2px;background:linear-gradient(90deg,transparent,#a855f7,transparent);
+       margin:32px auto;width:200px;border-radius:2px;"></div>
 
-  <table class="metric-table" style="width:520px;margin:32px auto;border:none;background:transparent;">
+  <!-- KPI row — fixed table, no flex -->
+  <table class="ut" style="width:360px;margin:0 auto 32px;">
     <tr>
-      <td>
-        <div class="metric-value" style="color:${vc.color};">${total}</div>
-        <div class="metric-label">GTM Score / 100</div>
+      <td style="text-align:center;padding:0 8px;">
+        <div class="mono" style="font-size:40px;font-weight:900;color:${vc.color};">${total}</div>
+        <div style="font-size:10px;color:#6b7280;">GTM Score / 100</div>
       </td>
-      <td>
-        <div class="metric-value" style="color:${vc.color};font-size:28px;">${vc.label}</div>
-        <div class="metric-label">Qualification</div>
+      <td style="width:1px;background:rgba(255,255,255,0.08);padding:0;"></td>
+      <td style="text-align:center;padding:0 8px;">
+        <div class="mono" style="font-size:${vc.label.length>2?'22':'38'}px;font-weight:900;
+             color:${vc.color};line-height:1.2;">${vc.label}</div>
+        <div style="font-size:10px;color:#6b7280;">Qualification</div>
       </td>
-      <td>
-        <div class="metric-value" style="color:#9ca3af;">${confScore}</div>
-        <div class="metric-label">Confidence</div>
+      <td style="width:1px;background:rgba(255,255,255,0.08);padding:0;"></td>
+      <td style="text-align:center;padding:0 8px;">
+        <div class="mono" style="font-size:40px;font-weight:900;color:#9ca3af;">${confScore}</div>
+        <div style="font-size:10px;color:#6b7280;">Confidence</div>
       </td>
     </tr>
   </table>
 
-  <div class="gold-rule" style="width:120px;"></div>
+  <div style="height:2px;background:linear-gradient(90deg,transparent,#a855f7,transparent);
+       margin:0 auto 32px;width:200px;border-radius:2px;"></div>
 
-  <div style="margin:32px auto 0;max-width:500px;">
-    <div style="font-size:13px;color:#d1d5db;line-height:1.8;">${esc(safe(p6.executive_brief, p3.verdict_reasoning || 'GTM qualification report generated by ABE AI Revenue Infrastructure platform.'))}</div>
+  <div style="max-width:500px;margin:0 auto;">
+    <div style="font-size:13px;color:#d1d5db;line-height:1.8;">${esc(safe(p6.executive_brief,
+      p3.verdict_reasoning || 'GTM qualification report generated by ABE AI platform.'))}</div>
   </div>
 
-  <div class="footer">
-    <span>CLASSIFICATION: CONFIDENTIAL</span>
-    <span>${dateStr}</span>
-  </div>
+  ${footer('CLASSIFICATION: CONFIDENTIAL — NOT FOR EXTERNAL DISTRIBUTION', dateStr)}
 </div>
 
-<!-- ═══════════════════════════════════════════════
-     PAGE 2 — SCORE SUMMARY + EXEC BRIEF
-═══════════════════════════════════════════════ -->
+<!-- ═══════════════════ PAGE 2 — EXEC SUMMARY ══════════════════════ -->
 <div class="page">
   ${sectionHeader('ES','Executive Summary & Score Breakdown','Data-backed GTM qualification across 4 dimensions')}
 
-  <div class="card">
-    <div class="label">Score Breakdown</div>
-    <table>
-      <tr><th>Dimension</th><th>Score</th><th>Max</th><th>Key Insight</th></tr>
-      <tr><td>Demand Signals</td><td class="mono" style="font-size:16px;font-weight:900;color:#22c55e;">${demand}</td><td>40</td><td>${esc(p2.demand_score?.rationale||'—')}</td></tr>
-      <tr><td>Market Timing</td><td class="mono" style="font-size:16px;font-weight:900;color:#60a5fa;">${timing}</td><td>25</td><td>${esc(p2.market_timing_score?.rationale||'—')}</td></tr>
-      <tr><td>ICP Fit</td><td class="mono" style="font-size:16px;font-weight:900;color:#a855f7;">${icp}</td><td>20</td><td>${esc(p2.icp_fit_score?.rationale||'—')}</td></tr>
-      <tr><td>Data Completeness</td><td class="mono" style="font-size:16px;font-weight:900;color:#f59e0b;">${data_c}</td><td>15</td><td>${esc(p2.data_completeness_score?.rationale||'—')}</td></tr>
-      <tr style="border-top:2px solid rgba(168,85,247,0.4);"><td style="font-weight:900;color:${vc.color};">TOTAL</td><td class="mono" style="font-size:18px;font-weight:900;color:${vc.color};">${total}</td><td colspan="2" style="color:#6b7280;">/100</td></tr>
+  <!-- Score rings — fixed 5-cell table, no flex -->
+  <div style="background:rgba(0,0,0,0.3);border:1px solid rgba(255,255,255,0.06);
+       border-radius:12px;padding:12px 6px;margin-bottom:16px;">
+    <table class="ut" style="width:100%;table-layout:fixed;">
+      <tr>
+        ${[
+          [demand,  40, '#22c55e','Demand',  'Hiring & Expansion'],
+          [timing,  25, '#60a5fa','Timing',  'Market & Trends'],
+          [icp,     20, '#a855f7','ICP Fit', 'Target Personas'],
+          [data_c,  15, '#f59e0b','Data',    'Completeness'],
+          [total,  100, vc.color, 'TOTAL',   'GTM Score'],
+        ].map(([val,max,col,lbl,sub]) => {
+          const pct = Math.min(val/max,1);
+          const r=32; const circ=2*Math.PI*r;
+          return `<td style="text-align:center;padding:8px 4px;">
+            <svg width="80" height="80" viewBox="0 0 80 80" style="display:block;margin:0 auto;">
+              <circle cx="40" cy="40" r="${r}" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="7"/>
+              <circle cx="40" cy="40" r="${r}" fill="none" stroke="${col}" stroke-width="7"
+                stroke-dasharray="${circ*pct} ${circ}" stroke-linecap="round"
+                transform="rotate(-90 40 40)"/>
+              <text x="40" y="38" text-anchor="middle" fill="${col}"
+                font-family="Space Mono,monospace" font-size="15" font-weight="900">${val}</text>
+              <text x="40" y="52" text-anchor="middle" fill="#6b7280"
+                font-family="sans-serif" font-size="9">/${max}</text>
+            </svg>
+            <div style="font-size:10px;font-weight:700;color:${col};margin-top:3px;">${lbl}</div>
+            <div style="font-size:8px;color:#6b7280;">${sub}</div>
+          </td>`;
+        }).join('')}
+      </tr>
     </table>
   </div>
 
-  <div class="card" style="padding:14px;">
-    <div class="label">Score Distribution</div>
-    <table style="border:none;margin:0;background:transparent;">
-      <tr><td style="width:26%;border:none;color:#22c55e;font-weight:800;">Demand</td><td style="width:12%;border:none;" class="mono">${demand}/40</td><td style="border:none;">${bar(demand,40,'#22c55e')}</td></tr>
-      <tr><td style="border:none;color:#60a5fa;font-weight:800;">Timing</td><td style="border:none;" class="mono">${timing}/25</td><td style="border:none;">${bar(timing,25,'#60a5fa')}</td></tr>
-      <tr><td style="border:none;color:#a855f7;font-weight:800;">ICP Fit</td><td style="border:none;" class="mono">${icp}/20</td><td style="border:none;">${bar(icp,20,'#a855f7')}</td></tr>
-      <tr><td style="border:none;color:#f59e0b;font-weight:800;">Data</td><td style="border:none;" class="mono">${data_c}/15</td><td style="border:none;">${bar(data_c,15,'#f59e0b')}</td></tr>
-    </table>
-    <div style="font-family:'Space Mono',monospace;font-size:9px;color:#6b7280;margin-top:8px;">${esc(p2.score_verification || demand + ' + ' + timing + ' + ' + icp + ' + ' + data_c + ' = ' + total)}</div>
+  <!-- Score bar chart -->
+  <div class="card" style="padding:14px;text-align:center;">
+    <span class="label" style="text-align:left;display:block;">Score Distribution</span>
+    <img src="${barChartUrl}" alt="Score Chart"
+         style="width:100%;max-height:160px;display:block;margin:0 auto;border-radius:6px;"
+         onerror="this.style.display='none'"/>
+    <div class="mono" style="font-size:9px;color:#6b7280;margin-top:8px;">${esc(p2.score_verification ||
+      demand+' + '+timing+' + '+icp+' + '+data_c+' = '+total)}</div>
   </div>
 
   ${div}
 
-  <!-- Verdict block -->
-  <div style="border:2px solid ${vc.border};background:${vc.bg};border-radius:12px;padding:18px 20px;margin-bottom:14px;">
-    <div class="mono" style="font-size:30px;font-weight:900;color:${vc.color};margin-bottom:8px;">${vc.label}</div>
-    <div>
-      <div style="font-size:11px;font-weight:700;color:${vc.color};text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">
+  <!-- Verdict block — no flex -->
+  <div style="border:2px solid ${vc.border};background:${vc.bg};
+       border-radius:12px;padding:18px 20px;margin-bottom:12px;">
+    <div style="margin-bottom:10px;">
+      <span class="mono" style="font-size:26px;font-weight:900;color:${vc.color};
+            display:inline-block;margin-right:14px;vertical-align:middle;">${vc.label}</span>
+      <span style="font-size:10px;font-weight:700;color:${vc.color};
+            text-transform:uppercase;letter-spacing:.08em;vertical-align:middle;">
         ${esc(p3.demand_assessment||'—').toUpperCase()} DEMAND · ${esc(p3.icp_assessment||'—').toUpperCase()} ICP FIT
-      </div>
-      <div style="font-size:12px;color:#d1d5db;">${esc(safe(p3.verdict_reasoning,'—'))}</div>
+      </span>
     </div>
+    <div style="font-size:12px;color:#d1d5db;margin-bottom:10px;">${esc(safe(p3.verdict_reasoning,'—'))}</div>
     ${arr(p3.conditions).length ? `
-    <div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.08);">
-      <div style="font-size:10px;font-weight:700;color:#f59e0b;margin-bottom:6px;">CONDITIONS TO SATISFY:</div>
-      ${arr(p3.conditions).map(c=>`<div style="font-size:11px;color:#fbbf24;margin-bottom:3px;">› ${esc(c)}</div>`).join('')}
-    </div>` : ''}
+      <div style="border-top:1px solid rgba(255,255,255,0.08);padding-top:10px;margin-top:4px;">
+        <span style="font-size:10px;font-weight:700;color:#f59e0b;">CONDITIONS: </span>
+        ${arr(p3.conditions).map(c=>`<div style="font-size:11px;color:#fbbf24;margin-top:3px;">› ${esc(c)}</div>`).join('')}
+      </div>` : ''}
   </div>
 
+  <!-- Score basis & what would change — stacked cards, no flex -->
   <div class="card">
-    <div class="label">Score Basis</div>
-    <div class="mono" style="font-size:11px;color:#c4b5fd;">${esc(safe(p3.score_basis,'—'))}</div>
-    <div style="margin-top:10px;font-size:11px;color:#9ca3af;border-top:1px solid rgba(255,255,255,0.06);padding-top:8px;">
-      <strong style="color:#e5e7eb;">What would change this verdict:</strong> ${esc(safe(p3.what_would_change_verdict,'—'))}
+    <span class="label">Score Basis</span>
+    <div class="mono" style="font-size:11px;color:#c4b5fd;margin-bottom:8px;">${esc(safe(p3.score_basis,'—'))}</div>
+    <div style="font-size:11px;color:#9ca3af;border-top:1px solid rgba(255,255,255,0.06);padding-top:8px;">
+      <strong style="color:#e5e7eb;">What would change this: </strong>${esc(safe(p3.what_would_change_verdict,'—'))}
     </div>
   </div>
 
-  <div class="footer">
-    <span>ABE · GTM Strategy Report · ${co}</span>
-    <span>Page 2</span>
-  </div>
+  ${footer('ABE · GTM Strategy Report · '+co, 'Page 1')}
 </div>
 
-<!-- ═══════════════════════════════════════════════
-     PAGE 3 — MARKET RESEARCH & DEMAND SIGNALS
-═══════════════════════════════════════════════ -->
+<!-- ═══════════════════ PAGE 3 — MARKET RESEARCH ════════════════════ -->
 <div class="page">
   ${sectionHeader(1,'Market Research & Insights','Demand signals · Market timing · ICP fit · Data completeness')}
 
-  <div class="label">Market Demand Signals</div>
-  <div class="card" style="padding:14px 16px;">
-    <table style="margin:0;">${signalRows(demandSignals, '#22c55e')}</table>
+  <span class="label">Market Demand Signals</span>
+  <div class="card" style="padding:12px 16px;">
+    ${demandSignals.length ? demandSignals.map(s => {
+      const sc = s.strength==='High'?'#22c55e':s.strength==='Medium'?'#f59e0b':'#6b7280';
+      const tc = s.strength==='High'?'tg':s.strength==='Medium'?'ta':'';
+      return `<div style="padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
+        <span style="display:inline-block;width:7px;height:7px;border-radius:50%;
+              background:${sc};margin-right:8px;vertical-align:middle;"></span>
+        <span style="font-size:11px;color:#e5e7eb;">${esc(s.signal)}</span>
+        <span class="tag ${tc}" style="margin-left:6px;">${esc(s.type||'')}</span>
+        <span style="float:right;font-size:9px;font-weight:700;color:${sc};margin-top:2px;">${esc(s.strength||'')}</span>
+      </div>`;
+    }).join('') : '<div style="color:#6b7280;font-size:11px;">No demand signals extracted.</div>'}
   </div>
 
   ${div}
 
-  <div class="label">Market Timing & Trends</div>
-  <div class="card" style="padding:14px 16px;">
-    <table style="margin:0;">${signalRows(timingSignals, '#60a5fa')}</table>
+  <span class="label">Market Timing & Trends</span>
+  <div class="card" style="padding:12px 16px;">
+    ${timingSignals.length ? timingSignals.map(s => {
+      const sc = s.strength==='High'?'#60a5fa':s.strength==='Medium'?'#f59e0b':'#6b7280';
+      return `<div style="padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
+        <span style="display:inline-block;width:7px;height:7px;border-radius:50%;
+              background:${sc};margin-right:8px;vertical-align:middle;"></span>
+        <span style="font-size:11px;color:#e5e7eb;">${esc(s.signal)}</span>
+        <span class="tag tb" style="margin-left:6px;">${esc(s.category||'')}</span>
+        <span style="float:right;font-size:9px;font-weight:700;color:${sc};margin-top:2px;">${esc(s.strength||'')}</span>
+      </div>`;
+    }).join('') : '<div style="color:#6b7280;font-size:11px;">No market timing signals extracted.</div>'}
   </div>
 
   ${div}
 
-  <!-- ICP Fit + Data side by side (safe 2-col) -->
-  <table>
+  <!-- ICP Fit + Data Completeness — 2-col table -->
+  <table class="dt">
     <tr>
       <th style="width:50%;">ICP Fit Assessment</th>
       <th style="width:50%;">Data Completeness</th>
@@ -3461,129 +3518,141 @@ async function generateProfessionalPDF() {
         ${arr(icpFit.mismatches).filter(m=>m&&m!=='missing data').map(m=>`<div style="font-size:10px;color:#f87171;margin-bottom:3px;">⚠ ${esc(m)}</div>`).join('')}
       </td>
       <td>
-        ${arr(p1.data_completeness?.available).map(a=>`<div style="font-size:10px;color:#4ade80;margin-bottom:3px;">✓ ${esc(a)}</div>`).join('') || '<div style="font-size:10px;color:#6b7280;">No data available fields listed</div>'}
-        <div style="margin-top:8px;">
-          ${arr(p1.data_completeness?.missing).filter(m=>m&&m!=='missing data').map(m=>`<div style="font-size:10px;color:#f87171;margin-bottom:3px;">✗ ${esc(m)}</div>`).join('') || ''}
-        </div>
+        ${arr(p1.data_completeness?.available).map(a=>`<div style="font-size:10px;color:#4ade80;margin-bottom:3px;">✓ ${esc(a)}</div>`).join('') || '<div style="font-size:10px;color:#6b7280;">No available fields listed</div>'}
+        ${arr(p1.data_completeness?.missing).filter(m=>m&&m!=='missing data').map(m=>`<div style="font-size:10px;color:#f87171;margin-bottom:3px;margin-top:2px;">✗ ${esc(m)}</div>`).join('')}
       </td>
     </tr>
   </table>
 
   <div class="card" style="border-left:3px solid #a855f7;">
-    <div class="label">Analyst Insight</div>
+    <span class="label">Analyst Insight</span>
     <div style="font-size:12px;color:#d1d5db;font-style:italic;">"${esc(safe(p1.analyst_insight,'No analyst insight available.'))}"</div>
   </div>
 
-  <div class="footer">
-    <span>ABE · GTM Strategy Report · ${co}</span>
-    <span>Page 3</span>
-  </div>
+  ${footer('ABE · GTM Strategy Report · '+co, 'Page 2')}
 </div>
 
-<!-- ═══════════════════════════════════════════════
-     PAGE 4 — TAM ANALYSIS / SCORING DETAIL
-═══════════════════════════════════════════════ -->
+<!-- ═══════════════════ PAGE 4 — TAM & SCORING ══════════════════════ -->
 <div class="page">
   ${sectionHeader(2,'Market Attractiveness & TAM Analysis','Demand · Timing · ICP Fit · Data Quality scoring')}
 
-  <table>
+  <!-- Score detail table -->
+  <table class="dt">
     <tr>
-      <th>Category</th>
-      <th>Score</th>
-      <th>Max</th>
+      <th style="width:28%;">Category</th>
+      <th style="width:10%;">Score</th>
+      <th style="width:8%;">Max</th>
       <th>Rationale</th>
     </tr>
     ${[
-      ['📈 Demand Signals',   p2.demand_score,           40, '#22c55e'],
-      ['⏱ Market Timing',    p2.market_timing_score,    25, '#60a5fa'],
-      ['🎯 ICP Fit',         p2.icp_fit_score,          20, '#a855f7'],
-      ['📋 Data Completeness',p2.data_completeness_score,15, '#f59e0b'],
+      ['Demand Signals',   p2.demand_score,           40, '#22c55e'],
+      ['Market Timing',    p2.market_timing_score,    25, '#60a5fa'],
+      ['ICP Fit',          p2.icp_fit_score,          20, '#a855f7'],
+      ['Data Completeness',p2.data_completeness_score,15, '#f59e0b'],
     ].map(([label,obj,max,col]) => `
     <tr>
       <td style="font-weight:700;color:${col};">${esc(label)}</td>
-      <td style="font-family:'Space Mono',monospace;font-size:16px;font-weight:900;color:${col};">${obj?.score??0}</td>
+      <td class="mono" style="font-size:18px;font-weight:900;color:${col};">${obj?.score??0}</td>
       <td style="color:#6b7280;">${max}</td>
       <td style="font-size:11px;">${esc(obj?.rationale||'—')}
-        ${obj?.sub_breakdown ? `<div style="margin-top:4px;font-size:9px;font-family:'Space Mono',monospace;color:#a855f7;">${esc(obj.sub_breakdown)}</div>` : ''}
+        ${obj?.sub_breakdown?`<div style="margin-top:4px;font-size:9px;font-family:'Space Mono',monospace;color:#a855f7;">${esc(obj.sub_breakdown)}</div>`:''}
       </td>
     </tr>`).join('')}
     <tr style="border-top:2px solid rgba(168,85,247,0.4);">
       <td style="font-weight:900;color:${vc.color};font-size:13px;">TOTAL</td>
-      <td style="font-family:'Space Mono',monospace;font-size:22px;font-weight:900;color:${vc.color};" colspan="2">${total}/100</td>
-      <td style="font-family:'Space Mono',monospace;font-size:10px;color:#a855f7;">${esc(p2.score_verification||'—')}</td>
+      <td class="mono" style="font-size:24px;font-weight:900;color:${vc.color};" colspan="2">${total}/100</td>
+      <td class="mono" style="font-size:10px;color:#a855f7;">${esc(p2.score_verification||'—')}</td>
     </tr>
   </table>
 
-  ${div}
-
-  <!-- Analyst insights from scoring -->
   <div class="card" style="border-left:3px solid #60a5fa;">
-    <div class="label">Scoring Analyst Note</div>
+    <span class="label">Scoring Analyst Note</span>
     <div style="font-size:12px;color:#d1d5db;font-style:italic;">"${esc(safe(p2.analyst_insight,'—'))}"</div>
   </div>
 
   ${div}
 
-  ${subHeader(3,'GTM Recommendation','Score-based qualification decision')}
+  ${sectionHeader(3,'GTM Recommendation','Score-based qualification decision')}
 
-  <div style="border:2px solid ${vc.border};background:${vc.bg};border-radius:12px;padding:20px 22px;margin-bottom:14px;">
-    <div class="mono" style="font-size:32px;font-weight:900;color:${vc.color};margin-bottom:6px;">${vc.label}</div>
-    <div style="font-size:10px;font-weight:700;color:${vc.color};letter-spacing:.1em;margin-bottom:4px;">TOTAL SCORE: ${total}/100</div>
-    <div style="font-size:12px;color:#d1d5db;margin-bottom:14px;">${esc(safe(p3.verdict_reasoning,'Verdict based on signal scoring across all four dimensions.'))}</div>
-    <div>
-      <div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:14px;">
-        <div style="font-size:9px;font-weight:700;color:#9ca3af;margin-bottom:6px;">DEMAND ASSESSMENT</div>
-        <div style="font-size:13px;font-weight:800;color:${p3.demand_assessment==='strong'?'#22c55e':p3.demand_assessment==='partial'?'#f59e0b':'#ef4444'};">${esc((p3.demand_assessment||'—').toUpperCase())}</div>
-      </div>
-      <div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:14px;margin-top:10px;">
-        <div style="font-size:9px;font-weight:700;color:#9ca3af;margin-bottom:6px;">ICP ASSESSMENT</div>
-        <div style="font-size:13px;font-weight:800;color:${p3.icp_assessment==='strong'?'#22c55e':p3.icp_assessment==='partial'?'#f59e0b':'#ef4444'};">${esc((p3.icp_assessment||'—').toUpperCase())}</div>
-      </div>
-      <div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:14px;margin-top:10px;">
-        <div style="font-size:9px;font-weight:700;color:#9ca3af;margin-bottom:6px;">SCORE BASIS</div>
-        <div style="font-size:10px;font-family:'Space Mono',monospace;color:#c4b5fd;">${esc(safe(p3.score_basis,'—'))}</div>
-      </div>
+  <div style="border:2px solid ${vc.border};background:${vc.bg};
+       border-radius:12px;padding:18px 20px;margin-bottom:12px;">
+    <!-- Verdict label + score — stacked, no flex -->
+    <div style="margin-bottom:12px;">
+      <span class="mono" style="font-size:28px;font-weight:900;color:${vc.color};
+            vertical-align:middle;margin-right:12px;">${vc.label}</span>
+      <span style="font-size:11px;font-weight:700;color:${vc.color};vertical-align:middle;">
+        TOTAL: ${total}/100
+      </span>
     </div>
+    <div style="font-size:12px;color:#d1d5db;margin-bottom:14px;">
+      ${esc(safe(p3.verdict_reasoning,'Verdict based on signal scoring across all four dimensions.'))}
+    </div>
+    <!-- Assessment cells — 3-col table, no flex -->
+    <table class="ut" style="width:100%;table-layout:fixed;">
+      <tr>
+        <td style="padding:0 4px 0 0;">
+          <div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:10px 12px;">
+            <div style="font-size:9px;font-weight:700;color:#9ca3af;margin-bottom:3px;">DEMAND ASSESSMENT</div>
+            <div style="font-size:13px;font-weight:800;color:${p3.demand_assessment==='strong'?'#22c55e':p3.demand_assessment==='partial'?'#f59e0b':'#ef4444'};">
+              ${esc((p3.demand_assessment||'—').toUpperCase())}
+            </div>
+          </div>
+        </td>
+        <td style="padding:0 4px;">
+          <div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:10px 12px;">
+            <div style="font-size:9px;font-weight:700;color:#9ca3af;margin-bottom:3px;">ICP ASSESSMENT</div>
+            <div style="font-size:13px;font-weight:800;color:${p3.icp_assessment==='strong'?'#22c55e':p3.icp_assessment==='partial'?'#f59e0b':'#ef4444'};">
+              ${esc((p3.icp_assessment||'—').toUpperCase())}
+            </div>
+          </div>
+        </td>
+        <td style="padding:0 0 0 4px;">
+          <div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:10px 12px;">
+            <div style="font-size:9px;font-weight:700;color:#9ca3af;margin-bottom:3px;">SCORE BASIS</div>
+            <div class="mono" style="font-size:9px;color:#c4b5fd;word-break:break-word;">
+              ${esc(safe(p3.score_basis,'—'))}
+            </div>
+          </div>
+        </td>
+      </tr>
+    </table>
   </div>
 
-  <div class="footer">
-    <span>ABE · GTM Strategy Report · ${co}</span>
-    <span>Page 4</span>
-  </div>
+  ${footer('ABE · GTM Strategy Report · '+co, 'Page 3')}
 </div>
 
-<!-- ═══════════════════════════════════════════════
-     PAGE 5 — GTM STRATEGY / DEAL LENS
-═══════════════════════════════════════════════ -->
+<!-- ═══════════════════ PAGE 5 — GTM STRATEGY ═══════════════════════ -->
 <div class="page">
   ${sectionHeader(4,'Target Accounts & GTM Strategy','ICP · Roles · Deal sizing · Sales approach')}
 
-  <div class="card">
-    <div class="label">Target Roles</div>
-    ${arr(p4.target_roles).map(r=>`<span class="tag tag-purple">${esc(r)}</span>`).join('') || '<div style="color:#6b7280;font-size:11px;">No target roles specified.</div>'}
-  </div>
+  <!-- Roles / Angle / Approach — 3-col table -->
+  <table class="dt">
+    <tr>
+      <th style="width:40%;">Target Roles</th>
+      <th style="width:30%;">Solution Angle</th>
+      <th style="width:30%;">Sales Approach</th>
+    </tr>
+    <tr>
+      <td>${arr(p4.target_roles).map(r=>`<span class="tag tp">${esc(r)}</span>`).join('') || '—'}</td>
+      <td style="font-weight:800;color:#a855f7;text-transform:uppercase;font-size:13px;">
+        ${esc(safe(p4.solution_angle,'—'))}</td>
+      <td style="font-weight:800;color:#60a5fa;text-transform:uppercase;font-size:13px;">
+        ${esc(safe(p4.sales_approach,'—'))}</td>
+    </tr>
+  </table>
 
   <div class="card">
-    <div class="label">Solution Angle</div>
-    <div style="font-size:13px;color:#e5e7eb;line-height:1.7;">${esc(safe(p4.solution_angle,'—'))}</div>
-  </div>
-
-  <div class="card">
-    <div class="label">Sales Approach</div>
-    <div style="font-size:13px;color:#e5e7eb;line-height:1.7;">${esc(safe(p4.sales_approach,'—'))}</div>
-  </div>
-
-  <div class="card">
-    <div class="label">Core Problem (Signal-Backed)</div>
-    <div style="font-size:13px;color:#e5e7eb;line-height:1.7;">${esc(safe(p4.core_problem,'—'))}</div>
+    <span class="label">Core Problem (Signal-Backed)</span>
+    <div style="font-size:12px;color:#e5e7eb;line-height:1.7;">${esc(safe(p4.core_problem,'—'))}</div>
   </div>
 
   <div class="card" style="border-left:3px solid #a855f7;">
-    <div class="label">Solution Pitch</div>
-    <div style="font-size:13px;color:#d1d5db;line-height:1.7;font-style:italic;">${esc(safe(p4.solution_pitch,'—'))}</div>
+    <span class="label">Solution Pitch</span>
+    <div style="font-size:12px;color:#d1d5db;line-height:1.7;font-style:italic;">${esc(safe(p4.solution_pitch,'—'))}</div>
   </div>
 
-  <table>
+  <!-- Why now / Deal size — 2-col table -->
+  <table class="dt">
     <tr>
       <th style="width:50%;">Why Now</th>
       <th style="width:50%;">Estimated Deal Size</th>
@@ -3591,49 +3660,43 @@ async function generateProfessionalPDF() {
     <tr>
       <td style="font-size:12px;">${esc(safe(p4.why_now,'—'))}</td>
       <td>
-        <div style="font-size:20px;font-weight:900;color:#22c55e;font-family:'Space Mono',monospace;">${esc(safe(p4.estimated_deal_size?.range,'—'))}</div>
-        ${p4.estimated_deal_size?.is_estimate ? '<div style="font-size:9px;color:#6b7280;">(Estimate)</div>' : ''}
+        <div class="mono" style="font-size:20px;font-weight:900;color:#22c55e;">${esc(safe(p4.estimated_deal_size?.range,'—'))}</div>
+        ${p4.estimated_deal_size?.is_estimate?'<div style="font-size:9px;color:#6b7280;">(Estimate)</div>':''}
         <div style="font-size:10px;color:#9ca3af;margin-top:4px;">${esc(safe(p4.estimated_deal_size?.basis,''))}</div>
       </td>
     </tr>
   </table>
 
-  ${p4.approach_rationale ? `<div class="card"><div class="label">Approach Rationale</div><div style="font-size:12px;color:#d1d5db;">${esc(p4.approach_rationale)}</div></div>` : ''}
+  ${p4.approach_rationale?`<div class="card"><span class="label">Approach Rationale</span>
+    <div style="font-size:12px;color:#d1d5db;">${esc(p4.approach_rationale)}</div></div>`:''}
 
   ${div}
 
-  <!-- SWOT Analysis -->
-  <div style="margin-bottom:8px;">
-    <div class="label" style="font-size:11px;">SWOT Analysis — Derived from Market Signals</div>
-  </div>
-  <table>
+  <!-- SWOT — 2x2 table -->
+  <span class="label" style="font-size:10px;">SWOT Analysis — Derived from Market Signals</span>
+  <table class="dt">
     <tr>
-      <th style="background:rgba(34,197,94,0.1);color:#4ade80;border-bottom-color:#22c55e;width:50%;">💪 Strengths</th>
-      <th style="background:rgba(239,68,68,0.1);color:#f87171;border-bottom-color:#ef4444;width:50%;">⚠ Weaknesses</th>
+      <th style="width:50%;background:rgba(34,197,94,0.08);color:#4ade80;border-bottom-color:#22c55e45;">Strengths</th>
+      <th style="width:50%;background:rgba(239,68,68,0.08);color:#f87171;border-bottom-color:#ef444445;">Weaknesses</th>
     </tr>
     <tr>
-      <td style="vertical-align:top;">${swotRow(swotS.length ? swotS : ['Strong demand signal presence','Clear ICP target identified'])}</td>
-      <td style="vertical-align:top;">${swotRow(swotW.length ? swotW : ['Data completeness gaps noted','Validation still required'])}</td>
+      <td>${swotRow(swotS.length?swotS:['Strong demand signal presence','Clear ICP target identified'])}</td>
+      <td>${swotRow(swotW.length?swotW:['Data completeness gaps noted','Validation still required'])}</td>
     </tr>
     <tr>
-      <th style="background:rgba(96,165,250,0.1);color:#60a5fa;border-bottom-color:#3b82f6;border-top:1px solid rgba(255,255,255,0.06);">🚀 Opportunities</th>
-      <th style="background:rgba(245,158,11,0.1);color:#fbbf24;border-bottom-color:#f59e0b;border-top:1px solid rgba(255,255,255,0.06);">🔴 Threats</th>
+      <th style="background:rgba(96,165,250,0.08);color:#60a5fa;border-top:1px solid rgba(255,255,255,0.06);border-bottom-color:#3b82f645;">Opportunities</th>
+      <th style="background:rgba(245,158,11,0.08);color:#fbbf24;border-top:1px solid rgba(255,255,255,0.06);border-bottom-color:#f59e0b45;">Threats</th>
     </tr>
     <tr>
-      <td style="vertical-align:top;">${swotRow(swotO.length ? swotO : ['Favourable market timing signals','Growing demand in target segment'])}</td>
-      <td style="vertical-align:top;">${swotRow(swotT.length ? swotT : ['Execution risks identified','Competitive pressure possible'])}</td>
+      <td>${swotRow(swotO.length?swotO:['Favourable market timing signals','Growing demand in target segment'])}</td>
+      <td>${swotRow(swotT.length?swotT:['Execution risks identified','Competitive pressure possible'])}</td>
     </tr>
   </table>
 
-  <div class="footer">
-    <span>ABE · GTM Strategy Report · ${co}</span>
-    <span>Page 5</span>
-  </div>
+  ${footer('ABE · GTM Strategy Report · '+co, 'Page 4')}
 </div>
 
-<!-- ═══════════════════════════════════════════════
-     PAGE 6 — EXECUTION RISKS + CONFIDENCE
-═══════════════════════════════════════════════ -->
+<!-- ═══════════════════ PAGE 6 — RISKS & CONFIDENCE ════════════════ -->
 <div class="page">
   ${sectionHeader(5,'Execution Risks & Considerations','Derived from missing and weak signals only')}
 
@@ -3641,187 +3704,221 @@ async function generateProfessionalPDF() {
 
   ${div}
 
+  <!-- Confidence — stacked block, no flex sidebar -->
   <div class="card">
-    <div class="label">Confidence</div>
-    <div class="mono" style="font-size:30px;font-weight:900;color:${confScore>=70?'#22c55e':confScore>=45?'#f59e0b':'#ef4444'};margin-bottom:6px;">${confScore}/100</div>
-    ${bar(confScore,100,confScore>=70?'#22c55e':confScore>=45?'#f59e0b':'#ef4444')}
-    <div style="font-size:12px;color:#d1d5db;margin-top:12px;margin-bottom:12px;">${esc(safe(p5.confidence_reasoning,'Confidence derived from data completeness and signal strength.'))}</div>
-    <div class="label">Validation Required</div>
-    ${arr(p5.validation_needed).map(v=>`<span class="tag tag-blue" style="margin-bottom:4px;">${esc(v)}</span>`).join('') || '<span style="color:#6b7280;font-size:11px;">None specified</span>'}
+    <table class="ut" style="width:100%;table-layout:fixed;">
+      <tr>
+        <!-- Gauge cell — fixed width -->
+        <td style="width:130px;text-align:center;vertical-align:top;padding-right:16px;">
+          <img src="${gaugeUrl}" alt="Confidence Gauge"
+               style="width:110px;height:110px;display:block;margin:0 auto;"
+               onerror="this.style.display='none'"/>
+          <div class="mono" style="font-size:26px;font-weight:900;
+               color:${confScore>=70?'#22c55e':confScore>=45?'#f59e0b':'#ef4444'};
+               margin-top:4px;">${confScore}</div>
+          <div style="font-size:9px;color:#6b7280;">Confidence / 100</div>
+        </td>
+        <!-- Text cell — takes remaining width -->
+        <td style="vertical-align:top;">
+          <span class="label">Confidence Reasoning</span>
+          <div style="font-size:12px;color:#d1d5db;margin-bottom:12px;">
+            ${esc(safe(p5.confidence_reasoning,'Confidence derived from data completeness and signal strength.'))}
+          </div>
+          <span class="label">Validation Required</span>
+          <div>
+            ${arr(p5.validation_needed).map(v=>`<span class="tag tb" style="margin-bottom:4px;">${esc(v)}</span>`).join('') || '<span style="color:#6b7280;font-size:11px;">None specified</span>'}
+          </div>
+        </td>
+      </tr>
+    </table>
   </div>
-
-  ${div}
 
   <div class="card" style="border-left:3px solid #ef4444;">
-    <div class="label">Risk Analyst Note</div>
-    <div style="font-size:12px;color:#d1d5db;font-style:italic;">"${esc(safe(p5.analyst_insight,'No specific analyst note available.'))}"</div>
+    <span class="label">Risk Analyst Note</span>
+    <div style="font-size:12px;color:#d1d5db;font-style:italic;">
+      "${esc(safe(p5.analyst_insight,'No specific analyst note available.'))}"
+    </div>
   </div>
 
-  <div class="footer">
-    <span>ABE · GTM Strategy Report · ${co}</span>
-    <span>Page 6</span>
-  </div>
+  ${footer('ABE · GTM Strategy Report · '+co, 'Page 5')}
 </div>
 
-<!-- ═══════════════════════════════════════════════
-     PAGE 7 — FINAL OUTPUT / ACTION PLAN
-═══════════════════════════════════════════════ -->
+<!-- ═══════════════════ PAGE 7 — ACTION PLAN ═══════════════════════ -->
 <div class="page">
   ${sectionHeader(6,'GTM Summary & Action Plan','Complete synthesised strategy output')}
 
-  <!-- Signal highlights -->
-  <div class="label">Top Market Signals</div>
-  <div class="card" style="padding:14px 16px;margin-bottom:14px;">
-    <table style="margin:0;">${arr(p6.signal_highlights).length ? arr(p6.signal_highlights).map(s => {
-      const t = s.type?.toLowerCase();
-      const cls = t==='demand' ? 'tag-green' : t==='timing' ? 'tag-blue' : 'tag-purple';
-      return `<tr>
-        <td style="width:22%;"><span class="tag ${cls}">${esc(s.type||'')}</span></td>
-        <td style="width:18%;"><span class="tag ${s.strength==='High'?'tag-green':s.strength==='Medium'?'tag-amber':''}">${esc(s.strength||'')}</span></td>
-        <td style="font-size:12px;color:#e5e7eb;">${esc(s.signal||'')}</td>
-      </tr>`;
-    }).join('') : '<tr><td style="color:#6b7280;font-size:11px;">Run all phases to populate signal highlights.</td></tr>'}</table>
+  <!-- Signal highlights — block rows, no flex -->
+  <span class="label">Top Market Signals</span>
+  <div class="card" style="padding:12px 16px;margin-bottom:12px;">
+    ${arr(p6.signal_highlights).map(s => {
+      const t = (s.type||'').toLowerCase();
+      const tc = t==='demand'?'tg':t==='timing'?'tb':'tp';
+      const sc = s.strength==='High'?'tg':s.strength==='Medium'?'ta':'';
+      return `<div style="padding:7px 0;border-bottom:1px solid rgba(255,255,255,0.04);">
+        <span class="tag ${tc}">${esc(s.type||'')}</span>
+        <span class="tag ${sc}" style="margin-right:6px;">${esc(s.strength||'')}</span>
+        <span style="font-size:12px;color:#e5e7eb;">${esc(s.signal||'')}</span>
+      </div>`;
+    }).join('') || '<div style="color:#6b7280;font-size:11px;">Run all phases to populate signal highlights.</div>'}
   </div>
 
   ${div}
 
   <div class="card">
-    <div class="label">GTM Strategy Summary</div>
+    <span class="label">GTM Strategy Summary</span>
     <div style="font-size:12px;color:#d1d5db;line-height:1.75;">${esc(safe(p6.deal_lens_summary,'—'))}</div>
   </div>
 
   <div class="card">
-    <div class="label">Risk Summary</div>
+    <span class="label">Risk Summary</span>
     <div style="font-size:12px;color:#d1d5db;line-height:1.75;">${esc(safe(p6.risks_summary,'—'))}</div>
   </div>
 
   <div class="card">
-    <div class="label">Confidence Note</div>
+    <span class="label">Confidence Note</span>
     <div style="font-size:12px;color:#d1d5db;">${esc(safe(p6.confidence_note,'—'))}</div>
   </div>
 
   ${div}
 
   <!-- Next action callout -->
-  <div style="background:linear-gradient(135deg,rgba(168,85,247,0.15),rgba(124,58,237,0.1));border:1px solid rgba(168,85,247,0.3);border-radius:12px;padding:20px 22px;">
-    <div style="font-size:9px;font-weight:700;color:#a855f7;letter-spacing:.15em;text-transform:uppercase;margin-bottom:8px;">Recommended Next Action</div>
-    <div style="font-size:15px;font-weight:700;color:white;line-height:1.6;">→ ${esc(safe(p6.recommended_next_action, s7?.next_steps?.[0] || 'Complete all 6 phases to generate a recommended next action.'))}</div>
+  <div style="background:linear-gradient(135deg,rgba(168,85,247,0.15),rgba(124,58,237,0.08));
+       border:1px solid rgba(168,85,247,0.3);border-radius:12px;padding:20px 22px;">
+    <span class="label" style="font-size:10px;letter-spacing:.18em;">Recommended Next Action</span>
+    <div style="font-size:14px;font-weight:700;color:white;line-height:1.6;">
+      → ${esc(safe(p6.recommended_next_action, s7?.next_steps?.[0] || 'Complete all 6 phases to generate a recommended next action.'))}
+    </div>
   </div>
 
-  ${s7?.strategic_hook ? `
-  ${div}
+  ${s7?.strategic_hook ? `${div}
   <div class="card" style="border-left:3px solid #22c55e;">
-    <div class="label">Revenue Intelligence — Strategic Hook (Step 7)</div>
+    <span class="label">Revenue Intelligence — Strategic Hook (Step 7)</span>
     <div style="font-size:12px;color:#4ade80;font-style:italic;">"${esc(s7.strategic_hook)}"</div>
-    ${s7.why_now ? `<div style="font-size:11px;color:#9ca3af;margin-top:8px;">Why now: ${esc(s7.why_now)}</div>` : ''}
+    ${s7.why_now?`<div style="font-size:11px;color:#9ca3af;margin-top:8px;">Why now: ${esc(s7.why_now)}</div>`:''}
   </div>` : ''}
 
-  <!-- Final score summary bar -->
+  <!-- Final score bar — table, no flex -->
   <div style="margin-top:16px;background:rgba(0,0,0,0.4);border-radius:10px;padding:14px 16px;">
-    <div class="mono" style="font-size:36px;font-weight:900;color:${vc.color};">${total}</div>
-    ${bar(total,100,vc.color)}
-    <div style="font-size:10px;color:#9ca3af;margin-top:6px;">GTM Score · ${vc.label} · Confidence ${confScore}/100</div>
-    <div class="mono" style="font-size:18px;font-weight:900;color:${vc.color};margin-top:8px;">${vc.label}</div>
+    <table class="ut" style="width:100%;table-layout:fixed;">
+      <tr>
+        <td style="width:70px;vertical-align:middle;">
+          <div class="mono" style="font-size:34px;font-weight:900;color:${vc.color};">${total}</div>
+        </td>
+        <td style="vertical-align:middle;padding:0 16px;">
+          <div style="height:6px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden;margin-bottom:6px;">
+            <div style="height:100%;width:${total}%;background:${vc.color};border-radius:3px;"></div>
+          </div>
+          <div style="font-size:10px;color:#9ca3af;">GTM Score · ${vc.label} · Confidence ${confScore}/100</div>
+        </td>
+        <td style="width:140px;text-align:right;vertical-align:middle;">
+          <div class="mono" style="font-size:${vc.label.length>2?'14':'18'}px;font-weight:900;color:${vc.color};">${vc.label}</div>
+        </td>
+      </tr>
+    </table>
   </div>
 
-  <div class="footer">
-    <span>ABE · GTM Strategy Report · ${co} · ${dateStr}</span>
-    <span>Page 7 · CONFIDENTIAL</span>
-  </div>
+  ${footer('ABE · GTM Strategy Report · '+co+' · '+dateStr, 'Page 6 · CONFIDENTIAL')}
 </div>
 
 </body></html>`;
 
-  /* ── Render to PDF ─────────────────────────────────────────── */
+  /* ── Render to PDF via sandboxed iframe ─────────────────────────
+   *
+   * WHY IFRAME:
+   * All previous approaches (position:absolute, position:fixed,
+   * left:-2000px, onclone, windowWidth) still append the container
+   * to document.body — which means the app's own CSS (sidebar flex
+   * layout, dark grid styles, width constraints) is inherited by the
+   * captured element through the cascade.
+   *
+   * An <iframe> with srcdoc is a completely separate browsing context.
+   * It has its own document, its own style scope, zero inherited CSS
+   * from the parent page. This is the only guaranteed way to ensure
+   * the PDF HTML renders exactly as written with no bleed-in.
+   * ─────────────────────────────────────────────────────────────── */
 
-  // A4 in pixels at 96 dpi — must be consistent everywhere
   const A4W = 794;
   const A4H = 1123;
 
-  // Keep the render DOM at a real A4 origin. Negative left offsets can
-  // introduce a blank capture gutter when html2canvas is also given x:0.
-  const container = document.createElement('div');
-  container.style.cssText = [
-    'position:absolute',
-    'top:0',
-    'left:0',
-    `width:${A4W}px`,
-    'background:#0d1120',
-    'overflow:visible',
-    'pointer-events:none',
-    'z-index:-9999',
-  ].join(';');
-  container.innerHTML = html;
-  document.body.appendChild(container);
+  // Create an off-screen iframe — not fixed, not absolute in body,
+  // physically outside the viewport via negative margin on a wrapper
+  const wrapper = document.createElement('div');
+  wrapper.style.cssText = 'position:fixed;top:0;left:-9999px;width:0;height:0;overflow:hidden;';
+  document.body.appendChild(wrapper);
 
-  // Force every .page to exact A4 pixel dimensions so html2canvas
-  // captures a consistent frame — no scrollHeight variance, no overflow
-  container.querySelectorAll('.page').forEach(p => {
-    p.style.width       = A4W + 'px';
-    p.style.height      = A4H + 'px';
-    p.style.minHeight   = A4H + 'px';
-    p.style.maxHeight   = A4H + 'px';
-    p.style.overflow    = 'hidden';
-    p.style.boxSizing   = 'border-box';
-    p.style.pageBreakAfter = 'always';
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = `width:${A4W}px;height:${A4H}px;border:none;background:#0d1120;`;
+  iframe.setAttribute('scrolling', 'no');
+  wrapper.appendChild(iframe);
+
+  // Write the full self-contained HTML into the iframe's own document.
+  // srcdoc would work but writeHTML via document.open() is more reliable
+  // across Chromium versions for large HTML strings.
+  iframe.contentDocument.open();
+  iframe.contentDocument.write(html);
+  iframe.contentDocument.close();
+
+  const iframeDoc  = iframe.contentDocument;
+  const iframeWin  = iframe.contentWindow;
+
+  // Fix every .page to exact A4 px inside the iframe document
+  Array.from(iframeDoc.querySelectorAll('.page')).forEach(p => {
+    p.style.width     = A4W + 'px';
+    p.style.height    = A4H + 'px';
+    p.style.minHeight = A4H + 'px';
+    p.style.maxHeight = A4H + 'px';
+    p.style.overflow  = 'hidden';
+    p.style.boxSizing = 'border-box';
   });
 
-  // 1. Two rAF ticks — lets the browser finish layout/paint
+  // 1. Let the iframe's own layout engine finish two paint cycles
   await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
-  // 2. Wait for document fonts (Inter, Space Mono from Google Fonts)
-  try { await document.fonts.ready; } catch (_) {}
+  // 2. Wait for fonts inside the iframe
+  try { await iframeDoc.fonts.ready; } catch (_) {}
 
-  // 3. Wait for every <img> in the container (QuickChart, gauges, etc.)
-  const imgEls = Array.from(container.querySelectorAll('img'));
-  await Promise.all(imgEls.map(img =>
+  // 3. Wait for all images inside the iframe (QuickChart, gauge, etc.)
+  const iframeImgs = Array.from(iframeDoc.querySelectorAll('img'));
+  await Promise.all(iframeImgs.map(img =>
     img.complete
       ? Promise.resolve()
       : new Promise(r => { img.onload = r; img.onerror = r; })
   ));
 
-  // 4. Small final buffer for any CSS transitions / repaints
-  await new Promise(r => setTimeout(r, 600));
+  // 4. Final settle buffer
+  await new Promise(r => setTimeout(r, 800));
 
   try {
     const { jsPDF } = window.jspdf;
     const pdf   = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const pages = Array.from(container.querySelectorAll('.page'));
+    const pages = Array.from(iframeDoc.querySelectorAll('.page'));
 
     for (let i = 0; i < pages.length; i++) {
+      // Resize iframe to exactly this page before capture so html2canvas
+      // sees a clean A4 viewport with no scrollbars or overflow
+      iframe.style.width  = A4W + 'px';
+      iframe.style.height = A4H + 'px';
+
       const canvas = await html2canvas(pages[i], {
-        scale:           2,          // 2× for retina-quality sharpness
+        // Target the iframe's own window so html2canvas measures layout
+        // against the iframe document, NOT the parent app document
+        windowWidth:     A4W,
+        windowHeight:    A4H,
+        width:           A4W,
+        height:          A4H,
+        scale:           2,
         useCORS:         true,
         allowTaint:      true,
         logging:         false,
         backgroundColor: '#0d1120',
-        width:           A4W,
-        height:          A4H,
-        windowWidth:     A4W,        // Prevents viewport-relative layout
-        windowHeight:    A4H,
         scrollX:         0,
         scrollY:         0,
         x:               0,
         y:               0,
-        onclone(clonedDoc) {
-          // Re-apply exact dimensions in the cloned document so any
-          // inherited styles from the live page can't bleed in
-          clonedDoc.querySelectorAll('.page').forEach(p => {
-            p.style.width     = A4W + 'px';
-            p.style.height    = A4H + 'px';
-            p.style.minHeight = A4H + 'px';
-            p.style.overflow  = 'hidden';
-          });
-          // Ensure body background matches
-          clonedDoc.body.style.background = '#0d1120';
-          clonedDoc.body.style.margin     = '0';
-          clonedDoc.body.style.padding    = '0';
-        },
       });
 
       const imgData = canvas.toDataURL('image/jpeg', 0.94);
       if (i > 0) pdf.addPage();
-      // Always fill the full A4 page — no aspect-ratio guessing
       pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
     }
 
@@ -3832,7 +3929,8 @@ async function generateProfessionalPDF() {
     showToast('PDF generation failed: ' + e.message, 'error');
     console.error(e);
   } finally {
-    document.body.removeChild(container);
+    // Always clean up the iframe wrapper
+    document.body.removeChild(wrapper);
   }
 }
 
