@@ -2765,26 +2765,39 @@ function renderStep4(d) {
     (d.approach_rationale ? `<br><span style="font-size:10px;color:var(--muted);">${escHtml(d.approach_rationale)}</span>` : '');
 }
 
+function ensureArray(value) {
+  if (Array.isArray(value)) return value;
+  if (value === null || value === undefined) return [];
+  if (typeof value === 'string') return [value];
+  if (typeof value === 'object') return [value];
+  return [String(value)];
+}
+
+function ensureObject(value) {
+  return value && typeof value === 'object' ? value : {};
+}
+
 function renderStep5(d) {
   // Step 5: Execution Risks & Considerations
   const risksEl = document.getElementById('oc-key-risks');
   risksEl.innerHTML = '';
-  (d.key_risks || []).forEach(r => {
+  const keyRisks = ensureArray(d.key_risks);
+  keyRisks.forEach(r => {
     const impactColors = { high:'#ef4444', medium:'#f59e0b', low:'#9ca3af' };
-    const impactColor = impactColors[(r.impact||'').toLowerCase()] || '#9ca3af';
+    const impactColor = impactColors[(r?.impact||'').toLowerCase()] || '#9ca3af';
     const div = document.createElement('div');
     div.style.cssText = `background:rgba(239,68,68,0.05);border:1px solid rgba(239,68,68,0.15);border-radius:8px;padding:12px 14px;margin-bottom:8px;`;
     div.innerHTML = `
       <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-        <span style="font-size:10px;font-weight:800;color:${impactColor};">⚠ ${(r.impact||'').toUpperCase()} IMPACT</span>
-        <span style="font-size:9px;color:var(--muted);">Source: ${escHtml(r.source||'unknown')}</span>
+        <span style="font-size:10px;font-weight:800;color:${impactColor};">⚠ ${(r?.impact||'').toUpperCase()} IMPACT</span>
+        <span style="font-size:9px;color:var(--muted);">Source: ${escHtml(r?.source||'unknown')}</span>
       </div>
-      <div style="font-size:12px;color:#e5e7eb;margin-bottom:6px;">${escHtml(r.risk||'')}</div>
-      ${r.mitigation ? `<div style="font-size:10px;color:var(--green);">→ Mitigation: ${escHtml(r.mitigation)}</div>` : ''}
+      <div style="font-size:12px;color:#e5e7eb;margin-bottom:6px;">${escHtml(r?.risk||'')}</div>
+      ${r?.mitigation ? `<div style="font-size:10px;color:var(--green);">→ Mitigation: ${escHtml(r.mitigation)}</div>` : ''}
     `;
     risksEl.appendChild(div);
   });
-  if (!d.key_risks?.length) risksEl.innerHTML = '<span style="color:var(--muted);font-size:11px;">No major risks identified</span>';
+  if (!keyRisks.length) risksEl.innerHTML = '<span style="color:var(--muted);font-size:11px;">No major risks identified</span>';
 
   const score = d.confidence_score ?? 0;
   const confColor = score >= 70 ? '#22c55e' : score >= 45 ? '#f59e0b' : '#ef4444';
@@ -2804,7 +2817,8 @@ function renderStep5(d) {
 
   const valEl = document.getElementById('oc-validation');
   valEl.innerHTML = '';
-  (d.validation_needed || []).forEach(v => {
+  const validationItems = ensureArray(d.validation_needed);
+  validationItems.forEach(v => {
     const el = document.createElement('div');
     el.className = 'tag tag-blue';
     el.textContent = v;
@@ -2816,15 +2830,19 @@ function renderStep6(d) {
   // Step 6: GTM Summary & Action Plan
   const highlightsEl = document.getElementById('oc-signal-highlights');
   highlightsEl.innerHTML = '';
-  (d.signal_highlights || []).forEach(s => {
+  const signalHighlights = ensureArray(d.signal_highlights);
+  signalHighlights.forEach(s => {
+    const signalObj = ensureObject(s);
     const typeColors = { demand:'tag-green', timing:'tag-blue', icp:'tag-accent' };
     const el = document.createElement('div');
-    el.className = `tag ${typeColors[(s.type||'').toLowerCase()] || ''}`;
-    el.textContent = `[${s.type||'?'}/${s.strength||'?'}] ${s.signal}`;
+    el.className = `tag ${typeColors[(signalObj.type||'').toLowerCase()] || ''}`;
+    el.textContent = `[${signalObj.type||'?'}/${signalObj.strength||'?'}] ${signalObj.signal||signalObj.description||signalObj.signal_description||'No signal text'}`;
     highlightsEl.appendChild(el);
   });
 
-  const sb = d.score_breakdown || {};
+  const sb = typeof d.score_breakdown === 'object' && d.score_breakdown !== null
+    ? d.score_breakdown
+    : { verification: d.score_breakdown ? String(d.score_breakdown) : '' };
   const total = sb.total ?? 0;
   const totalColor = total >= 70 ? '#22c55e' : total >= 55 ? '#f59e0b' : '#ef4444';
   document.getElementById('oc-score-breakdown').innerHTML =
@@ -4002,6 +4020,18 @@ function onWebsiteInput() {
   const val = document.getElementById('website-input').value.trim();
   state.websiteUrl = val;
   clearTimeout(_websiteDebounce);
+  if (state.demoMode) {
+    const statusDiv = document.getElementById('website-status');
+    const statusTxt = document.getElementById('website-status-text');
+    const statusDot = document.getElementById('website-status-dot');
+    statusDiv.style.display = 'flex';
+    statusTxt.textContent = 'Demo Mode active — website extraction skipped. No live data used.';
+    statusDot.style.background = 'var(--green)';
+    statusDiv.style.borderColor = 'rgba(34,197,94,0.3)';
+    statusDiv.style.color = '#86efac';
+    state.websiteProfile = null;
+    return;
+  }
   if (val.length > 5) {
     _websiteDebounce = setTimeout(() => extractWebsite(val), 1200);
   }
@@ -4016,6 +4046,16 @@ async function extractWebsite(url) {
   const statusDiv = document.getElementById('website-status');
   const statusTxt = document.getElementById('website-status-text');
   const statusDot = document.getElementById('website-status-dot');
+
+  if (state.demoMode) {
+    statusDiv.style.display = 'flex';
+    statusTxt.textContent = 'Demo Mode active — website extraction skipped. No live data used.';
+    statusDot.style.background = 'var(--green)';
+    statusDiv.style.borderColor = 'rgba(34,197,94,0.3)';
+    statusDiv.style.color = '#86efac';
+    state.websiteProfile = null;
+    return;
+  }
 
   statusDiv.style.display = 'flex';
   statusTxt.textContent   = 'Extracting company profile from website…';
@@ -4277,14 +4317,16 @@ function renderStep7(d) {
 
   // Signal Summary
   const sigContainer = document.getElementById('s7-signals');
-  if (sigContainer && d.signal_summary?.length) {
-    sigContainer.innerHTML = d.signal_summary.map(sig => {
-      const st = sig.strength || 'Medium';
-      const typeLabel = (sig.signal_type || 'signal').replace(/_/g, ' ');
+  const signalSummary = ensureArray(d.signal_summary);
+  if (sigContainer && signalSummary.length) {
+    sigContainer.innerHTML = signalSummary.map(sig => {
+      const signalObj = ensureObject(sig);
+      const st = signalObj.strength || 'Medium';
+      const typeLabel = (signalObj.signal_type || signalObj.type || 'signal').replace(/_/g, ' ');
       return `<div class="s7-signal">
         <div class="s7-signal-type sig-${st}">${typeLabel}</div>
         <div>
-          <div class="s7-signal-desc">${escHtml(sig.signal_description || '')}</div>
+          <div class="s7-signal-desc">${escHtml(signalObj.signal_description || signalObj.description || signalObj.signal || '')}</div>
           <div style="font-size:9px;color:var(--muted);margin-top:3px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;">${st} strength</div>
         </div>
       </div>`;
@@ -4298,13 +4340,14 @@ function renderStep7(d) {
   if (whyNow) whyNow.textContent = d.why_now_analysis || '—';
 
   // MCC View
-  if (d.mcc_view) {
+  const mccView = ensureObject(d.mcc_view);
+  if (Object.keys(mccView).length) {
     const mm = document.getElementById('s7-mcc-market');
     const mc = document.getElementById('s7-mcc-client');
     const mx = document.getElementById('s7-mcc-competitor');
-    if (mm) mm.textContent = d.mcc_view.market    || '—';
-    if (mc) mc.textContent = d.mcc_view.client    || '—';
-    if (mx) mx.textContent = d.mcc_view.competitor || '—';
+    if (mm) mm.textContent = mccView.market    || '—';
+    if (mc) mc.textContent = mccView.client    || '—';
+    if (mx) mx.textContent = mccView.competitor || '—';
   }
 
   // Strategic Hook
@@ -4312,24 +4355,26 @@ function renderStep7(d) {
   if (hook) hook.textContent = d.strategic_hook || '—';
 
   // Persona
-  if (d.persona_priority) {
+  const persona = Array.isArray(d.persona_priority) ? d.persona_priority[0] : ensureObject(d.persona_priority);
+  if (persona && Object.keys(persona).length) {
     const pn = document.getElementById('s7-persona-name');
     const pr = document.getElementById('s7-persona-reason');
-    if (pn) pn.textContent = d.persona_priority.persona || '—';
-    if (pr) pr.textContent = d.persona_priority.reason  || '—';
+    if (pn) pn.textContent = persona.persona || '—';
+    if (pr) pr.textContent = persona.reason  || '—';
   }
 
   // Go/No-Go
-  if (d.go_no_go) {
+  const goNoGo = ensureObject(d.go_no_go);
+  if (Object.keys(goNoGo).length) {
     const badge  = document.getElementById('s7-gng-badge');
     const reason = document.getElementById('s7-gng-reason');
-    const rec = d.go_no_go.recommendation || 'Watch';
+    const rec = goNoGo.recommendation || 'Watch';
     const cls = rec.replace(/[-\/]/g, '').replace(/\s+/g, '');
     if (badge) {
       badge.textContent = rec;
       badge.className = `s7-gng-badge gng-${cls}`;
     }
-    if (reason) reason.textContent = d.go_no_go.reason || '';
+    if (reason) reason.textContent = goNoGo.reason || '';
   }
 
   // Confidence Score
