@@ -503,16 +503,24 @@ function renderWaterfall(s2) {
 
 // ── Segment Table ─────────────────────────────────────────────────
 function renderSegments(s2) {
-  const segs = s2.market_segments;
-  if (!Array.isArray(segs) || !segs.length) return '';
-  const rows = segs.slice(0,8).map(sg => {
-    const name = esc(safe(sg.name||sg.segment_name||''));
-    const size = esc(safe(sg.size||sg.market_size||''));
-    const pri  = esc(safe(sg.priority||sg.priority_level||''));
-    return `<tr><td>${name}</td><td style="font-family:'Space Mono',monospace;text-align:right">${size}</td><td>${pri}</td></tr>`;
+  const segs = Array.isArray(s2.market_segments) ? s2.market_segments : [];
+  const filtered = segs.filter(sg => {
+    if (!sg) return false;
+    if (typeof sg === 'string') return sg.trim().length > 0;
+    return !!(sg.name || sg.segment_name || sg.est_size || sg.size || sg.priority || sg.growth || sg.rationale);
+  }).slice(0, 8);
+  if (!filtered.length) return '';
+
+  const rows = filtered.map(sg => {
+    const name = typeof sg === 'string' ? sg : safe(sg.name || sg.segment_name || '');
+    const size = typeof sg === 'string' ? '' : safe(sg.size || sg.est_size || sg.market_size || '');
+    const pri = typeof sg === 'string' ? '' : safe(sg.priority || sg.priority_level || '');
+    const growth = typeof sg === 'string' ? '' : safe(sg.growth || '');
+    const rationale = typeof sg === 'string' ? '' : safe(sg.rationale || sg.segment_rationale || '');
+    return `<tr><td>${esc(name)}${rationale ? `<div style="font-size:11px;color:var(--muted);margin-top:6px">${esc(rationale)}</div>` : ''}</td><td style="font-family:'Space Mono',monospace;text-align:right">${esc(size)}</td><td>${esc(pri)}</td><td>${esc(growth)}</td></tr>`;
   }).join('');
   return `<div class="field"><div class="fl">Market Segments</div>
-    <table class="pain-table"><thead><tr><th>Segment</th><th style="text-align:right">Est. Size</th><th>Priority</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    <table class="pain-table"><thead><tr><th>Segment</th><th style="text-align:right">Est. Size</th><th>Priority</th><th>Growth</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 // ── Pain-to-Solution Map ──────────────────────────────────────────
@@ -634,7 +642,7 @@ function renderDecisionEngine(r, s1, s2, s3) {
   }
 
   // 2. Fallback Logic (if no real Step 7 data exists)
-  const score = s1.gtm_relevance_score;
+  const score = s1.gtm_relevance_score || (r.full_report && r.full_report.gtm_relevance_score) || (s2 && s2.total_score) || 0;
   if (!score) return ''; // Hide gracefully if no data
 
   // Derive decision from score
@@ -730,7 +738,7 @@ function renderReport(r) {
   }
 
   // KPI strip
-  const score = s1.gtm_relevance_score;
+  const score = s1.gtm_relevance_score || (r.full_report && r.full_report.gtm_relevance_score) || (s2 && s2.total_score) || 0;
   const s7 = r.step_7_intelligence || (r.full_report && r.full_report.step_7_intelligence) || r.step7_decision_engine || {};
   const confScore = parseInt(s7.confidence_score) || score || 0;
   const rec = s7.go_no_go?.recommendation || (score>=75?'Go':score>=50?'Watch':'No-Go');
@@ -921,6 +929,8 @@ function renderReport(r) {
 // ── Load Report ───────────────────────────────────────────────────
 function isDemoReport(r) {
   return !!(
+    r?.report_mode === 'demo' ||
+    r?.demo_mode === true ||
     r?.full_report?.demo_mode === true ||
     r?.scraped_profile?.demo_mode === true ||
     r?.step_1_market?.demo_mode === true ||
@@ -970,27 +980,36 @@ async function exportPDF() {
 
 async function renderHtmlToPdf(html, filename) {
   const iframe = document.createElement('iframe');
-  iframe.style.cssText = 'position:fixed;top:0;left:-9999px;width:794px;border:none;opacity:0;pointer-events:none';
+  iframe.style.cssText = 'position:fixed;top:0;left:-9999px;width:794px;border:none;opacity:0;pointer-events:none;background:#0B0F1A';
   iframe.srcdoc = html;
   document.body.appendChild(iframe);
   await new Promise(resolve => { iframe.onload = resolve; setTimeout(resolve, 8000); });
   const iDoc = iframe.contentDocument || iframe.contentWindow.document;
+  if (iDoc) {
+    iDoc.documentElement.style.backgroundColor = '#0B0F1A';
+    iDoc.body.style.backgroundColor = '#0B0F1A';
+    iDoc.body.style.margin = '0';
+    iDoc.documentElement.style.margin = '0';
+  }
   const fullHeight = Math.max(iDoc.body.scrollHeight, iDoc.documentElement.scrollHeight, 2000);
   iframe.style.height = fullHeight + 'px';
   await new Promise(r => setTimeout(r, 1000));
   try {
     const canvas = await html2canvas(iDoc.documentElement, {
-      scale:2, useCORS:true, allowTaint:true, backgroundColor:'#ffffff',
+      scale:2, useCORS:true, allowTaint:true, backgroundColor:'#0B0F1A',
       logging:false, width:794, windowWidth:794, height:fullHeight, windowHeight:fullHeight,
     });
     const A4_W = 595.28, A4_H = 841.89;
     const cw = canvas.width, ch = canvas.height;
     const pageH = Math.round((A4_H / A4_W) * cw);
+    const pageCount = Math.ceil(ch / pageH);
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ unit:'pt', format:'a4', orientation:'portrait', compress:true });
-    for (let i = 0; i < Math.ceil(ch / pageH); i++) {
+    for (let i = 0; i < pageCount; i++) {
+      const srcY = i * pageH;
+      const srcH = Math.min(pageH, ch - srcY);
+      if (srcH <= 8) break;
       if (i > 0) pdf.addPage();
-      const srcY = i * pageH, srcH = Math.min(pageH, ch - srcY);
       const pg = document.createElement('canvas');
       pg.width = cw; pg.height = srcH;
       pg.getContext('2d').drawImage(canvas, 0, srcY, cw, srcH, 0, 0, cw, srcH);
