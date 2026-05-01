@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
-<head> 
+<head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Strategy Report · ABE AI Revenue Infrastructure</title>
@@ -41,6 +41,8 @@
     .btn-outline { background:transparent; color:var(--muted); border:1px solid var(--border); }
     .btn-outline:hover { border-color:var(--accent); color:white; }
     .btn:disabled { opacity:.5; cursor:not-allowed; transform:none!important; }
+    .demo-banner { display:flex; align-items:center; gap:10px; background:rgba(245,158,11,.14); border:1px solid rgba(245,158,11,.32); color:var(--amber); padding:18px 22px; border-radius:16px; margin-bottom:24px; font-size:12px; line-height:1.5; }
+    .demo-banner strong { color:white; }
 
     /* ── LAYOUT ── */
     .wrap { position:relative; z-index:1; max-width:1100px; margin:0 auto; padding:40px 32px; }
@@ -236,6 +238,9 @@
 </div>
 
 <div class="wrap">
+  <div id="demo-report-banner" class="demo-banner" style="display:none;">
+    <strong>Demo Mode Report — No live data was used.</strong> Validate before decision-making.
+  </div>
 
   <!-- Loading skeleton -->
   <div id="loading-state">
@@ -719,6 +724,11 @@ function renderReport(r) {
     (r.industry ? r.industry + ' · ' : '') +
     'Generated ' + new Date(r.updated_at||r.created_at).toLocaleDateString('en-GB',{year:'numeric',month:'long',day:'numeric'});
 
+  const demoBanner = document.getElementById('demo-report-banner');
+  if (demoBanner) {
+    demoBanner.style.display = isDemoReport(r) ? 'flex' : 'none';
+  }
+
   // KPI strip
   const score = s1.gtm_relevance_score;
   const s7 = r.step_7_intelligence || (r.full_report && r.full_report.step_7_intelligence) || r.step7_decision_engine || {};
@@ -909,6 +919,20 @@ function renderReport(r) {
 }
 
 // ── Load Report ───────────────────────────────────────────────────
+function isDemoReport(r) {
+  return !!(
+    r?.full_report?.demo_mode === true ||
+    r?.scraped_profile?.demo_mode === true ||
+    r?.step_1_market?.demo_mode === true ||
+    r?.step_2_tam?.demo_mode === true ||
+    r?.step_3_icp?.demo_mode === true ||
+    r?.step_4_sourcing?.demo_mode === true ||
+    r?.step_5_keywords?.demo_mode === true ||
+    r?.step_6_messaging?.demo_mode === true ||
+    r?.step_7_intelligence?.demo_mode === true
+  );
+}
+
 async function loadReport() {
   const params = new URLSearchParams(location.search);
   const id = params.get('id');
