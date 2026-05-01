@@ -746,14 +746,26 @@ function buildDemoStep4(company, industry) {
 
 function buildDemoStep5(company, industry) {
   const profile = getDemoIndustryProfile(company, industry);
+  const keywordFocusRaw = profile.keyword_focus || profile.keywords || profile.industryLabel || 'commercial growth';
+  const keywordFocus = String(keywordFocusRaw).trim() || 'commercial growth';
+  const keywordParts = keywordFocus.split(',').map(k => String(k || '').trim()).filter(Boolean);
+  const primaryKeyword = keywordParts[0] || 'commercial growth';
+  const secondaryKeyword = keywordParts[1] || primaryKeyword;
+  const targetRoles = Array.isArray(profile.target_roles)
+    ? profile.target_roles.filter(Boolean)
+    : profile.target_roles
+    ? [String(profile.target_roles).trim()]
+    : [];
+  const firstTargetRole = targetRoles[0] || 'Revenue Operations Leader';
+
   const output = {
-    primary_keywords: [`${profile.keyword_focus}`],
+    primary_keywords: [keywordFocus],
     secondary_keywords: ['commercial growth strategy', 'customer conversion intelligence'],
     intent_signals: ['High buyer research activity', 'Increase in decision-maker outreach', 'Improving funnel velocity'],
     funnel_taxonomy: 'Awareness → consideration → decision → expansion',
-    boolean_query: `("${profile.keyword_focus.split(',')[0]}" OR "${profile.keyword_focus.split(',')[1] || profile.keyword_focus}") AND (revenue OR growth OR operations)`,
-    linkedin_search_string: `"${profile.target_roles[0]}" AND "${profile.keyword_focus.split(',')[0]}"`,
-    content_topics: [profile.keyword_focus, 'commercial performance', 'strategy-to-execution alignment'],
+    boolean_query: `("${primaryKeyword}" OR "${secondaryKeyword}") AND (revenue OR growth OR operations)`,
+    linkedin_search_string: `"${firstTargetRole}" AND "${primaryKeyword}"`,
+    content_topics: [keywordFocus, 'commercial performance', 'strategy-to-execution alignment'],
     key_risks: [
       {
         risk: 'Demo keywords may not reflect actual customer language in this vertical.',
