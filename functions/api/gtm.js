@@ -278,6 +278,22 @@ function detectDemoStrategyMarker(steps, scrapedProfile, fullReport, step7Intell
   return hasDemoStep || scrapedIsDemo || fullReportIsDemo || step7IsDemo;
 }
 
+function deriveDemoModeState(record) {
+  const steps = {
+    1: record.step_1_market,
+    2: record.step_2_tam,
+    3: record.step_3_icp,
+    4: record.step_4_sourcing,
+    5: record.step_5_keywords,
+    6: record.step_6_messaging,
+  };
+  const isDemo = detectDemoStrategyMarker(steps, record.scraped_profile, record.full_report, record.step_7_intelligence);
+  return {
+    demo_mode: isDemo,
+    report_mode: isDemo ? 'demo' : 'live',
+  };
+}
+
 function applyDemoSaveMarkers(scrapedProfile, fullReport) {
   const sourceText = 'demo_mode_simulated';
   if (!scrapedProfile || typeof scrapedProfile !== 'object') scrapedProfile = {};
@@ -302,9 +318,11 @@ function buildDemoStep1(company, industry) {
     revenue_stage: 'Growth-stage',
     employee_count: '120–180 employees',
     products_services: 'Revenue intelligence, GTM execution orchestration, and demand signal automation for enterprise sales teams.',
+    tech_stack_hints: ['CRM automation tools', 'marketing attribution platform', 'BI dashboard integration'],
     growth_signals: [
       'Recurring revenue momentum observed in demo-mode account analogs.',
       'Industry demand is increasing for revenue operations efficiency.',
+      'High correlation between GTM execution and pipeline predictability.',
     ],
     demand_signals: [
       `Inbound interest is moderate for ${anchor}.`,
@@ -322,6 +340,14 @@ function buildDemoStep1(company, industry) {
       completeness: 'partial',
       missing: ['real website extraction', 'live customer evidence', 'verified buyer intent data'],
     },
+    gtm_relevance_score: 60,
+    gtm_relevance_reasoning: `Demo mode score reflects moderate fit from TAM, ICP alignment, and product-market positioning for ${company}.`,
+    swot: {
+      strengths: ['Clear revenue operations value proposition', 'Strong market timing for pipeline predictability', 'Well-defined ICP for enterprise revenue teams'],
+      weaknesses: ['Demo assumptions lack live customer evidence', 'Limited verified buyer intent signals', 'Potential execution risk in tech integration'],
+      opportunities: ['Growing demand for AI-driven revenue orchestration', 'Expansion into adjacent mid-market GTM segments', 'Alignment with modern sales operations agendas'],
+      threats: ['Competitive pressure from incumbent revenue intelligence vendors', 'Buyer skepticism of AI-derived GTM claims', 'Funding and economic cycle uncertainty'],
+    },
     analyst_insight: `Demo mode indicates ${company} has a promising GTM position, but live evidence is required before business decisions. [DEMO MODE – illustrative only]`,
   };
   return applyDemoMetadata(output, 1);
@@ -332,13 +358,46 @@ function buildDemoStep2(company, industry) {
     tam_size_estimate: 'USD 1.8B',
     growth_rate: '13% CAGR',
     market_maturity: 'Emerging with accelerating buyer demand',
-    market_segments: ['Mid-market SaaS', 'Revenue operations', 'Sales enablement'],
+    market_segments: [
+      {
+        name: 'Enterprise Revenue Operations',
+        est_size: 'USD 620M',
+        size: 'USD 620M',
+        priority: 'High',
+        growth: '14%',
+        rationale: 'Revenue teams seeking pipeline predictability and improved sales execution.',
+      },
+      {
+        name: 'Mid-Market SaaS GTM Teams',
+        est_size: 'USD 480M',
+        size: 'USD 480M',
+        priority: 'Medium',
+        growth: '11%',
+        rationale: 'High need for outbound efficiency and account prioritisation.',
+      },
+      {
+        name: 'Professional Services Automation',
+        est_size: 'USD 240M',
+        size: 'USD 240M',
+        priority: 'Medium',
+        growth: '10%',
+        rationale: 'Professional services buyers prioritise predictable revenue forecasting.',
+      },
+    ],
     priority_opportunities: 'Enterprise revenue operations teams seeking pipeline predictability.',
     demand_score: { score: 67, rationale: 'Moderate demand signals balanced by an illustrative ICP and market positioning.' },
     market_timing_score: { score: 63, rationale: 'Timing is favorable for revenue acceleration solutions in the current buying cycle.' },
     icp_fit_score: { score: 70, rationale: 'The demo ICP shows a strong fit with the product value proposition.' },
     data_completeness_score: { score: 58, rationale: 'Key market and customer signals are illustrative rather than validated.' },
-    total_score: 65,
+    total_score: 60,
+    score_breakdown: {
+      demand: 67,
+      market_timing: 63,
+      icp_fit: 70,
+      data_completeness: 58,
+      total: 60,
+      verification: 'Demo estimates only; confirm with live company intelligence.',
+    },
     score_verification: 'Demo estimates only; confirm with live company intelligence.',
     analyst_insight: `Demo mode TAM and market attractiveness point to a conditional $1.8B opportunity for ${company}. [DEMO MODE – illustrative only]`,
   };
@@ -415,14 +474,20 @@ function buildDemoStep6(company, industry) {
     email_1: {
       subject: `Unlock predictable pipeline for ${company}`,
       body: `Hi [Name],\n\nI noticed ${company} is focused on revenue operations and growth. We help teams like yours reduce sales cycle friction and improve forecast accuracy. I’d love to share a quick framework for predictable pipeline generation.\n\nBest,\n[Your Name]`,
+      angle: 'Revenue operations signal and pipeline predictability',
+      cta: 'Request a short briefing to discuss current forecasting gaps.',
     },
     email_2: {
       subject: 'Proof of pipeline acceleration for revenue teams',
       body: `Hi [Name],\n\nFollowing up on my note about revenue efficiency: our clients usually see a 15–20% uplift in pipeline conversion within 90 days. Can we connect to explore if this maps to your current goals?\n\nThanks,\n[Your Name]`,
+      angle: 'ROI and pipeline acceleration evidence',
+      cta: 'Book a quick call to review a short case study.',
     },
     email_3: {
       subject: 'Last check — revenue operations signal readiness',
       body: `Hi [Name],\n\nI wanted to leave you with one key observation: revenue teams that align intent signals and GTM execution close more pipeline. If you’re open, I’d be happy to share a short plan tailored to ${company}.\n\nRegards,\n[Your Name]`,
+      angle: 'Final validation with executive urgency',
+      cta: 'Reply with a time for a brief executive summary.',
     },
     follow_up_sequence: 'Send Email 1 → wait 3 days → Email 2 → reach out on LinkedIn → follow-up call attempt.',
     linkedin_message: `Hi [Name], I’m researching revenue operations leaders at companies like ${company}. If you’re open, I’d love to share an outline of a GTM approach that shortens your pipeline handoff and improves forecast reliability.`,
@@ -467,6 +532,8 @@ function buildDemoStep7(company, industry, priorSteps) {
     persona_priority: { persona: 'Revenue Operations Leader', reason: 'Focuses on predictable pipeline and sales execution.' },
     go_no_go: { recommendation: 'Watch', reason: 'Requires live evidence and customer validation before a full go decision.' },
     confidence_score: 60,
+    risk_constraint: 'Requires live customer validation and a stronger evidence base before scaling investments.',
+    execution_priority: 'Medium — validate hypothesis before scaling the GTM motion.',
     executive_brief: `Demo mode revenue intelligence suggests a Watch recommendation. Validate with live data before taking action. [DEMO MODE – illustrative only]`,
     analyst_insight: `Demo mode intelligence is illustrative only. [DEMO MODE – illustrative only]`,
     _data_quality: {
@@ -618,6 +685,30 @@ async function handleGetVault(body, userId, supabaseUrl, supabaseKey, cors) {
     return errRes('Failed to fetch vault: ' + errBody, 500, cors);
   }
   const data = await res.json();
+
+  // Enrich demo/live flags for summary rows with a lightweight secondary lookup
+  if (Array.isArray(data) && data.length > 0) {
+    const ids = data.filter(row => row && row.id).map(row => row.id);
+    if (ids.length > 0) {
+      const idList = ids.map(id => encodeURIComponent(id)).join(',');
+      const detailsRes = await sbFetch(supabaseUrl, supabaseKey, 'strategies', 'GET', null,
+        `?user_id=eq.${userId}&id=in.(${idList})&select=id,scraped_profile,full_report,step_1_market,step_2_tam,step_3_icp,step_4_sourcing,step_5_keywords,step_6_messaging,step_7_intelligence`);
+      if (detailsRes.ok) {
+        const details = await detailsRes.json();
+        const detailsById = (Array.isArray(details) ? details : []).reduce((acc, item) => {
+          if (item?.id) acc[item.id] = item;
+          return acc;
+        }, {});
+        data.forEach(strategy => {
+          const detail = detailsById[strategy.id];
+          if (!detail) return;
+          const flags = deriveDemoModeState(detail);
+          if (typeof strategy.demo_mode !== 'boolean') strategy.demo_mode = flags.demo_mode;
+          if (!strategy.report_mode) strategy.report_mode = flags.report_mode;
+        });
+      }
+    }
+  }
 
   // Get total count (for pagination UI)
   let totalQuery = `?user_id=eq.${userId}&select=id&status=neq.archived`;
