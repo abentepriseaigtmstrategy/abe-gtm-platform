@@ -1131,45 +1131,54 @@ async function exportPDF() {
 
 async function renderHtmlToPdf(html, filename) {
   const iframe = document.createElement('iframe');
-  iframe.style.cssText = 'position:fixed;top:0;left:-9999px;width:794px;border:none;opacity:0;pointer-events:none;background:#0B0F1A';
+  iframe.style.cssText = 'position:fixed;top:0;left:0;width:794px;height:auto;opacity:0;pointer-events:none;z-index:-9999;';
   iframe.srcdoc = html;
   document.body.appendChild(iframe);
   await new Promise(resolve => { iframe.onload = resolve; setTimeout(resolve, 8000); });
   const iDoc = iframe.contentDocument || iframe.contentWindow.document;
-  if (iDoc) {
-    iDoc.documentElement.style.backgroundColor = '#0B0F1A';
-    iDoc.body.style.backgroundColor = '#0B0F1A';
-    iDoc.body.style.margin = '0';
-    iDoc.documentElement.style.margin = '0';
-  }
-  const fullHeight = Math.max(iDoc.body.scrollHeight, iDoc.documentElement.scrollHeight, 2000);
-  iframe.style.height = fullHeight + 'px';
-  await new Promise(r => setTimeout(r, 1000));
+  if (!iDoc) throw new Error('Failed to load PDF content');
+  iDoc.documentElement.style.backgroundColor = '#0B0F1A';
+  iDoc.body.style.backgroundColor = '#0B0F1A';
+  iDoc.body.style.margin = '0';
+  iDoc.documentElement.style.margin = '0';
+  await new Promise(r => setTimeout(r, 500));
   try {
-    const canvas = await html2canvas(iDoc.documentElement, {
-      scale:2, useCORS:true, allowTaint:true, backgroundColor:'#0B0F1A',
-      logging:false, width:794, windowWidth:794, height:fullHeight, windowHeight:fullHeight,
-    });
-    const A4_W = 595.28, A4_H = 841.89;
-    const cw = canvas.width, ch = canvas.height;
-    const pageH = Math.round((A4_H / A4_W) * cw);
-    const pageCount = Math.ceil(ch / pageH);
+    const pages = Array.from(iDoc.querySelectorAll('.pdf-page'));
+    const validPages = pages.filter(page => hasMeaningfulPdfPage(page));
+    if (!validPages.length) throw new Error('No valid PDF pages found');
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ unit:'pt', format:'a4', orientation:'portrait', compress:true });
-    for (let i = 0; i < pageCount; i++) {
-      const srcY = i * pageH;
-      const srcH = Math.min(pageH, ch - srcY);
-      if (srcH <= 8) break;
-      if (i > 0) pdf.addPage();
-      const pg = document.createElement('canvas');
-      pg.width = cw; pg.height = srcH;
-      pg.getContext('2d').drawImage(canvas, 0, srcY, cw, srcH, 0, 0, cw, srcH);
-      pdf.addImage(pg.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, A4_W, (srcH / cw) * A4_W);
+    const A4_W = 595.28;
+    for (let pageIndex = 0; pageIndex < validPages.length; pageIndex++) {
+      const pageElement = validPages[pageIndex];
+      pageElement.style.width = '794px';
+      const canvas = await html2canvas(pageElement, {
+        scale:2,
+        useCORS:true,
+        allowTaint:true,
+        backgroundColor:'#0B0F1A',
+        logging:false,
+        width:794,
+        windowWidth:794,
+        height: pageElement.scrollHeight,
+        windowHeight: pageElement.scrollHeight,
+      });
+      const pageHeight = (canvas.height / canvas.width) * A4_W;
+      if (pageIndex > 0) pdf.addPage();
+      pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, A4_W, pageHeight);
     }
     pdf.save(filename);
   } finally {
     document.body.removeChild(iframe);
   }
+}
+
+function hasMeaningfulPdfPage(page) {
+  const content = page.querySelector('.page-content');
+  if (!content) return false;
+  const text = content.textContent.replace(/\s+/g, ' ').trim();
+  if (text.length > 20) return true;
+  return content.querySelector('.panel, .metric-card, .segment-card, .timeline-step, .mcc-card, .risk-item, .appendix-card') !== null;
 }
 
 // ── Init (preserve existing auth guard pattern) ───────────────────
