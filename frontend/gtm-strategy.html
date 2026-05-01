@@ -1707,6 +1707,9 @@ function restoreState() {
 
 /* ── Execution Logs (Fix #6) ── */
 const execLogs = [];
+let _websiteDebounce = null;
+const TIMEOUT_MS = 45000;
+const MAX_RETRIES = 1;
 
 function addLog(level, step, msg) {
   const ts = new Date().toLocaleTimeString('en-GB', { hour12: false });
@@ -1758,7 +1761,10 @@ function getGtmAction() {
 function setDemoMode(enabled) {
   state.demoMode = !!enabled;
   state.websiteProfile = null;
-  clearTimeout(_websiteDebounce);
+  if (_websiteDebounce) {
+    clearTimeout(_websiteDebounce);
+    _websiteDebounce = null;
+  }
   const banner = document.getElementById('demo-mode-banner');
   if (banner) banner.classList.toggle('show', state.demoMode);
   const toggle = document.getElementById('demo-toggle');
@@ -2163,49 +2169,87 @@ function resetAll() {
     showOutput(i, false);
     showLoading(i, false);
     clearError(i);
-    document.getElementById(`step-nav-${i}`).classList.toggle('locked', i !== 1);
-    document.getElementById(`step-nav-${i}`).classList.toggle('active', i === 1);
-    document.getElementById(`snnum-${i}`).textContent = String(i).padStart(2, '0');
-    if (document.getElementById(`tokens-${i}`)) document.getElementById(`tokens-${i}`).style.display = 'none';
-    document.getElementById(`run-btn-${i}`).disabled = i !== 1;
-    if (i > 1) {
-      document.getElementById(`body-${i}`).classList.remove('open');
-      document.getElementById(`card-${i}`).style.opacity = '';
-    } else {
-      document.getElementById(`body-1`).classList.add('open');
+    const stepNav = document.getElementById(`step-nav-${i}`);
+    if (stepNav) {
+      stepNav.classList.toggle('locked', i !== 1);
+      stepNav.classList.toggle('active', i === 1);
     }
-    if (document.getElementById(`ctx-chips-${i}`)) document.getElementById(`ctx-chips-${i}`).innerHTML = '';
+    const snnum = document.getElementById(`snnum-${i}`);
+    if (snnum) snnum.textContent = String(i).padStart(2, '0');
+    const tokensEl = document.getElementById(`tokens-${i}`);
+    if (tokensEl) tokensEl.style.display = 'none';
+    const runBtn = document.getElementById(`run-btn-${i}`);
+    if (runBtn) runBtn.disabled = i !== 1;
+    const bodyEl = document.getElementById(`body-${i}`);
+    if (bodyEl) {
+      if (i > 1) {
+        bodyEl.classList.remove('open');
+      } else {
+        bodyEl.classList.add('open');
+      }
+    }
+    const cardEl = document.getElementById(`card-${i}`);
+    if (cardEl && i > 1) cardEl.style.opacity = '';
+    const ctxChips = document.getElementById(`ctx-chips-${i}`);
+    if (ctxChips) ctxChips.innerHTML = '';
   }
   state.totalTokens = 0;
   state.company = '';
   state.industry = '';
-  document.getElementById('company-input').value = '';
-  document.getElementById('industry-input').value = '';
-  document.getElementById('token-counter').querySelector('span').textContent = '0 tokens used';
-  document.getElementById('main-progress-fill').style.width = '0%';
-  document.getElementById('main-progress-pct').textContent = '0 / 6';
-  document.getElementById('summary-panel').classList.remove('show');
-  document.getElementById('oc-messages-container').innerHTML = '';
-  document.getElementById('run-btn-1').disabled = true;
-  document.getElementById('start-btn').disabled = true;
-  document.getElementById('meta-1').innerText = 'Enter a company name above to begin.';
+  const companyInput = document.getElementById('company-input');
+  if (companyInput) companyInput.value = '';
+  const industryInput = document.getElementById('industry-input');
+  if (industryInput) industryInput.value = '';
+  const tokenCounter = document.getElementById('token-counter');
+  if (tokenCounter) {
+    const span = tokenCounter.querySelector('span');
+    if (span) span.textContent = '0 tokens used';
+  }
+  const progressFill = document.getElementById('main-progress-fill');
+  if (progressFill) progressFill.style.width = '0%';
+  const progressPct = document.getElementById('main-progress-pct');
+  if (progressPct) progressPct.textContent = '0 / 6';
+  const summaryPanel = document.getElementById('summary-panel');
+  if (summaryPanel) summaryPanel.classList.remove('show');
+  const messagesContainer = document.getElementById('oc-messages-container');
+  if (messagesContainer) messagesContainer.innerHTML = '';
+  const runBtn1 = document.getElementById('run-btn-1');
+  if (runBtn1) runBtn1.disabled = true;
+  const startBtn = document.getElementById('start-btn');
+  if (startBtn) startBtn.disabled = true;
+  const meta1 = document.getElementById('meta-1');
+  if (meta1) meta1.innerText = 'Enter a company name above to begin.';
   // Clear logs
   execLogs.length = 0;
-  document.getElementById('logs-list').innerHTML = '';
-  document.getElementById('log-count-badge').textContent = '0 events';
-  document.getElementById('exec-logs-panel').style.display = 'none';
+  const logsList = document.getElementById('logs-list');
+  if (logsList) logsList.innerHTML = '';
+  const logCountBadge = document.getElementById('log-count-badge');
+  if (logCountBadge) logCountBadge.textContent = '0 events';
+  const execLogsPanel = document.getElementById('exec-logs-panel');
+  if (execLogsPanel) execLogsPanel.style.display = 'none';
   // Clear Step 7
   state.step7 = null;
-  document.getElementById('step7-panel').classList.remove('show');
-  document.getElementById('step7-panel').style.display = 'none';
-  document.getElementById('step-nav-7').classList.add('locked');
-  document.getElementById('s7-body').classList.remove('show');
-  document.getElementById('s7-trigger').style.display = 'flex';
-  document.getElementById('s7-loading').style.display = 'none';
-  document.getElementById('s7-error').style.display = 'none';
-  document.getElementById('s7-generate-btn').disabled = false;
-  document.getElementById('s7-btn-text').textContent = 'Generate Revenue Intelligence';
-  document.getElementById('s7-status-pill').style.display = 'none';
+  const step7Panel = document.getElementById('step7-panel');
+  if (step7Panel) {
+    step7Panel.classList.remove('show');
+    step7Panel.style.display = 'none';
+  }
+  const stepNav7 = document.getElementById('step-nav-7');
+  if (stepNav7) stepNav7.classList.add('locked');
+  const s7Body = document.getElementById('s7-body');
+  if (s7Body) s7Body.classList.remove('show');
+  const s7Trigger = document.getElementById('s7-trigger');
+  if (s7Trigger) s7Trigger.style.display = 'flex';
+  const s7Loading = document.getElementById('s7-loading');
+  if (s7Loading) s7Loading.style.display = 'none';
+  const s7Error = document.getElementById('s7-error');
+  if (s7Error) s7Error.style.display = 'none';
+  const s7GenerateBtn = document.getElementById('s7-generate-btn');
+  if (s7GenerateBtn) s7GenerateBtn.disabled = false;
+  const s7BtnText = document.getElementById('s7-btn-text');
+  if (s7BtnText) s7BtnText.textContent = 'Generate Revenue Intelligence';
+  const s7StatusPill = document.getElementById('s7-status-pill');
+  if (s7StatusPill) s7StatusPill.style.display = 'none';
   // Clear persisted session
   sessionStorage.removeItem('gtm_state');
   showToast('Strategy reset', 'success');
@@ -2397,9 +2441,6 @@ Return exact JSON:
    - Strict JSON extraction
    - Error classification
 ═══════════════════════════════════════════ */
-
-const TIMEOUT_MS  = 45000;
-const MAX_RETRIES = 1;
 
 async function callAPI(step, prompt, attempt = 0) {
   // Token guardrail (Fix #6): warn if prompt >15k chars (~15k tokens)
@@ -4072,12 +4113,13 @@ state.userId         = null;
   }
 }());
 
-let _websiteDebounce = null;
-
 function onWebsiteInput() {
   const val = document.getElementById('website-input').value.trim();
   state.websiteUrl = val;
-  clearTimeout(_websiteDebounce);
+  if (_websiteDebounce) {
+    clearTimeout(_websiteDebounce);
+    _websiteDebounce = null;
+  }
   if (state.demoMode) {
     const statusDiv = document.getElementById('website-status');
     const statusTxt = document.getElementById('website-status-text');
