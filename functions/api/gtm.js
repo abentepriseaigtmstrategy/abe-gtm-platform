@@ -29,7 +29,6 @@ export async function onRequestPost(context) {
   const supabaseUrl = env.SUPABASE_URL      || 'https://cwcvneluhlimhlzowabv.supabase.co';
   // Service role key from Cloudflare env secrets
   const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY;
-  if (!openaiKey) return errRes('OpenAI not configured', 503, cors);
 
   let body;
   try { body = await request.json(); }
@@ -73,6 +72,7 @@ async function handleRunStep(body, userId, openaiKey, supabaseUrl, supabaseKey, 
     company: 'string|required',
   }, body);
   if (errors.length) return errRes(errors[0], 400, cors);
+  if (!openaiKey) return errRes('OpenAI not configured', 503, cors);
 
   const { step, company, industry, prior_steps, company_profile } = body;
   if (step < 1 || step > 6) return errRes('Step must be 1–6', 400, cors);
@@ -336,13 +336,18 @@ function buildDemoStep4(company, industry) {
 function buildDemoStep5(company, industry) {
   const output = {
     key_risks: [
-      'Go-to-market differentiation may be unclear without customer validation.',
-      'Sales cycle could lengthen if ICP priorities change mid-funnel.',
-      'Marketing assets may require stronger proof points for enterprise buyers.',
+      { risk: 'Go-to-market differentiation may be unclear without customer validation.', source: 'Demo signals', impact: 'medium', mitigation: 'Run customer interviews and test messaging quickly.' },
+      { risk: 'Sales cycle could lengthen if ICP priorities change mid-funnel.', source: 'Demo signals', impact: 'medium', mitigation: 'Validate buyer priorities and refine outreach.' },
+      { risk: 'Marketing assets may require stronger proof points for enterprise buyers.', source: 'Demo signals', impact: 'low', mitigation: 'Gather testimonial evidence and customer case detail.' },
     ],
     confidence_level: 'Medium',
     confidence_score: 62,
-    validation_needed: 'Live customer interviews and website signal validation are required before scaling.',
+    confidence_reasoning: 'Confidence is based on illustrative demo signals and requires live evidence to firm up.',
+    validation_needed: [
+      'Live ICP interviews',
+      'Competitor win/loss analysis',
+      'Validate real compliance or timing triggers',
+    ],
     analyst_insight: `Demo mode risk assessment highlights moderate execution risk. [DEMO MODE – illustrative only]`,
   };
   return applyDemoMetadata(output, 5);
@@ -350,13 +355,24 @@ function buildDemoStep5(company, industry) {
 
 function buildDemoStep6(company, industry) {
   const output = {
-    signal_highlights: ['Buyer interest is moderate', 'Market timing is improving', 'ICP fit appears reasonable'],
-    score_breakdown: 'Balanced strengths in ICP fit and timing, tempered by incomplete evidence.',
+    signal_highlights: [
+      { signal: 'Buyer interest is moderate', type: 'demand', strength: 'Medium' },
+      { signal: 'Market timing is improving', type: 'timing', strength: 'Medium' },
+      { signal: 'ICP fit appears reasonable', type: 'icp', strength: 'Medium' },
+    ],
+    score_breakdown: {
+      demand: 62,
+      market_timing: 60,
+      icp_fit: 65,
+      data_completeness: 55,
+      total: 60,
+      verification: 'Balanced strengths in ICP fit and timing, tempered by incomplete evidence.',
+    },
     verdict: 'CONDITIONAL GO',
     deal_lens_summary: 'The opportunity is viable with selective account focus and stronger proof points.',
     risks_summary: 'Main risks are missing evidence and execution cadence.',
     confidence_note: 'Demo mode confidence is illustrative only and should be validated live.',
-    executive_brief: `Demo summary for ${company}: conditional market opportunity with a need for live validation and stronger evidence before committing resources.`,
+    executive_brief: `Demo summary for ${company}: conditional market opportunity with a need for live validation and stronger evidence before committing resources. [DEMO MODE – illustrative only]`,
     recommended_next_action: 'Validate ICP and demand with customer conversations before investing in full GTM execution.',
     analyst_insight: `Demo mode summary is illustrative only. Do not use for live decisioning. [DEMO MODE – illustrative only]`,
   };
@@ -366,8 +382,8 @@ function buildDemoStep6(company, industry) {
 function buildDemoStep7(company, industry, priorSteps) {
   const output = {
     signal_summary: [
-      { signal_type: 'market_timing', signal_description: `Timing for ${industry || 'this sector'} is cautious yet opportunistic.`, strength: 'Medium' },
-      { signal_type: 'growth', signal_description: 'Industry growth is steady but requires validation.', strength: 'Medium' },
+      { signal_type: 'market_timing', description: `Timing for ${industry || 'this sector'} is cautious yet opportunistic.`, signal_description: `Timing for ${industry || 'this sector'} is cautious yet opportunistic.`, strength: 'Medium' },
+      { signal_type: 'growth', description: 'Industry growth is steady but requires validation.', signal_description: 'Industry growth is steady but requires validation.', strength: 'Medium' },
     ],
     why_now_analysis: 'Market conditions are moving toward revenue acceleration tools, but proof points remain illustrative.',
     mcc_view: {
@@ -378,9 +394,17 @@ function buildDemoStep7(company, industry, priorSteps) {
     strategic_hook: `Use ${company} to position for more predictable revenue outcomes in ${industry || 'its target market'}.`,
     persona_priority: { persona: 'Revenue Operations Leader', reason: 'Focuses on predictable pipeline and sales execution.' },
     go_no_go: { recommendation: 'Watch', reason: 'Requires live evidence and customer validation before a full go decision.' },
-    confidence_score: 58,
-    executive_brief: `Demo mode revenue intelligence suggests a Watch recommendation. Validate with live data before taking action.`,
+    confidence_score: 60,
+    executive_brief: `Demo mode revenue intelligence suggests a Watch recommendation. Validate with live data before taking action. [DEMO MODE – illustrative only]`,
     analyst_insight: `Demo mode intelligence is illustrative only. [DEMO MODE – illustrative only]`,
+    _data_quality: {
+      richness_score: 45,
+      warning: 'Demo mode – no live evidence',
+      confidence_ai_claimed: 60,
+      confidence_after_cap: 45,
+      signals_before_filter: 3,
+      signals_after_filter: 3,
+    },
   };
   return applyDemoMetadata(output, 7);
 }
@@ -668,6 +692,7 @@ async function handleCheckCache(body, userId, supabaseUrl, supabaseKey, env, cor
 async function handleScoreLeads(body, userId, openaiKey, cors) {
   const errors = validate({ leads: 'array|required' }, body);
   if (errors.length) return errRes(errors[0], 400, cors);
+  if (!openaiKey) return errRes('OpenAI not configured', 503, cors);
 
   const { leads, icp_context } = body;
   if (leads.length > 50) return errRes('Max 50 leads per request. Use /api/leads for batch scoring.', 400, cors);
@@ -693,6 +718,7 @@ async function handleRunStep7(body, userId, openaiKey, supabaseUrl, supabaseKey,
     steps:   'object|required',
   }, body);
   if (errors.length) return errRes(errors[0], 400, cors);
+  if (!openaiKey) return errRes('OpenAI not configured', 503, cors);
 
   const { company, industry, steps } = body;
 
