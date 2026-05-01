@@ -543,6 +543,8 @@ async function loadVault() {
 
 function getStrategyModeBadge(s) {
   const isDemo = !!(
+    s?.report_mode === 'demo' ||
+    s?.demo_mode === true ||
     s?.full_report?.demo_mode === true ||
     s?.scraped_profile?.demo_mode === true ||
     s?.step_1_market?.demo_mode === true ||
@@ -556,6 +558,7 @@ function getStrategyModeBadge(s) {
   if (isDemo) return { label: 'DEMO', class: 'status-demo' };
   const isLive = !!(
     s?.report_mode === 'live' ||
+    s?.demo_mode === false ||
     s?.scraped_profile?.report_mode === 'live' ||
     s?.full_report?.report_mode === 'live' ||
     (s?.steps_completed >= 6 && s?.status === 'complete')
