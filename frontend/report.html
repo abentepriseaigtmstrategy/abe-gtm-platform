@@ -52,6 +52,67 @@
     .ph-left .meta  { font-size:11px; color:var(--muted); margin-top:6px; }
     .ph-actions { display:flex; gap:10px; flex-shrink:0; }
 
+    .report-cover { position:relative; overflow:hidden; background:linear-gradient(180deg, rgba(24,30,47,.95), rgba(11,15,26,.98)); border:1px solid rgba(255,255,255,.08); border-radius:28px; padding:32px 32px 28px; margin-bottom:32px; }
+    .report-cover::before { content:''; position:absolute; top:-22%; right:-18%; width:240px; height:240px; background:radial-gradient(circle at center, rgba(168,85,247,.18), transparent 60%); filter:blur(16px); }
+    .report-cover::after { content:''; position:absolute; bottom:-10%; left:-10%; width:280px; height:280px; background:linear-gradient(135deg, rgba(59,130,246,.12), transparent 70%); transform:rotate(18deg); }
+    .cover-hero, .cover-kpis { position:relative; z-index:1; }
+    .cover-hero { display:grid; grid-template-columns:1fr auto; gap:24px; align-items:start; margin-bottom:24px; }
+    .cover-label { display:inline-flex; align-items:center; gap:12px; margin-bottom:18px; }
+    .cover-mark { width:42px; height:42px; border-radius:14px; background:linear-gradient(135deg,var(--accent),var(--accent2)); display:flex; align-items:center; justify-content:center; font-family:'Space Mono',monospace; font-size:14px; font-weight:900; color:white; }
+    .cover-info { display:grid; gap:8px; }
+    .cover-title { font-size:36px; font-weight:900; color:white; line-height:1.05; }
+    .cover-subtitle { font-size:12px; text-transform:uppercase; color:var(--muted); letter-spacing:.22em; font-weight:700; }
+    .cover-company { font-size:24px; font-weight:900; color:white; }
+    .cover-meta { display:flex; flex-wrap:wrap; gap:10px; align-items:center; color:var(--muted); font-size:11px; }
+    .cover-meta .cover-badge { display:inline-flex; align-items:center; gap:8px; padding:8px 14px; border-radius:999px; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.14em; border:1px solid transparent; }
+    .cover-badge.demo { color:var(--amber); background:rgba(245,158,11,.12); border-color:rgba(245,158,11,.24); }
+    .cover-badge.live { color:var(--green); background:rgba(34,197,94,.12); border-color:rgba(34,197,94,.24); }
+    .cover-detail { color:var(--text); font-size:13px; line-height:1.6; max-width:700px; }
+    .cover-kpis { display:grid; grid-template-columns:repeat(4,minmax(120px,1fr)); gap:14px; }
+    .cover-card { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:18px; padding:20px 18px; display:flex; flex-direction:column; justify-content:space-between; min-height:110px; }
+    .cover-card .cc-label { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.15em; color:var(--muted); margin-bottom:10px; }
+    .cover-card .cc-value { font-size:28px; font-weight:900; font-family:'Space Mono',monospace; color:white; line-height:1.05; }
+    .cover-card .cc-note { font-size:10px; color:var(--muted); margin-top:8px; }
+    .report-footer { border-top:1px solid rgba(255,255,255,.08); padding-top:18px; margin-top:32px; display:flex; justify-content:space-between; align-items:center; gap:16px; font-size:11px; color:var(--muted); }
+    .report-footer .footer-left { display:flex; flex-direction:column; gap:3px; }
+    .report-footer .footer-right { white-space:nowrap; }
+    .section { background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01)); border:1px solid rgba(255,255,255,.06); border-radius:20px; padding:28px 30px; margin-bottom:22px; }
+    .sec-header { display:grid; grid-template-columns:auto 1fr; gap:14px; align-items:flex-start; margin-bottom:12px; }
+    .sec-num { width:40px; height:40px; border-radius:12px; background:rgba(168,85,247,.14); color:var(--accent); font-size:12px; font-weight:900; display:flex; align-items:center; justify-content:center; }
+    .sec-title { font-size:18px; font-weight:800; color:white; line-height:1.2; }
+    .sec-subtitle { font-size:12px; color:var(--muted); margin-top:4px; }
+    .sec-context { font-size:12px; color:var(--muted); margin-bottom:18px; padding-bottom:0; }
+    .persona-card { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:18px; display:grid; grid-template-columns:1fr 1fr; gap:14px; padding:22px; margin-bottom:18px; }
+    .pc-head { display:flex; align-items:center; gap:14px; }
+    .pc-icon { width:46px; height:46px; border-radius:16px; background:rgba(168,85,247,.16); display:flex; align-items:center; justify-content:center; font-size:18px; }
+    .pc-title { font-size:13px; font-weight:800; color:white; }
+    .pc-meta { font-size:11px; color:var(--muted); line-height:1.6; }
+    .pc-row { display:flex; flex-direction:column; gap:4px; font-size:11px; color:var(--muted); margin-bottom:10px; }
+    .pc-row strong { color:white; font-size:12px; font-weight:700; }
+    .pain-map-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin-bottom:18px; }
+    .pain-card { position:relative; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:18px; padding:18px; min-height:130px; }
+    .pain-card::before { content:''; position:absolute; top:16px; right:16px; width:28px; height:28px; border-radius:50%; background:rgba(168,85,247,.16); }
+    .pain-card .pc-hed { font-size:10px; text-transform:uppercase; letter-spacing:.18em; color:var(--muted); margin-bottom:10px; font-weight:700; }
+    .pain-card .pc-copy { font-size:12px; color:var(--text); line-height:1.7; }
+    .pipeline-row { display:grid; grid-template-columns:repeat(4,minmax(130px,1fr)); gap:14px; margin-bottom:18px; }
+    .pipeline-step { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:18px; padding:18px; min-height:120px; }
+    .ps-label { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.16em; margin-bottom:10px; font-weight:700; }
+    .ps-value { font-size:13px; color:white; font-weight:800; margin-bottom:10px; line-height:1.4; }
+    .ps-note { font-size:11px; color:var(--muted); line-height:1.6; }
+    .intent-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin-bottom:18px; }
+    .intent-level { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.18em; margin-bottom:8px; font-weight:700; }
+    .intent-pill { display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1); border-radius:999px; padding:8px 12px; font-size:11px; color:white; margin:2px 3px 2px 0; }
+    .timeline { display:grid; gap:14px; margin-bottom:18px; }
+    .timeline-item { display:grid; grid-template-columns:38px 1fr; gap:12px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:18px; padding:16px; }
+    .ti-step { width:38px; height:38px; border-radius:50%; background:rgba(168,85,247,.16); color:var(--accent); font-weight:900; display:flex; align-items:center; justify-content:center; font-size:12px; }
+    .ti-title { font-size:13px; font-weight:800; color:white; margin-bottom:6px; }
+    .ti-body { font-size:11px; color:var(--muted); line-height:1.7; }
+    .cm-bar-row { display:grid; grid-template-columns:1fr 64px 1fr; gap:10px; align-items:center; margin-bottom:11px; }
+    .cm-bar-label { font-size:11px; color:var(--text); }
+    .cm-bar { height:10px; background:rgba(255,255,255,.05); border-radius:999px; overflow:hidden; }
+    .cm-bar-fill { height:100%; border-radius:999px; background:linear-gradient(90deg,var(--accent2),var(--accent)); }
+    @media (max-width:900px) { .cover-hero { grid-template-columns:1fr; } .cover-kpis { grid-template-columns:1fr 1fr; } .pipeline-row { grid-template-columns:1fr; } .intent-grid { grid-template-columns:1fr; } .pain-map-grid { grid-template-columns:1fr; } .persona-card { grid-template-columns:1fr; } .report-footer { flex-direction:column; align-items:flex-start; } }
+
     /* ── LOADING / ERROR ── */
     #loading-state { text-align:center; padding:100px 32px; }
     .spinner { width:40px; height:40px; border:3px solid rgba(168,85,247,.2); border-top-color:var(--accent);
@@ -78,12 +139,12 @@
     .exec-card p { font-size:13px; line-height:1.85; color:var(--text); }
 
     /* ── SECTION ── */
-    .section { background:rgba(18,24,39,.6); border:1px solid var(--border); border-radius:16px; padding:28px 32px; margin-bottom:20px; }
-    .sec-header { display:flex; align-items:center; gap:12px; margin-bottom:6px; }
-    .sec-num    { width:28px; height:28px; border-radius:50%; background:var(--accent); color:white;
-      font-size:10px; font-weight:900; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
-    .sec-title  { font-size:15px; font-weight:800; color:white; }
-    .sec-context { font-size:11px; color:var(--muted); margin-bottom:20px; padding-bottom:12px; border-bottom:1px dashed var(--border); }
+    .section { background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01)); border:1px solid rgba(255,255,255,.06); border-radius:20px; padding:28px 30px; margin-bottom:22px; }
+    .sec-header { display:grid; grid-template-columns:auto 1fr; gap:14px; align-items:flex-start; margin-bottom:12px; }
+    .sec-num { width:40px; height:40px; border-radius:12px; background:rgba(168,85,247,.14); color:var(--accent); font-size:12px; font-weight:900; display:flex; align-items:center; justify-content:center; }
+    .sec-title { font-size:18px; font-weight:800; color:white; line-height:1.2; }
+    .sec-subtitle { font-size:12px; color:var(--muted); margin-top:4px; }
+    .sec-context { font-size:12px; color:var(--muted); margin-bottom:18px; }
 
     /* ── ANALYST CALLOUT ── */
     .analyst-callout { background:rgba(168,85,247,.04); border:1px solid rgba(168,85,247,.2); border-left:4px solid var(--accent);
@@ -239,7 +300,7 @@
 
 <div class="wrap">
   <div id="demo-report-banner" class="demo-banner" style="display:none;">
-    <strong>Demo Mode Report — No live data was used.</strong> Validate before decision-making.
+    <strong>DEMO MODE REPORT — No live data was used.</strong> Validate before decision-making.
   </div>
 
   <!-- Loading skeleton -->
@@ -285,7 +346,8 @@
       </div>
     </div>
 
-    <!-- KPI Strip -->
+    <div id="report-cover" class="report-cover" style="display:none"></div>
+
     <div class="score-strip" style="grid-template-columns:repeat(5,1fr)">
       <div class="sc"><div class="sv green" id="r-score">—</div><div class="sl">GTM Score</div></div>
       <div class="sc"><div class="sv purple" id="r-tam">—</div><div class="sl">TAM Size</div></div>
@@ -296,6 +358,7 @@
 
     <!-- All sections injected by JS -->
     <div id="sections-container"></div>
+    <div class="report-footer"><div class="footer-left"><span>ABE Enterprise AI Revenue Infrastructure</span><span>Confidential · For internal review only</span></div><div class="footer-right">Page 1 · Demo reporting</div></div>
   </div>
 </div>
 
@@ -335,13 +398,77 @@ function emailCard(em, label) {
     ${em.cta ? `<div class="ec">→ ${esc(em.cta)}</div>` : ''}
   </div>`;
 }
-function sectionWrap(num, title, contextText, body) {
+function sectionWrap(num, title, subtitle, contextText, body) {
   const parts = body.filter(Boolean).join(''); if (!parts) return '';
   return `<div class="section">
-    <div class="sec-header"><div class="sec-num">${num}</div><div class="sec-title">${esc(title)}</div></div>
+    <div class="sec-header"><div class="sec-num">${esc(num)}</div><div><div class="sec-title">${esc(title)}</div>${subtitle ? `<div class="sec-subtitle">${esc(subtitle)}</div>` : ''}</div></div>
     ${contextText ? `<div class="sec-context">${esc(contextText)}</div>` : ''}
     ${parts}
   </div>`;
+}
+function renderPersonaCard(s3, industry) {
+  const primary = repairICP(s3.primary_icp, 'primary', s3, industry);
+  const trigger = Array.isArray(s3.buying_triggers) ? s3.buying_triggers[0] : 'Modernization / process risk';
+  const objection = Array.isArray(s3.objections) ? s3.objections[0] : 'Insufficient ROI proof';
+  const dms = Array.isArray(s3.decision_makers) ? s3.decision_makers : [];
+  return `<div class="persona-card">
+    <div>
+      <div class="pc-head"><span class="pc-icon">👤</span><div><div class="pc-title">Primary ICP Persona</div><div class="pc-meta">${esc(primary)}</div></div></div>
+      <div class="pc-row"><span>Decision responsibility</span><strong>${esc(dms[0] || 'Procurement / IT alignment')}</strong></div>
+      <div class="pc-row"><span>Buying trigger</span><strong>${esc(trigger)}</strong></div>
+    </div>
+    <div>
+      <div class="pc-row"><span>Objection</span><strong>${esc(objection)}</strong></div>
+      <div class="pc-row"><span>Next action</span><strong>Build a CFO-backed value case</strong></div>
+      <div class="pc-row"><span>Persona focus</span><strong>${esc(industry || 'Business transformation')}</strong></div>
+    </div>
+  </div>`;
+}
+function renderPipelineStep(label, value, note) {
+  if (!value) return '';
+  return `<div class="pipeline-step"><div class="ps-label">${esc(label)}</div><div class="ps-value">${esc(value)}</div>${note ? `<div class="ps-note">${esc(note)}</div>` : ''}</div>`;
+}
+function renderAccountPipeline(s4) {
+  if (!s4) return '';
+  return `<div class="pipeline-row">
+    ${renderPipelineStep('Database', safe(s4.recommended_databases) || 'CRM, Apollo, LinkedIn', 'Primary sourcing platforms')}
+    ${renderPipelineStep('Filter Criteria', safe(s4.filter_criteria) || 'Firmographic + tech + buying stage', 'Target fit rules')}
+    ${renderPipelineStep('Exclusion', safe(s4.exclusion_criteria) || 'Existing incumbents / low-fit accounts', 'Risk filters')}
+    ${renderPipelineStep('Outreach Priority', safe(s4.estimated_universe) || 'High-fit accounts first', 'Shortlist priority')}
+  </div>`;
+}
+function renderPainMap(s3) {
+  const psm = Array.isArray(s3.pain_solution_map) ? s3.pain_solution_map.slice(0,3) : [];
+  if (psm.length) {
+    return `<div class="pain-map-grid">
+      ${psm.map((p, idx) => `<div class="pain-card"><div class="pc-hed">${esc(['Pain','Impact','Intervention'][idx]||'Item')}</div><div class="pc-copy">${esc(safe(p.operational_friction || p.pain || '—'))}</div><div class="pc-copy" style="margin-top:10px;color:var(--amber)">${esc(safe(p.business_impact || p.impact || '—'))}</div><div class="pc-copy" style="margin-top:10px;color:var(--green)">${esc(safe(p.recommended_intervention || p.intervention || '—'))}</div></div>`).join('')}
+    </div>`;
+  }
+  return `<div class="pain-map-grid">
+    <div class="pain-card"><div class="pc-hed">Pain</div><div class="pc-copy">${esc(safe(s3.core_pain_points || s3.pain_description || 'Operational friction on key processes.'))}</div></div>
+    <div class="pain-card"><div class="pc-hed">Impact</div><div class="pc-copy">${esc(safe(s3.business_impact || s3.value_driver || 'Revenue leakage, efficiency drag, and risk exposure.'))}</div></div>
+    <div class="pain-card"><div class="pc-hed">Intervention</div><div class="pc-copy">${esc(safe(s3.recommended_intervention || 'Targeted enterprise outreach with outcome-driven messaging.'))}</div></div>
+  </div>`;
+}
+function renderKeywordIntent(s5) {
+  const primary = Array.isArray(s5.primary_keywords) ? s5.primary_keywords : [];
+  const secondary = Array.isArray(s5.secondary_keywords) ? s5.secondary_keywords : [];
+  const intent = Array.isArray(s5.intent_signals) ? s5.intent_signals : [];
+  return `<div class="intent-grid">
+    <div><div class="intent-level">Problem-aware</div>${primary.map(k=>`<span class="intent-pill">${esc(k)}</span>`).join('')}</div>
+    <div><div class="intent-level">Solution-aware</div>${secondary.map(k=>`<span class="intent-pill">${esc(k)}</span>`).join('')}</div>
+    <div><div class="intent-level">High-intent</div>${intent.map(k=>`<span class="intent-pill amber">${esc(k)}</span>`).join('') || '<span style="color:var(--muted);font-size:11px">No strong intent signals extracted</span>'}</div>
+  </div>`;
+}
+function renderSDRTimeline(s6) {
+  const steps = [
+    {label:'Email 1', angle:s6.email_1?.angle||'Signal capture', subject:s6.email_1?.subject, body:s6.email_1?.body, cta:s6.email_1?.cta},
+    {label:'Email 2', angle:s6.email_2?.angle||'Value proposition', subject:s6.email_2?.subject, body:s6.email_2?.body, cta:s6.email_2?.cta},
+    {label:'Email 3', angle:s6.email_3?.angle||'Proof and urgency', subject:s6.email_3?.subject, body:s6.email_3?.body, cta:s6.email_3?.cta},
+    {label:'LinkedIn', angle:'Social touch', body:s6.linkedin_message, cta:'Connect / engage'},
+    {label:'Follow-up', angle:'Persistence', body:s6.linkedin_follow_up, cta:'Nudge with next step'},
+  ];
+  return `<div class="timeline">${steps.filter(step=>step.subject||step.body||step.angle).map((step,idx)=>`<div class="timeline-item"><div class="ti-step">${idx+1}</div><div><div class="ti-title">${esc(step.label)} — ${esc(step.angle)}</div>${step.subject?`<div style="font-size:11px;color:var(--text);margin-bottom:4px"><strong>Subject:</strong> ${esc(step.subject)}</div>`:''}${step.body?`<div class="ti-body">${esc(step.body)}</div>`:''}${step.cta?`<div class="tag green" style="margin-top:10px">${esc(step.cta)}</div>`:''}</div></div>`).join('')}</div>`;
 }
 function callout(text, type='') {
   if (!text) return '';
@@ -756,6 +883,32 @@ function renderReport(r) {
   document.getElementById('r-steps').textContent = (r.steps_completed || Object.values({s1,s2,s3,s4,s5,s6}).filter(x=>Object.keys(x).length).length) + '/7';
 
   const industry = r.industry || '';
+  const demoMode = isDemoReport(r);
+  const reportCover = document.getElementById('report-cover');
+  if (reportCover) {
+    reportCover.innerHTML = `<div class="cover-hero">
+      <div class="cover-info">
+        <div class="cover-label"><span class="cover-mark">ABE</span><span class="cover-subtitle">Enterprise AI Revenue Infrastructure</span></div>
+        <div class="cover-title">GTM Intelligence Report</div>
+        <div class="cover-company">${esc(r.company_name || 'Unknown Company')}</div>
+        <div class="cover-meta">
+          <span>Generated ${new Date(r.updated_at||r.created_at).toLocaleDateString('en-GB',{year:'numeric',month:'long',day:'numeric'})}</span>
+          <span class="cover-badge ${demoMode ? 'demo' : 'live'}">${demoMode ? 'DEMO MODE' : 'LIVE MODE'}</span>
+          <span class="cover-badge" style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.12);color:var(--text)">Confidential</span>
+        </div>
+        <div class="cover-detail">Boardroom-ready GTM insight designed for enterprise strategy reviews, opportunity qualification, and executive decision-making.</div>
+      </div>
+      <div class="cover-kpis">
+        <div class="cover-card"><div class="cc-label">Total Addressable Market</div><div class="cc-value">${esc(safe(s2.tam_size_estimate) || '—')}</div><div class="cc-note">Market size signal</div></div>
+        <div class="cover-card"><div class="cc-label">Compound Annual Growth Rate</div><div class="cc-value">${esc(safe(s2.growth_rate) || '—')}</div><div class="cc-note">Momentum assessment</div></div>
+        <div class="cover-card"><div class="cc-label">GTM Relevance</div><div class="cc-value">${esc(score ? String(score) : '—')}</div><div class="cc-note">Strategy fit score</div></div>
+        <div class="cover-card"><div class="cc-label">Verdict</div><div class="cc-value">${esc(rec.toUpperCase())}</div><div class="cc-note">Go / Watch / No-Go</div></div>
+      </div>
+    </div>`;
+    reportCover.style.display = 'block';
+  }
+  const footerLabel = document.querySelector('.report-footer .footer-right');
+  if (footerLabel) footerLabel.textContent = `Page 1 · ${demoMode ? 'Demo reporting' : 'Live reporting'}`;
 
   const container = document.getElementById('sections-container');
   container.innerHTML = [
@@ -775,7 +928,7 @@ function renderReport(r) {
     </div>`,
 
     // Step 1 — Market Research
-    sectionWrap('01', 'Market Research & SWOT', 'Deconstructs positioning and isolates macro triggers. Identifies why a prospect would buy right now.', [
+    sectionWrap('01', 'Market Research', 'Market pulse & positioning', 'Deconstructs positioning and isolates macro triggers. Identifies why a prospect would buy right now.', [
       renderSWOT(s1),
       field('Market Position', s1.market_position),
       field('GTM Relevance Reasoning', s1.gtm_relevance_reasoning),
@@ -785,7 +938,7 @@ function renderReport(r) {
     ]),
 
     // Step 2 — TAM
-    sectionWrap('02', 'TAM Mapping — The Opportunity', 'Quantifies the total market velocity and filters it down to the actionable dollar amount.', [
+    sectionWrap('02', 'TAM Mapping', 'Opportunity sizing & waterfall analysis', 'Quantifies the total market velocity and filters it down to the actionable dollar amount.', [
       `<div class="grid2">
         ${safe(s2.tam_size_estimate) ? `<div class="metric-box"><div class="mv">${esc(safe(s2.tam_size_estimate))}</div><div class="ml">Total Addressable Market</div></div>` : ''}
         ${safe(s2.growth_rate) ? `<div class="metric-box"><div class="mv">${esc(safe(s2.growth_rate))}</div><div class="ml">CAGR</div></div>` : ''}
@@ -798,12 +951,12 @@ function renderReport(r) {
       callout(s2.priority_opportunities ? `Highest-leverage entry: ${safe(s2.priority_opportunities).split('.')[0]}.` : ''),
     ]),
 
-    // Step 3 — ICP (with repair logic + persona table)
-    sectionWrap('03', 'ICP Modeling — The Persona', 'Identifies exact decision-makers. Maps operational pain directly to high-margin solutions.', [
+    // Step 3 — ICP Modeling
+    sectionWrap('03', 'ICP Modeling', 'Buyer persona & decision ecosystem', 'Identifies exact decision-makers. Maps operational pain directly to high-margin solutions.', [
       field('Primary ICP', repairICP(s3.primary_icp, 'primary', s3, industry)),
       field('Secondary ICP', repairICP(s3.secondary_icp, 'secondary', s3, industry)),
+      renderPersonaCard(s3, industry),
       (isPlaceholderICP(s3.primary_icp)||isPlaceholderICP(s3.secondary_icp)) ? srcNote('One or more ICP values derived from decision-maker / industry / trigger data (original was placeholder)') : '',
-      // ICP Persona Table (Primary Contact / Economic Buyer / Champion)
       (function() {
         const pm = s3.persona_map;
         if (pm && typeof pm === 'object') {
@@ -811,7 +964,6 @@ function renderReport(r) {
           const rows = [pRow('Primary Contact', pm.primary_role), pRow('Economic Buyer', pm.economic_buyer), pRow('Internal Champion', pm.champion)].filter(Boolean).join('');
           if (rows) return `<div class="field"><div class="fl">ICP Persona Map</div><table class="pain-table"><thead><tr><th>Role</th><th>Title</th><th>Key Responsibility</th></tr></thead><tbody>${rows}</tbody></table></div>`;
         }
-        // Derive from decision_makers if no persona_map
         const dms = Array.isArray(s3.decision_makers) ? s3.decision_makers : [];
         if (dms.length >= 2) {
           return `<div class="field"><div class="fl">ICP Persona Map (Derived)</div><table class="pain-table"><thead><tr><th>Role</th><th>Title</th><th>Responsibility</th></tr></thead><tbody>
@@ -833,7 +985,8 @@ function renderReport(r) {
     ]),
 
     // Step 4 — Account Sourcing
-    sectionWrap('04', 'Account Sourcing — The Targets', 'Translates the persona into actionable technographic filters and a prospect roster.', [
+    sectionWrap('04', 'Account Sourcing', 'Targeting playbook and filters', 'Translates the persona into actionable technographic filters and a prospect roster.', [
+      renderAccountPipeline(s4),
       tagRow('Recommended Databases', s4.recommended_databases, 'green'),
       field('Filter Criteria', s4.filter_criteria),
       field('Sourcing Playbook', s4.sourcing_playbook),
@@ -843,19 +996,17 @@ function renderReport(r) {
     ]),
 
     // Step 5 — Keywords
-    sectionWrap('05', 'Keywords & Intent Intelligence', 'Maps the semantic footprint of the prospect before they issue an RFP.', [
-      renderKeywordTaxonomy(s5),
+    sectionWrap('05', 'Keywords & Intent', 'Semantic funnel taxonomy', 'Maps the semantic footprint of the prospect before they issue an RFP.', [
+      renderKeywordIntent(s5),
       field('Boolean Search Query', s5.boolean_query),
       field('LinkedIn Search String', s5.linkedin_search_strings),
       tagRow('Content Topics', s5.content_topics, 'blue'),
       callout(s5.analyst_insight),
     ]),
 
-    // Step 6 — Messaging
-    sectionWrap('06', 'Outreach Messaging — The Engagement', 'Hyper-targeted, trigger-specific sequences designed to agitate pain and validate scalability.', [
-      emailCard(s6.email_1, 'Email 1 — Agitation / Market Signal'),
-      emailCard(s6.email_2, 'Email 2 — Hard ROI Metric'),
-      emailCard(s6.email_3, 'Email 3 — Heavyweight Proof'),
+    // Step 6 — Outreach Messaging
+    sectionWrap('06', 'Enterprise SDR Sequence', 'Touchpoint timeline for outreach execution', 'Hyper-targeted, trigger-specific sequences designed to agitate pain and validate scalability.', [
+      renderSDRTimeline(s6),
       field('Follow-up Sequence', s6.follow_up_sequence),
       field('LinkedIn Message', s6.linkedin_message),
       field('LinkedIn Follow-up', s6.linkedin_follow_up),
