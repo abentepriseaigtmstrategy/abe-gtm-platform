@@ -135,7 +135,7 @@ async function handleRunStep(body, userId, openaiKey, supabaseUrl, supabaseKey, 
   if (!parsed) return errRes('AI returned unparseable response after retry', 422, cors);
 
   // Attach safe RAG metadata without changing existing payload fields
-  const stepData = augmentStepOutput(parsed, resolvedProfile);
+  const stepData = augmentStepOutput(parsed, step, resolvedProfile, prior_steps || {});
 
   const duration = Date.now() - t0;
 
@@ -921,7 +921,7 @@ function parseStep7(rawText) {
 // ── Prompt builder ───────────────────────────────────────────────
 function buildStepPrompt(step, company, industry, priorSteps, companyProfile) {
   const ind  = industry ? ` in the ${industry} industry` : '';
-  const sourceInstructions = `\nSOURCE ATTRIBUTION: include these metadata fields in your JSON output exactly as named: _source_context, _profile_source, _confidence_basis, _rag_enabled, _missing_evidence. If verified profile evidence is present, _profile_source must be "verified_company_profile". If verified evidence is missing, _profile_source must be "ai_estimate_validate_manually" and all source-backed facts should be avoided unless they come from the AI estimate context.`;
+  const sourceInstructions = `\nSOURCE ATTRIBUTION: include these metadata fields in your JSON output exactly as named: _source_context, _profile_source, _confidence_basis, _rag_enabled, _missing_evidence, _evidence_summary, _ai_estimate_fields, _verified_fields. If verified profile evidence is present, _profile_source must be "verified_company_profile". If verified evidence is missing, _profile_source must be "ai_estimate_validate_manually". When a value is derived from a prior phase, use "derived from Step X output". Add step-specific fields where relevant, such as _source_company_overview, _source_market_position, _source_growth_signals, _source_tam_size_estimate, _source_primary_icp, _source_filter_criteria, _source_primary_keywords, _source_email_angles, _source_go_no_go. Keep metadata compact and JSON-safe.`;
   const base = `You are a B2B GTM opportunity qualification analyst. CRITICAL: Return ONLY a valid JSON object. No markdown. No code fences. Start with { end with }. Use verified TRUTH LAYER evidence first. If verified evidence is missing, mark the output as an AI estimate and do not invent source-backed facts.${sourceInstructions}`;
 
   // Inject verified profile if available and high confidence
@@ -1155,33 +1155,99 @@ async function parseWithRetry(rawText, step, originalPrompt, openaiKey) {
   } catch { return parsed; }
 }
 
-function augmentStepOutput(data, companyProfile) {
+function augmentStepOutput(data, step, companyProfile, priorSteps) {
   if (!data || typeof data !== 'object' || Array.isArray(data)) return data;
 
+  const output = { ...data };
   const hasVerified = companyProfile && companyProfile.extraction_confidence !== 'LOW' && companyProfile.company_overview;
   const profileSource = hasVerified ? 'verified_company_profile' : 'ai_estimate_validate_manually';
-  const confidenceFactor = hasVerified ? 1.0 : 0.85;
-  const confidenceBasis = hasVerified
-    ? 'Verified website profile evidence'
-    : 'AI-only estimate with 0.85x confidence penalty applied';
+  const priorStep = priorSteps && Object.keys(priorSteps).length
+    ? Math.max(...Object.keys(priorSteps).map(n => Number(n)))
+    : null;
   const sourceContext = hasVerified
     ? 'Verified profile evidence is available and should be used first.'
-    : 'No verified profile evidence available; output is an AI estimate and should be validated manually.';
-  const missingEvidence = hasVerified ? 'none' : 'verified company profile';
-
-  const output = { ...data };
+    : priorStep
+      ? `Derived from Step ${priorStep} output and AI estimation.`
+      : 'No verified profile evidence available; output is an AI estimate and should be validated manually.';
+  const confidenceBasis = hasVerified
+    ? 'Verified company profile evidence'
+    : 'AI estimate based on prior GTM context; validate manually.';
+  const missingEvidence = hasVerified
+    ? 'none'
+    : Array.isArray(data.data_completeness?.missing) && data.data_completeness.missing.length
+      ? data.data_completeness.missing.filter(Boolean).join(', ')
+      : 'verified company profile evidence and supporting source data';
+  const evidenceSummary = hasVerified
+    ? 'Core content is grounded in verified company profile evidence.'
+    : priorStep
+      ? `Some content is derived from Step ${priorStep} output; verified profile evidence is missing.`
+      : 'No verified profile evidence is available; output is an AI estimate and should be validated manually.';
+  const verifiedFields = hasVerified
+    ? ['company_overview','services','industry','target_market','tech_stack','value_props']
+    : [];
+  const aiEstimateFields = [];
+  if (!hasVerified) {
+    aiEstimateFields.push('company profile', 'market assumptions');
+    if (priorStep) aiEstimateFields.push(`derived from Step ${priorStep} output`);
+  }
 
   if (typeof output.confidence_score === 'number') {
-    output.confidence_score = Math.round(output.confidence_score * confidenceFactor);
+    output.confidence_score = Math.round(output.confidence_score);
   } else if (typeof output.confidence_score === 'string' && !Number.isNaN(Number(output.confidence_score))) {
-    output.confidence_score = Math.round(Number(output.confidence_score) * confidenceFactor);
+    output.confidence_score = Math.round(Number(output.confidence_score));
   }
 
   output._source_context = sourceContext;
   output._profile_source = profileSource;
   output._confidence_basis = confidenceBasis;
   output._rag_enabled = true;
-  output._missing_evidence = missingEvidence;
+  output._missing_evidence = missingEvidence || 'none';
+  output._evidence_summary = evidenceSummary;
+  output._verified_fields = verifiedFields;
+  output._ai_estimate_fields = aiEstimateFields;
+
+  const sourceText = hasVerified
+    ? 'verified_company_profile'
+    : priorStep
+      ? `derived_from_step_${priorStep}_output`
+      : 'ai_estimate_validate_manually';
+
+  switch (step) {
+    case 1:
+      output._source_company_overview = sourceText;
+      output._source_market_position = sourceText;
+      output._source_growth_signals = sourceText;
+      break;
+    case 2:
+      output._source_tam_size_estimate = sourceText;
+      output._source_growth_rate = sourceText;
+      output._source_market_segments = sourceText;
+      output._tam_assumption_notes = sourceText;
+      break;
+    case 3:
+      output._source_primary_icp = sourceText;
+      output._source_secondary_icp = sourceText;
+      output._source_buying_triggers = sourceText;
+      output._icp_assumption_notes = sourceText;
+      break;
+    case 4:
+      output._source_filter_criteria = sourceText;
+      output._source_recommended_databases = sourceText;
+      output._account_assumption_notes = sourceText;
+      break;
+    case 5:
+      output._source_primary_keywords = sourceText;
+      output._source_intent_signals = sourceText;
+      output._keyword_assumption_notes = sourceText;
+      break;
+    case 6:
+      output._source_email_angles = sourceText;
+      output._source_value_proposition = sourceText;
+      output._messaging_assumption_notes = sourceText;
+      break;
+    default:
+      break;
+  }
 
   return output;
 }
