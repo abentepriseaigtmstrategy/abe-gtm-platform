@@ -51,6 +51,9 @@ export function buildReportHTML(strategy) {
   const rec = s7.go_no_go?.recommendation || (score>=75?'Go':score>=50?'Watch':'No-Go');
   const recUp = rec.toUpperCase();
   const recColor = /go$/i.test(rec)&&!/no/i.test(rec)?'var(--green)':/no/i.test(rec)?'var(--red)':'var(--amber)';
+  const isDemo = strategy.report_mode === 'demo' || strategy.demo_mode === true || (strategy.full_report && strategy.full_report.demo_mode) || (strategy.scraped_profile && strategy.scraped_profile.demo_mode) || s1.demo_mode || s2.demo_mode || s3.demo_mode || s4.demo_mode || s5.demo_mode || s6.demo_mode || s7.demo_mode;
+  const modeLabel = isDemo ? 'DEMO MODE' : 'LIVE MODE';
+  const modeClass = isDemo ? 'demo' : 'live';
   const veracity = Math.round(confScore*0.4);
   const timing = Math.round(confScore*0.25);
   const icpFit = Math.round(confScore*0.2);
@@ -85,8 +88,8 @@ export function buildReportHTML(strategy) {
   const cleanAcct = (name, i) => { if (!name||name==='—') return ANALOGS[i%ANALOGS.length]; const n=String(name).trim(); return FAKE_RE.test(n)?ANALOGS[i%ANALOGS.length]:n; };
 
   // ── Helper builders ──
-  const pageHdr = () => `<div class="ph"><div class="phb"><div class="am">ABE</div><div><div class="abn">AI Revenue Infrastructure</div><div class="abs">Enterprise GTM Platform</div></div></div><div class="cb">Confidential</div></div>`;
-  const pageFtr = (label,num) => `<div class="pf"><span>ABE · ${e(label)}</span><span>${num}</span></div>`;
+  const pageHdr = () => `<div class="ph"><div class="phb"><div class="am">ABE</div><div><div class="abn">AI Revenue Infrastructure</div><div class="abs">Enterprise GTM Platform</div></div></div><div><span class="cb ${modeClass}">${e(modeLabel)}</span><div class="cb" style="margin-top:4px;background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.08);color:var(--muted);">Confidential</div></div></div>`;
+  const pageFtr = (label,num) => `<div class="pf"><span>ABE Enterprise AI Revenue Infrastructure · Confidential · ${e(label)}</span><span>${num}</span></div>`;
   const secHead = (num,title) => `<h2><span class="sa">${num}</span> ${e(title)}</h2>`;
   const secCtx = text => text?`<div class="sc">${e(text)}</div>`:'';
   const callout = (text,cls='') => text?`<div class="ac ${cls}"><strong>👉 Analyst Insight:</strong> ${e(text)}</div>`:'';
@@ -216,6 +219,21 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-
 .abn{font-size:12px;font-weight:800;color:white}
 .abs{font-family:'Space Mono',monospace;font-size:8px;color:var(--muted);letter-spacing:.12em;text-transform:uppercase}
 .cb{background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.25);border-radius:20px;padding:4px 14px;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
+.cover{display:flex;flex-direction:column;justify-content:center;gap:18px;min-height:257mm;background:linear-gradient(180deg, rgba(11,15,26,.98), rgba(18,24,39,.98));padding:24mm 18mm;}
+.cover-hero{display:grid;grid-template-columns:1fr 1fr;gap:12mm;align-items:start;}
+.cover-title{font-size:34px;font-weight:900;color:white;line-height:1.05;margin-bottom:6px;}
+.cover-subtitle{font-size:10px;text-transform:uppercase;color:var(--muted);letter-spacing:.24em;margin-bottom:8px;}
+.cover-meta{display:flex;flex-wrap:wrap;gap:10px;align-items:center;color:var(--muted);font-size:10px;}
+.cover-badge{padding:6px 14px;border-radius:999px;font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.14em;}
+.cover-badge.demo{color:var(--amber);background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.22);}
+.cover-badge.live{color:var(--green);background:rgba(34,197,94,.12);border:1px solid rgba(34,197,94,.22);}
+.cover-card{background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);border-radius:16px;padding:14px;min-height:98px;display:flex;flex-direction:column;justify-content:space-between;}
+.cover-card .bl{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-bottom:6px;}
+.cover-card .mn{font-size:24px;line-height:1.1;color:white;}
+.cover-card p{margin:0;font-size:9px;color:var(--muted);}
+.cover-grid{display:grid;grid-template-columns:repeat(4,minmax(100px,1fr));gap:12px;}
+.cover-note{font-size:10px;color:var(--muted);line-height:1.7;max-width:55%;}
+.cover-footer{font-size:9px;color:var(--faint);letter-spacing:.12em;margin-top:12mm;}
 h1{font-size:36px;font-weight:900;color:white;letter-spacing:-.5px}
 h2{font-size:18px;font-weight:700;color:white;margin-bottom:4mm;display:flex;align-items:center;gap:8px}
 h3{font-size:14px;font-weight:600;color:var(--text);margin-top:5mm;margin-bottom:3mm}
@@ -262,15 +280,26 @@ ul{padding-left:5mm}li{margin-bottom:1.5mm}
 </style></head><body>
 
 <!-- COVER -->
-<div class="page" style="display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center">
-<div>
-  <div class="am" style="width:56px;height:56px;font-size:18px;margin:0 auto 8mm">ABE</div>
-  <h1>${e(co)}<br>GTM Intelligence Report</h1>
-  <p style="font-size:15px;color:var(--muted);margin-top:6mm">Confidential · Senior Strategy Brief</p>
-  <p style="font-size:12px;color:var(--muted);margin-top:4mm">Prepared by ABE AI Revenue Infrastructure<br>${date}</p>
-  ${ind?`<p style="font-size:11px;color:var(--faint);margin-top:3mm">${e(ind)}</p>`:''}
-</div>
-<div style="position:absolute;bottom:15mm;font-size:9px;color:var(--faint)">Classification: CONFIDENTIAL — Not for External Distribution</div>
+<div class="page cover">
+  <div class="cover-hero">
+    <div>
+      <div class="cover-subtitle">ABE Enterprise AI Revenue Infrastructure</div>
+      <div class="cover-title">GTM Intelligence Report</div>
+      <div class="cover-meta">
+        <span>${e(co)}</span>
+        <span class="cover-badge ${modeClass}">${e(modeLabel)}</span>
+        <span>Generated ${e(date)}</span>
+      </div>
+      <div class="cover-note">Premium executive briefing for enterprise strategy committees. Includes GTM fit, market sizing, ICP mapping, outreach design, and revenue intelligence.</div>
+    </div>
+    <div class="cover-grid">
+      <div class="cover-card"><div class="bl">Total Addressable Market</div><div class="mn">${e(safe(s2.tam_size_estimate)||'—')}</div><p>Market size signal</p></div>
+      <div class="cover-card"><div class="bl">Compound Annual Growth Rate</div><div class="mn">${e(safe(s2.growth_rate)||'—')}</div><p>Momentum assessment</p></div>
+      <div class="cover-card"><div class="bl">GTM Relevance</div><div class="mn">${e(score ? String(score) : '—')}</div><p>Strategy fit score</p></div>
+      <div class="cover-card"><div class="bl">Verdict</div><div class="mn">${e(recUp)}</div><p>Go / Watch / No-Go</p></div>
+    </div>
+  </div>
+  <div class="cover-footer">Confidential · For internal executive review only · ABE Enterprise AI Revenue Infrastructure</div>
 </div>
 
 <!-- EXECUTIVE SUMMARY -->
