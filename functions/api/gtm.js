@@ -190,6 +190,294 @@ function makeDemoAnchorText(company, industry) {
   return `${name} ${sector}`;
 }
 
+function getDemoIndustryProfile(company, industry) {
+  const source = `${company || ''} ${industry || ''}`.toLowerCase();
+  const saas = /(saas|software as a service|b2b software|enterprise software|cloud app|cloud software|subscription software)/;
+  const itServices = /(it services|system integrator|si|managed service|msps|consulting|technology services|digital transformation)/;
+  const fintech = /(fintech|payment|payments|banking|digital banking|card|issuer|acquirer|crypto|wallet|risk|transaction)/;
+  const travel = /(travel|ota|hospitality|hotel|airline|consumer internet|tourism|vacation|lodging|resort|booking)/;
+  const healthcare = /(healthcare|pharma|biotech|medical|life sciences|health tech|clinical|medtech)/;
+  const manufacturing = /(manufactur|factory|textile|apparel|garment|industrial|production|distribution)/;
+  const retail = /(retail|ecommerce|e-commerce|consumer brand|consumer goods|direct-to-consumer|d2c|shop|store)/;
+  const logistics = /(logistics|supply chain|freight|shipping|transportation|warehouse|fulfillment|distribution)/;
+  const education = /(education|edtech|e-learning|learning platform|training platform|school|university|academy)/;
+  const realEstate = /(real estate|construction|proptech|property management|residential|commercial building|developer)/;
+  const energy = /(energy|renewable|renewables|clean tech|cleantech|solar|wind|utilities|power|energy transition)/;
+  const media = /(media|entertainment|streaming|content platform|publishing|broadcast|creative agency|gaming|music)/;
+  const insurance = /(insurance|bfs|bfsi|insurer|broking|underwriting|claims|risk transfer)/;
+
+  if (saas.test(source)) {
+    return {
+      category: 'saas',
+      industryLabel: 'SaaS and B2B software',
+      primary_icp: 'VP Product, Head of Revenue, or Director of Customer Success at high-growth SaaS businesses',
+      secondary_icp: 'Sales operations and growth leaders at subscription software companies',
+      decision_makers: ['VP Product', 'Head of Revenue', 'Chief Customer Officer'],
+      firmographics: 'Mid-market to growth-stage software firms with recurring revenue and international GTM plans.',
+      buying_triggers: ['Churn reduction pressure', 'need for faster expansion motions', 'subscription revenue optimization'],
+      core_pain_points: 'The business needs better feature adoption, churn prevention and predictable recurring revenue growth.',
+      common_objections: ['Need proof of product-led impact', 'already using point solutions', 'unclear ROI overlay'],
+      sourcing_filters: 'Subscription software, ARR $10M–$100M, rapid customer acquisition, modern GTM stack.',
+      keywords: 'SaaS growth, product adoption, subscription revenue, churn reduction',
+      messaging_angle: 'Help software teams turn product usage into reliable revenue and reduce churn.',
+      risks: ['Overreliance on product-led growth signals', 'complex customer onboarding outcomes', 'integration friction'],
+      strategic_hook: 'Position the solution as the missing layer between product engagement and recurring revenue predictability.',
+      why_now: 'SaaS buyers are focused on retention and efficient growth as enterprise budgets tighten.',
+      account_analogs: ['High-growth SaaS platform', 'Mid-market cloud app vendor', 'Subscription software leader'],
+    };
+  }
+
+  if (itServices.test(source)) {
+    return {
+      category: 'it_services',
+      industryLabel: 'IT services and system integration',
+      primary_icp: 'Engagement Directors, Head of Delivery, or VP Technology at IT services firms',
+      secondary_icp: 'Sales leaders focused on large transformation deals and managed services',
+      decision_makers: ['Engagement Director', 'Head of Delivery', 'VP Technology'],
+      firmographics: 'System integrators and digital services providers serving enterprise IT transformation programs.',
+      buying_triggers: ['complex transformation demand', 'need for repeatable services delivery', 'client retention risk'],
+      core_pain_points: 'The business needs more predictable deal flow, lower delivery risk and stronger account expansion.',
+      common_objections: ['Existing partner relationships', 'project-based budgeting', 'client risk aversion'],
+      sourcing_filters: 'Organizations with active transformation programs, multi-year engagements, and strong partner ecosystems.',
+      keywords: 'systems integration, digital transformation, managed services, enterprise IT delivery',
+      messaging_angle: 'Help services teams win larger, higher-margin transformation engagements with repeatable deal design.',
+      risks: ['Deal-specific scope creep', 'capture challenges in conservative procurement', 'dependency on incumbent vendors'],
+      strategic_hook: 'Frame the opportunity around predictable, repeatable growth for complex IT services portfolios.',
+      why_now: 'Enterprise digital transformation budgets are expanding amid pressure to modernize legacy systems.',
+      account_analogs: ['Global systems integrator', 'Regional SI with enterprise accounts', 'Managed services provider'],
+    };
+  }
+
+  if (insurance.test(source) && !fintech.test(source)) {
+    return {
+      category: 'insurance',
+      industryLabel: 'insurance and BFSI',
+      primary_icp: 'Chief Insurance Officer, Head of Underwriting, or Director of Digital Insurance at insurers',
+      secondary_icp: 'Claims, underwriting and risk leaders focused on customer experience',
+      decision_makers: ['Chief Insurance Officer', 'Head of Underwriting', 'Director of Digital Insurance'],
+      firmographics: 'Established insurers and insurtech firms with digital transformation agendas.',
+      buying_triggers: ['pressure to reduce loss ratios', 'policyholder experience improvement', 'digital claims acceleration'],
+      core_pain_points: 'The business needs to lower underwriting risk, speed claims workflows and improve customer retention.',
+      common_objections: ['Regulatory complexity', 'legacy core systems', 'risk of vendor disruption'],
+      sourcing_filters: 'Insurers with digital transformation programs, embedded insurance products, or claims modernization initiatives.',
+      keywords: 'insurance automation, claims digitization, underwriting efficiency, risk intelligence',
+      messaging_angle: 'Help insurers modernize underwriting and claims while preserving compliance and risk control.',
+      risks: ['Regulatory scrutiny', 'legacy integration complexity', 'data quality concerns'],
+      strategic_hook: 'Position the solution as a compliance-safe revenue and claims efficiency engine for insurers.',
+      why_now: 'Insurance carriers are under pressure to digitize customer journeys and reduce operating costs.',
+      account_analogs: ['Regional insurer', 'Insurtech platform', 'embedded insurance provider'],
+    };
+  }
+
+  if (healthcare.test(source)) {
+    return {
+      category: 'healthcare',
+      industryLabel: 'healthcare, pharma and biotech',
+      primary_icp: 'Head of Commercial Growth, Director of Market Access, or Chief Innovation Officer at healthcare firms',
+      secondary_icp: 'Pharma marketing and biotech commercial operations leads',
+      decision_makers: ['Head of Commercial Growth', 'Director of Market Access', 'Chief Innovation Officer'],
+      firmographics: 'Health, life sciences and biotech organizations with commercial or go-to-market innovation priorities.',
+      buying_triggers: ['new product launch', 'commercial model shifts', 'regulatory and market access pressure'],
+      core_pain_points: 'The business needs stronger commercial execution, faster go-to-market for new therapies and better stakeholder alignment.',
+      common_objections: ['Regulatory risk', 'long validation cycles', 'incumbent provider relationships'],
+      sourcing_filters: 'Medical, biotech or pharma firms with product launches, digital commercialization programs, or specialty channels.',
+      keywords: 'market access, digital commercialization, healthcare revenue, biotech launch',
+      messaging_angle: 'Help life sciences teams accelerate commercial readiness and stakeholder engagement.',
+      risks: ['Regulatory review cycles', 'complex stakeholder approval', 'evidence requirements'],
+      strategic_hook: 'Present the solution as a way to align clinical innovation with commercial launch certainty.',
+      why_now: 'Health and biotech buyers are prioritizing faster commercialization and operational resilience.',
+      account_analogs: ['Specialty pharma commercial team', 'Biotech launch operations team', 'Healthtech commercialization partner'],
+    };
+  }
+
+  if (travel.test(source)) {
+    return {
+      category: 'travel',
+      industryLabel: 'travel and hospitality',
+      primary_icp: 'VP Growth, Head of Partnerships, Revenue Strategy Lead or Digital Transformation Leader at travel or OTA platforms',
+      secondary_icp: 'Partnerships and revenue strategy stakeholders at hospitality and consumer travel businesses',
+      decision_makers: ['VP Growth', 'Head of Partnerships', 'Revenue Strategy Lead', 'Digital Transformation Leader'],
+      firmographics: 'OTA platforms, hotel groups and hospitality brands with digital commerce ambitions.',
+      buying_triggers: ['distribution gap', 'ancillary revenue pressure', 'channel performance concerns'],
+      core_pain_points: 'The business needs better distribution partnerships, ancillary revenue coordination and digital channel growth.',
+      common_objections: ['legacy channel deals', 'settlement complexity', 'high partner onboarding costs'],
+      sourcing_filters: 'Travel and hospitality companies with active partnership programs and digital channel investments.',
+      keywords: 'travel distribution, OTA partnerships, hospitality revenue, ancillary growth',
+      messaging_angle: 'Help travel teams improve partnership monetization and digital commerce coordination.',
+      risks: ['Seasonal demand swings', 'channel conflict', 'partner contract friction'],
+      strategic_hook: 'Frame the opportunity around predictable revenue from aligned distribution and partnership models.',
+      why_now: 'Travel businesses are rebuilding commercial models after market recovery and need reliable channel growth.',
+      account_analogs: ['OTA platform', 'Hotel chain digital team', 'travel partnership operator'],
+    };
+  }
+
+  if (manufacturing.test(source)) {
+    return {
+      category: 'manufacturing',
+      industryLabel: 'manufacturing and industrial operations',
+      primary_icp: 'COO, Head of Operations, Export Sales Head or Procurement/Distribution Head at manufacturing firms',
+      secondary_icp: 'Supply chain and operations leaders in textiles, apparel and industrial production',
+      decision_makers: ['COO', 'Head of Operations', 'Export Sales Head', 'Procurement/Distribution Head'],
+      firmographics: 'Manufacturing and industrial businesses with complex production, export and distribution networks.',
+      buying_triggers: ['supply chain strain', 'operational cost pressure', 'capacity utilization gaps'],
+      core_pain_points: 'The business needs to tighten throughput, improve export readiness and increase supply chain visibility.',
+      common_objections: ['capital-intensive upgrade concerns', 'process disruption risk', 'legacy plant systems'],
+      sourcing_filters: 'Textile, apparel, and industrial manufacturers with export exposure and digital operations goals.',
+      keywords: 'manufacturing efficiency, supply chain visibility, export readiness, production planning',
+      messaging_angle: 'Help operations teams make output more predictable and supply chains more resilient.',
+      risks: ['factory downtime', 'supplier disruptions', 'system integration complexity'],
+      strategic_hook: 'Position the solution as the connective layer between production execution and customer delivery.',
+      why_now: 'Manufacturers are looking to stabilize supply chains and capture demand amid economic uncertainty.',
+      account_analogs: ['Textile exporter', 'Industrial manufacturer', 'distribution-centric factory'],
+    };
+  }
+
+  if (retail.test(source)) {
+    return {
+      category: 'retail',
+      industryLabel: 'retail, ecommerce and consumer brands',
+      primary_icp: 'Head of Ecommerce, VP Brand, or Director of Digital Commerce at retail and consumer brands',
+      secondary_icp: 'Customer experience and commerce operations leaders',
+      decision_makers: ['Head of Ecommerce', 'VP Brand', 'Director of Digital Commerce'],
+      firmographics: 'Consumer brands and retail merchants with digital sales channels and omnichannel ambitions.',
+      buying_triggers: ['margin pressure', 'conversion rate challenges', 'inventory performance concerns'],
+      core_pain_points: 'The business needs better demand forecasting, channel efficiency and customer retention.',
+      common_objections: ['high marketing cost', 'brand consistency risk', 'legacy merchandising systems'],
+      sourcing_filters: 'Retailers with ecommerce growth plans, DTC models, or complex channel distribution.',
+      keywords: 'ecommerce conversion, retail performance, customer retention, omnichannel growth',
+      messaging_angle: 'Help retail teams improve digital revenue and reduce channel waste through better demand intelligence.',
+      risks: ['inventory imbalance', 'seasonal volatility', 'channel fragmentation'],
+      strategic_hook: 'Position the solution as the commercial intelligence layer that bridges brand strategy and customer conversion.',
+      why_now: 'Retailers need stronger demand certainty and inventory today as channels shift online.',
+      account_analogs: ['DTC brand', 'omnichannel retailer', 'consumer goods platform'],
+    };
+  }
+
+  if (logistics.test(source) && !manufacturing.test(source)) {
+    return {
+      category: 'logistics',
+      industryLabel: 'logistics and supply chain',
+      primary_icp: 'Head of Supply Chain, VP Logistics, or Director of Fulfillment at logistics organizations',
+      secondary_icp: 'Operations and distribution leaders focused on transportation and inventory flow',
+      decision_makers: ['Head of Supply Chain', 'VP Logistics', 'Director of Fulfillment'],
+      firmographics: 'Freight, 3PL, warehouse, and supply chain organizations optimizing operational velocity.',
+      buying_triggers: ['capacity constraints', 'transportation cost pressure', 'inventory delays'],
+      core_pain_points: 'The business needs more reliable order flow, lower transportation costs and greater operational visibility.',
+      common_objections: ['infrastructure constraints', 'legacy TMS/WMS systems', 'seasonal volume risk'],
+      sourcing_filters: 'Logistics providers with distributed operations, freight networks, or modern fulfillment initiatives.',
+      keywords: 'supply chain visibility, logistics execution, fulfillment efficiency, freight optimization',
+      messaging_angle: 'Help logistics teams make supply chain execution more predictable and cost-efficient.',
+      risks: ['carrier capacity volatility', 'demand spikes', 'network fragmentation'],
+      strategic_hook: 'Frame the solution as the execution intelligence system that synchronizes transport and inventory.',
+      why_now: 'Supply chain executives are under pressure to cut delay risk and improve delivery predictability.',
+      account_analogs: ['Third-party logistics provider', 'warehouse operator', 'freight network leader'],
+    };
+  }
+
+  if (education.test(source)) {
+    return {
+      category: 'education',
+      industryLabel: 'education and edtech',
+      primary_icp: 'Head of Learning, Director of Education Programs, or VP Growth at edtech companies',
+      secondary_icp: 'Academic operations and digital learning leaders',
+      decision_makers: ['Head of Learning', 'Director of Education Programs', 'VP Growth'],
+      firmographics: 'Education technology platforms, online learning providers and academic services firms.',
+      buying_triggers: ['demand for remote learning', 'course completion issues', 'student engagement gaps'],
+      core_pain_points: 'The business needs better learner acquisition, engagement analytics and revenue predictability.',
+      common_objections: ['content quality concerns', 'integration with LMS', 'institutional procurement cycles'],
+      sourcing_filters: 'Edtech and training companies with digital enrollment programs and scalable learning solutions.',
+      keywords: 'edtech growth, learner engagement, education revenue, digital learning',
+      messaging_angle: 'Help education teams improve learner conversion and course execution with clearer demand signals.',
+      risks: ['policy and funding changes', 'seasonal enrollment swings', 'platform adoption challenges'],
+      strategic_hook: 'Position the solution as the insight layer that connects learner demand with program delivery.',
+      why_now: 'Education providers are accelerating digital enrollment and outcomes measurement.',
+      account_analogs: ['Online learning platform', 'corporate training provider', 'education publisher'],
+    };
+  }
+
+  if (realEstate.test(source)) {
+    return {
+      category: 'real_estate',
+      industryLabel: 'real estate and construction',
+      primary_icp: 'Head of Development, Director of Sales, or VP Commercial at real estate and construction firms',
+      secondary_icp: 'Property operations and development planning leaders',
+      decision_makers: ['Head of Development', 'Director of Sales', 'VP Commercial'],
+      firmographics: 'Property developers, construction project firms and proptech services with commercial growth needs.',
+      buying_triggers: ['project pipeline shortfall', 'pre-sales gaps', 'construction cost pressure'],
+      core_pain_points: 'The business needs more predictable project demand, better prospect qualification and stronger deal certainty.',
+      common_objections: ['planning cycle length', 'market volatility', 'capital allocation risk'],
+      sourcing_filters: 'Developers, brokers and construction firms with active project pipelines and commercial sales targets.',
+      keywords: 'real estate demand, construction pipeline, property sales, development execution',
+      messaging_angle: 'Help real estate teams turn project demand into reliable sales and execution visibility.',
+      risks: ['market cyclicality', 'planning delays', 'cost escalation'],
+      strategic_hook: 'Frame the solution as the commercial intelligence layer for project-led development portfolios.',
+      why_now: 'Real estate teams need stronger demand certainty as construction markets recover.',
+      account_analogs: ['Commercial developer', 'proptech platform', 'construction services firm'],
+    };
+  }
+
+  if (energy.test(source)) {
+    return {
+      category: 'energy',
+      industryLabel: 'energy and renewables',
+      primary_icp: 'Head of Commercial, Director of Renewables, or VP Energy Transition at energy firms',
+      secondary_icp: 'Project development and operations leaders in renewables and utilities',
+      decision_makers: ['Head of Commercial', 'Director of Renewables', 'VP Energy Transition'],
+      firmographics: 'Energy producers, renewable developers and utility innovators with sustainability ambitions.',
+      buying_triggers: ['carbon reduction targets', 'renewable project financing', 'grid modernization needs'],
+      core_pain_points: 'The business needs reliable off-take, better project commercialization and stronger market signals.',
+      common_objections: ['regulatory complexity', 'project finance risk', 'commodity price volatility'],
+      sourcing_filters: 'Renewable energy developers, utility innovation teams, and energy transition service providers.',
+      keywords: 'renewable energy, power transition, energy commercialization, grid modernization',
+      messaging_angle: 'Help energy teams connect project economics with market demand and commercial outcomes.',
+      risks: ['policy uncertainty', 'grid integration issues', 'financing delays'],
+      strategic_hook: 'Position the solution as the decision support layer for renewable and energy transition initiatives.',
+      why_now: 'Energy buyers are moving quickly to de-risk renewables and capture transition incentives.',
+      account_analogs: ['Solar developer', 'utility innovation team', 'renewables investor'],
+    };
+  }
+
+  if (media.test(source)) {
+    return {
+      category: 'media',
+      industryLabel: 'media and entertainment',
+      primary_icp: 'Head of Content, Director of Audience Growth, or VP Digital at media brands',
+      secondary_icp: 'Publishing and streaming commercial leaders',
+      decision_makers: ['Head of Content', 'Director of Audience Growth', 'VP Digital'],
+      firmographics: 'Media owners, entertainment platforms and content publishers with audience monetization goals.',
+      buying_triggers: ['audience growth pressure', 'monetization gaps', 'distribution channel shifts'],
+      core_pain_points: 'The business needs better content economics, audience engagement and revenue diversification.',
+      common_objections: ['creative team autonomy', 'platform dependency', 'measurement complexity'],
+      sourcing_filters: 'Media and entertainment brands with digital distribution, subscription models, or audience-first content strategies.',
+      keywords: 'audience growth, content monetization, digital publishing, entertainment distribution',
+      messaging_angle: 'Help media teams turn audience insight into more reliable commercial yield.',
+      risks: ['platform algorithm changes', 'content performance uncertainty', 'advertising spend shifts'],
+      strategic_hook: 'Frame the solution as the commercial engine behind audience and content revenue.',
+      why_now: 'Media companies need clearer demand signals as consumption shifts across digital channels.',
+      account_analogs: ['Streaming publisher', 'digital media brand', 'content distribution platform'],
+    };
+  }
+
+  return {
+    category: 'generic',
+    industryLabel: industry || 'B2B revenue operations',
+    primary_icp: 'Revenue Operations Leader at $30M+ ARR software or services companies',
+    secondary_icp: 'VP of Sales in fast-scaling B2B teams',
+    decision_makers: ['Head of Revenue', 'VP of Sales', 'Revenue Operations Director'],
+    firmographics: 'Mid-market B2B companies with business-critical revenue operations needs.',
+    buying_triggers: ['pipeline unpredictability', 'forecast misses', 'sales execution gaps'],
+    core_pain_points: 'Unpredictable pipeline, long sales cycles, and poor lead prioritization.',
+    common_objections: ['need for validated use cases', 'limited budget for new systems', 'internal alignment gaps'],
+    sourcing_filters: 'Companies with revenue operations teams, CRM investments, and growth targets.',
+    keywords: 'revenue operations, pipeline efficiency, forecast reliability, sales execution',
+    messaging_angle: 'Offer a unified revenue execution layer that connects intent signals to sales motion.',
+    risks: ['data fragmentation', 'stakeholder misalignment', 'tool consolidation challenges'],
+    strategic_hook: 'Position the solution as the connective tissue between commercial strategy and execution.',
+    why_now: 'Business leaders need more predictable revenue as market conditions remain uncertain.',
+    account_analogs: ['High-fit enterprise prospect', 'Strategic market account', 'Growth-ready target account'],
+  };
+}
+
 function applyDemoMetadata(output, step) {
   const sourceText = 'demo_mode_simulated';
   const demoMeta = {
@@ -312,29 +600,30 @@ function applyDemoSaveMarkers(scrapedProfile, fullReport) {
 
 function buildDemoStep1(company, industry) {
   const anchor = makeDemoAnchorText(company, industry);
+  const profile = getDemoIndustryProfile(company, industry);
   const output = {
-    company_overview: `${company} is a demo-stage B2B revenue intelligence provider targeting ${industry || 'high-growth enterprise markets'}.`,
-    market_position: `Positioned as a revenue acceleration partner for ${industry || 'mid-market GTM teams'} with a focus on predictable pipeline and deal velocity.`,
+    company_overview: `${company} is a demo-stage provider helping ${profile.industryLabel} teams improve revenue, partnerships and execution.`,
+    market_position: `Positioned as a revenue acceleration partner for ${profile.industryLabel} with a focus on predictable pipeline and revenue coordination.`,
     revenue_stage: 'Growth-stage',
     employee_count: '120–180 employees',
-    products_services: 'Revenue intelligence, GTM execution orchestration, and demand signal automation for enterprise sales teams.',
+    products_services: `Revenue intelligence, GTM execution orchestration, and demand signal automation for ${profile.industryLabel} businesses.`,
     tech_stack_hints: ['CRM automation tools', 'marketing attribution platform', 'BI dashboard integration'],
     growth_signals: [
-      'Recurring revenue momentum observed in demo-mode account analogs.',
-      'Industry demand is increasing for revenue operations efficiency.',
-      'High correlation between GTM execution and pipeline predictability.',
+      'Recurring commercial momentum observed in demo-mode account analogs.',
+      `Industry demand is increasing for ${profile.industryLabel} efficiency and digital revenue coordination.`,
+      'High correlation between GTM execution and predictable commercial outcomes.',
     ],
     demand_signals: [
       `Inbound interest is moderate for ${anchor}.`,
-      'Target buyers are actively researching revenue process automation.',
+      `Target buyers are actively researching ${profile.keyword_focus}.`,
     ],
     market_timing: [
       'Market timing is favorable as buyers prioritize pipeline predictability.',
       'Economic pressure is creating urgency for revenue growth tools.',
     ],
     icp_fit: {
-      target_description: `Mid-market revenue operations and sales enablement leaders in ${industry || 'B2B technology'} companies.`,
-      product_fit: 'Strong fit for companies with recurring revenue and multiple buyer personas.',
+      target_description: profile.primary_icp,
+      product_fit: `Strong fit for companies with ${profile.industryLabel} business models and recurring revenue or digital monetization strategies.`,
     },
     data_completeness: {
       completeness: 'partial',
@@ -405,19 +694,20 @@ function buildDemoStep2(company, industry) {
 }
 
 function buildDemoStep3(company, industry) {
+  const profile = getDemoIndustryProfile(company, industry);
   const output = {
-    primary_icp: 'Revenue Operations Leader at $30M+ ARR software or services companies',
-    secondary_icp: 'VP of Sales in fast-scaling B2B teams',
-    firmographics: 'Target accounts: 200–800 employees, $25M–$120M ARR, US/EMEA.',
-    core_pain_points: 'Unpredictable pipeline, long sales cycles, and poor lead prioritization.',
-    buying_triggers: ['Pipeline underperformance', 'CRM data fragmentation', 'quarterly revenue pressure'],
+    primary_icp: profile.primary_icp,
+    secondary_icp: profile.secondary_icp,
+    firmographics: `Target accounts: 200–800 employees, $25M–$120M ARR, US/EMEA, with ${profile.industryLabel} commercial operations focus.`,
+    core_pain_points: profile.core_problem,
+    buying_triggers: profile.buying_triggers || ['Pipeline underperformance', 'CRM data fragmentation', 'quarterly revenue pressure'],
     objections: ['Need proof of ROI', 'Prefer incumbent systems', 'Skepticism about AI-derived insights'],
     deal_cycle: '90–120 days for enterprise adoption',
-    decision_makers: ['Head of Revenue', 'VP of Sales', 'Revenue Operations Director'],
+    decision_makers: profile.decision_makers,
     persona_map: {
-      primary_role: { title: 'Revenue Operations Leader', key_responsibility: 'Improve forecast accuracy and pipeline velocity' },
-      economic_buyer: { title: 'VP of Sales', key_responsibility: 'Approve budget and close the deal' },
-      champion: { title: 'Director of Sales Operations', key_responsibility: 'Drive adoption and internal alignment' },
+      primary_role: { title: profile.primary_role_title, key_responsibility: profile.primary_role_responsibility },
+      economic_buyer: { title: profile.economic_buyer_title, key_responsibility: profile.economic_buyer_responsibility },
+      champion: { title: profile.champion_title, key_responsibility: profile.champion_responsibility },
     },
     verdict: 'CONDITIONAL GO',
     score_basis: 'Based on demo-mode market signals, ICP alignment, and demand thresholds.',
@@ -429,17 +719,18 @@ function buildDemoStep3(company, industry) {
 }
 
 function buildDemoStep4(company, industry) {
+  const profile = getDemoIndustryProfile(company, industry);
   const output = {
-    recommended_databases: ['Crunchbase', 'LinkedIn Sales Navigator', 'ZoomInfo'],
-    filter_criteria: 'Company size 200–800 employees, annual recurring revenue, revenue operations focus, modern tech stack.',
-    exclusion_criteria: 'Pre-revenue startups, non-B2B businesses, and accounts outside North America/EMEA.',
-    sourcing_playbook: 'Target high-fit accounts with a combined email + LinkedIn outreach campaign and executive briefing.',
+    recommended_databases: profile.recommended_databases || ['Crunchbase', 'LinkedIn Sales Navigator', 'ZoomInfo'],
+    filter_criteria: `Company size 200–800 employees, ${profile.industryLabel} commercial operations focus, modern digitization and distribution capacity.`,
+    exclusion_criteria: 'Pre-revenue startups, non-core distribution businesses, and accounts outside North America/EMEA.',
+    sourcing_playbook: `Target high-fit ${profile.industryLabel} accounts with curated outreach to partnerships and revenue leaders.`,
     data_enrichment: 'Append firmographics, technographics, funding status, and hiring signals to each account profile.',
-    high_fit_account_analogs: ['NimbleOps', 'PipelinePulse', 'RevSync'],
-    target_roles: ['VP Revenue', 'Revenue Operations Director', 'Sales Enablement Lead'],
-    core_problem: `Revenue teams in ${industry || 'this market'} lack predictable pipeline generation and clear account prioritization.`,
-    solution_angle: 'Offer a unified revenue execution layer that connects intent signals to sales motion.',
-    solution_pitch: `Use ${company} to shorten cycles and improve pipeline conversion through aligned GTM execution.`,
+    high_fit_account_analogs: profile.account_analogs,
+    target_roles: profile.target_roles,
+    core_problem: profile.core_problem,
+    solution_angle: profile.solution_angle,
+    solution_pitch: `Use ${company} to shorten cycles and improve ${profile.industryLabel} revenue coordination.`,
     why_now: 'Market pressure is driving buyers to fix pipeline efficiency and forecast predictability now.',
     estimated_deal_size: 'USD 120k–220k ARR per account',
     sales_approach: 'Land with one reference account, then expand through account-based marketing and sales enablement.',
@@ -449,14 +740,15 @@ function buildDemoStep4(company, industry) {
 }
 
 function buildDemoStep5(company, industry) {
+  const profile = getDemoIndustryProfile(company, industry);
   const output = {
-    primary_keywords: ['revenue acceleration software', 'pipeline predictability tools'],
-    secondary_keywords: ['B2B pipeline automation', 'sales cadence analytics'],
+    primary_keywords: [`${profile.keyword_focus}`],
+    secondary_keywords: ['commercial growth strategy', 'customer conversion intelligence'],
     intent_signals: ['High buyer research activity', 'Increase in decision-maker outreach', 'Improving funnel velocity'],
     funnel_taxonomy: 'Awareness → consideration → decision → expansion',
-    boolean_query: '("revenue operations" OR "sales operations") AND (pipeline OR forecast) AND (automation OR intelligence)',
-    linkedin_search_string: '"Revenue Operations" AND "Sales Enablement" AND "Annual Recurring Revenue"',
-    content_topics: ['pipeline predictability', 'revops efficiency', 'sales velocity', 'closed-loop revenue'],
+    boolean_query: `("${profile.keyword_focus.split(',')[0]}" OR "${profile.keyword_focus.split(',')[1] || profile.keyword_focus}") AND (revenue OR growth OR operations)`,
+    linkedin_search_string: `"${profile.target_roles[0]}" AND "${profile.keyword_focus.split(',')[0]}"`,
+    content_topics: [profile.keyword_focus, 'commercial performance', 'strategy-to-execution alignment'],
     key_risks: [
       'Demo keywords may not reflect actual customer language in this vertical.',
       'Intent signals are illustrative and require live validation.',
@@ -470,28 +762,29 @@ function buildDemoStep5(company, industry) {
 }
 
 function buildDemoStep6(company, industry) {
+  const profile = getDemoIndustryProfile(company, industry);
   const output = {
     email_1: {
-      subject: `Unlock predictable pipeline for ${company}`,
-      body: `Hi [Name],\n\nI noticed ${company} is focused on revenue operations and growth. We help teams like yours reduce sales cycle friction and improve forecast accuracy. I’d love to share a quick framework for predictable pipeline generation.\n\nBest,\n[Your Name]`,
-      angle: 'Revenue operations signal and pipeline predictability',
-      cta: 'Request a short briefing to discuss current forecasting gaps.',
+      subject: `Unlock predictable growth for ${company}`,
+      body: `Hi [Name],\n\nI noticed ${company} is focused on ${profile.outreach_language}. We help teams like yours reduce execution friction and improve forecast or partnership revenue accuracy. I’d love to share a quick framework for more predictable commercial outcomes.\n\nBest,\n[Your Name]`,
+      angle: `${profile.outreach_language} and revenue predictability`,
+      cta: 'Request a short briefing to discuss current revenue or partnership gaps.',
     },
     email_2: {
-      subject: 'Proof of pipeline acceleration for revenue teams',
-      body: `Hi [Name],\n\nFollowing up on my note about revenue efficiency: our clients usually see a 15–20% uplift in pipeline conversion within 90 days. Can we connect to explore if this maps to your current goals?\n\nThanks,\n[Your Name]`,
-      angle: 'ROI and pipeline acceleration evidence',
+      subject: `Proof of performance for ${profile.industryLabel} leaders`,
+      body: `Hi [Name],\n\nFollowing up on my note about operational efficiency: our clients usually see a 15–20% uplift in commercial conversion or partnership yield within 90 days. Can we connect to explore if this matches your current priorities?\n\nThanks,\n[Your Name]`,
+      angle: `ROI and operational performance evidence`,
       cta: 'Book a quick call to review a short case study.',
     },
     email_3: {
-      subject: 'Last check — revenue operations signal readiness',
-      body: `Hi [Name],\n\nI wanted to leave you with one key observation: revenue teams that align intent signals and GTM execution close more pipeline. If you’re open, I’d be happy to share a short plan tailored to ${company}.\n\nRegards,\n[Your Name]`,
-      angle: 'Final validation with executive urgency',
+      subject: `Last check — ${profile.industryLabel} signal readiness`,
+      body: `Hi [Name],\n\nI wanted to leave you with one key observation: teams that align intent signals and execution close more revenue and partnership opportunities. If you’re open, I’d be happy to share a short plan tailored to ${company}.\n\nRegards,\n[Your Name]`,
+      angle: 'Final validation with commercial urgency',
       cta: 'Reply with a time for a brief executive summary.',
     },
     follow_up_sequence: 'Send Email 1 → wait 3 days → Email 2 → reach out on LinkedIn → follow-up call attempt.',
-    linkedin_message: `Hi [Name], I’m researching revenue operations leaders at companies like ${company}. If you’re open, I’d love to share an outline of a GTM approach that shortens your pipeline handoff and improves forecast reliability.`,
-    linkedin_followup: 'Following up on my message — are you available for a brief 10-minute conversation this week?',
+    linkedin_message: `Hi [Name], I’m researching ${profile.industryLabel} leaders at companies like ${company}. If you’re open, I’d love to share an outline of a GTM approach that shortens your pipeline handoff and improves commercial reliability.`,
+    linkedin_followup: `Following up on my message — are you available for a brief 10-minute conversation this week?`,
     signal_highlights: [
       { signal: 'Buyer interest is moderate', type: 'demand', strength: 'Medium' },
       { signal: 'Market timing is improving', type: 'timing', strength: 'Medium' },
@@ -517,19 +810,20 @@ function buildDemoStep6(company, industry) {
 }
 
 function buildDemoStep7(company, industry, priorSteps) {
+  const profile = getDemoIndustryProfile(company, industry);
   const output = {
     signal_summary: [
-      { signal_type: 'market_timing', description: `Timing for ${industry || 'this sector'} is cautious yet opportunistic.`, signal_description: `Timing for ${industry || 'this sector'} is cautious yet opportunistic.`, strength: 'Medium' },
-      { signal_type: 'growth', description: 'Industry growth is steady but requires validation.', signal_description: 'Industry growth is steady but requires validation.', strength: 'Medium' },
+      { signal_type: 'market_timing', description: `Timing for ${profile.industryLabel} is cautious yet opportunistic.`, signal_description: `Timing for ${profile.industryLabel} is cautious yet opportunistic.`, strength: 'Medium' },
+      { signal_type: 'growth', description: `${profile.industryLabel} growth is steady but requires validation.`, signal_description: `${profile.industryLabel} growth is steady but requires validation.`, strength: 'Medium' },
     ],
-    why_now_analysis: 'Market conditions are moving toward revenue acceleration tools, but proof points remain illustrative.',
+    why_now_analysis: `Market conditions are moving toward ${profile.industryLabel} revenue acceleration, but proof points remain illustrative.`,
     mcc_view: {
-      market: 'Market is maturing with stronger buyer scrutiny.',
-      client: 'Client priorities center on predictable revenue growth.',
+      market: `Market is maturing with stronger ${profile.industryLabel} buyer scrutiny.`,
+      client: `Client priorities center on predictable ${profile.industryLabel} revenue growth.`,
       competitor: 'Competitor activity is moderate and centered on differentiation.',
     },
-    strategic_hook: `Use ${company} to position for more predictable revenue outcomes in ${industry || 'its target market'}.`,
-    persona_priority: { persona: 'Revenue Operations Leader', reason: 'Focuses on predictable pipeline and sales execution.' },
+    strategic_hook: `Use ${company} to position for more predictable revenue outcomes in ${profile.industryLabel}.`,
+    persona_priority: { persona: profile.primary_icp.split(',')[0] || 'Revenue Operations Leader', reason: profile.primary_role_responsibility },
     go_no_go: { recommendation: 'Watch', reason: 'Requires live evidence and customer validation before a full go decision.' },
     confidence_score: 60,
     risk_constraint: 'Requires live customer validation and a stronger evidence base before scaling investments.',
