@@ -1757,10 +1757,26 @@ function getGtmAction() {
 
 function setDemoMode(enabled) {
   state.demoMode = !!enabled;
+  state.websiteProfile = null;
+  clearTimeout(_websiteDebounce);
   const banner = document.getElementById('demo-mode-banner');
   if (banner) banner.classList.toggle('show', state.demoMode);
   const toggle = document.getElementById('demo-toggle');
   if (toggle) toggle.checked = state.demoMode;
+  const statusDiv = document.getElementById('website-status');
+  const statusTxt = document.getElementById('website-status-text');
+  const statusDot = document.getElementById('website-status-dot');
+  if (statusDiv && statusTxt && statusDot) {
+    if (state.demoMode) {
+      statusDiv.style.display = 'flex';
+      statusTxt.textContent = 'Demo Mode active — website extraction skipped. No live data used.';
+      statusDot.style.background = 'var(--green)';
+      statusDiv.style.borderColor = 'rgba(34,197,94,0.3)';
+      statusDiv.style.color = '#86efac';
+    } else {
+      statusDiv.style.display = 'none';
+    }
+  }
   persistState();
 }
 
