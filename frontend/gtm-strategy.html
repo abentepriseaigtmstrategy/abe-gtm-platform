@@ -3034,9 +3034,58 @@ function closeExportModal() {
 }
 
 async function downloadExport() {
-  // Use the pure client-side A4 renderer instead of backend HTML export.
   closeExportModal();
-  await generateProfessionalPDF();
+
+  if (!state.company) {
+    showToast('Enter a company name before exporting.', 'error');
+    return;
+  }
+
+  const popup = window.open('', '_blank');
+  if (!popup) {
+    showToast('Please allow pop-ups to open the report viewer.', 'error');
+    return;
+  }
+
+  showToast('Saving strategy. Opening report viewer for PDF export...', 'info');
+
+  try {
+    const steps = {};
+    for (let i = 1; i <= 6; i += 1) {
+      if (state.steps[i]?.data) steps[i] = state.steps[i].data;
+    }
+
+    const token = await getAuthToken();
+    const res = await fetch('/api/gtm', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        action:              'save_strategy',
+        company_name:        state.company,
+        industry:            state.industry || null,
+        steps,
+        total_tokens:        state.totalTokens || 0,
+        full_report:         buildExportText(),
+        step_7_intelligence: state.step7 || null,
+        status:              Object.keys(steps).length === 6 ? 'complete' : 'in_progress',
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Save failed');
+    if (!data.strategy_id) throw new Error('Save did not return a strategy ID');
+
+    state.strategyId = data.strategy_id;
+    const url = `report.html?id=${encodeURIComponent(data.strategy_id)}`;
+    popup.location.href = url;
+    showToast('Strategy saved. Opening report viewer for PDF export.', 'success');
+  } catch (err) {
+    popup.close?.();
+    showToast(`Strategy save failed: ${err.message}`, 'error');
+  }
 }
 
 /**
