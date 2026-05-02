@@ -1862,24 +1862,17 @@ function createPdfSandbox() {
   const resetStyle = document.createElement('style');
   resetStyle.textContent = `
     * { box-sizing:border-box !important; opacity:1 !important; }
-    html, body, #pdf-export-sandbox, #pdf-export-root, #pdf-export-root * { background:#0B0F1A !important; color:#E5E7EB !important; }
+    html, body, #pdf-export-sandbox, #pdf-export-root, .pdf-page { background:#0B0F1A !important; color:#E5E7EB !important; }
     #pdf-export-root { width:794px !important; max-width:794px !important; margin:0 auto !important; padding:0 !important; }
     #pdf-export-root .wrap { width:794px !important; max-width:794px !important; margin:0 auto !important; padding:0 !important; }
     #pdf-export-root .report-footer { flex-direction:column !important; align-items:flex-start !important; }
     #pdf-export-root .report-cover { margin-bottom:24px !important; }
-    #pdf-export-root .section { margin-bottom:22px !important; background:rgba(15,20,35,.96) !important; border-color:rgba(148,163,184,.3) !important; }
-    #pdf-export-root .sec-header, #pdf-export-root .sec-context, #pdf-export-root .sec-title, #pdf-export-root .sec-subtitle,
-    #pdf-export-root .sec-num, #pdf-export-root .field, #pdf-export-root .tag, #pdf-export-root table,
-    #pdf-export-root .score-strip .sc, #pdf-export-root .cover-card,
-    #pdf-export-root .persona-card, #pdf-export-root .pipeline-step, #pdf-export-root .timeline-item,
-    #pdf-export-root .truth-card, #pdf-export-root .email-card, #pdf-export-root .decision-badge,
-    #pdf-export-root .swot-cell, #pdf-export-root .risk-list li { color:#E5E7EB !important; }
-    #pdf-export-root .score-strip .sc, #pdf-export-root .cover-card, #pdf-export-root .section,
-    #pdf-export-root .persona-card, #pdf-export-root .pipeline-step, #pdf-export-root .timeline-item,
-    #pdf-export-root .truth-card, #pdf-export-root .email-card, #pdf-export-root .decision-badge,
-    #pdf-export-root .swot-cell, #pdf-export-root .risk-list li { background:rgba(15,20,35,.95) !important; border-color:rgba(148,163,184,.25) !important; }
+    #pdf-export-root .section { margin-bottom:22px !important; }
     #pdf-export-root img { max-width:100% !important; height:auto !important; }
     #pdf-export-root * { text-shadow:none !important; filter:none !important; }
+    #pdf-export-root .sec-header, #pdf-export-root .sec-context, #pdf-export-root .sec-title, #pdf-export-root .sec-subtitle,
+    #pdf-export-root .sec-num, #pdf-export-root .field, #pdf-export-root .tag, #pdf-export-root table,
+    #pdf-export-root .decision-badge, #pdf-export-root .swot-cell, #pdf-export-root .risk-list li { color:#E5E7EB !important; }
   `;
   styleContainer.appendChild(resetStyle);
   sandbox.appendChild(styleContainer);
@@ -1893,6 +1886,8 @@ function createPdfSandbox() {
   return sandbox;
 }
 
+// LEGACY / UNUSED: old live-DOM auto-pagination helpers retained here for reference only.
+// Current export flow uses buildPdfExportDom() with 11 fixed pages and does not call these functions.
 function collectReportBlocks(root) {
   const blocks = [];
   Array.from(root.children).forEach(child => {
@@ -1988,6 +1983,7 @@ function isElementVisible(el) {
   return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
 }
 
+// LEGACY / UNUSED: this pagination clone helper is not used by the current fixed-page PDF builder.
 function paginateReportClone(root, measurementContainer) {
   const createPage = () => {
     const page = document.createElement('div');
