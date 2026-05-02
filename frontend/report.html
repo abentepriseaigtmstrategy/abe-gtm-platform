@@ -21,14 +21,6 @@
     body::before { content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
       background-image:linear-gradient(rgba(168,85,247,.02) 1px,transparent 1px),
       linear-gradient(90deg,rgba(168,85,247,.02) 1px,transparent 1px); background-size:48px 48px; }
-    html, body, #pdf-export-root, #pdf-export-sandbox { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    .pdf-page, #pdf-export-root, #pdf-export-sandbox { break-inside: avoid; page-break-inside: avoid; }
-    @media print {
-      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-      #topnav, .nav-right, #mobile-menu-btn, #mobile-nav-drawer, .btn, .demo-banner, #loading-state, #error-state, .report-footer { display:none !important; }
-      body { background:none !important; }
-      .pdf-page { box-shadow:none !important; }
-    }
 
     /* ── NAV ── */
     #topnav { position:sticky; top:0; z-index:100; background:rgba(11,15,26,.95);
@@ -49,8 +41,6 @@
     .btn-outline { background:transparent; color:var(--muted); border:1px solid var(--border); }
     .btn-outline:hover { border-color:var(--accent); color:white; }
     .btn:disabled { opacity:.5; cursor:not-allowed; transform:none!important; }
-    .demo-banner { display:flex; align-items:center; gap:10px; background:rgba(245,158,11,.14); border:1px solid rgba(245,158,11,.32); color:var(--amber); padding:18px 22px; border-radius:16px; margin-bottom:24px; font-size:12px; line-height:1.5; }
-    .demo-banner strong { color:white; }
 
     /* ── LAYOUT ── */
     .wrap { position:relative; z-index:1; max-width:1100px; margin:0 auto; padding:40px 32px; }
@@ -59,67 +49,6 @@
     .ph-left .title { font-size:30px; font-weight:900; color:white; letter-spacing:-.8px; }
     .ph-left .meta  { font-size:11px; color:var(--muted); margin-top:6px; }
     .ph-actions { display:flex; gap:10px; flex-shrink:0; }
-
-    .report-cover { position:relative; overflow:hidden; background:linear-gradient(180deg, rgba(24,30,47,.95), rgba(11,15,26,.98)); border:1px solid rgba(255,255,255,.08); border-radius:28px; padding:32px 32px 28px; margin-bottom:32px; }
-    .report-cover::before { content:''; position:absolute; top:-22%; right:-18%; width:240px; height:240px; background:radial-gradient(circle at center, rgba(168,85,247,.18), transparent 60%); filter:blur(16px); }
-    .report-cover::after { content:''; position:absolute; bottom:-10%; left:-10%; width:280px; height:280px; background:linear-gradient(135deg, rgba(59,130,246,.12), transparent 70%); transform:rotate(18deg); }
-    .cover-hero, .cover-kpis { position:relative; z-index:1; }
-    .cover-hero { display:grid; grid-template-columns:1fr auto; gap:24px; align-items:start; margin-bottom:24px; }
-    .cover-label { display:inline-flex; align-items:center; gap:12px; margin-bottom:18px; }
-    .cover-mark { width:42px; height:42px; border-radius:14px; background:linear-gradient(135deg,var(--accent),var(--accent2)); display:flex; align-items:center; justify-content:center; font-family:'Space Mono',monospace; font-size:14px; font-weight:900; color:white; }
-    .cover-info { display:grid; gap:8px; }
-    .cover-title { font-size:36px; font-weight:900; color:white; line-height:1.05; }
-    .cover-subtitle { font-size:12px; text-transform:uppercase; color:var(--muted); letter-spacing:.22em; font-weight:700; }
-    .cover-company { font-size:24px; font-weight:900; color:white; }
-    .cover-meta { display:flex; flex-wrap:wrap; gap:10px; align-items:center; color:var(--muted); font-size:11px; }
-    .cover-meta .cover-badge { display:inline-flex; align-items:center; gap:8px; padding:8px 14px; border-radius:999px; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.14em; border:1px solid transparent; }
-    .cover-badge.demo { color:var(--amber); background:rgba(245,158,11,.12); border-color:rgba(245,158,11,.24); }
-    .cover-badge.live { color:var(--green); background:rgba(34,197,94,.12); border-color:rgba(34,197,94,.24); }
-    .cover-detail { color:var(--text); font-size:13px; line-height:1.6; max-width:700px; }
-    .cover-kpis { display:grid; grid-template-columns:repeat(4,minmax(120px,1fr)); gap:14px; }
-    .cover-card { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:18px; padding:20px 18px; display:flex; flex-direction:column; justify-content:space-between; min-height:110px; }
-    .cover-card .cc-label { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.15em; color:var(--muted); margin-bottom:10px; }
-    .cover-card .cc-value { font-size:28px; font-weight:900; font-family:'Space Mono',monospace; color:white; line-height:1.05; }
-    .cover-card .cc-note { font-size:10px; color:var(--muted); margin-top:8px; }
-    .report-footer { border-top:1px solid rgba(255,255,255,.08); padding-top:18px; margin-top:32px; display:flex; justify-content:space-between; align-items:center; gap:16px; font-size:11px; color:var(--muted); }
-    .report-footer .footer-left { display:flex; flex-direction:column; gap:3px; }
-    .report-footer .footer-right { white-space:nowrap; }
-    .section { background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01)); border:1px solid rgba(255,255,255,.06); border-radius:20px; padding:28px 30px; margin-bottom:22px; }
-    .sec-header { display:grid; grid-template-columns:auto 1fr; gap:14px; align-items:flex-start; margin-bottom:12px; }
-    .sec-num { width:40px; height:40px; border-radius:12px; background:rgba(168,85,247,.14); color:var(--accent); font-size:12px; font-weight:900; display:flex; align-items:center; justify-content:center; }
-    .sec-title { font-size:18px; font-weight:800; color:white; line-height:1.2; }
-    .sec-subtitle { font-size:12px; color:var(--muted); margin-top:4px; }
-    .sec-context { font-size:12px; color:var(--muted); margin-bottom:18px; padding-bottom:0; }
-    .persona-card { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:18px; display:grid; grid-template-columns:1fr 1fr; gap:14px; padding:22px; margin-bottom:18px; }
-    .pc-head { display:flex; align-items:center; gap:14px; }
-    .pc-icon { width:46px; height:46px; border-radius:16px; background:rgba(168,85,247,.16); display:flex; align-items:center; justify-content:center; font-size:18px; }
-    .pc-title { font-size:13px; font-weight:800; color:white; }
-    .pc-meta { font-size:11px; color:var(--muted); line-height:1.6; }
-    .pc-row { display:flex; flex-direction:column; gap:4px; font-size:11px; color:var(--muted); margin-bottom:10px; }
-    .pc-row strong { color:white; font-size:12px; font-weight:700; }
-    .pain-map-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin-bottom:18px; }
-    .pain-card { position:relative; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:18px; padding:18px; min-height:130px; }
-    .pain-card::before { content:''; position:absolute; top:16px; right:16px; width:28px; height:28px; border-radius:50%; background:rgba(168,85,247,.16); }
-    .pain-card .pc-hed { font-size:10px; text-transform:uppercase; letter-spacing:.18em; color:var(--muted); margin-bottom:10px; font-weight:700; }
-    .pain-card .pc-copy { font-size:12px; color:var(--text); line-height:1.7; }
-    .pipeline-row { display:grid; grid-template-columns:repeat(4,minmax(130px,1fr)); gap:14px; margin-bottom:18px; }
-    .pipeline-step { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:18px; padding:18px; min-height:120px; }
-    .ps-label { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.16em; margin-bottom:10px; font-weight:700; }
-    .ps-value { font-size:13px; color:white; font-weight:800; margin-bottom:10px; line-height:1.4; }
-    .ps-note { font-size:11px; color:var(--muted); line-height:1.6; }
-    .intent-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:14px; margin-bottom:18px; }
-    .intent-level { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.18em; margin-bottom:8px; font-weight:700; }
-    .intent-pill { display:inline-flex; align-items:center; gap:6px; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.1); border-radius:999px; padding:8px 12px; font-size:11px; color:white; margin:2px 3px 2px 0; }
-    .timeline { display:grid; gap:14px; margin-bottom:18px; }
-    .timeline-item { display:grid; grid-template-columns:38px 1fr; gap:12px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:18px; padding:16px; }
-    .ti-step { width:38px; height:38px; border-radius:50%; background:rgba(168,85,247,.16); color:var(--accent); font-weight:900; display:flex; align-items:center; justify-content:center; font-size:12px; }
-    .ti-title { font-size:13px; font-weight:800; color:white; margin-bottom:6px; }
-    .ti-body { font-size:11px; color:var(--muted); line-height:1.7; }
-    .cm-bar-row { display:grid; grid-template-columns:1fr 64px 1fr; gap:10px; align-items:center; margin-bottom:11px; }
-    .cm-bar-label { font-size:11px; color:var(--text); }
-    .cm-bar { height:10px; background:rgba(255,255,255,.05); border-radius:999px; overflow:hidden; }
-    .cm-bar-fill { height:100%; border-radius:999px; background:linear-gradient(90deg,var(--accent2),var(--accent)); }
-    @media (max-width:900px) { .cover-hero { grid-template-columns:1fr; } .cover-kpis { grid-template-columns:1fr 1fr; } .pipeline-row { grid-template-columns:1fr; } .intent-grid { grid-template-columns:1fr; } .pain-map-grid { grid-template-columns:1fr; } .persona-card { grid-template-columns:1fr; } .report-footer { flex-direction:column; align-items:flex-start; } }
 
     /* ── LOADING / ERROR ── */
     #loading-state { text-align:center; padding:100px 32px; }
@@ -136,34 +65,28 @@
 
     /* ── KPI STRIP ── */
     .score-strip { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:32px; }
-    .sc  { background:rgba(18,24,39,.7); border:1px solid var(--border); border-radius:14px; padding:20px 22px; transition:border-color .2s; }
+    .sc  { background:rgba(18,24,39,.7); border:1px solid var(--border); border-radius:14px; padding:20px 22px; transition:border-color .2s; position:relative; overflow:hidden; }
+    .sc::before { content:''; position:absolute; bottom:0; left:0; right:0; height:3px; background:linear-gradient(90deg,var(--accent2),var(--accent)); opacity:.6; border-radius:0 0 14px 14px; }
     .sc:hover { border-color:var(--accent); }
-    .insight-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin-top:18px; }
-    .chart-card { background:rgba(255,255,255,.04); border:1px solid rgba(148,163,184,.18); border-radius:20px; padding:20px; min-height:132px; display:flex; flex-direction:column; justify-content:space-between; }
-    .chart-card-header { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; margin-bottom:14px; }
-    .chart-label { font-size:12px; font-weight:700; color:white; }
-    .chart-detail { font-size:11px; color:var(--muted); text-align:right; }
-    .chart-value { font-size:20px; font-weight:900; color:white; font-family:'Space Mono',monospace; margin-bottom:12px; }
-    .chart-series { display:flex; flex-direction:column; gap:10px; }
-    .chart-series-bar { width:100%; height:12px; background:rgba(255,255,255,.05); border-radius:999px; overflow:hidden; }
-    .chart-series-fill { height:100%; border-radius:999px; background:linear-gradient(90deg,var(--accent2),var(--accent)); }
-    .insight-grid span, .chart-card span { word-break:break-word; }
-    @media (max-width:900px) { .insight-grid { grid-template-columns:1fr; } }
     .sv  { font-size:26px; font-weight:900; font-family:'Space Mono',monospace; color:white; letter-spacing:-1px; }
     .sl  { font-size:9px; text-transform:uppercase; letter-spacing:.18em; color:var(--muted); font-weight:700; margin-top:4px; }
     .sv.green { color:var(--green); } .sv.amber { color:var(--amber); } .sv.purple { color:var(--accent); } .sv.red { color:var(--red); }
+    /* ── COVER POSITIONING STRIP ── */
+    .cover-strip { background:linear-gradient(135deg,rgba(168,85,247,.06),rgba(124,58,237,.04)); border:1px solid rgba(168,85,247,.15); border-left:3px solid var(--accent); border-radius:8px; padding:12px 18px; margin-bottom:24px; }
+    .cover-strip .cs-label { font-size:8px; font-weight:900; text-transform:uppercase; letter-spacing:.2em; color:var(--accent); margin-bottom:4px; }
+    .cover-strip .cs-text  { font-size:12px; color:var(--text); line-height:1.6; }
 
     /* ── EXECUTIVE SUMMARY ── */
     .exec-card { background:rgba(168,85,247,.04); border:1px solid rgba(168,85,247,.18); border-radius:16px; padding:24px 28px; margin-bottom:24px; }
     .exec-card p { font-size:13px; line-height:1.85; color:var(--text); }
 
     /* ── SECTION ── */
-    .section { background:linear-gradient(180deg, rgba(255,255,255,.02), rgba(255,255,255,.01)); border:1px solid rgba(255,255,255,.06); border-radius:20px; padding:28px 30px; margin-bottom:22px; }
-    .sec-header { display:grid; grid-template-columns:auto 1fr; gap:14px; align-items:flex-start; margin-bottom:12px; }
-    .sec-num { width:40px; height:40px; border-radius:12px; background:rgba(168,85,247,.14); color:var(--accent); font-size:12px; font-weight:900; display:flex; align-items:center; justify-content:center; }
-    .sec-title { font-size:18px; font-weight:800; color:white; line-height:1.2; }
-    .sec-subtitle { font-size:12px; color:var(--muted); margin-top:4px; }
-    .sec-context { font-size:12px; color:var(--muted); margin-bottom:18px; }
+    .section { background:rgba(18,24,39,.6); border:1px solid var(--border); border-radius:16px; padding:28px 32px; margin-bottom:20px; }
+    .sec-header { display:flex; align-items:center; gap:12px; margin-bottom:6px; }
+    .sec-num    { width:28px; height:28px; border-radius:50%; background:var(--accent); color:white;
+      font-size:10px; font-weight:900; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+    .sec-title  { font-size:15px; font-weight:800; color:white; }
+    .sec-context { font-size:11px; color:var(--muted); margin-bottom:20px; padding-bottom:12px; border-bottom:1px dashed var(--border); }
 
     /* ── ANALYST CALLOUT ── */
     .analyst-callout { background:rgba(168,85,247,.04); border:1px solid rgba(168,85,247,.2); border-left:4px solid var(--accent);
@@ -212,12 +135,14 @@
     .wf-row { display:flex; align-items:center; margin-bottom:10px; gap:10px; }
     .wf-label { width:80px; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); text-align:right; }
     .wf-val   { width:110px; font-family:'Space Mono',monospace; font-size:11px; font-weight:700; text-align:right; color:white; flex-shrink:0; }
-    .wf-bar-wrap { flex:1; background:rgba(0,0,0,.3); border-radius:6px; height:14px; overflow:hidden; }
-    .wf-bar   { height:100%; border-radius:6px; transition:width .6s ease; }
-    .wf-blue  { background:linear-gradient(90deg,#3b82f6,#60a5fa); }
-    .wf-purple{ background:linear-gradient(90deg,var(--accent2),var(--accent)); }
-    .wf-amber { background:linear-gradient(90deg,#d97706,var(--amber)); }
-    .wf-green { background:linear-gradient(90deg,#16a34a,var(--green)); }
+    .wf-bar-wrap { flex:1; background:rgba(255,255,255,.08); border-radius:6px; height:18px; overflow:hidden; border:1px solid rgba(255,255,255,.06); position:relative; }
+    .wf-bar   { height:100%; border-radius:6px; transition:width .6s ease; min-width:4px; }
+    .wf-blue  { background:linear-gradient(90deg,#1d4ed8,#3b82f6,#60a5fa); box-shadow:0 0 8px rgba(59,130,246,.4); }
+    .wf-purple{ background:linear-gradient(90deg,var(--accent2),var(--accent),#c084fc); box-shadow:0 0 8px rgba(168,85,247,.4); }
+    .wf-amber { background:linear-gradient(90deg,#b45309,#d97706,var(--amber)); box-shadow:0 0 8px rgba(245,158,11,.3); }
+    .wf-green { background:linear-gradient(90deg,#15803d,#16a34a,var(--green)); box-shadow:0 0 8px rgba(34,197,94,.3); }
+    .wf-label { width:90px; font-size:9px; font-weight:800; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); text-align:right; flex-shrink:0; }
+    .wf-val   { width:120px; font-family:'Space Mono',monospace; font-size:11px; font-weight:700; text-align:right; color:white; flex-shrink:0; padding-right:4px; }
 
     /* ── PAIN TABLE ── */
     .pain-table { width:100%; border-collapse:collapse; font-size:11px; margin-bottom:14px; }
@@ -229,7 +154,7 @@
     .email-card { background:rgba(0,0,0,.3); border:1px solid rgba(168,85,247,.2); border-radius:10px; padding:18px 20px; margin-bottom:14px; }
     .ea  { font-size:9px; font-weight:900; text-transform:uppercase; letter-spacing:.15em; color:var(--accent); margin-bottom:6px; }
     .es  { font-size:12px; font-weight:800; color:white; margin-bottom:8px; }
-    .ebo { font-size:11px; color:#D1D5DB; line-height:1.7; white-space:pre-wrap; }
+    .ebo { font-size:11px; color:#D1D5DB; line-height:1.7; white-space:pre-line; word-break:break-word; overflow-wrap:anywhere; min-width:0; width:100%; display:block; }
     .ec  { font-size:10px; font-weight:700; color:var(--accent); margin-top:10px; padding-top:10px; border-top:1px solid rgba(168,85,247,.15); }
 
     /* ── STEP 7 DECISION ENGINE ── */
@@ -268,170 +193,19 @@
     .cm-table th { text-align:left; color:var(--muted); font-weight:700; font-size:8px; text-transform:uppercase; letter-spacing:.12em; padding:8px 10px; border-bottom:1px solid var(--border); }
     .cm-table td { padding:8px 10px; border-bottom:1px solid rgba(31,41,55,.5); }
     .cm-table .num { font-family:'Space Mono',monospace; text-align:right; color:var(--accent); font-weight:700; }
-    .pdf-cover-hero { position:relative; overflow:hidden; border-radius:26px; background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.01)); padding:28px; border:1px solid rgba(148,163,184,.18); }
-    .pdf-cover-hero::before { content:''; position:absolute; inset:0; background:radial-gradient(circle at 22% 18%, rgba(168,85,247,.14), transparent 18%), radial-gradient(circle at 80% 28%, rgba(59,130,246,.1), transparent 20%), radial-gradient(circle at 50% 100%, rgba(255,255,255,.04), transparent 40%); opacity:.85; pointer-events:none; }
-    .pdf-cover-hero-inner { position:relative; display:grid; grid-template-columns:1.5fr 1fr; gap:20px; z-index:1; }
-    .pdf-cover-hero-head { display:flex; align-items:flex-start; gap:14px; margin-bottom:18px; }
-    .pdf-cover-badges { display:flex; flex-wrap:wrap; gap:10px; margin-top:16px; }
-    .pdf-cover-pill { display:inline-flex; align-items:center; gap:8px; padding:9px 14px; border-radius:999px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); font-size:10px; color:var(--text); letter-spacing:.1em; text-transform:uppercase; }
-    .pdf-cover-pill.accent { background:rgba(168,85,247,.12); border-color:rgba(168,85,247,.18); color:var(--accent); }
-    .pdf-cover-intro { font-size:12px; color:var(--muted); line-height:1.8; max-width:480px; }
-    .pdf-cover-grid { display:grid; grid-template-columns:repeat(2,minmax(140px,1fr)); gap:14px; margin-top:20px; }
-    .pdf-kpi-card { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.1); border-radius:20px; padding:18px 16px; min-height:110px; display:flex; flex-direction:column; justify-content:space-between; }
-    .pdf-kpi-card .label { font-size:9px; text-transform:uppercase; letter-spacing:.16em; color:var(--muted); margin-bottom:10px; font-weight:700; }
-    .pdf-kpi-card .value { font-size:28px; line-height:1.05; font-family:'Space Mono',monospace; font-weight:900; color:white; }
-    .pdf-kpi-card .note { margin-top:12px; font-size:10px; color:var(--muted); line-height:1.6; }
-    .pdf-dashboard { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
-    .pdf-panel { background:rgba(255,255,255,.04); border:1px solid rgba(148,163,184,.18); border-radius:22px; padding:20px; min-height:200px; }
-    .pdf-panel-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
-    .pdf-panel-title { font-size:13px; font-weight:800; color:white; }
-    .pdf-panel-copy { font-size:10px; color:var(--muted); line-height:1.7; }
-    .pdf-opportunity-risk { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:14px; }
-    .pdf-opportunity-card { background:rgba(255,255,255,.05); border:1px solid rgba(148,163,184,.18); border-radius:18px; padding:16px; }
-    .pdf-opportunity-card .title { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.16em; color:var(--muted); margin-bottom:10px; }
-    .pdf-opportunity-card .text { font-size:12px; line-height:1.7; color:var(--text); }
-    .pdf-score-band { display:grid; gap:10px; margin-top:12px; }
-    .pdf-score-band .label { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.16em; }
-    .pdf-score-band .bar-wrap { background:rgba(255,255,255,.08); border-radius:999px; overflow:hidden; height:12px; }
-    .pdf-score-band .bar-fill { height:100%; border-radius:999px; background:linear-gradient(90deg,var(--accent2),var(--accent)); min-width:20%; }
-    .pdf-swot-matrix { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:18px; }
-    .pdf-swot-card { position:relative; padding:18px; min-height:150px; border-radius:20px; background:rgba(255,255,255,.04); border:1px solid rgba(148,163,184,.18); }
-    .pdf-swot-card[data-label]::before { content:attr(data-label); position:absolute; top:14px; right:14px; font-size:9px; letter-spacing:.18em; text-transform:uppercase; color:var(--muted); }
-    .pdf-swot-card .pdf-swot-title { font-size:12px; font-weight:800; color:white; margin-bottom:10px; }
-    .pdf-swot-card ul { margin:0;padding-left:18px; list-style:disc; color:var(--text); font-size:11px; line-height:1.65; }
-    .pdf-swot-card li { margin-bottom:8px; }
-    .pdf-market-strip { border:1px solid rgba(148,163,184,.18); border-radius:18px; padding:16px; background:rgba(255,255,255,.03); display:flex; justify-content:space-between; gap:16px; }
-    .pdf-market-strip .metric { font-size:11px; color:var(--muted); }
-    .pdf-market-strip .metric strong { display:block; font-size:16px; color:white; margin-top:6px; }
-    .pdf-bar-row { display:grid; gap:10px; }
-    .pdf-bar-row .pdf-bar-label { display:flex; justify-content:space-between; font-size:10px; color:var(--muted); letter-spacing:.1em; text-transform:uppercase; }
-    .pdf-bar-row .pdf-bar-track { width:100%; height:12px; border-radius:999px; background:rgba(255,255,255,.08); overflow:hidden; }
-    .pdf-bar-row .pdf-bar-fill { height:100%; border-radius:999px; background:linear-gradient(90deg,var(--accent2),var(--accent)); }
-    .pdf-tam-bars { margin-top:18px; }
-    .pdf-assumption-strip { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:18px; }
-    .vis-bar-row { margin-bottom: 16px; }
-    .vis-bar-header { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; font-weight: 700; letter-spacing: .08em; }
-    .vis-bar-track { height: 10px; background: var(--faint); border-radius: 5px; overflow: hidden; position: relative; }
-    .vis-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 5px; transition: width .5s ease; }
-
-    .step-timeline { border-left: 2px solid var(--faint); margin-left: 10px; padding-left: 30px; position: relative; }
-    .step-timeline .timeline-item { position: relative; margin-bottom: 22px; padding: 18px; background: rgba(255,255,255,0.02); border-radius: 14px; border: 1px solid var(--border); }
-    .step-timeline .timeline-item::before { content: ''; position: absolute; left: -36px; top: 18px; width: 14px; height: 14px; background: var(--accent); border-radius: 50%; border: 4px solid var(--bg); }
-
-    .verdict-cockpit { text-align: center; padding: 32px; border: 2px dashed var(--amber); border-radius: 24px; background: rgba(245,158,11,0.06); margin: 16px 0 20px; }
-    .verdict-hero { font-size: 52px; font-weight: 900; color: var(--amber); letter-spacing: -1.5px; line-height: 1; margin-bottom: 10px; }
-    .confidence-meter { width:100%; max-width:320px; margin: 14px auto 0; }
-    .confidence-meter .vis-bar-track { width:100%; }
-    .confidence-meter .vis-bar-fill { background: linear-gradient(90deg, var(--amber), #fbbf24); }
-
-    .risk-strip { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:16px; }
-    .risk-pill { padding:12px 14px; border-radius:16px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.12em; }
-    .risk-pill.red { background:rgba(239,68,68,.1); color:var(--red); }
-    .risk-pill.amber { background:rgba(245,158,11,.1); color:var(--amber); }
-    .risk-pill.green { background:rgba(34,197,94,.1); color:var(--green); }
-    .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:14px; }
-
-    .pdf-tam-grid { display:grid; grid-template-columns:repeat(3,minmax(120px,1fr)); gap:12px; margin-bottom:18px; }
-    .pdf-segment-card { background:rgba(255,255,255,.04); border:1px solid rgba(148,163,184,.18); border-radius:18px; padding:16px; min-height:130px; }
-    .pdf-segment-card .title { font-size:11px; font-weight:800; margin-bottom:8px; color:white; }
-    .pdf-segment-card .metric { font-size:14px; font-family:'Space Mono',monospace; color:white; margin-bottom:8px; }
-    .pdf-segment-card .line { font-size:10px; color:var(--muted); line-height:1.6; }
-    .pdf-persona-panel { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:14px; }
-    .pdf-persona-card { background:rgba(255,255,255,.04); border:1px solid rgba(148,163,184,.18); border-radius:20px; padding:18px; }
-    .pdf-persona-top { display:flex; align-items:center; gap:14px; margin-bottom:16px; }
-    .pdf-avatar { width:56px; height:56px; border-radius:18px; background:rgba(168,85,247,.16); display:flex; align-items:center; justify-content:center; font-size:22px; color:var(--accent); }
-    .pdf-persona-label { font-size:10px; text-transform:uppercase; letter-spacing:.16em; color:var(--muted); margin-bottom:6px; }
-    .pdf-persona-name { font-size:16px; font-weight:900; color:white; margin-bottom:6px; }
-    .pdf-chip-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
-    .pdf-chip { padding:8px 12px; border-radius:999px; font-size:10px; color:white; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12); }
-    .pdf-chip.green { background:rgba(34,197,94,.16); border-color:rgba(34,197,94,.24); color:var(--green); }
-    .pdf-chip.blue { background:rgba(59,130,246,.15); border-color:rgba(59,130,246,.25); color:var(--blue); }
-    .pdf-chip.amber { background:rgba(245,158,11,.15); border-color:rgba(245,158,11,.25); color:var(--amber); }
-    .pdf-bullet-map { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-top:16px; }
-    .pdf-map-card { background:rgba(255,255,255,.04); border:1px solid rgba(148,163,184,.18); border-radius:18px; padding:16px; min-height:120px; }
-    .pdf-map-card .title { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.14em; margin-bottom:10px; font-weight:700; }
-    .pdf-map-card .value { font-size:12px; color:white; line-height:1.75; }
-    .pdf-pipeline { display:grid; grid-template-columns:repeat(4,minmax(140px,1fr)); gap:12px; margin-top:18px; }
-    .pdf-pipeline-step { background:rgba(255,255,255,.04); border:1px solid rgba(148,163,184,.18); border-radius:20px; padding:16px; min-height:120px; display:flex; flex-direction:column; justify-content:space-between; }
-    .pdf-pipeline-step .step-label { font-size:9px; text-transform:uppercase; letter-spacing:.16em; color:var(--muted); margin-bottom:10px; font-weight:700; }
-    .pdf-pipeline-step .step-value { font-size:14px; font-weight:800; color:white; margin-bottom:10px; }
-    .pdf-pipeline-step .step-note { font-size:10px; color:var(--muted); line-height:1.6; }
-    .pdf-analog-grid { display:grid; grid-template-columns:repeat(3,minmax(140px,1fr)); gap:12px; margin-top:18px; }
-    .pdf-analog-card { background:rgba(255,255,255,.04); border:1px solid rgba(148,163,184,.18); border-radius:18px; padding:16px; min-height:120px; }
-    .pdf-analog-card .analog-name { font-size:12px; font-weight:800; color:white; margin-bottom:8px; }
-    .pdf-fit-bar { height:10px; background:rgba(255,255,255,.08); border-radius:999px; overflow:hidden; margin-top:12px; }
-    .pdf-fit-bar .fill { height:100%; border-radius:999px; background:linear-gradient(90deg,var(--accent2),var(--accent)); }
-    .pdf-cloud { display:flex; flex-wrap:wrap; gap:9px; margin-top:14px; }
-    .pdf-funnel { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-top:16px; }
-    .pdf-funnel-step { background:rgba(255,255,255,.04); border:1px solid rgba(148,163,184,.18); border-radius:18px; padding:16px; }
-    .pdf-funnel-step .label { font-size:9px; text-transform:uppercase; color:var(--muted); letter-spacing:.16em; margin-bottom:8px; font-weight:700; }
-    .pdf-funnel-step .title { font-size:13px; font-weight:800; color:white; margin-bottom:10px; }
-    .pdf-command-card { background:rgba(255,255,255,.04); border:1px solid rgba(148,163,184,.18); border-radius:18px; padding:16px; font-family:'Space Mono',monospace; font-size:11px; color:white; margin-top:12px; }
-    .pdf-command-card .label { font-size:9px; text-transform:uppercase; letter-spacing:.16em; color:var(--muted); margin-bottom:8px; }
-    .pdf-timeline { position:relative; margin-top:18px; padding-left:26px; }
-    .pdf-timeline::before { content:''; position:absolute; left:10px; top:0; bottom:0; width:2px; background:linear-gradient(180deg,rgba(168,85,247,.6),rgba(59,130,246,.8)); }
-    .pdf-timeline-item { position:relative; background:rgba(255,255,255,.04); border:1px solid rgba(148,163,184,.18); border-radius:18px; padding:16px 18px 16px 24px; margin-bottom:14px; }
-    .pdf-timeline-item::before { content:attr(data-step); position:absolute; left:-10px; top:16px; width:28px; height:28px; border-radius:50%; background:linear-gradient(135deg,var(--accent2),var(--accent)); color:white; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:900; border:3px solid #0B0F1A; }
-    .pdf-timeline-item .ti-title { font-size:12px; font-weight:800; color:white; margin-bottom:8px; }
-    .pdf-timeline-item .ti-body { font-size:11px; color:var(--text); line-height:1.7; }
-    .pdf-timeline-item .ti-chip { margin-top:10px; display:inline-flex; padding:7px 12px; border-radius:999px; background:rgba(59,130,246,.12); color:var(--blue); font-size:10px; font-weight:700; }
-    .pdf-decision-grid { display:grid; grid-template-columns:1.2fr 1fr; gap:16px; margin-top:18px; }
-    .pdf-verdict-panel { background:rgba(255,255,255,.05); border:1px solid rgba(148,163,184,.18); border-radius:24px; padding:22px; min-height:220px; }
-    .pdf-verdict-panel .title { font-size:13px; text-transform:uppercase; letter-spacing:.16em; color:var(--muted); margin-bottom:10px; font-weight:700; }
-    .pdf-verdict-panel .score { font-size:44px; font-weight:900; font-family:'Space Mono',monospace; color:white; margin-bottom:10px; }
-    .pdf-verdict-panel .reason { font-size:11px; color:var(--text); line-height:1.7; margin-bottom:16px; }
-    .pdf-meter { height:16px; background:rgba(255,255,255,.08); border-radius:999px; overflow:hidden; margin-top:12px; }
-    .pdf-meter-fill { height:100%; background:linear-gradient(90deg,var(--accent2),var(--accent)); min-width:20%; }
-    .pdf-mcc-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-top:16px; }
-    .pdf-mcc-card { background:rgba(255,255,255,.04); border:1px solid rgba(148,163,184,.18); border-radius:18px; padding:16px; min-height:108px; }
-    .pdf-mcc-card .label { font-size:9px; text-transform:uppercase; color:var(--muted); margin-bottom:8px; font-weight:700; }
-    .pdf-mcc-card .value { font-size:12px; color:white; line-height:1.6; }
-    .pdf-risk-strip { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-top:16px; }
-    .pdf-risk-pill { padding:12px 14px; border-radius:18px; font-size:11px; font-weight:700; }
-    .pdf-risk-pill.red { background:rgba(239,68,68,.12); color:var(--red); border:1px solid rgba(239,68,68,.2); }
-    .pdf-risk-pill.amber { background:rgba(245,158,11,.12); color:var(--amber); border:1px solid rgba(245,158,11,.2); }
-    .pdf-risk-pill.green { background:rgba(34,197,94,.12); color:var(--green); border:1px solid rgba(34,197,94,.2); }
-    .pdf-priority-card { background:rgba(255,255,255,.04); border:1px solid rgba(148,163,184,.18); border-radius:20px; padding:18px; margin-top:14px; }
-    .pdf-priority-card .title { font-size:10px; text-transform:uppercase; letter-spacing:.16em; color:var(--muted); margin-bottom:8px; font-weight:700; }
-    .pdf-priority-card .text { font-size:12px; color:white; line-height:1.7; }
-    .pdf-scorebar-row { display:grid; gap:12px; margin-top:18px; }
-    .pdf-scorebar { display:grid; grid-template-columns:1fr auto; gap:10px; align-items:center; }
-    .pdf-scorebar-label { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.14em; }
-    .pdf-scorebar-track { background:rgba(255,255,255,.08); border-radius:999px; overflow:hidden; height:12px; }
-    .pdf-scorebar-fill { height:100%; width:0; border-radius:999px; background:linear-gradient(90deg,var(--accent2),var(--accent)); }
-    .pdf-scorebar-value { font-size:11px; font-family:'Space Mono',monospace; color:white; }
-    .pdf-gauge { position:relative; background:rgba(255,255,255,.08); border-radius:999px; height:18px; overflow:hidden; margin-top:12px; }
-    .pdf-gauge-fill { position:absolute; left:0; top:0; bottom:0; width:0; background:linear-gradient(90deg, #3b82f6, var(--accent)); }
-    .pdf-gauge-label { position:absolute; right:12px; top:50%; transform:translateY(-50%); font-size:10px; color:var(--white); font-weight:700; }
-    .pdf-appendix-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:18px; }
-    .pdf-appendix-card { background:rgba(255,255,255,.04); border:1px solid rgba(148,163,184,.18); border-radius:20px; padding:18px; min-height:120px; }
-    .pdf-appendix-card .title { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.14em; margin-bottom:8px; font-weight:700; }
-    .pdf-appendix-card .text { font-size:12px; color:white; line-height:1.7; }
-    .pdf-warning-banner { background:rgba(245,158,11,.12); border:1px solid rgba(245,158,11,.24); border-left:4px solid var(--amber); border-radius:16px; padding:16px; color:var(--amber); font-size:11px; line-height:1.7; margin-bottom:16px; }
+    /* ── CONFIDENCE BAR ROWS ── */
+    .cm-bar-row { margin-bottom:14px; }
+    .cm-bar-header { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:5px; }
+    .cm-bar-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; color:var(--muted); }
+    .cm-bar-score { font-family:'Space Mono',monospace; font-size:12px; font-weight:900; color:var(--accent); }
+    .cm-bar-track { background:rgba(255,255,255,.07); border-radius:6px; height:10px; overflow:hidden; border:1px solid rgba(255,255,255,.05); }
+    .cm-bar-fill  { height:100%; border-radius:6px; background:linear-gradient(90deg,var(--accent2),var(--accent)); transition:width .8s ease; min-width:3px; }
+    .cm-bar-overall .cm-bar-track { height:14px; border-radius:8px; background:rgba(168,85,247,.12); border-color:rgba(168,85,247,.2); }
+    .cm-bar-overall .cm-bar-fill  { background:linear-gradient(90deg,#5b21b6,var(--accent2),var(--accent),#c084fc); box-shadow:0 0 10px rgba(168,85,247,.5); }
+    .cm-bar-overall .cm-bar-label { color:white; font-size:11px; font-weight:900; }
+    .cm-bar-overall .cm-bar-score { color:white; font-size:15px; }
     /* ── SOURCE NOTES ── */
     .src-note { font-size:9px; color:var(--faint); font-style:italic; margin:4px 0 10px; }
-    .truth-card { background:rgba(31,41,55,.75); border:1px solid rgba(168,85,247,.18); border-radius:16px; padding:18px 20px; margin-bottom:20px; }
-    .truth-card .truth-row { display:grid; grid-template-columns:1fr auto; gap:12px; align-items:flex-start; margin-bottom:12px; }
-    .truth-card .truth-row:last-child { margin-bottom:0; }
-    .truth-card .truth-label { font-size:10px; font-weight:800; letter-spacing:.16em; text-transform:uppercase; color:var(--muted); }
-    .truth-card .truth-value { font-size:12px; color:var(--text); line-height:1.6; }
-    .truth-badges { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
-    .truth-badge { padding:6px 12px; border-radius:999px; font-size:10px; font-weight:800; letter-spacing:.15em; text-transform:uppercase; border:1px solid transparent; }
-    .truth-badge-verified { background:rgba(34,197,94,.12); color:var(--green); border-color:rgba(34,197,94,.24); }
-    .truth-badge-warning  { background:rgba(245,158,11,.12); color:var(--amber); border-color:rgba(245,158,11,.24); }
-    .section-highlight { background:rgba(168,85,247,.05); border:1px solid rgba(168,85,247,.16); border-radius:18px; padding:18px 20px; margin-bottom:18px; }
-    .info-strip { display:grid; grid-template-columns:repeat(3,minmax(160px,1fr)); gap:12px; margin:18px 0; }
-    .info-chip { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:16px; padding:14px 16px; }
-    .info-chip strong { display:block; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.16em; color:var(--muted); margin-bottom:8px; }
-    .info-chip span { display:block; font-size:11px; color:var(--text); line-height:1.5; }
-    .metric-segment { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:18px; }
-    .matrix-card { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:18px; padding:18px; min-height:100px; }
-    .matrix-card .ml { color:var(--muted); margin-bottom:8px; }
-    .matrix-card .mv { color:white; font-size:16px; line-height:1.5; }
-    .trend-strip { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:18px; }
-    .trend-pill { display:inline-flex; align-items:center; gap:8px; padding:8px 12px; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.12); border-radius:999px; font-size:10px; color:var(--text); }
-    .sec-context { color:var(--muted); margin-bottom:18px; }
-    .section .field { margin-bottom:16px; }
     /* ── APPENDIX ── */
     .appendix-table { width:100%; border-collapse:collapse; font-size:11px; margin:8px 0 16px; }
     .appendix-table th { text-align:left; color:var(--muted); font-weight:700; font-size:8px; text-transform:uppercase; letter-spacing:.1em; padding:8px 10px; border-bottom:1px solid var(--border); }
@@ -471,9 +245,6 @@
 </div>
 
 <div class="wrap">
-  <div id="demo-report-banner" class="demo-banner" style="display:none;">
-    <strong>DEMO MODE REPORT — No live data was used.</strong> Validate before decision-making.
-  </div>
 
   <!-- Loading skeleton -->
   <div id="loading-state">
@@ -518,8 +289,7 @@
       </div>
     </div>
 
-    <div id="report-cover" class="report-cover" style="display:none"></div>
-
+    <!-- KPI Strip -->
     <div class="score-strip" style="grid-template-columns:repeat(5,1fr)">
       <div class="sc"><div class="sv green" id="r-score">—</div><div class="sl">GTM Score</div></div>
       <div class="sc"><div class="sv purple" id="r-tam">—</div><div class="sl">TAM Size</div></div>
@@ -529,8 +299,8 @@
     </div>
 
     <!-- All sections injected by JS -->
+    <div id="cover-strip-container"></div>
     <div id="sections-container"></div>
-    <div class="report-footer"><div class="footer-left"><span>ABE Enterprise AI Revenue Infrastructure</span><span>Confidential · For internal review only</span></div><div class="footer-right">Page 1 · Demo reporting</div></div>
   </div>
 </div>
 
@@ -556,49 +326,6 @@ function field(label, val, cls='') {
   const v = safe(val); if (!v) return '';
   return `<div class="field"><div class="fl">${esc(label)}</div><div class="fv ${cls}">${esc(v).replace(/\n/g,'<br>')}</div></div>`;
 }
-function parseMarketValue(value) {
-  if (!value && value !== 0) return 0;
-  const normalized = String(value).trim().replace(/,/g, '');
-  const match = normalized.match(/^([\d\.]+)\s*([kKmMbB])?$/);
-  if (!match) return parseFloat(normalized) || 0;
-  let num = parseFloat(match[1]) || 0;
-  const suffix = match[2]?.toLowerCase();
-  if (suffix === 'k') num *= 1e3;
-  if (suffix === 'm') num *= 1e6;
-  if (suffix === 'b') num *= 1e9;
-  return num;
-}
-function formatCompactNumber(num) {
-  if (num >= 1e9) return `${(num / 1e9).toFixed(1).replace(/\.0$/, '')}B`;
-  if (num >= 1e6) return `${(num / 1e6).toFixed(1).replace(/\.0$/, '')}M`;
-  if (num >= 1e3) return `${(num / 1e3).toFixed(1).replace(/\.0$/, '')}K`;
-  return String(Math.round(num));
-}
-function renderPdfTamBars(s2) {
-  const tamValue = parseMarketValue(safe(s2.tam_size_estimate) || safe(s2.tam) || '0');
-  const samValue = parseMarketValue(safe(s2.sam_estimate) || safe(s2.sam) || '0');
-  const somValue = parseMarketValue(safe(s2.som_estimate) || '0');
-  const maxValue = Math.max(tamValue, samValue, somValue, 1);
-  const rows = [
-    { label: 'Global TAM', value: tamValue, pct: 100 },
-    { label: 'Serviceable (SAM)', value: samValue, pct: tamValue ? Math.round(samValue / tamValue * 100) : 65 },
-    { label: 'Obtainable (SOM)', value: somValue, pct: tamValue ? Math.round(somValue / tamValue * 100) : 20 },
-  ];
-  return `<div>${rows.map(row => `<div class="vis-bar-row"><div class="vis-bar-header"><span>${esc(row.label)}</span><span>${esc(row.value ? formatCompactNumber(row.value) : '—')}</span></div><div class="vis-bar-track"><div class="vis-bar-fill" style="width:${Math.max(8, row.pct)}%; opacity:${row.label === 'Global TAM' ? 1 : row.label === 'Serviceable (SAM)' ? 0.85 : 0.7};"></div></div></div>`).join('')}</div>`;
-}
-function renderPdfTamAssumptionStrip(s2) {
-  const assumptions = [
-    safe(s2.tam_assumptions || s2.assumptions || s2.market_assumptions || ''),
-    safe(s2.segmentation_assumptions || s2.assumption_matrix || ''),
-  ].filter(Boolean).slice(0,2);
-  if (!assumptions.length) return '';
-  return `<div class="pdf-assumption-strip">${assumptions.map(text => `<div class="pdf-chip amber">${esc(text)}</div>`).join('')}</div>`;
-}
-function renderMiniChartCard(label, value, detail='', pct=72, color='var(--accent2)') {
-  const score = Number(pct);
-  const safePct = Math.max(8, Math.min(100, Number.isFinite(score) ? score : 72));
-  return `<div class="chart-card"><div class="chart-card-header"><div class="chart-label">${esc(label)}</div>${detail ? `<div class="chart-detail">${esc(detail)}</div>` : ''}</div><div class="chart-value">${esc(value)}</div><div class="chart-series"><div class="chart-series-bar"><div class="chart-series-fill" style="width:${safePct}%;background:linear-gradient(90deg,${color},var(--accent));"></div></div></div></div>`;
-}
 function tagRow(label, arr, cls='') {
   const a = Array.isArray(arr) ? arr : (arr ? [String(arr)] : []); if (!a.length) return '';
   return `<div class="field"><div class="fl">${esc(label)}</div><div class="tags">${a.slice(0,20).map(t=>`<span class="tag ${cls}">${esc(String(t))}</span>`).join('')}</div></div>`;
@@ -613,91 +340,13 @@ function emailCard(em, label) {
     ${em.cta ? `<div class="ec">→ ${esc(em.cta)}</div>` : ''}
   </div>`;
 }
-function sectionWrap(num, title, subtitle, contextText, body) {
+function sectionWrap(num, title, contextText, body) {
   const parts = body.filter(Boolean).join(''); if (!parts) return '';
   return `<div class="section">
-    <div class="sec-header"><div class="sec-num">${esc(num)}</div><div><div class="sec-title">${esc(title)}</div>${subtitle ? `<div class="sec-subtitle">${esc(subtitle)}</div>` : ''}</div></div>
+    <div class="sec-header"><div class="sec-num">${num}</div><div class="sec-title">${esc(title)}</div></div>
     ${contextText ? `<div class="sec-context">${esc(contextText)}</div>` : ''}
     ${parts}
   </div>`;
-}
-function renderPersonaCard(s3, industry) {
-  const primary = repairICP(s3.primary_icp, 'primary', s3, industry);
-  const trigger = Array.isArray(s3.buying_triggers) ? s3.buying_triggers[0] : 'Modernization / process risk';
-  const objection = Array.isArray(s3.objections) ? s3.objections[0] : 'Insufficient ROI proof';
-  const dms = Array.isArray(s3.decision_makers) ? s3.decision_makers : [];
-  return `<div class="persona-card">
-    <div>
-      <div class="pc-head"><span class="pc-icon">👤</span><div><div class="pc-title">Primary ICP Persona</div><div class="pc-meta">${esc(primary)}</div></div></div>
-      <div class="pc-row"><span>Decision responsibility</span><strong>${esc(dms[0] || 'Procurement / IT alignment')}</strong></div>
-      <div class="pc-row"><span>Buying trigger</span><strong>${esc(trigger)}</strong></div>
-    </div>
-    <div>
-      <div class="pc-row"><span>Objection</span><strong>${esc(objection)}</strong></div>
-      <div class="pc-row"><span>Next action</span><strong>Build a CFO-backed value case</strong></div>
-      <div class="pc-row"><span>Persona focus</span><strong>${esc(industry || 'Business transformation')}</strong></div>
-    </div>
-  </div>`;
-}
-function renderPipelineStep(label, value, note) {
-  if (!value) return '';
-  return `<div class="pipeline-step"><div class="ps-label">${esc(label)}</div><div class="ps-value">${esc(value)}</div>${note ? `<div class="ps-note">${esc(note)}</div>` : ''}</div>`;
-}
-function renderAccountPipeline(s4) {
-  if (!s4) return '';
-  return `<div class="pipeline-row">
-    ${renderPipelineStep('Database', safe(s4.recommended_databases) || 'CRM, Apollo, LinkedIn', 'Primary sourcing platforms')}
-    ${renderPipelineStep('Filter Criteria', safe(s4.filter_criteria) || 'Firmographic + tech + buying stage', 'Target fit rules')}
-    ${renderPipelineStep('Exclusion', safe(s4.exclusion_criteria) || 'Existing incumbents / low-fit accounts', 'Risk filters')}
-    ${renderPipelineStep('Outreach Priority', safe(s4.estimated_universe) || 'High-fit accounts first', 'Shortlist priority')}
-  </div>`;
-}
-function renderPainMap(s3) {
-  const psm = Array.isArray(s3.pain_solution_map) ? s3.pain_solution_map.slice(0,3) : [];
-  if (psm.length) {
-    return `<div class="pain-map-grid">
-      ${psm.map((p, idx) => `<div class="pain-card"><div class="pc-hed">${esc(['Pain','Impact','Intervention'][idx]||'Item')}</div><div class="pc-copy">${esc(safe(p.operational_friction || p.pain || '—'))}</div><div class="pc-copy" style="margin-top:10px;color:var(--amber)">${esc(safe(p.business_impact || p.impact || '—'))}</div><div class="pc-copy" style="margin-top:10px;color:var(--green)">${esc(safe(p.recommended_intervention || p.intervention || '—'))}</div></div>`).join('')}
-    </div>`;
-  }
-  return `<div class="pain-map-grid">
-    <div class="pain-card"><div class="pc-hed">Pain</div><div class="pc-copy">${esc(safe(s3.core_pain_points || s3.pain_description || 'Operational friction on key processes.'))}</div></div>
-    <div class="pain-card"><div class="pc-hed">Impact</div><div class="pc-copy">${esc(safe(s3.business_impact || s3.value_driver || 'Revenue leakage, efficiency drag, and risk exposure.'))}</div></div>
-    <div class="pain-card"><div class="pc-hed">Intervention</div><div class="pc-copy">${esc(safe(s3.recommended_intervention || 'Targeted enterprise outreach with outcome-driven messaging.'))}</div></div>
-  </div>`;
-}
-function renderKeywordIntent(s5) {
-  const primary = Array.isArray(s5.primary_keywords) ? s5.primary_keywords : [];
-  const secondary = Array.isArray(s5.secondary_keywords) ? s5.secondary_keywords : [];
-  const intent = Array.isArray(s5.intent_signals) ? s5.intent_signals : [];
-  return `<div class="intent-grid">
-    <div><div class="intent-level">Problem-aware</div>${primary.map(k=>`<span class="intent-pill">${esc(k)}</span>`).join('') || '<span style="color:var(--muted);font-size:11px">No keywords available</span>'}</div>
-    <div><div class="intent-level">Solution-aware</div>${secondary.map(k=>`<span class="intent-pill">${esc(k)}</span>`).join('') || '<span style="color:var(--muted);font-size:11px">No keywords available</span>'}</div>
-    <div><div class="intent-level">High-intent</div>${intent.map(k=>`<span class="intent-pill amber">${esc(k)}</span>`).join('') || '<span style="color:var(--muted);font-size:11px">No strong intent signals extracted</span>'}</div>
-  </div>`;
-}
-function renderMarketTrend(s1) {
-  const trend = safe(s1.market_movement || s1.market_trend || s1.timing_signals || s1.growth_signals);
-  if (!trend) return '';
-  return `<div class="section-highlight"><div class="fl">Market movement</div><div class="fv">${esc(trend)}</div></div>`;
-}
-function renderOpportunityRiskSplit(s1) {
-  const opportunity = safe(s1.key_opportunity || s1.priority_opportunities || (Array.isArray(s1.growth_signals) ? s1.growth_signals[0] : s1.growth_signals));
-  const risk = safe(s1.key_risk || s1.market_risks || (Array.isArray(s1.threats) ? s1.threats[0] : s1.threats));
-  if (!opportunity && !risk) return '';
-  return `<div class="metric-segment">
-    <div class="matrix-card" style="border-color:rgba(34,197,94,.2);"><div class="ml">Key Opportunity</div><div class="mv">${esc(opportunity || 'Opportunity signal not explicit')}</div></div>
-    <div class="matrix-card" style="border-color:rgba(239,68,68,.2);"><div class="ml">Key Risk</div><div class="mv">${esc(risk || 'Risk signal not explicit')}</div></div>
-  </div>`;
-}
-function renderSDRTimeline(s6) {
-  const steps = [
-    {label:'Email 1', angle:s6.email_1?.angle||'Direct value prop focus', body:s6.email_1?.body || 'Open with strategic value and pipeline efficiency.', cta:s6.email_1?.cta || 'Send initial hook'},
-    {label:'Email 2', angle:s6.email_2?.angle||'Social proof push', body:s6.email_2?.body || 'Share peer benchmarks and case evidence.', cta:s6.email_2?.cta || 'Show credibility'},
-    {label:'Email 3', angle:s6.email_3?.angle||'Executive briefing', body:s6.email_3?.body || 'Outline the opportunity for leadership review.', cta:s6.email_3?.cta || 'Invite leadership'},
-    {label:'LinkedIn', angle:s6.linkedin_message ? 'LinkedIn engagement' : 'Social touch', body:s6.linkedin_message || 'Engage with the buying committee via LI.', cta:'Connect / engage'},
-    {label:'Follow-up', angle:s6.linkedin_follow_up ? 'Follow-up persistence' : 'Nudge for next step', body:s6.linkedin_follow_up || 'Reinforce urgency with a clear CTA.', cta:'Schedule next call'},
-  ];
-  return `<div class="pdf-timeline">${steps.filter(step=>step.angle||step.body).map((step,idx)=>`<div class="pdf-timeline-item" data-step="${idx+1}"><div class="ti-title">${esc(step.label)}</div><div class="ti-body"><strong>${esc(step.angle)}</strong></div><div class="ti-body" style="margin-top:8px;">${esc(step.body)}</div>${step.cta?`<div class="ti-chip">${esc(step.cta)}</div>`:''}</div>`).join('')}</div>`;
 }
 function callout(text, type='') {
   if (!text) return '';
@@ -706,55 +355,6 @@ function callout(text, type='') {
 function srcNote(text) {
   if (!text) return '';
   return `<div class="src-note">Source: ${esc(text)} — validate manually</div>`;
-}
-
-function renderTruthLayer(r) {
-  const stepKeys = [
-    {label:'Step 1', data:r.step_1_market || (r.full_report && r.full_report.step_1_market) || {}},
-    {label:'Step 2', data:r.step_2_tam || (r.full_report && r.full_report.step_2_tam) || {}},
-    {label:'Step 3', data:r.step_3_icp || (r.full_report && r.full_report.step_3_icp) || {}},
-    {label:'Step 4', data:r.step_4_sourcing || (r.full_report && r.full_report.step_4_sourcing) || {}},
-    {label:'Step 5', data:r.step_5_keywords || (r.full_report && r.full_report.step_5_keywords) || {}},
-    {label:'Step 6', data:r.step_6_messaging || (r.full_report && r.full_report.step_6_messaging) || {}},
-    {label:'Step 7', data:r.step_7_intelligence || (r.full_report && r.full_report.step_7_intelligence) || {}},
-  ];
-
-  const truthSteps = stepKeys.filter(({data}) => data && typeof data === 'object' && (
-    '_rag_enabled' in data || '_profile_source' in data || '_confidence_basis' in data || '_source_context' in data || '_missing_evidence' in data
-  ));
-
-  if (!truthSteps.length) {
-    return `<div class="truth-card"><div class="truth-row"><div class="truth-label">Truth Layer / Evidence Status</div><div class="truth-value">Evidence metadata not available for this report.</div></div></div>`;
-  }
-
-  const verifiedSteps = truthSteps.filter(({data}) => String(data._profile_source) === 'verified_company_profile');
-  const aiSteps = truthSteps.filter(({data}) => String(data._profile_source) === 'ai_estimate_validate_manually');
-  const otherSteps = truthSteps.filter(({data}) => !['verified_company_profile','ai_estimate_validate_manually'].includes(String(data._profile_source)));
-
-  const uniqueSources = Array.from(new Set(truthSteps.map(({data}) => safe(data._profile_source))).values()).filter(Boolean);
-  const missingEvidence = Array.from(new Set(truthSteps.map(({data}) => safe(data._missing_evidence)).filter(Boolean))).join(', ');
-  const sourceContext = truthSteps.map(({data}) => safe(data._source_context)).filter(Boolean).slice(0,2).join(' · ');
-
-  const badge = verifiedSteps.length
-    ? `<span class="truth-badge truth-badge-verified">Verified company profile used</span>`
-    : `<span class="truth-badge truth-badge-warning">AI estimate — validate manually</span>`;
-
-  const summary = truthSteps.length > 1
-    ? `Verified steps: ${verifiedSteps.length}, AI-estimated steps: ${aiSteps.length}${otherSteps.length ? `, Other: ${otherSteps.length}` : ''}`
-    : `${truthSteps[0].label} metadata available`;
-
-  const profileSource = uniqueSources.length === 1 ? uniqueSources[0] : uniqueSources.join(' · ');
-  const ragEnabled = truthSteps.some(({data}) => data._rag_enabled === true) ? 'Yes' : 'No';
-
-  return `<div class="truth-card">
-    <div class="truth-row"><div class="truth-label">Truth Layer / Evidence Status</div><div class="truth-value">${esc(summary)}</div></div>
-    <div class="truth-row"><div class="truth-label">RAG enabled</div><div class="truth-value">${esc(ragEnabled)}</div></div>
-    <div class="truth-row"><div class="truth-label">Profile source</div><div class="truth-value">${esc(profileSource)}</div></div>
-    <div class="truth-row"><div class="truth-label">Confidence basis</div><div class="truth-value">${esc(truthSteps[0].data._confidence_basis || truthSteps[0].data._confidence_basis || '')}</div></div>
-    ${missingEvidence ? `<div class="truth-row"><div class="truth-label">Missing evidence</div><div class="truth-value">${esc(missingEvidence)}</div></div>` : ''}
-    ${sourceContext ? `<div class="truth-row"><div class="truth-label">Source context</div><div class="truth-value">${esc(sourceContext)}</div></div>` : ''}
-    <div class="truth-badges">${badge}</div>
-  </div>`;
 }
 
 // ── ICP Placeholder Repair ──
@@ -859,24 +459,16 @@ function renderWaterfall(s2) {
 
 // ── Segment Table ─────────────────────────────────────────────────
 function renderSegments(s2) {
-  const segs = Array.isArray(s2.market_segments) ? s2.market_segments : [];
-  const filtered = segs.filter(sg => {
-    if (!sg) return false;
-    if (typeof sg === 'string') return sg.trim().length > 0;
-    return !!(sg.name || sg.segment_name || sg.est_size || sg.size || sg.priority || sg.growth || sg.rationale);
-  }).slice(0, 8);
-  if (!filtered.length) return '';
-
-  const rows = filtered.map(sg => {
-    const name = typeof sg === 'string' ? sg : safe(sg.name || sg.segment_name || '');
-    const size = typeof sg === 'string' ? '' : safe(sg.size || sg.est_size || sg.market_size || '');
-    const pri = typeof sg === 'string' ? '' : safe(sg.priority || sg.priority_level || '');
-    const growth = typeof sg === 'string' ? '' : safe(sg.growth || '');
-    const rationale = typeof sg === 'string' ? '' : safe(sg.rationale || sg.segment_rationale || '');
-    return `<tr><td>${esc(name)}${rationale ? `<div style="font-size:11px;color:var(--muted);margin-top:6px">${esc(rationale)}</div>` : ''}</td><td style="font-family:'Space Mono',monospace;text-align:right">${esc(size)}</td><td>${esc(pri)}</td><td>${esc(growth)}</td></tr>`;
+  const segs = s2.market_segments;
+  if (!Array.isArray(segs) || !segs.length) return '';
+  const rows = segs.slice(0,8).map(sg => {
+    const name = esc(safe(sg.name||sg.segment_name||''));
+    const size = esc(safe(sg.size||sg.market_size||''));
+    const pri  = esc(safe(sg.priority||sg.priority_level||''));
+    return `<tr><td>${name}</td><td style="font-family:'Space Mono',monospace;text-align:right">${size}</td><td>${pri}</td></tr>`;
   }).join('');
   return `<div class="field"><div class="fl">Market Segments</div>
-    <table class="pain-table"><thead><tr><th>Segment</th><th style="text-align:right">Est. Size</th><th>Priority</th><th>Growth</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    <table class="pain-table"><thead><tr><th>Segment</th><th style="text-align:right">Est. Size</th><th>Priority</th></tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 
 // ── Pain-to-Solution Map ──────────────────────────────────────────
@@ -913,113 +505,8 @@ function renderKeywordTaxonomy(s5) {
   ${is.length ? `<div class="field"><div class="fl">Intent Signals</div><div class="tags">${is.map(s=>`<span class="tag amber">${esc(s)}</span>`).join('')}</div></div>` : ''}`;
 }
 
-function renderPdfSwotMatrix(s1) {
-  const sw = s1.swot || {};
-  const listItems = arr => (Array.isArray(arr) ? arr : (arr ? String(arr).split(',') : [])).filter(Boolean).slice(0,4).map(item => `<li>${esc(item.trim())}</li>`).join('');
-  return `<div class="pdf-swot-matrix">
-    <div class="pdf-swot-card" data-label="Strengths"><div class="pdf-swot-title">Strengths</div><ul>${listItems(sw.strengths) || `<li>${esc(s1.market_position || 'Market positioning clarity')}</li>`}</ul></div>
-    <div class="pdf-swot-card" data-label="Weaknesses"><div class="pdf-swot-title">Weaknesses</div><ul>${listItems(sw.weaknesses) || `<li>${esc(s1.revenue_stage || 'Execution risk in scaling')}</li>`}</ul></div>
-    <div class="pdf-swot-card" data-label="Opportunities"><div class="pdf-swot-title">Opportunities</div><ul>${listItems(sw.opportunities) || `<li>${esc(s1.priority_opportunities || 'Growth adjacent to core offering')}</li>`}</ul></div>
-    <div class="pdf-swot-card" data-label="Threats"><div class="pdf-swot-title">Threats</div><ul>${listItems(sw.threats) || `<li>${esc(s1.market_risks || 'Competitive pressure')}</li>`}</ul></div>
-  </div>`;
-}
-
-function compactRationale(text) {
-  const raw = safe(text);
-  if (!raw) return '';
-  const first = raw.split('. ').slice(0,2).join('. ') + (raw.includes('.') ? '.' : '');
-  return `<div class="pdf-priority-card"><div class="title">Scoring Rationale</div><div class="text">${esc(first)}</div></div>`;
-}
-
-function renderPdfSegmentCards(s2) {
-  const segments = Array.isArray(s2.market_segments) ? s2.market_segments.slice(0,4) : [];
-  if (!segments.length) return `<div class="pdf-segment-card"><div class="title">Segment analysis not available</div><div class="metric">Est. segment fit pending</div><div class="line">Use company data to replace this summary.</div></div>`;
-  return `<div class="pdf-tam-grid">${segments.map((seg, idx) => {
-    const name = typeof seg === 'string' ? seg : safe(seg.name || seg.segment_name || 'Segment');
-    const size = typeof seg === 'string' ? safe(seg) : safe(seg.size || seg.est_size || seg.market_size || 'Undisclosed');
-    const priority = typeof seg === 'string' ? '' : safe(seg.priority || seg.priority_level || 'Moderate');
-    const growth = typeof seg === 'string' ? '' : safe(seg.growth || 'Stable');
-    const rationale = typeof seg === 'string' ? '' : safe(seg.rationale || seg.segment_rationale || 'Alignment with current GTM focus');
-    return `<div class="pdf-segment-card"><div class="title">${esc(name)}</div><div class="metric">${esc(size)}</div><div class="line">${esc(priority ? `Priority: ${priority}` : 'Priority: not set')}${growth ? ` · Growth: ${growth}` : ''}</div>${rationale ? `<div class="line" style="margin-top:10px">${esc(rationale)}</div>` : ''}</div>`;
-  }).join('')}</div>`;
-}
-
-function renderPdfBuyingCommittee(s3) {
-  const dms = Array.isArray(s3.decision_makers) ? s3.decision_makers : [];
-  if (!dms.length) return '';
-  return `<div class="pdf-persona-card"><div class="pdf-persona-label">Buying Committee</div><div class="pdf-chip-row">${dms.slice(0,6).map((item, idx) => `<span class="pdf-chip ${idx===0?'green':''}">${esc(item)}</span>`).join('')}</div></div>`;
-}
-
-function renderPdfTriggerChips(s3) {
-  const triggers = Array.isArray(s3.buying_triggers) ? s3.buying_triggers : [];
-  if (!triggers.length) return '';
-  return `<div class="pdf-persona-card"><div class="pdf-persona-label">Buying Triggers</div><div class="pdf-chip-row">${triggers.slice(0,8).map(trigger => `<span class="pdf-chip blue">${esc(trigger)}</span>`).join('')}</div></div>`;
-}
-
-function renderPdfObjectionChips(s3) {
-  const objections = Array.isArray(s3.objections) ? s3.objections : [];
-  if (!objections.length) return '';
-  return `<div class="pdf-persona-card"><div class="pdf-persona-label">Objections / Risk Signals</div><div class="pdf-chip-row">${objections.slice(0,6).map(obs => `<span class="pdf-chip amber">${esc(obs)}</span>`).join('')}</div></div>`;
-}
-
-function renderPdfPainImpactMap(s3) {
-  const psm = Array.isArray(s3.pain_solution_map) ? s3.pain_solution_map.slice(0,3) : [];
-  const cards = psm.length ? psm : [
-    { label: 'Pain', value: s3.core_pain_points || 'Key operational friction points' },
-    { label: 'Impact', value: s3.business_impact || 'Revenue / cost implications' },
-    { label: 'Intervention', value: s3.recommended_intervention || 'Recommended engagement strategy' },
-  ];
-  return `<div class="pdf-bullet-map">${cards.map(card => `<div class="pdf-map-card"><div class="title">${esc(card.label)}</div><div class="value">${esc(safe(card.value))}</div></div>`).join('')}</div>`;
-}
-
-function renderPdfAccountPipeline(s4) {
-  const steps = [
-    {label:'Database', value:safe(s4.recommended_databases) || 'CRM / Apollo / LinkedIn'},
-    {label:'Filter', value:safe(s4.filter_criteria) || 'Firmographic + buying stage'},
-    {label:'Exclusion', value:safe(s4.exclusion_criteria) || 'Existing customers / low-fit accounts'},
-    {label:'Priority', value:safe(s4.estimated_universe) || 'High-fit accounts first'},
-  ];
-  return `<div class="pdf-pipeline">${steps.map(step => `<div class="pdf-pipeline-step"><div class="step-label">${esc(step.label)}</div><div class="step-value">${esc(step.value)}</div><div class="step-note">${esc(step.label === 'Database' ? 'Primary source systems' : step.label === 'Priority' ? 'Shortlist guidance' : 'Target logic')}</div></div>`).join('')}</div>`;
-}
-
-function renderPdfAccountAnalogs(s4) {
-  let analogs = Array.isArray(s4.account_analogs) ? s4.account_analogs.slice(0,3) : [];
-  if (!analogs.length && s4.estimated_universe) analogs = [s4.estimated_universe];
-  if (!analogs.length) return '';
-  return `<div class="pdf-analog-grid">${analogs.map((item, idx) => `<div class="pdf-analog-card"><div class="analog-name">${esc(cleanAccountName(item, idx))}</div><div class="line">${esc(safe(s4.filter_criteria) || 'Derived from the sourcing model')}</div><div class="pdf-fit-bar"><div class="fill" style="width:${Math.min(90, 40 + idx * 18)}%;"></div></div></div>`).join('')}</div>`;
-}
-
-function renderPdfKeywordCloud(s5) {
-  const cloud = [...(Array.isArray(s5.primary_keywords) ? s5.primary_keywords : []), ...(Array.isArray(s5.secondary_keywords) ? s5.secondary_keywords : []), ...(Array.isArray(s5.intent_signals) ? s5.intent_signals : [])].filter(Boolean).slice(0,20);
-  if (!cloud.length) return '<div class="pdf-cloud"><span class="pdf-chip">No keyword cloud available</span></div>';
-  return `<div class="pdf-cloud">${cloud.map(term => `<span class="pdf-chip">${esc(term)}</span>`).join('')}</div>`;
-}
-
-function renderPdfIntentFunnel(s5) {
-  const primary  = Array.isArray(s5.primary_keywords)   ? s5.primary_keywords.slice(0,4)   : [];
-  const secondary= Array.isArray(s5.secondary_keywords) ? s5.secondary_keywords.slice(0,4) : [];
-  const intent   = Array.isArray(s5.intent_signals)      ? s5.intent_signals.slice(0,4)      : [];
-  const steps = [
-    {label:'Problem-aware', title:'Problem-aware', items:primary},
-    {label:'Solution-aware', title:'Solution-aware', items:secondary},
-    {label:'High-intent', title:'High-intent', items:intent},
-  ];
-  return `<div class="pdf-funnel">${steps.map(step => `<div class="pdf-funnel-step"><div class="label">${esc(step.label)}</div><div class="title">${esc(step.title)}</div>${step.items.length ? step.items.map(item => `<span class="pdf-chip">${esc(item)}</span>`).join('') : `<div class="line" style="color:var(--muted);font-size:11px;">No signals available</div>`}</div>`).join('')}</div>`;
-}
-
-function renderPdfQueryCard(label, value) {
-  if (!value) return '';
-  return `<div class="pdf-command-card"><div class="label">${esc(label)}</div><div>${esc(safe(value))}</div></div>`;
-}
-
-function scoreToPercent(score) {
-  const n = parseInt(score, 10);
-  if (Number.isNaN(n)) return 0;
-  return Math.max(0, Math.min(100, n));
-}
-
 // ── Step 7 Decision Engine ────────────────────────────────────────
-function renderDecisionEngine(r, s1, s2, s3, pageNum = '07') {
+function renderDecisionEngine(r, s1, s2, s3) {
   // 1. Prioritize real Step 7 enterprise data
   const s7 = r.step_7_intelligence || (r.full_report && r.full_report.step_7_intelligence) || r.step7_decision_engine;
 
@@ -1054,7 +541,7 @@ function renderDecisionEngine(r, s1, s2, s3, pageNum = '07') {
     const dms = Array.isArray(s3.decision_makers) ? s3.decision_makers : [];
 
     return `<div class="section" style="border:1px solid rgba(168,85,247,.3);background:rgba(168,85,247,.03)">
-      <div class="sec-header"><div class="sec-num" style="background:var(--amber);font-size:9px;">${esc(pageNum)}</div><div class="sec-title">Revenue Intelligence — Decision Engine</div></div>
+      <div class="sec-header"><div class="sec-num" style="background:var(--amber);font-size:9px;">07</div><div class="sec-title">Revenue Intelligence — Decision Engine</div></div>
       <div class="sec-context">Boardroom-grade decision layer. Actionable verdict derived from enterprise intelligence.</div>
 
       ${s7.executive_brief ? `<div class="field"><div class="fl">Executive Brief</div><div class="fv" style="border-left-color:var(--blue);font-size:12px">${esc(s7.executive_brief)}</div></div>` : ''}
@@ -1103,7 +590,7 @@ function renderDecisionEngine(r, s1, s2, s3, pageNum = '07') {
   }
 
   // 2. Fallback Logic (if no real Step 7 data exists)
-  const score = s1.gtm_relevance_score || (r.full_report && r.full_report.gtm_relevance_score) || (s2 && s2.total_score) || 0;
+  const score = s1.gtm_relevance_score;
   if (!score) return ''; // Hide gracefully if no data
 
   // Derive decision from score
@@ -1134,7 +621,7 @@ function renderDecisionEngine(r, s1, s2, s3, pageNum = '07') {
   const execTarget = dms[0] || icp;
 
   return `<div class="section" style="border:1px solid rgba(168,85,247,.3);background:rgba(168,85,247,.03)">
-    <div class="sec-header"><div class="sec-num" style="background:var(--amber);font-size:9px;">${esc(pageNum)}</div><div class="sec-title">Revenue Intelligence — Decision Engine (Derived)</div></div>
+    <div class="sec-header"><div class="sec-num" style="background:var(--amber);font-size:9px;">07</div><div class="sec-title">Revenue Intelligence — Decision Engine (Derived)</div></div>
     <div class="sec-context">Boardroom-grade decision layer. Not a summary. Actionable verdict before entering this account.</div>
 
     <div class="field"><div class="fl">Why Now (Trigger Logic)</div>
@@ -1193,13 +680,8 @@ function renderReport(r) {
     (r.industry ? r.industry + ' · ' : '') +
     'Generated ' + new Date(r.updated_at||r.created_at).toLocaleDateString('en-GB',{year:'numeric',month:'long',day:'numeric'});
 
-  const demoBanner = document.getElementById('demo-report-banner');
-  if (demoBanner) {
-    demoBanner.style.display = isDemoReport(r) ? 'flex' : 'none';
-  }
-
   // KPI strip
-  const score = s1.gtm_relevance_score || (r.full_report && r.full_report.gtm_relevance_score) || (s2 && s2.total_score) || 0;
+  const score = s1.gtm_relevance_score;
   const s7 = r.step_7_intelligence || (r.full_report && r.full_report.step_7_intelligence) || r.step7_decision_engine || {};
   const confScore = parseInt(s7.confidence_score) || score || 0;
   const rec = s7.go_no_go?.recommendation || (score>=75?'Go':score>=50?'Watch':'No-Go');
@@ -1217,37 +699,6 @@ function renderReport(r) {
   document.getElementById('r-steps').textContent = (r.steps_completed || Object.values({s1,s2,s3,s4,s5,s6}).filter(x=>Object.keys(x).length).length) + '/7';
 
   const industry = r.industry || '';
-  const demoMode = isDemoReport(r);
-  const reportCover = document.getElementById('report-cover');
-  if (reportCover) {
-    reportCover.innerHTML = `<div class="cover-hero">
-      <div class="cover-info">
-        <div class="cover-label"><span class="cover-mark">ABE</span><span class="cover-subtitle">Enterprise AI Revenue Infrastructure</span></div>
-        <div class="cover-title">GTM Intelligence Report</div>
-        <div class="cover-company">${esc(r.company_name || 'Unknown Company')}</div>
-        <div class="cover-meta">
-          <span>Generated ${new Date(r.updated_at||r.created_at).toLocaleDateString('en-GB',{year:'numeric',month:'long',day:'numeric'})}</span>
-          <span class="cover-badge ${demoMode ? 'demo' : 'live'}">${demoMode ? 'DEMO MODE' : 'LIVE MODE'}</span>
-          <span class="cover-badge" style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.12);color:var(--text)">Confidential</span>
-        </div>
-        <div class="cover-detail">Boardroom-ready GTM insight designed for enterprise strategy reviews, opportunity qualification, and executive decision-making.</div>
-        <div class="info-strip">
-          <div class="info-chip"><strong>Opportunity focus</strong><span>${esc(safe(s2.priority_opportunities) || 'Opportunity signal not explicit')}</span></div>
-          <div class="info-chip"><strong>Risk focus</strong><span>${esc(safe(s1.market_risks) || s1.threats || 'Review competitive inertia')}</span></div>
-          <div class="info-chip"><strong>Primary signal</strong><span>${esc(safe(s1.demand_signals) || s1.timing_signals || 'Demand and timing signals')}</span></div>
-        </div>
-      </div>
-      <div class="cover-kpis">
-        <div class="cover-card"><div class="cc-label">Total Addressable Market</div><div class="cc-value">${esc(safe(s2.tam_size_estimate) || '—')}</div><div class="cc-note">Market size signal</div></div>
-        <div class="cover-card"><div class="cc-label">Compound Annual Growth Rate</div><div class="cc-value">${esc(safe(s2.growth_rate) || '—')}</div><div class="cc-note">Momentum assessment</div></div>
-        <div class="cover-card"><div class="cc-label">GTM Relevance</div><div class="cc-value">${esc(score ? String(score) : '—')}</div><div class="cc-note">Strategy fit score</div></div>
-        <div class="cover-card"><div class="cc-label">Verdict</div><div class="cc-value">${esc(rec.toUpperCase())}</div><div class="cc-note">Go / Watch / No-Go</div></div>
-      </div>
-    </div>`;
-    reportCover.style.display = 'block';
-  }
-  const footerLabel = document.querySelector('.report-footer .footer-right');
-  if (footerLabel) footerLabel.textContent = `Page 1 · ${demoMode ? 'Demo reporting' : 'Live reporting'}`;
 
   const container = document.getElementById('sections-container');
   container.innerHTML = [
@@ -1259,23 +710,8 @@ function renderReport(r) {
       ${renderExecSummary(r, s1, s2)}
     </div>` : '',
 
-    // Truth Layer / Evidence Status
-    `<div class="section">
-      <div class="sec-header"><div class="sec-num">TL</div><div class="sec-title">Truth Layer / Evidence Status</div></div>
-      <div class="sec-context">Provenance metadata from the GTM step outputs. Displays whether the report is backed by verified profile data or AI estimate fallback.</div>
-      <div class="info-strip">
-        <div class="info-chip"><strong>Evidence confidence</strong><span>${esc(s7.confidence_score || s1.gtm_relevance_score || 'N/A')} / 100</span></div>
-        <div class="info-chip"><strong>Profile source</strong><span>${esc(s7._profile_source || s1._profile_source || s2._profile_source || 'Verified / AI estimate')}</span></div>
-        <div class="info-chip"><strong>Missing evidence</strong><span>${esc(s7._missing_evidence || s1._missing_evidence || s2._missing_evidence || 'None flagged')}</span></div>
-      </div>
-      ${renderTruthLayer(r)}
-      ${field('Recommended Action', s7.recommended_action || s1.recommended_action || s2.recommended_action)}
-    </div>`,
-
     // Step 1 — Market Research
-    sectionWrap('01', 'Market Research', 'Market pulse & positioning', 'Deconstructs positioning and isolates macro triggers. Identifies why a prospect would buy right now.', [
-      renderMarketTrend(s1),
-      renderOpportunityRiskSplit(s1),
+    sectionWrap('01', 'Market Research & SWOT', 'Deconstructs positioning and isolates macro triggers. Identifies why a prospect would buy right now.', [
       renderSWOT(s1),
       field('Market Position', s1.market_position),
       field('GTM Relevance Reasoning', s1.gtm_relevance_reasoning),
@@ -1285,7 +721,7 @@ function renderReport(r) {
     ]),
 
     // Step 2 — TAM
-    sectionWrap('02', 'TAM Mapping', 'Opportunity sizing & waterfall analysis', 'Quantifies the total market velocity and filters it down to the actionable dollar amount.', [
+    sectionWrap('02', 'TAM Mapping — The Opportunity', 'Quantifies the total market velocity and filters it down to the actionable dollar amount.', [
       `<div class="grid2">
         ${safe(s2.tam_size_estimate) ? `<div class="metric-box"><div class="mv">${esc(safe(s2.tam_size_estimate))}</div><div class="ml">Total Addressable Market</div></div>` : ''}
         ${safe(s2.growth_rate) ? `<div class="metric-box"><div class="mv">${esc(safe(s2.growth_rate))}</div><div class="ml">CAGR</div></div>` : ''}
@@ -1298,12 +734,12 @@ function renderReport(r) {
       callout(s2.priority_opportunities ? `Highest-leverage entry: ${safe(s2.priority_opportunities).split('.')[0]}.` : ''),
     ]),
 
-    // Step 3 — ICP Modeling
-    sectionWrap('03', 'ICP Modeling', 'Buyer persona & decision ecosystem', 'Identifies exact decision-makers. Maps operational pain directly to high-margin solutions.', [
+    // Step 3 — ICP (with repair logic + persona table)
+    sectionWrap('03', 'ICP Modeling — The Persona', 'Identifies exact decision-makers. Maps operational pain directly to high-margin solutions.', [
       field('Primary ICP', repairICP(s3.primary_icp, 'primary', s3, industry)),
       field('Secondary ICP', repairICP(s3.secondary_icp, 'secondary', s3, industry)),
-      renderPersonaCard(s3, industry),
       (isPlaceholderICP(s3.primary_icp)||isPlaceholderICP(s3.secondary_icp)) ? srcNote('One or more ICP values derived from decision-maker / industry / trigger data (original was placeholder)') : '',
+      // ICP Persona Table (Primary Contact / Economic Buyer / Champion)
       (function() {
         const pm = s3.persona_map;
         if (pm && typeof pm === 'object') {
@@ -1311,6 +747,7 @@ function renderReport(r) {
           const rows = [pRow('Primary Contact', pm.primary_role), pRow('Economic Buyer', pm.economic_buyer), pRow('Internal Champion', pm.champion)].filter(Boolean).join('');
           if (rows) return `<div class="field"><div class="fl">ICP Persona Map</div><table class="pain-table"><thead><tr><th>Role</th><th>Title</th><th>Key Responsibility</th></tr></thead><tbody>${rows}</tbody></table></div>`;
         }
+        // Derive from decision_makers if no persona_map
         const dms = Array.isArray(s3.decision_makers) ? s3.decision_makers : [];
         if (dms.length >= 2) {
           return `<div class="field"><div class="fl">ICP Persona Map (Derived)</div><table class="pain-table"><thead><tr><th>Role</th><th>Title</th><th>Responsibility</th></tr></thead><tbody>
@@ -1332,8 +769,7 @@ function renderReport(r) {
     ]),
 
     // Step 4 — Account Sourcing
-    sectionWrap('04', 'Account Sourcing', 'Targeting playbook and filters', 'Translates the persona into actionable technographic filters and a prospect roster.', [
-      renderAccountPipeline(s4),
+    sectionWrap('04', 'Account Sourcing — The Targets', 'Translates the persona into actionable technographic filters and a prospect roster.', [
       tagRow('Recommended Databases', s4.recommended_databases, 'green'),
       field('Filter Criteria', s4.filter_criteria),
       field('Sourcing Playbook', s4.sourcing_playbook),
@@ -1343,18 +779,19 @@ function renderReport(r) {
     ]),
 
     // Step 5 — Keywords
-    sectionWrap('05', 'Keywords & Intent', 'Semantic funnel taxonomy', 'Maps the semantic footprint of the prospect before they issue an RFP.', [
+    sectionWrap('05', 'Keywords & Intent Intelligence', 'Maps the semantic footprint of the prospect before they issue an RFP.', [
       renderKeywordTaxonomy(s5),
-      renderKeywordIntent(s5),
       field('Boolean Search Query', s5.boolean_query),
       field('LinkedIn Search String', s5.linkedin_search_strings),
       tagRow('Content Topics', s5.content_topics, 'blue'),
       callout(s5.analyst_insight),
     ]),
 
-    // Step 6 — Outreach Messaging
-    sectionWrap('06', 'Enterprise SDR Sequence', 'Touchpoint timeline for outreach execution', 'Hyper-targeted, trigger-specific sequences designed to agitate pain and validate scalability.', [
-      renderSDRTimeline(s6),
+    // Step 6 — Messaging
+    sectionWrap('06', 'Outreach Messaging — The Engagement', 'Hyper-targeted, trigger-specific sequences designed to agitate pain and validate scalability.', [
+      emailCard(s6.email_1, 'Email 1 — Agitation / Market Signal'),
+      emailCard(s6.email_2, 'Email 2 — Hard ROI Metric'),
+      emailCard(s6.email_3, 'Email 3 — Heavyweight Proof'),
       field('Follow-up Sequence', s6.follow_up_sequence),
       field('LinkedIn Message', s6.linkedin_message),
       field('LinkedIn Follow-up', s6.linkedin_follow_up),
@@ -1362,26 +799,25 @@ function renderReport(r) {
     ]),
 
     // Step 7 — Decision Engine
-    renderDecisionEngine(r, s1, s2, s3, '07'),
+    renderDecisionEngine(r, s1, s2, s3),
 
     // Weighted Confidence Matrix
     (function() {
       if (!confScore) return '';
       const v = Math.round(confScore*0.4), t = Math.round(confScore*0.25), f = Math.round(confScore*0.2), c = Math.round(confScore*0.15);
+      const bar = (label, score, maxScore, extraClass='') => `<div class="cm-bar-row ${extraClass}">
+        <div class="cm-bar-header"><span class="cm-bar-label">${label}</span><span class="cm-bar-score">${score}<span style="font-size:10px;font-weight:400;color:var(--muted)">/${maxScore}</span></span></div>
+        <div class="cm-bar-track"><div class="cm-bar-fill" style="width:${Math.round((score/maxScore)*100)}%"></div></div>
+      </div>`;
       return `<div class="section">
         <div class="sec-header"><div class="sec-num" style="background:var(--accent)">CM</div><div class="sec-title">Weighted Confidence Matrix</div></div>
         <div class="sec-context">Quantified fidelity assessment. Sub-scores derived from data richness, capped by server-side hallucination guard.</div>
-        <table class="cm-table">
-          <thead><tr><th>Dimension</th><th style="text-align:right">Score</th><th>Description</th></tr></thead>
-          <tbody>
-            <tr><td>Signal Veracity (40%)</td><td class="num">${v}/40</td><td>Density and recency of buying signals</td></tr>
-            <tr><td>Market Timing (25%)</td><td class="num">${t}/25</td><td>Alignment with macro tailwinds and budget cycles</td></tr>
-            <tr><td>ICP Fit (20%)</td><td class="num">${f}/20</td><td>Firmographic and technographic match rate</td></tr>
-            <tr><td>Data Completeness (15%)</td><td class="num">${c}/15</td><td>Quality and depth of extraction source</td></tr>
-            <tr style="border-top:1px solid var(--accent)"><td><strong>Overall Fidelity</strong></td><td class="num" style="font-size:14px">${confScore}/100</td><td></td></tr>
-          </tbody>
-        </table>
-        <div class="confidence-bar-wrap"><div class="confidence-bar" style="width:${confScore}%"></div></div>
+        ${bar('Signal Veracity', v, 40)}
+        ${bar('Market Timing', t, 25)}
+        ${bar('ICP Fit', f, 20)}
+        ${bar('Data Completeness', c, 15)}
+        <div style="border-top:1px solid rgba(168,85,247,.2);margin:14px 0 10px"></div>
+        ${bar('Overall Fidelity', confScore, 100, 'cm-bar-overall')}
         ${srcNote('Confidence score is algorithmic — weights fixed (40/25/20/15), capped by data richness')}
       </div>`;
     })(),
@@ -1422,26 +858,21 @@ function renderReport(r) {
   document.getElementById('btn-export').disabled  = false;
   document.getElementById('btn-export2').disabled = false;
 
+  // Cover positioning strip
+  const positioningText = safe(s1.company_overview) || safe(r.company_name) + ' — GTM intelligence report.';
+  const stripContainer = document.getElementById('cover-strip-container');
+  if (stripContainer && positioningText) {
+    const icp = safe(s3.primary_icp) || 'Enterprise revenue operations teams seeking pipeline predictability';
+    stripContainer.innerHTML = `<div class="cover-strip">
+      <div class="cs-label">Strategic Positioning</div>
+      <div class="cs-text">${esc(positioningText.split('.')[0])}. Targeting: ${esc(icp.split(',')[0])}.</div>
+    </div>`;
+  }
+
   window._strategy = r;
 }
 
 // ── Load Report ───────────────────────────────────────────────────
-function isDemoReport(r) {
-  return !!(
-    r?.report_mode === 'demo' ||
-    r?.demo_mode === true ||
-    r?.full_report?.demo_mode === true ||
-    r?.scraped_profile?.demo_mode === true ||
-    r?.step_1_market?.demo_mode === true ||
-    r?.step_2_tam?.demo_mode === true ||
-    r?.step_3_icp?.demo_mode === true ||
-    r?.step_4_sourcing?.demo_mode === true ||
-    r?.step_5_keywords?.demo_mode === true ||
-    r?.step_6_messaging?.demo_mode === true ||
-    r?.step_7_intelligence?.demo_mode === true
-  );
-}
-
 async function loadReport() {
   const params = new URLSearchParams(location.search);
   const id = params.get('id');
@@ -1465,668 +896,50 @@ function showError(msg) {
 // ── PDF Export ────────────────────────────────────────────────────
 async function exportPDF() {
   const btn = document.getElementById('btn-export') || document.getElementById('btn-export2');
-  const originalText = btn?.textContent || 'Export PDF';
   if (btn) { btn.disabled = true; btn.textContent = 'Generating…'; }
   try {
-    await exportCurrentReportAsPDF();
+    const data = await window.APP.api('/api/export-pdf', { strategy: window._strategy });
+    if (!data.html) throw new Error(data.error || 'Export failed');
+    await renderHtmlToPdf(data.html, data.filename || 'GTM_Report.pdf');
   } catch (e) {
-    alert('PDF export failed: ' + (e?.message || e));
-    console.error('PDF export failed', e);
+    alert('PDF export failed: ' + e.message);
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = originalText; }
+    if (btn) { btn.disabled = false; btn.textContent = 'Export PDF'; }
   }
 }
 
-function sanitizeFilename(value) {
-  const raw = String(value || 'GTM_Report').trim();
-  return raw
-    .replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
-    .replace(/\s+/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_+|_+$/g, '')
-    .slice(0, 120) || 'GTM_Report';
-}
-
-const PAGE_WIDTH = 794;
-const PAGE_HEIGHT = 1123;
-const PAGE_PADDING_TOP = 32;
-const PAGE_PADDING_BOTTOM = 32;
-const BLOCK_GAP = 18;
-const PAGE_BODY_HEIGHT = PAGE_HEIGHT - PAGE_PADDING_TOP - PAGE_PADDING_BOTTOM;
-
-async function exportCurrentReportAsPDF() {
-  const reportData = window._strategy;
-  if (!reportData || typeof reportData !== 'object') {
-    throw new Error('Report data is not loaded for PDF export.');
-  }
-
-  const source = document.getElementById('report-content');
-  if (!source || source.style.display === 'none' || source.offsetParent === null) {
-    throw new Error('Report is not visible for export.');
-  }
-
-  const reportName = sanitizeFilename(`GTM_${reportData.company_name || 'GTM_Report'}_${new Date().toISOString().slice(0,10)}`);
-  const filename = `${reportName}.pdf`;
-
-  const sandbox = createPdfSandbox();
-  const pdfRoot = buildPdfExportDom(reportData);
-  sandbox.appendChild(pdfRoot);
-  document.body.appendChild(sandbox);
-
+async function renderHtmlToPdf(html, filename) {
+  const iframe = document.createElement('iframe');
+  iframe.style.cssText = 'position:fixed;top:0;left:-9999px;width:794px;border:none;opacity:0;pointer-events:none';
+  iframe.srcdoc = html;
+  document.body.appendChild(iframe);
+  await new Promise(resolve => { iframe.onload = resolve; setTimeout(resolve, 8000); });
+  const iDoc = iframe.contentDocument || iframe.contentWindow.document;
+  const fullHeight = Math.max(iDoc.body.scrollHeight, iDoc.documentElement.scrollHeight, 2000);
+  iframe.style.height = fullHeight + 'px';
+  await new Promise(r => setTimeout(r, 1000));
   try {
-    await waitForRenderStability(pdfRoot);
-    const pages = Array.from(pdfRoot.querySelectorAll('.pdf-page'));
-    console.log('[PDF] fixed pages generated:', pages.length);
-    if (!pages.length) {
-      throw new Error('PDF export failed: no pages generated.');
+    const canvas = await html2canvas(iDoc.documentElement, {
+      scale:2, useCORS:true, allowTaint:true, backgroundColor:'#ffffff',
+      logging:false, width:794, windowWidth:794, height:fullHeight, windowHeight:fullHeight,
+    });
+    const A4_W = 595.28, A4_H = 841.89;
+    const cw = canvas.width, ch = canvas.height;
+    const pageH = Math.round((A4_H / A4_W) * cw);
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ unit:'pt', format:'a4', orientation:'portrait', compress:true });
+    for (let i = 0; i < Math.ceil(ch / pageH); i++) {
+      if (i > 0) pdf.addPage();
+      const srcY = i * pageH, srcH = Math.min(pageH, ch - srcY);
+      const pg = document.createElement('canvas');
+      pg.width = cw; pg.height = srcH;
+      pg.getContext('2d').drawImage(canvas, 0, srcY, cw, srcH, 0, 0, cw, srcH);
+      pdf.addImage(pg.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, A4_W, (srcH / cw) * A4_W);
     }
-    await capturePagesToPdf(pages, filename);
+    pdf.save(filename);
   } finally {
-    if (sandbox.parentNode) sandbox.parentNode.removeChild(sandbox);
+    document.body.removeChild(iframe);
   }
-}
-
-function createPdfPage() {
-  const page = document.createElement('section');
-  page.className = 'pdf-page';
-  page.style.cssText = 'width:794px;height:1123px;background:#0B0F1A;overflow:hidden;box-sizing:border-box;padding:44px 48px;position:relative;display:block;';
-  return page;
-}
-
-function pdfStatCard(label, value, note) {
-  return `<div class="cover-card" style="min-height:90px;padding:18px 16px;display:flex;flex-direction:column;justify-content:space-between;">
-    <div class="cc-label">${esc(label)}</div>
-    <div class="cc-value" style="font-size:30px;line-height:1.05;">${esc(value)}</div>
-    ${note ? `<div class="cc-note">${esc(note)}</div>` : ''}
-  </div>`;
-}
-
-function buildPdfExportDom(r) {
-  const root = document.createElement('div');
-  root.id = 'pdf-export-root';
-  root.style.cssText = 'width:794px;max-width:794px;margin:0 auto;padding:0;box-sizing:border-box;';
-
-  const pages = [
-    buildPdfCoverPage(r),
-    buildPdfTruthPage(r),
-    buildPdfMarketPage(r),
-    buildPdfTamPage(r),
-    buildPdfICPPage(r),
-    buildPdfAccountSourcingPage(r),
-    buildPdfKeywordsPage(r),
-    buildPdfOutboundPage(r),
-    buildPdfDecisionPage(r),
-    buildPdfConfidenceMatrixPage(r),
-    buildPdfAppendixPage(r),
-  ];
-  pages.forEach(page => root.appendChild(page));
-  return root;
-}
-
-function buildPdfCoverPage(r) {
-  const score = r.step_1_market?.gtm_relevance_score || r.full_report?.gtm_relevance_score || r.step_2_tam?.total_score || 0;
-  const s1 = r.step_1_market || {};
-  const s2 = r.step_2_tam || {};
-  const demoMode = isDemoReport(r);
-  const page = createPdfPage();
-  page.innerHTML = `
-    <div class="report-cover">
-      <div class="cover-hero">
-        <div class="cover-info">
-          <div class="cover-label"><span class="cover-mark">ABE</span><span class="cover-subtitle">Enterprise AI Revenue Infrastructure</span></div>
-          <div class="cover-title">GTM Intelligence Report</div>
-          <div class="cover-company">${esc(r.company_name || 'Unknown Company')}</div>
-          <div class="cover-meta">
-            <span>Generated ${new Date(r.updated_at||r.created_at).toLocaleDateString('en-GB',{year:'numeric',month:'long',day:'numeric'})}</span>
-            <span class="cover-badge ${demoMode ? 'demo' : 'live'}">${demoMode ? 'DEMO MODE' : 'LIVE MODE'}</span>
-            <span class="cover-badge" style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.12);color:var(--text)">Confidential</span>
-            <span class="cover-badge" style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.12);color:var(--text)">Page 1 of 11</span>
-          </div>
-          <div class="cover-detail">Boardroom-ready GTM insight designed for enterprise strategy reviews, opportunity qualification, and executive decision-making.</div>
-          <div class="insight-grid">
-            ${renderMiniChartCard('Opportunity signal', safe(s2.priority_opportunities) || safe(s1.key_opportunity) || 'Priority opportunity not explicit', 'Primary buying trigger', score)}
-            ${renderMiniChartCard('Risk horizon', safe(s1.market_risks) || 'Competitive inertia', 'Approval / procurement exposure', 45, 'var(--amber)')}
-            ${renderMiniChartCard('Confidence lens', `${score ? String(score) : '—'}%`, 'Strategy fit confidence', score, 'var(--green)')}
-          </div>
-          <div class="info-strip">
-            <div class="info-chip"><strong>Opportunity focus</strong><span>${esc(safe(s2.priority_opportunities) || 'Opportunity signal not explicit')}</span></div>
-            <div class="info-chip"><strong>Risk focus</strong><span>${esc(safe(s1.market_risks) || s1.threats || 'Review competitive inertia')}</span></div>
-            <div class="info-chip"><strong>Primary signal</strong><span>${esc(safe(s1.demand_signals) || s1.timing_signals || 'Demand and timing signals')}</span></div>
-          </div>
-        </div>
-        <div class="cover-kpis">
-          <div class="cover-card"><div class="cc-label">Total Addressable Market</div><div class="cc-value">${esc(safe(s2.tam_size_estimate) || '—')}</div><div class="cc-note">Market size signal</div></div>
-          <div class="cover-card"><div class="cc-label">Compound Annual Growth Rate</div><div class="cc-value">${esc(safe(s2.growth_rate) || '—')}</div><div class="cc-note">Momentum assessment</div></div>
-          <div class="cover-card"><div class="cc-label">GTM Relevance</div><div class="cc-value">${esc(score ? String(score) : '—')}</div><div class="cc-note">Strategy fit score</div></div>
-          <div class="cover-card"><div class="cc-label">Verdict</div><div class="cc-value">${esc((r.step_7_intelligence?.go_no_go?.recommendation || (score >= 75 ? 'Go' : score >= 50 ? 'Watch' : 'No-Go') || '—').toUpperCase())}</div><div class="cc-note">Go / Watch / No-Go</div></div>
-        </div>
-      </div>
-    </div>
-  `;
-  return page;
-}
-
-function buildPdfTruthPage(r) {
-  const s1 = r.step_1_market || {};
-  const s2 = r.step_2_tam || {};
-  const s7 = r.step_7_intelligence || {};
-  const evidenceScore = scoreToPercent(s7.confidence_score || s1.gtm_relevance_score || 0);
-  const missingEvidence = safe(s7._missing_evidence || s1._missing_evidence || s2._missing_evidence || 'None flagged');
-  const page = createPdfPage();
-  page.innerHTML = `
-    <div class="section">
-      <div class="sec-header"><div class="sec-num">02</div><div><div class="sec-title">Truth Layer / Executive Summary</div><div class="sec-subtitle">Evidence status, profile source, and summary guidance.</div></div></div>
-      <div class="sec-context">Provenance metadata from the GTM step outputs. Displays whether the report is backed by verified profile data or AI estimate fallback.</div>
-      <div class="info-strip">
-        <div class="info-chip"><strong>Evidence confidence</strong><span>${esc(evidenceScore)}%</span></div>
-        <div class="info-chip"><strong>Profile source</strong><span>${esc(s7._profile_source || s1._profile_source || s2._profile_source || 'Verified / AI estimate')}</span></div>
-        <div class="info-chip"><strong>Missing evidence</strong><span>${esc(missingEvidence)}</span></div>
-      </div>
-      <div class="insight-grid">
-        ${renderMiniChartCard('Evidence confidence', `${evidenceScore}%`, 'Source-quality estimate', evidenceScore)}
-        ${renderMiniChartCard('Profile source', s7._profile_source || s2._profile_source || 'Mixed source', safe(s7._source_context || s2._source_context || 'Source metadata available'), 65, 'var(--blue)')}
-        ${renderMiniChartCard('Missing evidence', missingEvidence || 'None flagged', 'Validate before decision', missingEvidence && missingEvidence !== 'None flagged' ? 40 : 95, missingEvidence && missingEvidence !== 'None flagged' ? 'var(--amber)' : 'var(--green)')}
-      </div>
-      ${renderTruthLayer(r)}
-      ${field('Recommended Action', s7.recommended_action || s1.recommended_action || s2.recommended_action)}
-      ${renderExecSummary(r, s1, s2)}
-    </div>
-  `;
-  return page;
-}
-
-function buildPdfMarketPage(r) {
-  const s1 = r.step_1_market || {};
-  const marketPulse = safe(s1.demand_signals || s1.market_movement || s1.market_trend || 'Moderate');
-  const position = safe(s1.market_position || 'Positioning not explicit');
-  const timing = safe(s1.timing_signals || s1.growth_signals || 'Timing unclear');
-  const marketScore = scoreToPercent(s1.gtm_relevance_score || 68);
-  const page = createPdfPage();
-  page.innerHTML = `
-    <div class="section">
-      <div class="sec-header"><div class="sec-num">03</div><div><div class="sec-title">Market Research</div><div class="sec-subtitle">Market pulse, positioning, and demand timing.</div></div></div>
-      <div class="sec-context">Deconstructs positioning and isolates macro triggers. Identifies why a prospect would buy right now.</div>
-      <div class="insight-grid">
-        ${renderMiniChartCard('Demand strength', marketPulse, 'Buyer interest signal', marketScore)}
-        ${renderMiniChartCard('Positioning clarity', position, 'Value differentiation', Math.min(94, marketScore + 4), 'var(--green)')}
-        ${renderMiniChartCard('Timing urgency', timing, 'Go-to-market window', Math.max(42, marketScore - 10), 'var(--amber)')}
-      </div>
-      ${renderMarketTrend(s1)}
-      ${renderOpportunityRiskSplit(s1)}
-      ${renderSWOT(s1)}
-      ${field('Market Position', s1.market_position)}
-      ${field('GTM Relevance Reasoning', s1.gtm_relevance_reasoning)}
-      ${tagRow('Growth Signals', s1.growth_signals, 'green')}
-      ${tagRow('Tech Stack Hints', s1.tech_stack_hints, 'blue')}
-      ${callout(s1.gtm_relevance_reasoning ? `GTM Score ${s1.gtm_relevance_score || ''}: ${safe(s1.gtm_relevance_reasoning).split('.')[0]}.` : '')}
-    </div>
-  `;
-  return page;
-}
-
-function buildPdfTamPage(r) {
-  const s2 = r.step_2_tam || {};
-  const page = createPdfPage();
-  page.innerHTML = `
-    <div class="section">
-      <div class="sec-header"><div class="sec-num">04</div><div><div class="sec-title">TAM Mapping</div><div class="sec-subtitle">Sizing, segmentation, and market-fit analysis.</div></div></div>
-      <div class="sec-context">Translates addressable market into an action plan for the first revenue wave.</div>
-      <div class="insight-grid">
-        ${renderMiniChartCard('Global TAM', safe(s2.tam_size_estimate) || '—', 'Total addressable market', 92)}
-        ${renderMiniChartCard('Serviceable SAM', safe(s2.sam_estimate || s2.sam) || '—', 'Serviceable market', 75, 'var(--green)')}
-        ${renderMiniChartCard('Obtainable SOM', safe(s2.som_estimate) || '—', 'Near-term opportunity', 48, 'var(--amber)')}
-      </div>
-      <div class="grid2" style="margin-bottom:18px;">
-        <div class="metric-box"><div class="mv">${esc(safe(s2.tam_size_estimate) || '—')}</div><div class="ml">TAM</div></div>
-        <div class="metric-box"><div class="mv">${esc(safe(s2.sam_estimate || s2.sam) || '—')}</div><div class="ml">SAM</div></div>
-        <div class="metric-box"><div class="mv">${esc(safe(s2.som_estimate) || '—')}</div><div class="ml">SOM</div></div>
-        <div class="metric-box"><div class="mv">${esc(safe(s2.growth_rate) || '—')}</div><div class="ml">CAGR</div></div>
-      </div>
-      ${renderWaterfall(s2)}
-      ${renderSegments(s2)}
-      ${field('Priority Markets', s2.priority_opportunities)}
-      ${field('TAM Assumptions', s2.assumptions)}
-      ${field('Market Maturity', s2.market_maturity)}
-      ${callout(s2.tam_assumption_note || s2.priority_opportunities)}
-    </div>
-  `;
-  return page;
-}
-
-function buildPdfICPPage(r) {
-  const industry = r.industry || '';
-  const s3 = r.step_3_icp || {};
-  const page = createPdfPage();
-  page.innerHTML = `
-    <div class="section">
-      <div class="sec-header"><div class="sec-num">05</div><div><div class="sec-title">ICP Modeling</div><div class="sec-subtitle">Persona, buying committee and decision ecosystem.</div></div></div>
-      <div class="sec-context">Profiles the ideal buyer and the decision landscape for fast-moving enterprise sales.</div>
-      ${renderPersonaCard(s3, industry)}
-      ${field('Primary ICP', repairICP(s3.primary_icp, 'primary', s3, industry))}
-      ${field('Secondary ICP', repairICP(s3.secondary_icp, 'secondary', s3, industry))}
-      ${field('Firmographics', s3.firmographics)}
-      ${renderPainMap(s3)}
-      ${tagRow('Buying Triggers', s3.buying_triggers, 'green')}
-      ${tagRow('Decision Makers', s3.decision_makers)}
-      ${tagRow('Common Objections', s3.objections, 'amber')}
-      ${field('Deal Cycle', s3.deal_cycle)}
-      ${callout(s3.analyst_insight)}
-    </div>
-  `;
-  return page;
-}
-
-function buildPdfAccountSourcingPage(r) {
-  const s4 = r.step_4_sourcing || {};
-  const page = createPdfPage();
-  page.innerHTML = `
-    <div class="section">
-      <div class="sec-header"><div class="sec-num">06</div><div><div class="sec-title">Account Sourcing</div><div class="sec-subtitle">Targeting pipeline, filters, and account prioritisation.</div></div></div>
-      <div class="sec-context">Maps the ideal account set and filtering criteria for outreach readiness.</div>
-      ${renderAccountPipeline(s4)}
-      ${tagRow('Target Roles', s4.target_roles, 'blue')}
-      ${tagRow('Account Filters', s4.account_filters, 'green')}
-      ${field('Estimated Deal Size', s4.estimated_deal_size)}
-      ${field('Sales Approach', s4.sales_approach)}
-      ${field('Exclusion Criteria', s4.exclusion_criteria, 'red')}
-      ${field('Data Enrichment Tips', s4.data_enrichment_tips)}
-    </div>
-  `;
-  return page;
-}
-
-function buildPdfKeywordsPage(r) {
-  const s5 = r.step_5_keywords || {};
-  const page = createPdfPage();
-  page.innerHTML = `
-    <div class="section">
-      <div class="sec-header"><div class="sec-num">07</div><div><div class="sec-title">Keywords & Intent</div><div class="sec-subtitle">Semantic funnel taxonomy and search readiness.</div></div></div>
-      <div class="sec-context">Aligns keyword taxonomy with intent signals for demand capture.</div>
-      ${renderKeywordTaxonomy(s5)}
-      ${renderKeywordIntent(s5)}
-      ${field('Priority Intent Signals', Array.isArray(s5.intent_signals) ? s5.intent_signals.join(' · ') : s5.intent_signals)}
-      ${field('Boolean Query', s5.boolean_query)}
-      ${field('LinkedIn Search String', s5.linkedin_search_strings)}
-      ${tagRow('Content Topics', s5.content_topics)}
-      ${callout(s5.keyword_insight)}
-    </div>
-  `;
-  return page;
-}
-
-function buildPdfOutboundPage(r) {
-  const s6 = r.step_6_messaging || {};
-  const page = createPdfPage();
-  page.innerHTML = `
-    <div class="section">
-      <div class="sec-header"><div class="sec-num">08</div><div><div class="sec-title">SDR / Outreach Sequence</div><div class="sec-subtitle">Engagement timeline for high-conversion outreach.</div></div></div>
-      ${renderSDRTimeline(s6)}
-      <div class="pdf-opportunity-risk">
-        <div class="pdf-opportunity-card"><div class="title">Primary channel</div><div class="text">${esc(s6.email_1?.angle || s6.linkedin_message ? 'Email / LinkedIn mix' : 'Channel not defined')}</div></div>
-        <div class="pdf-opportunity-card"><div class="title">Cadence focus</div><div class="text">${esc(s6.follow_up_sequence || 'Follow-up sequence detail not provided')}</div></div>
-      </div>
-    </div>
-  `;
-  return page;
-}
-
-function buildPdfDecisionPage(r) {
-  const s1 = r.step_1_market || {};
-  const s2 = r.step_2_tam || {};
-  const s3 = r.step_3_icp || {};
-  const page = createPdfPage();
-  page.innerHTML = renderDecisionEngine(r, s1, s2, s3, '09');
-  return page;
-}
-
-function buildPdfConfidenceMatrixPage(r) {
-  const s7 = r.step_7_intelligence || {};
-  const overall = scoreToPercent(s7.confidence_score || r.step_1_market?.gtm_relevance_score || 0);
-  const signal = scoreToPercent(s7.signal_veracity_score || s7.signal_score || Math.round(overall * 0.9));
-  const timing = scoreToPercent(s7.market_timing_score || s7.timing_score || Math.round(overall * 0.75));
-  const fit = scoreToPercent(s7.icp_fit_score || s7.icp_fit || Math.round(overall * 0.8));
-  const completeness = scoreToPercent(s7.data_completeness_score || s7.data_quality_score || Math.round(overall * 0.7));
-  const metrics = [
-    {label:'Signal Veracity', value:signal},
-    {label:'Market Timing', value:timing},
-    {label:'ICP Fit', value:fit},
-    {label:'Data Completeness', value:completeness},
-    {label:'Overall Fidelity', value:overall},
-  ];
-  const page = createPdfPage();
-  page.innerHTML = `
-    <div class="section">
-      <div class="sec-header"><div class="sec-num">10</div><div><div class="sec-title">Weighted Confidence Matrix</div><div class="sec-subtitle">Signal veracity, timing, ICP fit and data completeness.</div></div></div>
-      <div class="sec-context">Summarizes the integrated confidence picture using the same signal framework as the report.</div>
-      <table class="cm-table">
-        <tbody>
-          ${metrics.map(metric => `<tr><td>${esc(metric.label)}</td><td><div class="confidence-bar-wrap"><div class="confidence-bar" style="width:${metric.value}%"></div></div></td><td>${esc(metric.value)}%</td></tr>`).join('')}
-        </tbody>
-      </table>
-      ${field('Confidence Interpretation', s7.matrix_note || 'Higher scores indicate stronger signal alignment and execution readiness.')}
-      ${callout(s7.confidence_summary || 'Review this section with the go/no-go committee before committing resources.')}
-    </div>
-  `;
-  return page;
-}
-
-function buildPdfAppendixPage(r) {
-  const page = createPdfPage();
-  const metadata = [
-    `Company: ${esc(r.company_name || 'Unknown')}`,
-    `Industry: ${esc(r.industry || 'N/A')}`,
-    `Report Mode: ${isDemoReport(r) ? 'Demo' : 'Live'}`,
-    `Generated: ${new Date(r.updated_at || r.created_at).toLocaleDateString('en-GB',{year:'numeric',month:'long',day:'numeric'})}`,
-    `Report ID: ${esc(r.id || r.report_id || 'N/A')}`,
-  ].join(' | ');
-  page.innerHTML = `
-    <div class="section">
-      <div class="sec-header"><div class="sec-num">11</div><div><div class="sec-title">Appendix / Methodology</div><div class="sec-subtitle">Source notes, assumptions and AI estimate disclaimers.</div></div></div>
-      <div class="sec-context">Documents the inputs, assumptions, and validation guidance for the GTM intelligence output.</div>
-      ${field('Methodology', r.methodology || r.data_sources || 'Analysis combines company signals, market benchmarks, and AI-extracted GTM evidence.')}
-      ${field('Assumptions', r.assumptions || 'Historical growth patterns, benchmark data, and inferred buyer intent were used.')}
-      ${field('Source Quality', r.step_7_intelligence?.data_sources || 'Company website, public filings, analyst estimates and inferred sources.')}
-      ${field('Assumptions Matrix', r.assumption_matrix || 'Geography, service fit, win rate, and addressable universe are modeled from available inputs.')}
-      <div class="analyst-callout">⚠️ AI-Estimated Content: TAM/SAM/SOM, ICP derivations, account analogs, and messaging sequences are AI-derived and should be validated before operational use.</div>
-      ${field('Report Metadata', metadata)}
-    </div>
-  `;
-  return page;
-}
-
-function createPdfSandbox() {
-  const sandbox = document.createElement('div');
-  sandbox.id = 'pdf-export-sandbox';
-  sandbox.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;min-height:1123px;background:#0B0F1A;opacity:1;pointer-events:none;z-index:1000000;overflow:visible;';
-
-  const styleContainer = document.createElement('div');
-  const styleLoadPromises = [];
-  Array.from(document.querySelectorAll('link[rel="stylesheet"],style')).forEach(node => {
-    if (node.tagName === 'LINK') {
-      const clone = document.createElement('link');
-      clone.rel = 'stylesheet';
-      clone.href = node.href;
-      styleLoadPromises.push(new Promise(resolve => {
-        clone.addEventListener('load', () => resolve(), { once: true });
-        clone.addEventListener('error', () => resolve(), { once: true });
-      }));
-      styleContainer.appendChild(clone);
-    } else {
-      const clone = document.createElement('style');
-      clone.textContent = node.textContent;
-      styleContainer.appendChild(clone);
-    }
-  });
-  sandbox._styleLoadPromises = styleLoadPromises;
-
-  const resetStyle = document.createElement('style');
-  resetStyle.textContent = `
-    * { box-sizing:border-box !important; opacity:1 !important; }
-    html, body, #pdf-export-sandbox, #pdf-export-root, .pdf-page { background:#0B0F1A !important; color:#E5E7EB !important; }
-    #pdf-export-root { width:794px !important; max-width:794px !important; margin:0 auto !important; padding:0 !important; }
-    #pdf-export-root .wrap { width:794px !important; max-width:794px !important; margin:0 auto !important; padding:0 !important; }
-    #pdf-export-root .report-footer { flex-direction:column !important; align-items:flex-start !important; }
-    #pdf-export-root .report-cover { margin-bottom:24px !important; }
-    #pdf-export-root .section { margin-bottom:22px !important; }
-    #pdf-export-root img { max-width:100% !important; height:auto !important; }
-    #pdf-export-root * { text-shadow:none !important; filter:none !important; }
-    #pdf-export-root .sec-header, #pdf-export-root .sec-context, #pdf-export-root .sec-title, #pdf-export-root .sec-subtitle,
-    #pdf-export-root .sec-num, #pdf-export-root .field, #pdf-export-root .tag, #pdf-export-root table,
-    #pdf-export-root .decision-badge, #pdf-export-root .swot-cell, #pdf-export-root .risk-list li { color:#E5E7EB !important; }
-  `;
-  styleContainer.appendChild(resetStyle);
-  sandbox.appendChild(styleContainer);
-
-  const measurementContainer = document.createElement('div');
-  measurementContainer.id = 'pdf-export-measurement';
-  measurementContainer.style.cssText = 'width:794px;position:absolute;left:-9999px;top:0;visibility:visible;opacity:1;pointer-events:none;background:#0B0F1A;box-sizing:border-box;';
-  sandbox._measurement = measurementContainer;
-  sandbox.appendChild(measurementContainer);
-
-  return sandbox;
-}
-
-// LEGACY / UNUSED: old live-DOM auto-pagination helpers retained here for reference only.
-// Current export flow uses buildPdfExportDom() with 11 fixed pages and does not call these functions.
-function collectReportBlocks(root) {
-  const blocks = [];
-  Array.from(root.children).forEach(child => {
-    if (!isElementVisible(child)) return;
-    if (child.id === 'sections-container') {
-      Array.from(child.children).forEach(section => {
-        if (isElementVisible(section)) blocks.push(section);
-      });
-    } else {
-      blocks.push(child);
-    }
-  });
-  return blocks;
-}
-
-function measureBlockHeight(block, measurementContainer) {
-  const temp = block.cloneNode(true);
-  temp.style.cssText = 'width:100%;box-sizing:border-box;margin:0;padding:0;display:block;position:relative;visibility:visible;opacity:1;';
-  measurementContainer.appendChild(temp);
-  const height = temp.getBoundingClientRect().height || temp.offsetHeight || temp.scrollHeight || 0;
-  measurementContainer.removeChild(temp);
-  return height;
-}
-
-function splitOversizedBlock(block, measurementContainer, pages, createPage) {
-  const sectionHeader = block.querySelector('.sec-header');
-  const sectionContext = block.querySelector('.sec-context');
-  const contentChildren = Array.from(block.children).filter(child => child !== sectionHeader && child !== sectionContext);
-  if (!contentChildren.length) return null;
-
-  const createChunk = () => {
-    const chunk = block.cloneNode(false);
-    if (sectionHeader) chunk.appendChild(sectionHeader.cloneNode(true));
-    if (sectionContext) chunk.appendChild(sectionContext.cloneNode(true));
-    return chunk;
-  };
-
-  const chunks = [];
-  let currentChunk = createChunk();
-
-  for (const child of contentChildren) {
-    const childClone = child.cloneNode(true);
-    currentChunk.appendChild(childClone);
-    const chunkHeight = measureBlockHeight(currentChunk, measurementContainer);
-    if (chunkHeight + BLOCK_GAP > PAGE_BODY_HEIGHT) {
-      currentChunk.removeChild(childClone);
-      if (currentChunk.children.length <= (sectionHeader ? 1 : 0) + (sectionContext ? 1 : 0)) {
-        return null;
-      }
-      chunks.push(currentChunk);
-      currentChunk = createChunk();
-      currentChunk.appendChild(childClone);
-      const nextHeight = measureBlockHeight(currentChunk, measurementContainer);
-      if (nextHeight + BLOCK_GAP > PAGE_BODY_HEIGHT) {
-        return null;
-      }
-    }
-  }
-  chunks.push(currentChunk);
-
-  let page = createPage();
-  pages.push(page);
-  let usedHeight = PAGE_PADDING_TOP;
-  chunks.forEach((chunk, index) => {
-    page.appendChild(chunk);
-    const chunkHeight = measureBlockHeight(chunk, measurementContainer);
-    usedHeight = PAGE_PADDING_TOP + chunkHeight + BLOCK_GAP;
-    if (index < chunks.length - 1) {
-      page = createPage();
-      pages.push(page);
-    }
-  });
-
-  return { currentPage: page, usedHeight };
-}
-
-function blockNameForExportBlock(block) {
-  if (!block || !block.tagName) return 'unknown';
-  if (block.id === 'report-cover') return 'Report Cover';
-  if (block.id === 'sections-container') return 'Sections Container';
-  if (block.classList.contains('score-strip')) return 'KPI Row';
-  if (block.classList.contains('report-footer')) return 'Footer';
-  if (block.classList.contains('ph')) return 'Report Header';
-  const title = block.querySelector('.sec-title')?.textContent?.trim();
-  if (title) return title;
-  return block.id || block.className || block.tagName.toLowerCase();
-}
-
-function isElementVisible(el) {
-  if (!(el instanceof HTMLElement)) return false;
-  if (el.hidden) return false;
-  const style = window.getComputedStyle(el);
-  return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
-}
-
-// LEGACY / UNUSED: this pagination clone helper is not used by the current fixed-page PDF builder.
-function paginateReportClone(root, measurementContainer) {
-  const createPage = () => {
-    const page = document.createElement('div');
-    page.className = 'page pdf-page';
-    page.style.width = `${PAGE_WIDTH}px`;
-    page.style.height = `${PAGE_HEIGHT}px`;
-    page.style.overflow = 'hidden';
-    page.style.background = '#0B0F1A';
-    page.style.position = 'relative';
-    page.style.padding = '0';
-    page.style.margin = '0';
-    return page;
-  };
-
-  const blocks = collectReportBlocks(root);
-  root.innerHTML = '';
-  const pages = [];
-  let page = createPage();
-  pages.push(page);
-  let usedHeight = PAGE_PADDING_TOP;
-  const blockHeights = [];
-
-  blocks.forEach((block, index) => {
-    const name = blockNameForExportBlock(block);
-    const blockHeight = measureBlockHeight(block, measurementContainer);
-    blockHeights.push(blockHeight);
-    console.log('[PDF] block height', index + 1, `(${name}):`, blockHeight);
-
-    const fitsOnCurrentPage = usedHeight + blockHeight + BLOCK_GAP <= PAGE_HEIGHT - PAGE_PADDING_BOTTOM;
-    const blockOversized = blockHeight > PAGE_BODY_HEIGHT;
-
-    if (!fitsOnCurrentPage) {
-      if (!blockOversized) {
-        page = createPage();
-        pages.push(page);
-        usedHeight = PAGE_PADDING_TOP;
-      }
-    }
-
-    if (blockOversized) {
-      const splitResult = splitOversizedBlock(block, measurementContainer, pages, createPage);
-      if (splitResult) {
-        page = splitResult.currentPage;
-        usedHeight = splitResult.usedHeight;
-        return;
-      }
-
-      console.warn('[PDF] oversized block:', name, blockHeight);
-      page = createPage();
-      pages.push(page);
-      page.style.overflow = 'visible';
-      page.appendChild(block);
-      usedHeight = PAGE_HEIGHT;
-      return;
-    }
-
-    if (!fitsOnCurrentPage) {
-      // start a fresh page for this block
-      page = createPage();
-      pages.push(page);
-      usedHeight = PAGE_PADDING_TOP;
-    }
-
-    page.appendChild(block);
-    usedHeight += blockHeight + BLOCK_GAP;
-  });
-
-  console.log('[PDF] block heights:', blockHeights);
-  while (pages.length > 1 && pages[pages.length - 1].children.length === 0) pages.pop();
-  root.append(...pages);
-  return pages;
-}
-
-function unhideHiddenElements(root) {
-  root.querySelectorAll('[hidden], [style*="display:none"], [style*="visibility:hidden"]').forEach(el => {
-    el.hidden = false;
-    el.style.display = 'block';
-    el.style.visibility = 'visible';
-    el.style.opacity = '1';
-  });
-}
-
-async function promoteLazyImages(root) {
-  const images = Array.from(root.querySelectorAll('img'));
-  const promises = images.map(img => {
-    const srcFromData = img.dataset?.src || img.getAttribute('data-src');
-    if (srcFromData && !img.src) img.src = srcFromData;
-    if (img.complete) return Promise.resolve();
-    return new Promise(resolve => {
-      img.addEventListener('load', resolve, { once: true });
-      img.addEventListener('error', resolve, { once: true });
-    });
-  });
-  await Promise.all(promises);
-}
-
-async function waitForRenderStability(root) {
-  const waits = [];
-  if (document.fonts?.ready) waits.push(document.fonts.ready);
-  const frameFonts = Array.from(root.querySelectorAll('iframe')).map(frame => frame.contentDocument?.fonts?.ready).filter(Boolean);
-  waits.push(...frameFonts);
-  const sandbox = root.closest('#pdf-export-sandbox');
-  if (sandbox?._styleLoadPromises) waits.push(...sandbox._styleLoadPromises);
-  waits.push(promoteLazyImages(root));
-  await Promise.all(waits);
-  await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
-  await new Promise(resolve => setTimeout(resolve, 250));
-}
-
-async function capturePagesToPdf(pages, filename) {
-  const { jsPDF } = window.jspdf;
-  if (!jsPDF) throw new Error('jsPDF is not available for PDF generation.');
-
-  const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true });
-  const widthMM = 210;
-  const heightMM = 297;
-  const capturedPages = [];
-
-  for (let i = 0; i < pages.length; i++) {
-    const page = pages[i];
-    console.log('[PDF] capturing page', i + 1, page.scrollHeight);
-    const canvas = await html2canvas(page, {
-      scale: 2,
-      backgroundColor: '#0B0F1A',
-      useCORS: true,
-      allowTaint: false,
-      logging: false,
-      width: page.offsetWidth,
-      height: page.offsetHeight,
-      windowWidth: page.offsetWidth,
-      windowHeight: page.offsetHeight,
-    });
-    capturedPages.push(canvas);
-    const imageData = canvas.toDataURL('image/jpeg', 0.95);
-    if (i > 0) pdf.addPage();
-    pdf.addImage(imageData, 'JPEG', 0, 0, widthMM, heightMM);
-  }
-
-  if (capturedPages.length !== pages.length) {
-    throw new Error(`PDF capture failed: expected ${pages.length} pages, captured ${capturedPages.length}.`);
-  }
-
-  pdf.save(filename);
 }
 
 // ── Init (preserve existing auth guard pattern) ───────────────────
