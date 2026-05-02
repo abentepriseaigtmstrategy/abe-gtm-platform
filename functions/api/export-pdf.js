@@ -60,6 +60,12 @@ export function buildReportHTML(strategy) {
   const sam = safe(s2.sam || s2.sam_estimate || s2.market_serviceable || s2.serviceable_market) || '—';
   const som = safe(s2.som || s2.som_estimate || s2.served_market || s2.served_market_estimate) || '—';
   const cagr = safe(s2.growth_rate || s2.cagr) || '—';
+  const stepsComplete = [s1, s2, s3, s4, s5, s6, s7].filter(step => step && Object.keys(step).length > 0).length;
+  const profileSource = safe(strategy.scraped_profile?._profile_source || s1._profile_source || s2._profile_source || s3._profile_source || s4._profile_source || s5._profile_source || s6._profile_source || s7._profile_source || strategy._profile_source || 'Not available');
+  const confidenceBasis = safe(strategy.scraped_profile?._confidence_basis || s1._confidence_basis || s2._confidence_basis || s3._confidence_basis || s4._confidence_basis || s5._confidence_basis || s6._confidence_basis || s7._confidence_basis || strategy._confidence_basis || 'Not available');
+  const missingEvidence = safe(strategy.scraped_profile?._missing_evidence || s1._missing_evidence || s2._missing_evidence || s3._missing_evidence || s4._missing_evidence || s5._missing_evidence || s6._missing_evidence || s7._missing_evidence || strategy._missing_evidence || 'Not available');
+  const sourceContext = safe(strategy.scraped_profile?._source_context || s1._source_context || s2._source_context || s3._source_context || s4._source_context || s5._source_context || s6._source_context || s7._source_context || strategy._source_context || 'Not available');
+  const evidenceNotice = mode.isDemo ? 'Demo mode output is illustrative only. No live data was used.' : 'This report is based on the available validated data sources.';
 
   const html = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${esc(company)} GTM Intelligence Report</title><style>
     :root{--bg:#090b14;--surface:#101827;--surface-soft:#131d30;--border:#24304b;--accent:#a855f7;--accent-soft:#7c3aed;--green:#22c55e;--amber:#f59e0b;--red:#ef4444;--blue:#3b82f6;--text:#e5e7eb;--muted:#9ca3af;--white:#ffffff;}
@@ -110,7 +116,7 @@ export function buildReportHTML(strategy) {
     .hero-row{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:start;}
     .hero-chip{display:inline-flex;align-items:center;gap:8px;padding:8px 12px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);color:var(--text);font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;}
     .warning-strip{background:rgba(245,158,11,.12);border:1px solid rgba(245,158,11,.2);border-radius:16px;padding:14px;color:var(--amber);font-size:10px;}
-    .kpi-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;}
+    .kpi-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;}
     .progress-bar{display:grid;gap:8px;}
     .progress-row{display:flex;justify-content:space-between;align-items:center;font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.14em;}
     .progress-track{height:10px;border-radius:999px;background:rgba(255,255,255,.08);overflow:hidden;}
@@ -165,6 +171,7 @@ export function buildReportHTML(strategy) {
     @media print{.page{border:none;border-radius:0;}}
   </style></head><body><div id="root">
     ${renderCoverPage()}
+    ${renderTruthLayerPage()}
     ${renderExecutiveSummaryPage()}
     ${renderMarketResearchPage()}
     ${renderTAMPage()}
@@ -208,6 +215,18 @@ export function buildReportHTML(strategy) {
     const numeric = Number(String(value).replace(/[^0-9.-]/g, ''));
     if (!Number.isFinite(numeric)) return null;
     return Math.max(0, Math.min(100, Math.round(numeric)));
+  }
+
+  function sentence(...parts) {
+    return asArray(parts).join(' ').replace(/\s+/g, ' ').trim();
+  }
+
+  function joinWithDot(...parts) {
+    return asArray(parts).join(' · ');
+  }
+
+  function joinWithComma(...parts) {
+    return asArray(parts).join(', ');
   }
 
   function getReportMode(strategyData) {
@@ -337,10 +356,11 @@ export function buildReportHTML(strategy) {
           </div>
         </div>
         <div class="kpi-strip" style="margin-top:26px;">
+          ${renderMetricCard('GTM Score', gtmScore ? `${gtmScore}/100` : '—', 'Strategic fit', 'score')}
           ${renderMetricCard('TAM', tam, 'Total addressable market', 'tam')}
           ${renderMetricCard('CAGR', cagr, 'Compound annual growth rate', 'market')}
-          ${renderMetricCard('GTM Score', gtmScore ? `${gtmScore}/100` : '—', 'Strategic fit', 'score')}
           ${renderMetricCard('Verdict', verdict, 'Boardroom recommendation', 'decision')}
+          ${renderMetricCard('Steps complete', `${stepsComplete}/7`, 'Completed GTM phases', 'insight')}
         </div>
         <div class="panel" style="margin-top:20px;display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;">
           <div><div class="panel-strong">${esc(company)}</div><div class="panel-copy">${esc(industry || 'Industry details not supplied.')}</div></div>
@@ -350,14 +370,36 @@ export function buildReportHTML(strategy) {
     `);
   }
 
+  function renderTruthLayerPage() {
+    return renderPage('Truth Layer / Evidence Status', 2, `
+      <div class="hero-panel" style="padding:28px;">
+        <div class="section-title">Truth Layer</div>
+        <div class="panel-copy">A structured evidence status page showing provenance, validation needs, and confidence basis for the report.</div>
+        <div class="grid2" style="margin-top:18px;">
+          <div class="panel"><div class="section-title">Profile source</div><div class="panel-copy">${esc(profileSource)}</div></div>
+          <div class="panel"><div class="section-title">Confidence basis</div><div class="panel-copy">${esc(confidenceBasis)}</div></div>
+        </div>
+        <div class="grid2" style="margin-top:14px;">
+          <div class="panel"><div class="section-title">Missing evidence</div><div class="panel-copy">${esc(missingEvidence)}</div></div>
+          <div class="panel"><div class="section-title">Source context</div><div class="panel-copy">${esc(sourceContext)}</div></div>
+        </div>
+        <div class="warning-strip" style="margin-top:18px;">${esc(evidenceNotice)}</div>
+      </div>
+    `);
+  }
+
   function renderExecutiveSummaryPage() {
-    return renderPage('Executive Summary', 2, `
+    return renderPage('Executive Summary', 3, `
       <div class="panel">
         <div class="section-title">Executive Summary</div>
-        <div class="panel-copy">A concise executive narrative describing the GTM opportunity, risk posture, recommendation and confidence for leadership review.</div>
+        <div class="panel-copy">A concise executive narrative describing the GTM opportunity, recommendation, and confidence for leadership review.</div>
         <div class="hero-panel">
-          <div class="panel-strong">${esc(s1.executive_summary || s1.gtm_relevance_reasoning || 'Executive summary content is not available.')}</div>
-          <div class="panel-copy">${esc(s1.executive_context || 'This summary prioritizes outcome-directed guidance for executive decision-making rather than tactical detail.')}</div>
+          <div class="panel-strong">${esc(s7.executive_brief || s7.summary || s1.executive_summary || s1.gtm_relevance_reasoning || 'Executive summary content is not available.')}</div>
+          <div class="panel-copy">${esc(s7.why_now_analysis || s7.why_now || s1.market_timing?.[0] || 'This summary prioritizes outcome-directed guidance for executive decision-making rather than tactical detail.')}</div>
+        </div>
+        <div class="grid2">
+          <div class="panel"><div class="section-title">Strategic hook</div><div class="panel-copy">${esc(s7.strategic_hook || s7.hook || s1.solution_angle || 'A differentiated revenue intelligence narrative to shape market positioning.')}</div></div>
+          <div class="panel"><div class="section-title">Recommended action</div><div class="panel-copy">${esc(s7.recommended_next_action || s7.recommended_action || s1.recommended_action || 'Focus on high-fit account outreach and outcome-oriented messaging.')}</div></div>
         </div>
         ${mode.isDemo ? '<div class="warning-strip">Demo Mode Report — No live data was used. Validate before decision-making.</div>' : ''}
       </div>
@@ -367,10 +409,7 @@ export function buildReportHTML(strategy) {
         ${renderMetricCard('TAM', tam, 'Market opportunity', 'tam')}
         ${renderMetricCard('Verdict', verdict, 'Suggested decision', 'decision')}
       </div>
-      <div class="grid2">
-        <div class="panel"><div class="section-title">Recommended action</div><div class="panel-copy">${esc(s7.recommended_action || s1.recommended_action || 'Proceed with high-fit account outreach and outcome-oriented messaging.')}</div></div>
-        <div class="panel">${renderProgressBar(confidenceScore, 'Confidence score')}</div>
-      </div>
+      <div class="panel">${renderProgressBar(confidenceScore, 'Confidence score')}</div>
     `);
   }
 
@@ -379,7 +418,9 @@ export function buildReportHTML(strategy) {
     const weaknesses = s1.swot?.weaknesses || s1.weaknesses || [];
     const opportunities = s1.swot?.opportunities || s1.opportunities || [];
     const threats = s1.swot?.threats || s1.threats || [];
-    return renderPage('Market Research', 3, `
+    const demandSignals = asArray(s1.demand_signals || s1.demand_signals || s1.demand || s1.signals || []);
+    const timingSignals = asArray(s1.market_timing || s1.timing_signals || s1.market_timing || []);
+    return renderPage('Market Research', 4, `
       <div class="grid2">
         <div class="panel"><div class="section-title">Company overview</div><div class="panel-copy">${esc(s1.company_overview || s1.market_description || 'Overview content is not available.')}</div></div>
         <div class="grid2" style="gap:12px;">
@@ -387,13 +428,18 @@ export function buildReportHTML(strategy) {
           <div class="metric-card"><div class="metric-card-head">${renderSvgIcon('insight')}<div class="metric-card-title">Position</div></div><div class="metric-card-value">${esc(s1.market_position || s1.position || 'Not specified')}</div><div class="metric-card-note">Market differentiation</div></div>
         </div>
       </div>
+      <div class="grid2">
+        <div class="panel"><div class="section-title">Demand signals</div><div class="panel-copy">${esc(demandSignals.join(' · ') || 'Demand signal detail is not available.')}</div></div>
+        <div class="panel"><div class="section-title">Timing signals</div><div class="panel-copy">${esc(timingSignals.join(' · ') || 'Timing signal detail is not available.')}</div></div>
+      </div>
       <div class="swot-grid">
         <div class="swot-card"><div class="swot-card-title">${renderSvgIcon('swot-strength')}Strengths</div>${renderList(strengths)}</div>
         <div class="swot-card"><div class="swot-card-title">${renderSvgIcon('swot-weakness')}Weaknesses</div>${renderList(weaknesses)}</div>
         <div class="swot-card"><div class="swot-card-title">${renderSvgIcon('swot-opportunity')}Opportunities</div>${renderList(opportunities)}</div>
         <div class="swot-card"><div class="swot-card-title">${renderSvgIcon('swot-threat')}Threats</div>${renderList(threats)}</div>
       </div>
-      <div class="chip-wrap">${renderPills(asArray(s1.growth_signals || s1.market_signals || s1.signals), 'accent')}${renderPills(asArray(s1.technology_stack || s1.tech_stack || s1.tech), 'green')}</div>
+      <div class="panel"><div class="section-title">Analyst insight</div><div class="panel-copy">${esc(s1.analyst_insight || s1.insight || 'Analyst insight is not available.')}</div></div>
+      <div class="chip-wrap">${renderPills(demandSignals, 'accent')}${renderPills(timingSignals, 'green')}${renderPills(asArray(s1.technology_stack || s1.tech_stack || s1.tech), 'accent')}</div>
     `);
   }
 
@@ -411,7 +457,7 @@ export function buildReportHTML(strategy) {
           return renderSegmentCard(label, value || 'Not available', note);
         }).join('')
       : `${renderSegmentCard('Primary market segment', safe(s2.primary_segment || s2.market_segment || 'Not available'), 'Core segment definition')}${renderSegmentCard('Secondary market segment', safe(s2.secondary_segment || s2.segment_priority || 'Not available'), 'Segment priority')}${renderSegmentCard('Market insight', safe(s2.segment_insight || s2.market_insight || 'Not available'), 'Key takeaway')}`;
-    return renderPage('TAM Mapping', 4, `
+    return renderPage('TAM Mapping', 5, `
       <div class="kpi-strip">
         ${renderMetricCard('TAM', tam, 'Total Addressable Market', 'tam')}
         ${renderMetricCard('SAM', sam || '—', 'Serviceable Available Market', 'market')}
@@ -438,50 +484,63 @@ export function buildReportHTML(strategy) {
     const pain = safe(s3.core_pain_points || s3.pain_points || s3.primary_pain) || 'Not available';
     const impact = safe(s3.business_impact || s3.pain_impact || 'Not available');
     const intervention = safe(s3.recommended_intervention || s3.solution || 'Not available');
-    return renderPage('ICP Modeling', 5, `
+    const decisionMakers = asArray(s3.decision_makers || s3.decision_maker || s3.stakeholders);
+    const objections = asArray(s3.objections || s3.key_objections || s3.risks);
+    return renderPage('ICP Modeling', 6, `
       <div class="persona-block">
         <div class="persona-card"><div class="persona-title">Primary ICP</div><div class="persona-detail">${esc(primaryICP)}</div></div>
         <div class="persona-card"><div class="persona-title">Secondary ICP</div><div class="persona-detail">${esc(secondaryICP)}</div></div>
       </div>
-      <div class="panel"><div class="section-title">Firmographics & triggers</div><div class="panel-copy">${esc(s3.firmographics || s3.company_profile || 'Firmographic detail is not available.')}</div><div style="margin-top:14px;">${renderPills(triggers, 'green')}</div></div>
+      <div class="panel"><div class="section-title">Firmographics</div><div class="panel-copy">${esc(s3.firmographics || s3.company_profile || 'Firmographic detail is not available.')}</div></div>
+      <div class="grid2">
+        <div class="panel"><div class="section-title">Decision makers</div><div class="panel-copy">${esc(decisionMakers.join(' · ') || 'Not available')}</div></div>
+        <div class="panel"><div class="section-title">Buying triggers</div><div class="panel-copy">${esc(triggers.join(' · ') || 'Not available')}</div></div>
+      </div>
       <div class="segment-grid">
         ${renderSegmentCard('Pain', pain)}
         ${renderSegmentCard('Impact', impact)}
         ${renderSegmentCard('Intervention', intervention)}
+        ${renderSegmentCard('Objections', objections.join(', ') || 'Not available')}
       </div>
     `);
   }
 
   function renderSourcingPage() {
-    return renderPage('Account Sourcing', 6, `
-      <div class="hero-panel" style="grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;">
-        ${renderPipelineStep('Database', safe(s4.recommended_databases || s4.data_source || 'Not available'))}
-        ${renderPipelineStep('Filter', safe(s4.filter_criteria || s4.target_filters || 'Not available'))}
-        ${renderPipelineStep('Exclusion', safe(s4.exclusion_criteria || s4.exclude || 'Not available'))}
-        ${renderPipelineStep('Priority', safe(s4.estimated_universe || s4.target_universe || 'Not available'))}
+    const accountAnalogs = asArray(s4.account_analogs || s4.high_fit_account_analogs || s4.account_analogs || []);
+    return renderPage('Account Sourcing', 7, `
+      <div class="panel"><div class="section-title">Target roles</div><div class="panel-copy">${esc(asArray(s4.target_roles || s4.target_role || s4.target_title).join(' · ') || 'Not available')}</div></div>
+      <div class="grid2">
+        <div class="panel"><div class="section-title">Sourcing filters</div><div class="panel-copy">${esc(s4.filter_criteria || s4.target_filters || s4.sourcing_filters || 'Not available')}</div></div>
+        <div class="panel"><div class="section-title">Exclusion criteria</div><div class="panel-copy">${esc(s4.exclusion_criteria || s4.exclude || s4.exclusions || 'Not available')}</div></div>
       </div>
-      <div class="segment-grid">
-        ${renderAccountCard(s4.account_targets?.[0], 1)}
-        ${renderAccountCard(s4.account_targets?.[1], 2)}
-        ${renderAccountCard(s4.account_targets?.[2], 3)}
+      <div class="hero-panel" style="grid-template-columns:repeat(4,minmax(0,1fr));gap:14px;">
+        ${renderPipelineStep('Recommended DBs', safe(s4.recommended_databases || s4.data_source || s4.databases || 'Not available'))}
+        ${renderPipelineStep('Estimated deal size', safe(s4.estimated_deal_size?.range || s4.estimated_deal_size || s4.deal_size || 'Not available'))}
+        ${renderPipelineStep('Sales approach', safe(s4.sales_approach || s4.sales_strategy || 'Not available'))}
+        ${renderPipelineStep('Account analogs', safe(accountAnalogs.join(', ') || 'Not available'))}
       </div>
       <div class="panel"><div class="section-title">Sourcing playbook</div><div class="panel-copy">${esc(s4.sourcing_playbook || s4.account_strategy || 'No sourcing playbook was supplied.')}</div></div>
     `);
   }
 
   function renderKeywordsPage() {
-    const problem = safe(s5.primary_keywords || s5.problem_keywords || 'Not available');
-    const solution = safe(s5.secondary_keywords || s5.solution_keywords || 'Not available');
-    const intent = safe(s5.intent_signals || s5.high_intent_keywords || 'Not available');
+    const problem = asArray(s5.primary_keywords || s5.problem_keywords || []);
+    const solution = asArray(s5.secondary_keywords || s5.solution_keywords || []);
+    const intent = asArray(s5.intent_signals || s5.high_intent_keywords || s5.intent_signals || []);
     const booleanQuery = safe(s5.boolean_query || s5.search_query || 'Not available');
-    const linkedinQuery = safe(s5.linkedin_search_strings || s5.linkedin_query || 'Not available');
-    return renderPage('Keywords & Intent', 7, `
+    const linkedinQuery = safe(s5.linkedin_search_strings || s5.linkedin_query || s5.linkedin_search_string || 'Not available');
+    const contentTopics = asArray(s5.content_topics || s5.topics || []);
+    return renderPage('Keywords & Intent', 8, `
       <div class="hero-panel" style="grid-template-columns:1fr 1fr 1fr;gap:14px;">
-        ${renderFunnelStep('Problem-aware', problem)}
-        ${renderFunnelStep('Solution-aware', solution)}
-        ${renderFunnelStep('High-intent', intent)}
+        ${renderFunnelStep('Problem-aware', problem.join(', ') || 'Not available')}
+        ${renderFunnelStep('Solution-aware', solution.join(', ') || 'Not available')}
+        ${renderFunnelStep('High-intent', intent.join(', ') || 'Not available')}
       </div>
-      <div class="panel"><div class="section-title">Keyword clusters</div><div class="chip-wrap">${renderPills(asArray(problem).concat(asArray(solution)).concat(asArray(intent)), 'accent')}</div></div>
+      <div class="panel"><div class="section-title">Keyword clusters</div><div class="chip-wrap">${renderPills(problem.concat(solution).concat(intent), 'accent')}</div></div>
+      <div class="grid2">
+        <div class="panel"><div class="section-title">Intent signals</div><div class="panel-copy">${esc(intent.join(' · ') || 'Not available')}</div></div>
+        <div class="panel"><div class="section-title">Content topics</div><div class="panel-copy">${esc(contentTopics.join(' · ') || 'Not available')}</div></div>
+      </div>
       <div class="grid2">
         <div class="panel"><div class="section-title">Boolean search</div><div class="panel-copy">${esc(booleanQuery)}</div></div>
         <div class="panel"><div class="section-title">LinkedIn query</div><div class="panel-copy">${esc(linkedinQuery)}</div></div>
@@ -497,7 +556,7 @@ export function buildReportHTML(strategy) {
       { label: 'LinkedIn', data: { angle: 'Social touch', body: s6.linkedin_message }, defaultAngle: 'Professional engagement' },
       { label: 'Follow-up', data: { angle: 'Persistence', body: s6.linkedin_follow_up }, defaultAngle: 'Next-step prompt' },
     ];
-    return renderPage('Enterprise Outreach', 8, `
+    return renderPage('SDR / Outreach Sequence', 9, `
       <div class="timeline">
         ${activities.map((item, index) => renderTimelineStep(index + 1, item.label, item.data, item.defaultAngle)).join('')}
       </div>
@@ -506,22 +565,28 @@ export function buildReportHTML(strategy) {
   }
 
   function renderRevenueIntelPage() {
-    return renderPage('Revenue Intelligence', 9, `
+    const buyingSignals = asArray(s7.buying_signals || s7.signals || s7.signal_summary || []);
+    const riskConstraint = safe(s7.risk_constraint || s7.constraint || s7.risk || 'Requires live customer validation and a stronger evidence base before scaling.');
+    return renderPage('Revenue Intelligence', 10, `
       <div class="grid2">
         <div class="panel"><div class="section-title">Decision verdict</div><div class="badge-block ${verdict.toLowerCase().includes('go') ? 'badge-go' : verdict.toLowerCase().includes('watch') ? 'badge-watch' : 'badge-nogo'}">${esc(verdict)}</div></div>
         <div class="panel">${renderProgressBar(confidenceScore, 'Confidence')}</div>
       </div>
+      <div class="panel"><div class="section-title">Executive brief</div><div class="panel-copy">${esc(s7.executive_brief || s7.summary || 'Executive briefing detail is not available.')}</div></div>
+      <div class="grid2">
+        <div class="panel"><div class="section-title">Why now</div><div class="panel-copy">${esc(s7.why_now_analysis || s7.why_now || 'Timing rationale is not available.')}</div></div>
+        <div class="panel"><div class="section-title">Strategic hook</div><div class="panel-copy">${esc(s7.strategic_hook || s7.hook || 'Strategic value proposition not available.')}</div></div>
+      </div>
+      <div class="panel"><div class="section-title">Buying signals</div><div class="panel-copy">${esc(buyingSignals.join(' · ') || 'No buying signals were supplied.')}</div></div>
       <div class="mcc-grid">
         ${renderMccCard('Market', safe(s7.mcc_view?.market || s2.market_maturity || 'Market context not available'))}
         ${renderMccCard('Client', safe(s7.mcc_view?.client || s3.primary_icp || 'Client persona not available'))}
         ${renderMccCard('Competitor', safe(s7.mcc_view?.competitor || 'Competitive pressure not available'))}
       </div>
       <div class="risk-strip">
-        ${renderRiskItem('Decision Cycle', safe(asArray(s3.decision_makers || s3.stakeholders).join(', ')) || 'Multi-stakeholder alignment may extend the pipeline.')}
-        ${renderRiskItem('Vendor Friction', 'Existing incumbent relationships may slow adoption. Lead with outcome differentiation.')}
-        ${renderRiskItem('Budget Risk', 'CFO-level ROI language is required. Show quantified efficiency or revenue impact.')}
+        ${renderRiskItem('Risk constraint', riskConstraint)}
+        ${renderRiskItem('Execution priority', safe(s7.execution_priority || 'Medium — validate hypothesis before scaling execution.'))}
       </div>
-      <div class="panel"><div class="section-title">Execution priority</div><div class="panel-copy">${esc(s7.strategic_hook || s7.execution_priority || 'Focus on high-fit accounts and outcome-driven messaging to accelerate conversion.')}</div></div>
     `);
   }
 
@@ -537,7 +602,7 @@ export function buildReportHTML(strategy) {
       : confidenceScore >= 50
         ? 'Moderate confidence; validate account targets and message fit before scaling execution.'
         : 'Low confidence; confirm ICP alignment and data quality before active pursuit.';
-    return renderPage('Confidence Matrix', 10, `
+    return renderPage('Confidence Matrix', 11, `
       <div class="panel"><div class="section-title">Weighted Confidence Matrix</div><div class="panel-copy">Visual assessment of signal veracity, timing, ICP fit and data completeness.</div></div>
       <div class="confidence-grid">
         <div>${matrix.map(item => renderProgressBar(item.value, item.label, 100)).join('')}</div>
@@ -547,14 +612,14 @@ export function buildReportHTML(strategy) {
   }
 
   function renderAppendixPage() {
-    return renderPage('Appendix', 11, `
+    return renderPage('Appendix', 12, `
       <div class="appendix-grid">
         <div class="appendix-card"><div class="appendix-label">Methodology</div><div class="appendix-copy">Company profile data, market analysis, AI inference and signal extraction are combined to shape the GTM narrative and assumptions.</div></div>
         <div class="appendix-card"><div class="appendix-label">Assumptions</div><div class="appendix-copy">Geography, service-line fit, win-rate and TAM/SAM/SOM defaults are used conservatively when company-specific inputs are incomplete.</div></div>
       </div>
       <div class="appendix-grid" style="margin-top:16px;">
         <div class="appendix-card"><div class="appendix-label">AI-estimated fields</div><div class="appendix-copy">TAM sizing, ICP derivations, account analogs, buying triggers and outreach sequencing may require independent validation.</div></div>
-        <div class="appendix-card"><div class="appendix-label">Report metadata</div><div class="appendix-copy">Subject: ${esc(company)}${industry ? ` · Industry: ${esc(industry)}` : ''} · Generated: ${esc(reportDate)} · GTM Score: ${gtmScore}/100 · Confidence: ${confidenceScore}/100</div></div>
+        <div class="appendix-card"><div class="appendix-label">Report metadata</div><div class="appendix-copy">${esc(joinWithDot(`Subject: ${company}`, industry ? `Industry: ${industry}` : '', `Generated: ${reportDate}`, `GTM Score: ${gtmScore}/100`, `Confidence: ${confidenceScore}/100`))}</div></div>
       </div>
     `);
   }
