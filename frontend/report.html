@@ -21,6 +21,14 @@
     body::before { content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
       background-image:linear-gradient(rgba(168,85,247,.02) 1px,transparent 1px),
       linear-gradient(90deg,rgba(168,85,247,.02) 1px,transparent 1px); background-size:48px 48px; }
+    html, body, #pdf-export-root, #pdf-export-sandbox { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    .pdf-page, #pdf-export-root, #pdf-export-sandbox { break-inside: avoid; page-break-inside: avoid; }
+    @media print {
+      * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+      #topnav, .nav-right, #mobile-menu-btn, #mobile-nav-drawer, .btn, .demo-banner, #loading-state, #error-state, .report-footer { display:none !important; }
+      body { background:none !important; }
+      .pdf-page { box-shadow:none !important; }
+    }
 
     /* ── NAV ── */
     #topnav { position:sticky; top:0; z-index:100; background:rgba(11,15,26,.95);
@@ -288,6 +296,8 @@
     .pdf-bar-row .pdf-bar-label { display:flex; justify-content:space-between; font-size:10px; color:var(--muted); letter-spacing:.1em; text-transform:uppercase; }
     .pdf-bar-row .pdf-bar-track { width:100%; height:12px; border-radius:999px; background:rgba(255,255,255,.08); overflow:hidden; }
     .pdf-bar-row .pdf-bar-fill { height:100%; border-radius:999px; background:linear-gradient(90deg,var(--accent2),var(--accent)); }
+    .pdf-tam-bars { margin-top:18px; }
+    .pdf-assumption-strip { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:18px; }
     .pdf-tam-grid { display:grid; grid-template-columns:repeat(3,minmax(120px,1fr)); gap:12px; margin-bottom:18px; }
     .pdf-segment-card { background:rgba(255,255,255,.04); border:1px solid rgba(148,163,184,.18); border-radius:18px; padding:16px; min-height:130px; }
     .pdf-segment-card .title { font-size:11px; font-weight:800; margin-bottom:8px; color:white; }
@@ -512,6 +522,46 @@ function safe(val) {
 function field(label, val, cls='') {
   const v = safe(val); if (!v) return '';
   return `<div class="field"><div class="fl">${esc(label)}</div><div class="fv ${cls}">${esc(v).replace(/\n/g,'<br>')}</div></div>`;
+}
+function parseMarketValue(value) {
+  if (!value && value !== 0) return 0;
+  const normalized = String(value).trim().replace(/,/g, '');
+  const match = normalized.match(/^([\d\.]+)\s*([kKmMbB])?$/);
+  if (!match) return parseFloat(normalized) || 0;
+  let num = parseFloat(match[1]) || 0;
+  const suffix = match[2]?.toLowerCase();
+  if (suffix === 'k') num *= 1e3;
+  if (suffix === 'm') num *= 1e6;
+  if (suffix === 'b') num *= 1e9;
+  return num;
+}
+function formatCompactNumber(num) {
+  if (num >= 1e9) return `${(num / 1e9).toFixed(1).replace(/\.0$/, '')}B`;
+  if (num >= 1e6) return `${(num / 1e6).toFixed(1).replace(/\.0$/, '')}M`;
+  if (num >= 1e3) return `${(num / 1e3).toFixed(1).replace(/\.0$/, '')}K`;
+  return String(Math.round(num));
+}
+function renderPdfTamBars(s2) {
+  const tamValue = parseMarketValue(safe(s2.tam_size_estimate) || safe(s2.tam) || '0');
+  const samValue = parseMarketValue(safe(s2.sam_estimate) || safe(s2.sam) || '0');
+  const somValue = parseMarketValue(safe(s2.som_estimate) || '0');
+  const maxValue = Math.max(tamValue, samValue, somValue, 1);
+  const rows = [
+    { label: 'TAM', value: tamValue },
+    { label: 'SAM', value: samValue },
+    { label: 'SOM', value: somValue },
+  ];
+  return `<div class="pdf-bar-row">
+    ${rows.map(row => `<div><div class="pdf-bar-label">${esc(row.label)}${row.value ? ` · ${formatCompactNumber(row.value)}` : ''}</div><div class="pdf-bar-track"><div class="pdf-bar-fill" style="width:${row.value ? Math.max(8, Math.round(row.value / maxValue * 100)) : 8}%"></div></div></div>`).join('')}
+  </div>`;
+}
+function renderPdfTamAssumptionStrip(s2) {
+  const assumptions = [
+    safe(s2.tam_assumptions || s2.assumptions || s2.market_assumptions || ''),
+    safe(s2.segmentation_assumptions || s2.assumption_matrix || ''),
+  ].filter(Boolean).slice(0,2);
+  if (!assumptions.length) return '';
+  return `<div class="pdf-assumption-strip">${assumptions.map(text => `<div class="pdf-chip amber">${esc(text)}</div>`).join('')}</div>`;
 }
 function tagRow(label, arr, cls='') {
   const a = Array.isArray(arr) ? arr : (arr ? [String(arr)] : []); if (!a.length) return '';
@@ -1605,6 +1655,9 @@ function buildPdfTamPage(r) {
   page.innerHTML = `
     <div class="section">
       <div class="sec-header"><div class="sec-num">04</div><div><div class="sec-title">TAM / Market Attractiveness</div><div class="sec-subtitle">Sizing, segmentation, and market-fit scoring.</div></div></div>
+      <div class="pdf-tam-bars">
+        ${renderPdfTamBars(s2)}
+      </div>
       <div class="pdf-tam-grid">
         <div class="pdf-segment-card"><div class="title">TAM</div><div class="metric">${esc(tam)}</div><div class="line">Total addressable market.</div></div>
         <div class="pdf-segment-card"><div class="title">SAM</div><div class="metric">${esc(sam)}</div><div class="line">Serviceable available market.</div></div>
@@ -1613,6 +1666,7 @@ function buildPdfTamPage(r) {
       </div>
       ${renderWaterfall(s2)}
       ${renderPdfSegmentCards(s2)}
+      ${renderPdfTamAssumptionStrip(s2)}
       ${compactRationale(s2.scoring_rationale)}
     </div>
   `;
