@@ -1151,34 +1151,48 @@ async function exportCurrentReportAsPDF() {
 
   const sandbox = createPdfSandbox();
   const clone = source.cloneNode(true);
-  clone.style.display = 'block';
-  clone.style.width = '794px';
-  clone.style.maxWidth = '794px';
-  clone.style.margin = '0';
-  clone.style.padding = '0';
-  clone.style.transform = 'none';
-  clone.style.zoom = '1';
-  clone.style.boxSizing = 'border-box';
-  clone.style.background = '#0B0F1A';
-  clone.style.color = 'inherit';
-  clone.style.minHeight = '1123px';
-  clone.style.position = 'relative';
-  clone.style.left = '0';
-  clone.style.top = '0';
+  clone.id = 'pdf-export-clone';
+  clone.style.cssText = [
+    'display:block',
+    'width:794px',
+    'max-width:794px',
+    'margin:0',
+    'padding:0',
+    'transform:none',
+    'zoom:1',
+    'box-sizing:border-box',
+    'background:#0B0F1A',
+    'color:#E5E7EB',
+    'min-height:1123px',
+    'position:relative',
+    'left:0',
+    'top:0'
+  ].join(';');
   unhideHiddenElements(clone);
   await promoteLazyImages(clone);
 
   const exportRoot = document.createElement('div');
   exportRoot.id = 'pdf-export-root';
   exportRoot.style.cssText = 'width:794px;max-width:794px;margin:0 auto;padding:0;box-sizing:border-box;transform:none;zoom:1;';
-  exportRoot.appendChild(clone);
+
+  const reportBlocks = collectReportBlocks(clone);
+  console.log('[PDF] source blocks found:', reportBlocks.length);
+  console.log('[PDF] block names:', reportBlocks.map(blockNameForExportBlock));
+  if (reportBlocks.length < 8) {
+    throw new Error('PDF export failed: insufficient report blocks found.');
+  }
+
+  reportBlocks.forEach(block => exportRoot.appendChild(block));
   sandbox.appendChild(exportRoot);
   document.body.appendChild(sandbox);
 
   try {
-    await waitForRenderStability(clone);
-    const pages = paginateReportClone(clone);
-    if (!pages.length) throw new Error('No PDF pages were generated from the report.');
+    await waitForRenderStability(exportRoot);
+    const pages = paginateReportClone(exportRoot);
+    console.log('[PDF] pages created:', pages.length);
+    if (pages.length <= 1 && reportBlocks.length > 3) {
+      throw new Error('PDF pagination failed: only one page created for multi-section report.');
+    }
     await capturePagesToPdf(pages, filename);
   } finally {
     if (sandbox.parentNode) sandbox.parentNode.removeChild(sandbox);
@@ -1212,23 +1226,67 @@ function createPdfSandbox() {
 
   const resetStyle = document.createElement('style');
   resetStyle.textContent = `
-    * { box-sizing:border-box !important; }
-    html, body, #pdf-export-sandbox, #pdf-export-root, #pdf-export-root * { background:#0B0F1A !important; color:inherit !important; }
+    * { box-sizing:border-box !important; opacity:1 !important; }
+    html, body, #pdf-export-sandbox, #pdf-export-root, #pdf-export-root * { background:#0B0F1A !important; color:#E5E7EB !important; }
     #pdf-export-root { width:794px !important; max-width:794px !important; margin:0 auto !important; padding:0 !important; }
     #pdf-export-root .wrap { width:794px !important; max-width:794px !important; margin:0 auto !important; padding:0 !important; }
     #pdf-export-root .ph, #pdf-export-root .cover-hero, #pdf-export-root .cover-kpis, #pdf-export-root .score-strip,
-    #pdf-export-root .grid2, #pdf-export-root .grid3, #pdf-export-root .grid4, #pdf-export-root .pipeline-row,
+    #pdf-export-root .grid2, #pdf-export-root .grid3, #pdf-export-root .pipeline-row,
     #pdf-export-root .intent-grid, #pdf-export-root .pain-map-grid, #pdf-export-root .persona-card,
     #pdf-export-root .truth-card .truth-row, #pdf-export-root .timeline-item { grid-template-columns:1fr !important; }
     #pdf-export-root .report-footer { flex-direction:column !important; align-items:flex-start !important; }
     #pdf-export-root .report-cover { margin-bottom:24px !important; }
-    #pdf-export-root .section { margin-bottom:22px !important; }
-    #pdf-export-root .page { page-break-after:always !important; }
-    #pdf-export-root .page:last-child { page-break-after:auto !important; }
+    #pdf-export-root .section { margin-bottom:22px !important; background:rgba(15,20,35,.96) !important; border-color:rgba(148,163,184,.3) !important; }
+    #pdf-export-root .sec-header, #pdf-export-root .sec-context, #pdf-export-root .sec-title, #pdf-export-root .sec-subtitle,
+    #pdf-export-root .sec-num, #pdf-export-root .field, #pdf-export-root .tag, #pdf-export-root table,
+    #pdf-export-root .score-strip .sc, #pdf-export-root .cover-card,
+    #pdf-export-root .persona-card, #pdf-export-root .pipeline-step, #pdf-export-root .timeline-item,
+    #pdf-export-root .truth-card, #pdf-export-root .email-card, #pdf-export-root .decision-badge,
+    #pdf-export-root .swot-cell, #pdf-export-root .risk-list li { color:#E5E7EB !important; }
+    #pdf-export-root .score-strip .sc, #pdf-export-root .cover-card, #pdf-export-root .section,
+    #pdf-export-root .persona-card, #pdf-export-root .pipeline-step, #pdf-export-root .timeline-item,
+    #pdf-export-root .truth-card, #pdf-export-root .email-card, #pdf-export-root .decision-badge,
+    #pdf-export-root .swot-cell, #pdf-export-root .risk-list li { background:rgba(15,20,35,.95) !important; border-color:rgba(148,163,184,.25) !important; }
+    #pdf-export-root img { max-width:100% !important; height:auto !important; }
+    #pdf-export-root * { text-shadow:none !important; filter:none !important; }
   `;
   styleContainer.appendChild(resetStyle);
   sandbox.appendChild(styleContainer);
   return sandbox;
+}
+
+function collectReportBlocks(root) {
+  const blocks = [];
+  Array.from(root.children).forEach(child => {
+    if (!isElementVisible(child)) return;
+    if (child.id === 'sections-container') {
+      Array.from(child.children).forEach(section => {
+        if (isElementVisible(section)) blocks.push(section);
+      });
+    } else {
+      blocks.push(child);
+    }
+  });
+  return blocks;
+}
+
+function blockNameForExportBlock(block) {
+  if (!block || !block.tagName) return 'unknown';
+  if (block.id === 'report-cover') return 'Report Cover';
+  if (block.id === 'sections-container') return 'Sections Container';
+  if (block.classList.contains('score-strip')) return 'KPI Row';
+  if (block.classList.contains('report-footer')) return 'Footer';
+  if (block.classList.contains('ph')) return 'Report Header';
+  const title = block.querySelector('.sec-title')?.textContent?.trim();
+  if (title) return title;
+  return block.id || block.className || block.tagName.toLowerCase();
+}
+
+function isElementVisible(el) {
+  if (!(el instanceof HTMLElement)) return false;
+  if (el.hidden) return false;
+  const style = window.getComputedStyle(el);
+  return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
 }
 
 function paginateReportClone(root) {
@@ -1246,15 +1304,7 @@ function paginateReportClone(root) {
     return page;
   };
 
-  const blocks = [];
-  Array.from(root.children).forEach(child => {
-    if (child.id === 'sections-container') {
-      Array.from(child.children).forEach(section => blocks.push(section));
-    } else {
-      blocks.push(child);
-    }
-  });
-
+  const blocks = collectReportBlocks(root);
   root.innerHTML = '';
   const pages = [];
   let page = createPage();
@@ -1262,42 +1312,45 @@ function paginateReportClone(root) {
 
   const appendToCurrentPage = (block) => {
     page.appendChild(block);
-    if (page.scrollHeight <= pageHeight) return true;
+    const height = page.scrollHeight;
+    if (height <= pageHeight) return true;
     page.removeChild(block);
     return false;
   };
 
-  const splitBlockAcrossPages = (block) => {
+  const splitOversizedBlock = (block) => {
     if (!block.children.length) return false;
-    const cloneFrame = block.cloneNode(false);
+    const sectionHeader = block.querySelector('.sec-header');
+    const sectionContext = block.querySelector('.sec-context');
+    const contentChildren = Array.from(block.children).filter(child => child !== sectionHeader && child !== sectionContext);
+    if (!contentChildren.length) return false;
+
     let currentPage = page;
+    const createSectionChunk = () => {
+      const chunk = block.cloneNode(false);
+      if (sectionHeader) chunk.appendChild(sectionHeader.cloneNode(true));
+      if (sectionContext) chunk.appendChild(sectionContext.cloneNode(true));
+      currentPage.appendChild(chunk);
+      return chunk;
+    };
 
-    while (block.children.length) {
-      const child = block.children[0];
-      cloneFrame.appendChild(child);
-      currentPage.appendChild(cloneFrame);
+    let pageBlock = createSectionChunk();
+    for (const child of contentChildren) {
+      const childClone = child.cloneNode(true);
+      pageBlock.appendChild(childClone);
       if (currentPage.scrollHeight > pageHeight) {
-        cloneFrame.removeChild(child);
-        currentPage.removeChild(cloneFrame);
-
-        if (!cloneFrame.children.length) {
-          if (child.children.length) {
-            currentPage = createPage();
-            pages.push(currentPage);
-            currentPage = splitBlockAcrossPages(child) || currentPage;
-          } else {
-            currentPage = createPage();
-            pages.push(currentPage);
-            currentPage.appendChild(child);
-          }
-        } else {
-          currentPage.appendChild(cloneFrame.cloneNode(true));
-          currentPage = createPage();
-          pages.push(currentPage);
-          cloneFrame.innerHTML = '';
-          cloneFrame.appendChild(child);
-          currentPage.appendChild(cloneFrame);
+        pageBlock.removeChild(childClone);
+        currentPage.removeChild(pageBlock);
+        currentPage = createPage();
+        pages.push(currentPage);
+        pageBlock = createSectionChunk();
+        pageBlock.appendChild(childClone);
+        if (currentPage.scrollHeight > pageHeight) {
+          return false;
         }
+      }
+      if (child !== contentChildren[contentChildren.length - 1]) {
+        pageBlock = createSectionChunk();
       }
     }
 
@@ -1313,13 +1366,14 @@ function paginateReportClone(root) {
       page.appendChild(block);
       return;
     }
-    if (splitBlockAcrossPages(block)) return;
+    if (splitOversizedBlock(block)) return;
+    console.warn('[PDF] oversized report block rendered on its own page:', blockNameForExportBlock(block));
     page = createPage();
     pages.push(page);
     page.appendChild(block);
   });
 
-  if (pages.length > 1 && pages[pages.length - 1].children.length === 0) pages.pop();
+  while (pages.length > 1 && pages[pages.length - 1].children.length === 0) pages.pop();
   root.append(...pages);
   return pages;
 }
@@ -1367,9 +1421,11 @@ async function capturePagesToPdf(pages, filename) {
   const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true });
   const widthMM = 210;
   const heightMM = 297;
+  const capturedPages = [];
 
   for (let i = 0; i < pages.length; i++) {
     const page = pages[i];
+    console.log('[PDF] capturing page', i + 1, page.scrollHeight);
     const canvas = await html2canvas(page, {
       scale: 2,
       backgroundColor: '#0B0F1A',
@@ -1381,9 +1437,14 @@ async function capturePagesToPdf(pages, filename) {
       windowWidth: page.offsetWidth,
       windowHeight: page.offsetHeight,
     });
-    const imageData = canvas.toDataURL('image/png');
+    capturedPages.push(canvas);
+    const imageData = canvas.toDataURL('image/jpeg', 0.95);
     if (i > 0) pdf.addPage();
-    pdf.addImage(imageData, 'PNG', 0, 0, widthMM, heightMM);
+    pdf.addImage(imageData, 'JPEG', 0, 0, widthMM, heightMM);
+  }
+
+  if (capturedPages.length !== pages.length) {
+    throw new Error(`PDF capture failed: expected ${pages.length} pages, captured ${capturedPages.length}.`);
   }
 
   pdf.save(filename);
