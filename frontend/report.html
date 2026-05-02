@@ -1143,14 +1143,26 @@ async function exportCurrentReportAsPDF() {
   const clone = source.cloneNode(true);
   clone.style.display = 'block';
   clone.style.width = '794px';
-  clone.style.background = '#0B0F1A';
-  clone.style.color = 'inherit';
-  clone.style.boxSizing = 'border-box';
+  clone.style.maxWidth = '794px';
   clone.style.margin = '0';
   clone.style.padding = '0';
+  clone.style.transform = 'none';
+  clone.style.zoom = '1';
+  clone.style.boxSizing = 'border-box';
+  clone.style.background = '#0B0F1A';
+  clone.style.color = 'inherit';
+  clone.style.minHeight = '1123px';
+  clone.style.position = 'relative';
+  clone.style.left = '0';
+  clone.style.top = '0';
   unhideHiddenElements(clone);
   await promoteLazyImages(clone);
-  sandbox.appendChild(clone);
+
+  const exportRoot = document.createElement('div');
+  exportRoot.id = 'pdf-export-root';
+  exportRoot.style.cssText = 'width:794px;max-width:794px;margin:0 auto;padding:0;box-sizing:border-box;transform:none;zoom:1;';
+  exportRoot.appendChild(clone);
+  sandbox.appendChild(exportRoot);
   document.body.appendChild(sandbox);
 
   try {
@@ -1163,17 +1175,10 @@ async function exportCurrentReportAsPDF() {
   }
 }
 
-function sanitizeFilename(value) {
-  return String(value)
-    .replace(/[^a-zA-Z0-9._-]/g, '_')
-    .replace(/_+/g, '_')
-    .replace(/^_+|_+$/g, '') || 'GTM_Report.pdf';
-}
-
 function createPdfSandbox() {
   const sandbox = document.createElement('div');
   sandbox.id = 'pdf-export-sandbox';
-  sandbox.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;background:#0B0F1A;opacity:1;pointer-events:none;z-index:1000000;';
+  sandbox.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;min-height:1123px;background:#0B0F1A;opacity:1;pointer-events:none;z-index:1000000;overflow:hidden;';
 
   const styleContainer = document.createElement('div');
   const styleLoadPromises = [];
@@ -1197,16 +1202,116 @@ function createPdfSandbox() {
 
   const resetStyle = document.createElement('style');
   resetStyle.textContent = `
-    @media print {
-      * { display:unset !important; visibility:visible !important; opacity:1 !important; }
-    }
-    html, body, #pdf-export-sandbox, .pdf-page { background:#0B0F1A !important; color:inherit !important; }
-    .pdf-page { width:794px !important; height:1123px !important; overflow:hidden !important; background:#0B0F1A !important; box-sizing:border-box !important; }
-    * { -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+    * { box-sizing:border-box !important; }
+    html, body, #pdf-export-sandbox, #pdf-export-root, #pdf-export-root * { background:#0B0F1A !important; color:inherit !important; }
+    #pdf-export-root { width:794px !important; max-width:794px !important; margin:0 auto !important; padding:0 !important; }
+    #pdf-export-root .wrap { width:794px !important; max-width:794px !important; margin:0 auto !important; padding:0 !important; }
+    #pdf-export-root .ph, #pdf-export-root .cover-hero, #pdf-export-root .cover-kpis, #pdf-export-root .score-strip,
+    #pdf-export-root .grid2, #pdf-export-root .grid3, #pdf-export-root .grid4, #pdf-export-root .pipeline-row,
+    #pdf-export-root .intent-grid, #pdf-export-root .pain-map-grid, #pdf-export-root .persona-card,
+    #pdf-export-root .truth-card .truth-row, #pdf-export-root .timeline-item { grid-template-columns:1fr !important; }
+    #pdf-export-root .report-footer { flex-direction:column !important; align-items:flex-start !important; }
+    #pdf-export-root .report-cover { margin-bottom:24px !important; }
+    #pdf-export-root .section { margin-bottom:22px !important; }
+    #pdf-export-root .page { page-break-after:always !important; }
+    #pdf-export-root .page:last-child { page-break-after:auto !important; }
   `;
   styleContainer.appendChild(resetStyle);
   sandbox.appendChild(styleContainer);
   return sandbox;
+}
+
+function paginateReportClone(root) {
+  const pageHeight = 1123;
+  const createPage = () => {
+    const page = document.createElement('div');
+    page.className = 'page pdf-page';
+    page.style.width = '794px';
+    page.style.height = '1123px';
+    page.style.overflow = 'hidden';
+    page.style.background = '#0B0F1A';
+    page.style.position = 'relative';
+    page.style.padding = '0';
+    page.style.margin = '0';
+    return page;
+  };
+
+  const blocks = [];
+  Array.from(root.children).forEach(child => {
+    if (child.id === 'sections-container') {
+      Array.from(child.children).forEach(section => blocks.push(section));
+    } else {
+      blocks.push(child);
+    }
+  });
+
+  root.innerHTML = '';
+  const pages = [];
+  let page = createPage();
+  pages.push(page);
+
+  const appendToCurrentPage = (block) => {
+    page.appendChild(block);
+    if (page.scrollHeight <= pageHeight) return true;
+    page.removeChild(block);
+    return false;
+  };
+
+  const splitBlockAcrossPages = (block) => {
+    if (!block.children.length) return false;
+    const cloneFrame = block.cloneNode(false);
+    let currentPage = page;
+
+    while (block.children.length) {
+      const child = block.children[0];
+      cloneFrame.appendChild(child);
+      currentPage.appendChild(cloneFrame);
+      if (currentPage.scrollHeight > pageHeight) {
+        cloneFrame.removeChild(child);
+        currentPage.removeChild(cloneFrame);
+
+        if (!cloneFrame.children.length) {
+          if (child.children.length) {
+            currentPage = createPage();
+            pages.push(currentPage);
+            currentPage = splitBlockAcrossPages(child) || currentPage;
+          } else {
+            currentPage = createPage();
+            pages.push(currentPage);
+            currentPage.appendChild(child);
+          }
+        } else {
+          currentPage.appendChild(cloneFrame.cloneNode(true));
+          currentPage = createPage();
+          pages.push(currentPage);
+          cloneFrame.innerHTML = '';
+          cloneFrame.appendChild(child);
+          currentPage.appendChild(cloneFrame);
+        }
+      }
+    }
+
+    page = currentPage;
+    return true;
+  };
+
+  blocks.forEach(block => {
+    if (appendToCurrentPage(block)) return;
+    if (block.scrollHeight <= pageHeight) {
+      page = createPage();
+      pages.push(page);
+      page.appendChild(block);
+      return;
+    }
+    if (splitBlockAcrossPages(block)) return;
+    page = createPage();
+    pages.push(page);
+    page.appendChild(block);
+  });
+
+  if (pages.length > 1 && pages[pages.length - 1].children.length === 0) pages.pop();
+  root.append(...pages);
+  return pages;
 }
 
 function unhideHiddenElements(root) {
@@ -1243,55 +1348,6 @@ async function waitForRenderStability(root) {
   await Promise.all(waits);
   await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
   await new Promise(resolve => setTimeout(resolve, 250));
-}
-
-function paginateReportClone(root) {
-  const pageHeight = 1123;
-  const pageWidth = 794;
-  const children = Array.from(root.children);
-  root.innerHTML = '';
-
-  const createPage = () => {
-    const page = document.createElement('div');
-    page.className = 'page pdf-page';
-    page.style.width = `${pageWidth}px`;
-    page.style.height = `${pageHeight}px`;
-    page.style.overflow = 'hidden';
-    page.style.background = '#0B0F1A';
-    page.style.position = 'relative';
-    page.style.padding = '0';
-    page.style.margin = '0';
-    return page;
-  };
-
-  const pages = [];
-  let page = createPage();
-  pages.push(page);
-
-  children.forEach(child => {
-    page.appendChild(child);
-    const overflow = page.scrollHeight > pageHeight;
-    if (!overflow) return;
-
-    page.removeChild(child);
-    if (child.scrollHeight > pageHeight) {
-      console.warn('PDF export: block exceeds a single A4 page height and will be placed on its own page.', child);
-      const oversizedPage = createPage();
-      oversizedPage.appendChild(child);
-      pages.push(oversizedPage);
-      page = oversizedPage;
-      return;
-    }
-
-    const nextPage = createPage();
-    nextPage.appendChild(child);
-    pages.push(nextPage);
-    page = nextPage;
-  });
-
-  if (pages.length > 1 && pages[pages.length - 1].children.length === 0) pages.pop();
-  root.append(...pages);
-  return pages;
 }
 
 async function capturePagesToPdf(pages, filename) {
