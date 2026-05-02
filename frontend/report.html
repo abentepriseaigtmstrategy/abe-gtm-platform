@@ -298,6 +298,28 @@
     .pdf-bar-row .pdf-bar-fill { height:100%; border-radius:999px; background:linear-gradient(90deg,var(--accent2),var(--accent)); }
     .pdf-tam-bars { margin-top:18px; }
     .pdf-assumption-strip { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:18px; }
+    .vis-bar-row { margin-bottom: 16px; }
+    .vis-bar-header { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-bottom: 6px; text-transform: uppercase; font-weight: 700; letter-spacing: .08em; }
+    .vis-bar-track { height: 10px; background: var(--faint); border-radius: 5px; overflow: hidden; position: relative; }
+    .vis-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 5px; transition: width .5s ease; }
+
+    .step-timeline { border-left: 2px solid var(--faint); margin-left: 10px; padding-left: 30px; position: relative; }
+    .step-timeline .timeline-item { position: relative; margin-bottom: 22px; padding: 18px; background: rgba(255,255,255,0.02); border-radius: 14px; border: 1px solid var(--border); }
+    .step-timeline .timeline-item::before { content: ''; position: absolute; left: -36px; top: 18px; width: 14px; height: 14px; background: var(--accent); border-radius: 50%; border: 4px solid var(--bg); }
+
+    .verdict-cockpit { text-align: center; padding: 32px; border: 2px dashed var(--amber); border-radius: 24px; background: rgba(245,158,11,0.06); margin: 16px 0 20px; }
+    .verdict-hero { font-size: 52px; font-weight: 900; color: var(--amber); letter-spacing: -1.5px; line-height: 1; margin-bottom: 10px; }
+    .confidence-meter { width:100%; max-width:320px; margin: 14px auto 0; }
+    .confidence-meter .vis-bar-track { width:100%; }
+    .confidence-meter .vis-bar-fill { background: linear-gradient(90deg, var(--amber), #fbbf24); }
+
+    .risk-strip { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-top:16px; }
+    .risk-pill { padding:12px 14px; border-radius:16px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.12em; }
+    .risk-pill.red { background:rgba(239,68,68,.1); color:var(--red); }
+    .risk-pill.amber { background:rgba(245,158,11,.1); color:var(--amber); }
+    .risk-pill.green { background:rgba(34,197,94,.1); color:var(--green); }
+    .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:14px; }
+
     .pdf-tam-grid { display:grid; grid-template-columns:repeat(3,minmax(120px,1fr)); gap:12px; margin-bottom:18px; }
     .pdf-segment-card { background:rgba(255,255,255,.04); border:1px solid rgba(148,163,184,.18); border-radius:18px; padding:16px; min-height:130px; }
     .pdf-segment-card .title { font-size:11px; font-weight:800; margin-bottom:8px; color:white; }
@@ -547,13 +569,11 @@ function renderPdfTamBars(s2) {
   const somValue = parseMarketValue(safe(s2.som_estimate) || '0');
   const maxValue = Math.max(tamValue, samValue, somValue, 1);
   const rows = [
-    { label: 'TAM', value: tamValue },
-    { label: 'SAM', value: samValue },
-    { label: 'SOM', value: somValue },
+    { label: 'Global TAM', value: tamValue, pct: 100 },
+    { label: 'Serviceable (SAM)', value: samValue, pct: tamValue ? Math.round(samValue / tamValue * 100) : 65 },
+    { label: 'Obtainable (SOM)', value: somValue, pct: tamValue ? Math.round(somValue / tamValue * 100) : 20 },
   ];
-  return `<div class="pdf-bar-row">
-    ${rows.map(row => `<div><div class="pdf-bar-label">${esc(row.label)}${row.value ? ` · ${formatCompactNumber(row.value)}` : ''}</div><div class="pdf-bar-track"><div class="pdf-bar-fill" style="width:${row.value ? Math.max(8, Math.round(row.value / maxValue * 100)) : 8}%"></div></div></div>`).join('')}
-  </div>`;
+  return `<div>${rows.map(row => `<div class="vis-bar-row"><div class="vis-bar-header"><span>${esc(row.label)}</span><span>${esc(row.value ? formatCompactNumber(row.value) : '—')}</span></div><div class="vis-bar-track"><div class="vis-bar-fill" style="width:${Math.max(8, row.pct)}%; opacity:${row.label === 'Global TAM' ? 1 : row.label === 'Serviceable (SAM)' ? 0.85 : 0.7};"></div></div></div>`).join('')}</div>`;
 }
 function renderPdfTamAssumptionStrip(s2) {
   const assumptions = [
@@ -655,13 +675,13 @@ function renderOpportunityRiskSplit(s1) {
 }
 function renderSDRTimeline(s6) {
   const steps = [
-    {label:'Email 1', angle:s6.email_1?.angle||'Signal capture', subject:s6.email_1?.subject, body:s6.email_1?.body, cta:s6.email_1?.cta},
-    {label:'Email 2', angle:s6.email_2?.angle||'Value proposition', subject:s6.email_2?.subject, body:s6.email_2?.body, cta:s6.email_2?.cta},
-    {label:'Email 3', angle:s6.email_3?.angle||'Proof and urgency', subject:s6.email_3?.subject, body:s6.email_3?.body, cta:s6.email_3?.cta},
-    {label:'LinkedIn', angle:'Social touch', body:s6.linkedin_message, cta:'Connect / engage'},
-    {label:'Follow-up', angle:'Persistence', body:s6.linkedin_follow_up, cta:'Nudge with next step'},
+    {label:'Email 1', angle:s6.email_1?.angle||'Direct value prop focus', body:s6.email_1?.body || 'Open with strategic value and pipeline efficiency.', cta:s6.email_1?.cta || 'Send initial hook'},
+    {label:'Email 2', angle:s6.email_2?.angle||'Social proof push', body:s6.email_2?.body || 'Share peer benchmarks and case evidence.', cta:s6.email_2?.cta || 'Show credibility'},
+    {label:'Email 3', angle:s6.email_3?.angle||'Executive briefing', body:s6.email_3?.body || 'Outline the opportunity for leadership review.', cta:s6.email_3?.cta || 'Invite leadership'},
+    {label:'LinkedIn', angle:s6.linkedin_message ? 'LinkedIn engagement' : 'Social touch', body:s6.linkedin_message || 'Engage with the buying committee via LI.', cta:'Connect / engage'},
+    {label:'Follow-up', angle:s6.linkedin_follow_up ? 'Follow-up persistence' : 'Nudge for next step', body:s6.linkedin_follow_up || 'Reinforce urgency with a clear CTA.', cta:'Schedule next call'},
   ];
-  return `<div class="pdf-timeline">${steps.filter(step=>step.subject||step.body||step.angle).map((step,idx)=>`<div class="pdf-timeline-item" data-step="${idx+1}"><div class="ti-title">${esc(step.label)}</div><div class="ti-body"><strong>${esc(step.angle)}</strong></div>${step.subject?`<div class="ti-body" style="margin-top:8px;"><strong>Subject:</strong> ${esc(step.subject)}</div>`:''}${step.body?`<div class="ti-body">${esc(step.body)}</div>`:''}${step.cta?`<div class="ti-chip">${esc(step.cta)}</div>`:''}</div>`).join('')}</div>`;
+  return `<div class="step-timeline">${steps.filter(step=>step.angle||step.body).map((step,idx)=>`<div class="timeline-item"><strong>${esc(step.label)}</strong><p style="margin:8px 0 0;font-size:11px;color:var(--muted);line-height:1.6">${esc(step.angle)}</p><p style="margin:10px 0 0;font-size:11px;color:var(--text);line-height:1.7">${esc(step.body)}</p>${step.cta?`<div class="tag blue" style="margin-top:12px;display:inline-flex;padding:6px 10px;border-radius:999px;font-size:10px;font-weight:700;color:var(--blue);background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.2);">${esc(step.cta)}</div>`:''}</div>`).join('')}</div>`;
 }
 function callout(text, type='') {
   if (!text) return '';
@@ -1664,10 +1684,12 @@ function buildPdfTamPage(r) {
         <div class="pdf-segment-card"><div class="title">SOM</div><div class="metric">${esc(som)}</div><div class="line">Expected obtainable market.</div></div>
         <div class="pdf-segment-card"><div class="title">CAGR</div><div class="metric">${esc(cagr)}</div><div class="line">Market growth velocity.</div></div>
       </div>
+      <div class="cover-kpis">
+        <div class="cover-card"><div class="cc-label">CAGR</div><div class="cc-value">${esc(cagr)}%</div></div>
+        <div class="cover-card"><div class="cc-label">Market Pulse</div><div class="cc-value">${esc(safe(s2.market_pulse || s2.market_signal || 'Moderate'))}</div></div>
+      </div>
       ${renderWaterfall(s2)}
-      ${renderPdfSegmentCards(s2)}
       ${renderPdfTamAssumptionStrip(s2)}
-      ${compactRationale(s2.scoring_rationale)}
     </div>
   `;
   return page;
@@ -1782,46 +1804,53 @@ function buildPdfDecisionPage(r) {
   const page = createPdfPage();
   page.innerHTML = `
     <div class="section">
-      <div class="sec-header"><div class="sec-num">09</div><div><div class="sec-title">Revenue Intelligence / Decision Engine</div><div class="sec-subtitle">C-suite verdict, confidence cockpit and execution priorities.</div></div></div>
-      <div class="pdf-decision-grid">
-        <div class="pdf-verdict-panel">
-          <div class="title">Decision cockpit</div>
-          <div class="score">${esc(verdict)}</div>
-          <div class="reason">${esc(s7.go_no_go?.reason || s7.recommendation_reason || 'Balanced decision logic based on available signals and market readiness.')}</div>
-          <div class="pdf-meter"><div class="pdf-meter-fill" style="width:${score}%"></div><span class="pdf-gauge-label">${score}% confidence</span></div>
-          <div class="pdf-priority-card"><div class="title">Execution priority</div><div class="text">${esc(s7.execution_priority || s7.persona_priority?.reason || 'Priority guidance not yet formalised.')}</div></div>
-        </div>
-        <div>
-          <div class="pdf-mcc-grid">
-            ${['market','client','competitor'].map(label => `<div class="pdf-mcc-card"><div class="label">${label.toUpperCase()}</div><div class="value">${esc(mcc[label] || `No ${label} insight available.`)}</div></div>`).join('')}
-          </div>
-          <div class="pdf-risk-strip">
-            <span class="pdf-risk-pill red">${esc(s7.risk_summary || 'Incumbent inertia risk')}</span>
-            <span class="pdf-risk-pill amber">${esc(s7.constraint_summary || 'Approval cycle risk')}</span>
-            <span class="pdf-risk-pill green">${esc(s7.signal_strength || 'Signal alignment to ICP')}</span>
-          </div>
-        </div>
+      <div class="sec-header"><div class="sec-num">09</div><div><div class="sec-title">Decision Cockpit</div><div class="sec-subtitle">Revenue Intelligence, verdict and execution priority.</div></div></div>
+      <div class="verdict-cockpit">
+        <div class="verdict-hero">${esc(verdict)}</div>
+        <div class="cc-label">Confidence Score: ${score}%</div>
+        <div class="confidence-meter"><div class="vis-bar-track"><div class="vis-bar-fill" style="width:${score}%; background: var(--amber);"></div></div></div>
       </div>
+      <div class="grid-2">
+        <div class="section" style="padding:18px; background:rgba(255,255,255,.03); border:1px solid rgba(148,163,184,.18); border-radius:18px;"><h4 style="font-size:12px;color:white;margin-bottom:10px;">Strategic Context</h4><p style="font-size:11px;color:var(--muted);line-height:1.7;">Market is maturing with strong scrutiny on B2B execution and value delivery.</p></div>
+        <div class="section" style="padding:18px; background:rgba(255,255,255,.03); border:1px solid rgba(148,163,184,.18); border-radius:18px;"><h4 style="font-size:12px;color:white;margin-bottom:10px;">Primary Risk</h4><p style="font-size:11px;color:var(--muted);line-height:1.7;">High incumbent inertia risk in enterprise accounts; execution velocity will determine win rate.</p></div>
+      </div>
+      <div class="pdf-mcc-grid">
+        ${['market','client','competitor'].map(label => `<div class="pdf-mcc-card"><div class="label">${label.toUpperCase()}</div><div class="value">${esc(mcc[label] || `No ${label} insight available.`)}</div></div>`).join('')}
+      </div>
+      <div class="risk-strip">
+        <span class="risk-pill red">${esc(s7.risk_summary || 'Incumbent inertia risk')}</span>
+        <span class="risk-pill amber">${esc(s7.constraint_summary || 'Approval cycle risk')}</span>
+        <span class="risk-pill green">${esc(s7.signal_strength || 'Signal alignment to ICP')}</span>
+      </div>
+      <div class="pdf-priority-card"><div class="title">Execution Priority</div><div class="text">${esc(s7.execution_priority || 'Deploy the highest-signal ICP pockets first, backed by executive alignment and risk mitigation.')}</div></div>
     </div>
   `;
   return page;
 }
 
 function buildPdfConfidenceMatrixPage(r) {
-  const score = scoreToPercent(r.step_7_intelligence?.confidence_score || r.step_1_market?.gtm_relevance_score || 0);
-  const v = Math.round(score * 0.4);
-  const t = Math.round(score * 0.25);
-  const f = Math.round(score * 0.2);
-  const c = Math.round(score * 0.15);
+  const s7 = r.step_7_intelligence || {};
+  const overall = scoreToPercent(s7.confidence_score || r.step_1_market?.gtm_relevance_score || 0);
+  const signal = scoreToPercent(s7.signal_veracity_score || s7.signal_score || Math.round(overall * 0.9));
+  const timing = scoreToPercent(s7.market_timing_score || s7.timing_score || Math.round(overall * 0.75));
+  const fit = scoreToPercent(s7.icp_fit_score || s7.icp_fit || Math.round(overall * 0.8));
+  const completeness = scoreToPercent(s7.data_completeness_score || s7.data_quality_score || Math.round(overall * 0.7));
+  const metrics = [
+    {label:'Signal Veracity', value:signal},
+    {label:'Market Timing', value:timing},
+    {label:'ICP Fit', value:fit},
+    {label:'Data Completeness', value:completeness},
+    {label:'Overall Fidelity', value:overall},
+  ];
   const page = createPdfPage();
   page.innerHTML = `
     <div class="section">
-      <div class="sec-header"><div class="sec-num">10</div><div><div class="sec-title">Weighted Confidence Matrix</div><div class="sec-subtitle">Signal veracity, timing, persona fit and data completeness.</div></div></div>
+      <div class="sec-header"><div class="sec-num">10</div><div><div class="sec-title">Weighted Confidence Matrix</div><div class="sec-subtitle">Signal veracity, timing, ICP fit and data completeness.</div></div></div>
       <div class="pdf-scorebar-row">
-        ${[{label:'Signal Veracity (40%)',value:v,max:40},{label:'Market Timing (25%)',value:t,max:25},{label:'ICP Fit (20%)',value:f,max:20},{label:'Data Completeness (15%)',value:c,max:15}].map(item => `<div class="pdf-scorebar"><div><div class="pdf-scorebar-label">${esc(item.label)}</div><div class="pdf-scorebar-track"><div class="pdf-scorebar-fill" style="width:${item.max ? Math.round(item.value / item.max * 100) : 0}%"></div></div></div><div class="pdf-scorebar-value">${esc(item.value + '/' + item.max)}</div></div>`).join('')}
+        ${metrics.map(item => `<div class="pdf-scorebar"><div><div class="pdf-scorebar-label">${esc(item.label)}</div><div class="pdf-scorebar-track"><div class="pdf-scorebar-fill" style="width:${Math.max(6, item.value)}%"></div></div></div><div class="pdf-scorebar-value">${esc(item.value)}%</div></div>`).join('')}
       </div>
-      <div class="pdf-gauge"><div class="pdf-gauge-fill" style="width:${score}%"></div><span class="pdf-gauge-label">Overall fidelity ${score}%</span></div>
-      <div class="pdf-priority-card"><div class="title">Interpretation</div><div class="text">${esc(r.step_7_intelligence?.matrix_note || 'A higher score indicates stronger evidence alignment and execution readiness.')}</div></div>
+      <div class="pdf-gauge"><div class="pdf-gauge-fill" style="width:${overall}%"></div><span class="pdf-gauge-label">Overall fidelity ${overall}%</span></div>
+      <div class="pdf-priority-card"><div class="title">Interpretation</div><div class="text">${esc(s7.matrix_note || 'A higher score indicates stronger signal alignment, market timing and execution readiness.')}</div></div>
     </div>
   `;
   return page;
