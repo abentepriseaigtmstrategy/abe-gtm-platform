@@ -1147,68 +1147,339 @@ const BLOCK_GAP = 18;
 const PAGE_BODY_HEIGHT = PAGE_HEIGHT - PAGE_PADDING_TOP - PAGE_PADDING_BOTTOM;
 
 async function exportCurrentReportAsPDF() {
+  const reportData = window._strategy;
+  if (!reportData || typeof reportData !== 'object') {
+    throw new Error('Report data is not loaded for PDF export.');
+  }
+
   const source = document.getElementById('report-content');
-  if (!source) throw new Error('Report content is not available.');
-  if (source.style.display === 'none' || source.offsetParent === null) {
+  if (!source || source.style.display === 'none' || source.offsetParent === null) {
     throw new Error('Report is not visible for export.');
   }
 
-  const reportName = (window._strategy?.company_name || document.getElementById('r-company')?.textContent || 'GTM_Report').trim() || 'GTM_Report';
-  const filename = sanitizeFilename(`GTM_${reportName}_${new Date().toISOString().slice(0,10)}.pdf`);
+  const reportName = sanitizeFilename(`GTM_${reportData.company_name || 'GTM_Report'}_${new Date().toISOString().slice(0,10)}`);
+  const filename = `${reportName}.pdf`;
 
   const sandbox = createPdfSandbox();
-  const clone = source.cloneNode(true);
-  clone.id = 'pdf-export-clone';
-  clone.style.cssText = [
-    'display:block',
-    'width:794px',
-    'max-width:794px',
-    'margin:0',
-    'padding:0',
-    'transform:none',
-    'zoom:1',
-    'box-sizing:border-box',
-    'background:#0B0F1A',
-    'color:#E5E7EB',
-    'min-height:1123px',
-    'position:relative',
-    'left:0',
-    'top:0'
-  ].join(';');
-  unhideHiddenElements(clone);
-  await promoteLazyImages(clone);
-
-  const exportRoot = document.createElement('div');
-  exportRoot.id = 'pdf-export-root';
-  exportRoot.style.cssText = 'width:794px;max-width:794px;margin:0 auto;padding:0;box-sizing:border-box;transform:none;zoom:1;';
-
-  const reportBlocks = collectReportBlocks(clone);
-  console.log('[PDF] source blocks found:', reportBlocks.length);
-  console.log('[PDF] block names:', reportBlocks.map(blockNameForExportBlock));
-  if (reportBlocks.length < 8) {
-    throw new Error('PDF export failed: insufficient report blocks found.');
-  }
-
-  reportBlocks.forEach(block => exportRoot.appendChild(block));
-  sandbox.appendChild(exportRoot);
+  const pdfRoot = buildPdfExportDom(reportData);
+  sandbox.appendChild(pdfRoot);
   document.body.appendChild(sandbox);
 
-  const measurementContainer = sandbox._measurement;
-  if (!measurementContainer) {
-    throw new Error('PDF export failed: measurement container is not available.');
-  }
-
   try {
-    await waitForRenderStability(exportRoot);
-    const pages = paginateReportClone(exportRoot, measurementContainer);
-    console.log('[PDF] pages created:', pages.length);
-    if (pages.length <= 1 && reportBlocks.length >= 8) {
-      throw new Error('PDF pagination failed: only one page created for multi-section report.');
+    await waitForRenderStability(pdfRoot);
+    const pages = Array.from(pdfRoot.querySelectorAll('.pdf-page'));
+    console.log('[PDF] fixed pages generated:', pages.length);
+    if (!pages.length) {
+      throw new Error('PDF export failed: no pages generated.');
     }
     await capturePagesToPdf(pages, filename);
   } finally {
     if (sandbox.parentNode) sandbox.parentNode.removeChild(sandbox);
   }
+}
+
+function createPdfPage() {
+  const page = document.createElement('section');
+  page.className = 'pdf-page';
+  page.style.cssText = 'width:794px;height:1123px;background:#0B0F1A;overflow:hidden;box-sizing:border-box;padding:44px 48px;position:relative;display:block;';
+  return page;
+}
+
+function pdfStatCard(label, value, note) {
+  return `<div class="cover-card" style="min-height:90px;padding:18px 16px;display:flex;flex-direction:column;justify-content:space-between;">
+    <div class="cc-label">${esc(label)}</div>
+    <div class="cc-value" style="font-size:30px;line-height:1.05;">${esc(value)}</div>
+    ${note ? `<div class="cc-note">${esc(note)}</div>` : ''}
+  </div>`;
+}
+
+function buildPdfExportDom(r) {
+  const root = document.createElement('div');
+  root.id = 'pdf-export-root';
+  root.style.cssText = 'width:794px;max-width:794px;margin:0 auto;padding:0;box-sizing:border-box;';
+
+  const pages = [
+    buildPdfCoverPage(r),
+    buildPdfTruthPage(r),
+    buildPdfMarketPage(r),
+    buildPdfTamPage(r),
+    buildPdfICPPage(r),
+    buildPdfAccountSourcingPage(r),
+    buildPdfKeywordsPage(r),
+    buildPdfOutboundPage(r),
+    buildPdfDecisionPage(r),
+    buildPdfConfidenceMatrixPage(r),
+    buildPdfAppendixPage(r),
+  ];
+  pages.forEach(page => root.appendChild(page));
+  return root;
+}
+
+function buildPdfCoverPage(r) {
+  const score = r.step_1_market?.gtm_relevance_score || r.full_report?.gtm_relevance_score || r.step_2_tam?.total_score || 0;
+  const tam = safe(r.step_2_tam?.tam_size_estimate) || '—';
+  const cagr = safe(r.step_2_tam?.growth_rate) || '—';
+  const verdict = (r.step_7_intelligence?.go_no_go?.recommendation || (score >= 75 ? 'Go' : score >= 50 ? 'Watch' : 'No-Go') || '—').toUpperCase();
+  const steps = r.steps_completed || Object.values({
+    s1: r.step_1_market || {},
+    s2: r.step_2_tam || {},
+    s3: r.step_3_icp || {},
+    s4: r.step_4_sourcing || {},
+    s5: r.step_5_keywords || {},
+    s6: r.step_6_messaging || {},
+  }).filter(x => Object.keys(x).length).length + '/7';
+  const demoMode = isDemoReport(r);
+
+  const page = createPdfPage();
+  page.innerHTML = `
+    <div style="display:flex;justify-content:space-between;gap:24px;align-items:flex-start;min-height:180px;">
+      <div style="max-width:420px;">
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
+          <div style="width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-size:16px;font-weight:900;color:white;">ABE</div>
+          <div>
+            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.24em;color:var(--accent);font-weight:700;">ABE</div>
+            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.22em;">Enterprise AI Revenue Infrastructure</div>
+          </div>
+        </div>
+        <div style="font-size:36px;font-weight:900;line-height:1.05;color:white;margin-bottom:16px;">GTM Intelligence Report</div>
+        <div style="font-size:24px;font-weight:900;color:white;margin-bottom:10px;">${esc(r.company_name || 'Unknown Company')}</div>
+        <div style="font-size:11px;color:var(--muted);line-height:1.7;max-width:420px;">Generated ${new Date(r.updated_at || r.created_at).toLocaleDateString('en-GB',{year:'numeric',month:'long',day:'numeric'})}</div>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:18px;">
+          <div class="cover-badge ${demoMode ? 'demo' : 'live'}" style="font-size:9px;padding:8px 12px;">${demoMode ? 'DEMO MODE' : 'LIVE MODE'}</div>
+          <div class="cover-badge" style="font-size:9px;padding:8px 12px;background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.12);color:var(--text);">Confidential</div>
+        </div>
+      </div>
+      <div style="display:grid;grid-template-columns:repeat(2,minmax(140px,1fr));gap:14px;flex:1;">
+        ${pdfStatCard('GTM Score', score ? String(score) : '—', 'Strategy fit score')}
+        ${pdfStatCard('TAM Size', tam, 'Market opportunity')}
+        ${pdfStatCard('CAGR', cagr, 'Growth signal')}
+        ${pdfStatCard('Verdict', verdict, 'Go / Watch / No-Go')}
+        ${pdfStatCard('Steps Complete', steps, 'Report completion')}
+      </div>
+    </div>
+    <div class="analyst-callout" style="margin-top:24px;font-size:11px;line-height:1.6;">Boardroom-ready GTM insight built from the same report data already loaded in the platform. This export does not use a backend PDF template.</div>
+  `;
+  return page;
+}
+
+function buildPdfTruthPage(r) {
+  const s1 = r.step_1_market || {};
+  const s2 = r.step_2_tam || {};
+  const s7 = r.step_7_intelligence || {};
+  const demoMode = isDemoReport(r);
+  const page = createPdfPage();
+  const execHtml = renderExecSummary(r, s1, s2) || `<div class="field"><div class="fl">Executive Brief</div><div class="fv">Executive summary not available from the current report data.</div></div>`;
+  const recommended = safe(s7.recommended_action || s1.recommended_action || s2.recommended_action || 'Recommend quick validation with the leadership team and next-step alignment workshop.');
+  page.innerHTML = `
+    <div class="section" style="margin-bottom:20px;">
+      <div class="sec-header"><div class="sec-num">02</div><div><div class="sec-title">Truth Layer & Executive Summary</div><div class="sec-subtitle">Evidence status, profile source, and summary guidance.</div></div></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px;">
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          ${renderTruthLayer(r)}
+          <div class="field"><div class="fl">Recommended Action</div><div class="fv">${esc(recommended)}</div></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          ${execHtml}
+          <div class="field"><div class="fl">Confidence Basis</div><div class="fv">${esc(s7.confidence_basis || s7._confidence_basis || s1.gtm_relevance_reasoning || 'Derived from the report signal quality and source provenance.')}</div></div>
+          <div class="field"><div class="fl">Confidence Score</div><div class="confidence-bar-wrap"><div class="confidence-bar" style="width:${parseInt(s7.confidence_score) || (r.step_1_market?.gtm_relevance_score||0)}%"></div></div></div>
+        </div>
+      </div>
+      ${demoMode ? `<div class="analyst-callout amber" style="margin-top:18px;">DEMO REPORT — No live data was used. Validate before decision-making.</div>` : ''}
+    </div>
+  `;
+  return page;
+}
+
+function buildPdfMarketPage(r) {
+  const s1 = r.step_1_market || {};
+  const page = createPdfPage();
+  page.innerHTML = `
+    <div class="section">
+      <div class="sec-header"><div class="sec-num">03</div><div><div class="sec-title">Market Research</div><div class="sec-subtitle">Market pulse, positioning, and demand timing.</div></div></div>
+      ${field('Company Overview', s1.company_overview)}
+      ${field('Market Position', s1.market_position)}
+      ${field('Demand Signals', s1.demand_signals)}
+      ${field('Timing Signals', s1.timing_signals)}
+      ${field('Growth Indicators', s1.growth_signals)}
+      ${renderSWOT(s1)}
+      ${callout(s1.analyst_insight)}
+    </div>
+  `;
+  return page;
+}
+
+function buildPdfTamPage(r) {
+  const s2 = r.step_2_tam || {};
+  const scoreCards = [
+    {label:'TAM', value:safe(s2.tam_size_estimate)},
+    {label:'SAM', value:safe(s2.sam_estimate) || s2.sam || '—'},
+    {label:'SOM', value:safe(s2.som_estimate) || '—'},
+    {label:'CAGR', value:safe(s2.growth_rate) || '—'},
+    {label:'Demand Score', value:safe(s2.demand_score) || '—'},
+    {label:'Timing Score', value:safe(s2.timing_score) || '—'},
+    {label:'ICP Fit', value:safe(s2.icp_fit_score) || '—'},
+    {label:'Data Completeness', value:safe(s2.data_completeness_score) || '—'},
+    {label:'Total Score', value:safe(s2.total_score) || '—'},
+  ];
+  const cardsHtml = scoreCards.map(card => `<div class="metric-box" style="padding:16px;"><div class="ml">${esc(card.label)}</div><div class="mv" style="font-size:24px;">${esc(card.value)}</div></div>`).join('');
+  const page = createPdfPage();
+  page.innerHTML = `
+    <div class="section">
+      <div class="sec-header"><div class="sec-num">04</div><div><div class="sec-title">TAM / Market Attractiveness</div><div class="sec-subtitle">Sizing, segmentation, and market-fit scoring.</div></div></div>
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(120px,1fr));gap:12px;margin-bottom:18px;">${cardsHtml}</div>
+      ${renderWaterfall(s2)}
+      ${renderSegments(s2)}
+      ${field('Scoring Rationale', s2.scoring_rationale)}
+    </div>
+  `;
+  return page;
+}
+
+function buildPdfICPPage(r) {
+  const industry = r.industry || '';
+  const s3 = r.step_3_icp || {};
+  const page = createPdfPage();
+  page.innerHTML = `
+    <div class="section">
+      <div class="sec-header"><div class="sec-num">05</div><div><div class="sec-title">ICP Modeling</div><div class="sec-subtitle">Persona, firmographics and buying triggers.</div></div></div>
+      ${field('Primary ICP', repairICP(s3.primary_icp, 'primary', s3, industry))}
+      ${field('Secondary ICP', repairICP(s3.secondary_icp, 'secondary', s3, industry))}
+      ${field('Firmographics', s3.firmographics)}
+      ${field('Decision Makers', s3.decision_makers)}
+      ${field('Buying Triggers', s3.buying_triggers)}
+      ${field('Common Objections', s3.objections)}
+      ${renderPersonaCard(s3, industry)}
+      ${renderPainMap(s3)}
+    </div>
+  `;
+  return page;
+}
+
+function buildPdfAccountSourcingPage(r) {
+  const s4 = r.step_4_sourcing || {};
+  const page = createPdfPage();
+  page.innerHTML = `
+    <div class="section">
+      <div class="sec-header"><div class="sec-num">06</div><div><div class="sec-title">Account Sourcing</div><div class="sec-subtitle">Targeting playbook, filters, and outreach priorities.</div></div></div>
+      ${field('Target Roles', s4.target_roles)}
+      ${renderAccountPipeline(s4)}
+      ${tagRow('Recommended Databases', s4.recommended_databases, 'green')}
+      ${field('Filter Criteria', s4.filter_criteria)}
+      ${field('Exclusion Criteria', s4.exclusion_criteria, 'red')}
+      ${field('Outreach Priority', s4.estimated_universe)}
+      ${field('Estimated Deal Size', s4.estimated_deal_size)}
+      ${field('Sales Approach', s4.sales_approach)}
+      ${field('Account Analogues', s4.account_analogs)}
+    </div>
+  `;
+  return page;
+}
+
+function buildPdfKeywordsPage(r) {
+  const s5 = r.step_5_keywords || {};
+  const page = createPdfPage();
+  page.innerHTML = `
+    <div class="section">
+      <div class="sec-header"><div class="sec-num">07</div><div><div class="sec-title">Keywords & Intent</div><div class="sec-subtitle">Search taxonomy and demand signal capture.</div></div></div>
+      ${renderKeywordIntent(s5)}
+      ${field('Boolean Query', s5.boolean_query)}
+      ${field('LinkedIn Query', s5.linkedin_search_strings)}
+      ${tagRow('Keyword Clusters', s5.keyword_clusters)}
+      ${tagRow('Content Topics', s5.content_topics, 'blue')}
+      ${field('Intent Signals', s5.intent_signals)}
+    </div>
+  `;
+  return page;
+}
+
+function buildPdfOutboundPage(r) {
+  const s6 = r.step_6_messaging || {};
+  const page = createPdfPage();
+  page.innerHTML = `
+    <div class="section">
+      <div class="sec-header"><div class="sec-num">08</div><div><div class="sec-title">SDR / Outreach Sequence</div><div class="sec-subtitle">Email and LinkedIn cadence for engagement.</div></div></div>
+      ${renderSDRTimeline(s6)}
+      ${field('Follow-up Sequence', s6.follow_up_sequence)}
+      ${field('LinkedIn Message', s6.linkedin_message)}
+      ${field('LinkedIn Follow-up', s6.linkedin_follow_up)}
+    </div>
+  `;
+  return page;
+}
+
+function buildPdfDecisionPage(r) {
+  const s1 = r.step_1_market || {};
+  const s2 = r.step_2_tam || {};
+  const s3 = r.step_3_icp || {};
+  const s7 = r.step_7_intelligence || {};
+  const score = parseInt(s7.confidence_score) || s1.gtm_relevance_score || 0;
+  const verdict = (s7.go_no_go?.recommendation || (score >= 75 ? 'Go' : score >= 50 ? 'Watch' : 'No-Go') || 'Watch').toUpperCase();
+  const verdictClass = verdict === 'GO' ? 'decision-go' : verdict === 'NO-GO' ? 'decision-nogo' : 'decision-watch';
+  const buyingSignals = Array.isArray(s7.signal_summary) ? s7.signal_summary.slice(0,3).map(sig => `<li><strong style="color:${sig.strength === 'High' ? 'var(--green)' : sig.strength === 'Medium' ? 'var(--amber)' : 'var(--blue)'};text-transform:uppercase;font-size:10px;margin-right:6px">[${esc(sig.signal_type || 'SIGNAL')}]</strong>${esc(sig.signal_description || '')}</li>`).join('') : '';
+  const mcc = s7.mcc_view || {};
+  const page = createPdfPage();
+  page.innerHTML = `
+    <div class="section">
+      <div class="sec-header"><div class="sec-num">09</div><div><div class="sec-title">Revenue Intelligence / Decision Engine</div><div class="sec-subtitle">Go / Watch / No-Go verdict and execution guidance.</div></div></div>
+      <div class="decision-badge" style="margin-bottom:18px;padding:18px;">
+        <div class="verdict ${verdictClass}" style="font-size:32px;">${verdict}</div>
+        <div class="reason" style="font-size:12px;color:var(--text);margin-top:12px;">${esc(s7.go_no_go?.reason || s7.recommendation_reason || 'Balanced decision logic based on the available signals and market readiness.')}</div>
+      </div>
+      ${field('Executive Brief', s7.executive_brief)}
+      ${field('Why Now', s7.why_now_analysis)}
+      ${field('Strategic Hook', s7.strategic_hook)}
+      ${buyingSignals ? `<div class="field"><div class="fl">Buying Signals</div><ul class="risk-list" style="background:rgba(59,130,246,.05);border-left-color:var(--blue);margin-top:6px;">${buyingSignals}</ul></div>` : ''}
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">${['Market','Client','Competitor'].map(label => `<div style="background:rgba(0,0,0,.3);border:1px solid rgba(148,163,184,.2);border-radius:12px;padding:14px;"><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px">${label}</div><div style="font-size:11px;color:var(--text);line-height:1.6">${esc(mcc[label.toLowerCase()] || `No ${label.toLowerCase()} insight available.`)}</div></div>`).join('')}</div>
+      ${field('Execution Priority', s7.execution_priority || s7.persona_priority?.reason)}
+      <div class="field"><div class="fl">Confidence Score</div><div class="fv"><strong>${score}/100</strong></div></div>
+    </div>
+  `;
+  return page;
+}
+
+function buildPdfConfidenceMatrixPage(r) {
+  const score = parseInt(r.step_7_intelligence?.confidence_score) || parseInt(r.step_1_market?.gtm_relevance_score) || 0;
+  const v = Math.round(score * 0.4);
+  const t = Math.round(score * 0.25);
+  const f = Math.round(score * 0.2);
+  const c = Math.round(score * 0.15);
+  const page = createPdfPage();
+  page.innerHTML = `
+    <div class="section">
+      <div class="sec-header"><div class="sec-num">10</div><div><div class="sec-title">Weighted Confidence Matrix</div><div class="sec-subtitle">Signal veracity, timing, persona fit and data completeness.</div></div></div>
+      <div class="field"><div class="fl">Overall Fidelity</div><div class="fv">${score}/100</div></div>
+      <table class="cm-table"><thead><tr><th>Dimension</th><th style="text-align:right">Score</th><th>Description</th></tr></thead><tbody>
+        <tr><td>Signal Veracity (40%)</td><td class="num">${v}/40</td><td>Buying signal reliability</td></tr>
+        <tr><td>Market Timing (25%)</td><td class="num">${t}/25</td><td>Opportunity window alignment</td></tr>
+        <tr><td>ICP Fit (20%)</td><td class="num">${f}/20</td><td>Target persona match</td></tr>
+        <tr><td>Data Completeness (15%)</td><td class="num">${c}/15</td><td>Source quality and depth</td></tr>
+      </tbody></table>
+      <div class="confidence-bar-wrap"><div class="confidence-bar" style="width:${score}%"></div></div>
+      ${field('Interpretation Note', r.step_7_intelligence?.matrix_note || 'A higher score indicates stronger evidence alignment and execution readiness.')}
+    </div>
+  `;
+  return page;
+}
+
+function buildPdfAppendixPage(r) {
+  const page = createPdfPage();
+  const metadata = [
+    `Company: ${esc(r.company_name || 'Unknown')}`,
+    `Industry: ${esc(r.industry || 'N/A')}`,
+    `Report Mode: ${isDemoReport(r) ? 'Demo' : 'Live'}`,
+    `Generated: ${new Date(r.updated_at || r.created_at).toLocaleDateString('en-GB',{year:'numeric',month:'long',day:'numeric'})}`,
+    `Report ID: ${esc(r.id || r.report_id || 'N/A')}`,
+  ].join(' | ');
+  page.innerHTML = `
+    <div class="section">
+      <div class="sec-header"><div class="sec-num">11</div><div><div class="sec-title">Appendix / Methodology</div><div class="sec-subtitle">Source notes, assumptions and AI estimate disclaimers.</div></div></div>
+      ${field('Data Sources', r.data_sources || r.step_7_intelligence?.data_sources || 'Company website, public filings, analyst estimates and enterprise signal feeds.')}
+      ${field('Assumptions', r.assumptions || 'Historical growth trends, available market benchmarks and inferred buyer intent were used.')}
+      <div class="analyst-callout amber">⚠️ AI-Estimated Content: TAM/SAM/SOM, ICP derivations, account analogs, and messaging sequences are AI-derived and should be validated with customer evidence before operational use.</div>
+      <div class="field"><div class="fl">Report Metadata</div><div class="fv">${esc(metadata)}</div></div>
+    </div>
+  `;
+  return page;
 }
 
 function createPdfSandbox() {
@@ -1242,10 +1513,6 @@ function createPdfSandbox() {
     html, body, #pdf-export-sandbox, #pdf-export-root, #pdf-export-root * { background:#0B0F1A !important; color:#E5E7EB !important; }
     #pdf-export-root { width:794px !important; max-width:794px !important; margin:0 auto !important; padding:0 !important; }
     #pdf-export-root .wrap { width:794px !important; max-width:794px !important; margin:0 auto !important; padding:0 !important; }
-    #pdf-export-root .ph, #pdf-export-root .cover-hero, #pdf-export-root .cover-kpis, #pdf-export-root .score-strip,
-    #pdf-export-root .grid2, #pdf-export-root .grid3, #pdf-export-root .pipeline-row,
-    #pdf-export-root .intent-grid, #pdf-export-root .pain-map-grid, #pdf-export-root .persona-card,
-    #pdf-export-root .truth-card .truth-row, #pdf-export-root .timeline-item { grid-template-columns:1fr !important; }
     #pdf-export-root .report-footer { flex-direction:column !important; align-items:flex-start !important; }
     #pdf-export-root .report-cover { margin-bottom:24px !important; }
     #pdf-export-root .section { margin-bottom:22px !important; background:rgba(15,20,35,.96) !important; border-color:rgba(148,163,184,.3) !important; }
