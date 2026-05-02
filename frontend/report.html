@@ -249,6 +249,122 @@
     .cm-table th { text-align:left; color:var(--muted); font-weight:700; font-size:8px; text-transform:uppercase; letter-spacing:.12em; padding:8px 10px; border-bottom:1px solid var(--border); }
     .cm-table td { padding:8px 10px; border-bottom:1px solid rgba(31,41,55,.5); }
     .cm-table .num { font-family:'Space Mono',monospace; text-align:right; color:var(--accent); font-weight:700; }
+    .pdf-cover-hero { position:relative; overflow:hidden; border-radius:26px; background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.01)); padding:28px; border:1px solid rgba(148,163,184,.18); }
+    .pdf-cover-hero::before { content:''; position:absolute; inset:0; background:radial-gradient(circle at 22% 18%, rgba(168,85,247,.14), transparent 18%), radial-gradient(circle at 80% 28%, rgba(59,130,246,.1), transparent 20%), radial-gradient(circle at 50% 100%, rgba(255,255,255,.04), transparent 40%); opacity:.85; pointer-events:none; }
+    .pdf-cover-hero-inner { position:relative; display:grid; grid-template-columns:1.5fr 1fr; gap:20px; z-index:1; }
+    .pdf-cover-hero-head { display:flex; align-items:flex-start; gap:14px; margin-bottom:18px; }
+    .pdf-cover-badges { display:flex; flex-wrap:wrap; gap:10px; margin-top:16px; }
+    .pdf-cover-pill { display:inline-flex; align-items:center; gap:8px; padding:9px 14px; border-radius:999px; background:rgba(255,255,255,.06); border:1px solid rgba(255,255,255,.1); font-size:10px; color:var(--text); letter-spacing:.1em; text-transform:uppercase; }
+    .pdf-cover-pill.accent { background:rgba(168,85,247,.12); border-color:rgba(168,85,247,.18); color:var(--accent); }
+    .pdf-cover-intro { font-size:12px; color:var(--muted); line-height:1.8; max-width:480px; }
+    .pdf-cover-grid { display:grid; grid-template-columns:repeat(2,minmax(140px,1fr)); gap:14px; margin-top:20px; }
+    .pdf-kpi-card { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.1); border-radius:20px; padding:18px 16px; min-height:110px; display:flex; flex-direction:column; justify-content:space-between; }
+    .pdf-kpi-card .label { font-size:9px; text-transform:uppercase; letter-spacing:.16em; color:var(--muted); margin-bottom:10px; font-weight:700; }
+    .pdf-kpi-card .value { font-size:28px; line-height:1.05; font-family:'Space Mono',monospace; font-weight:900; color:white; }
+    .pdf-kpi-card .note { margin-top:12px; font-size:10px; color:var(--muted); line-height:1.6; }
+    .pdf-dashboard { display:grid; grid-template-columns:1fr 1fr; gap:16px; }
+    .pdf-panel { background:rgba(255,255,255,.04); border:1px solid rgba(148,163,184,.18); border-radius:22px; padding:20px; min-height:200px; }
+    .pdf-panel-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
+    .pdf-panel-title { font-size:13px; font-weight:800; color:white; }
+    .pdf-panel-copy { font-size:10px; color:var(--muted); line-height:1.7; }
+    .pdf-opportunity-risk { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:14px; }
+    .pdf-opportunity-card { background:rgba(255,255,255,.05); border:1px solid rgba(148,163,184,.18); border-radius:18px; padding:16px; }
+    .pdf-opportunity-card .title { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.16em; color:var(--muted); margin-bottom:10px; }
+    .pdf-opportunity-card .text { font-size:12px; line-height:1.7; color:var(--text); }
+    .pdf-score-band { display:grid; gap:10px; margin-top:12px; }
+    .pdf-score-band .label { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.16em; }
+    .pdf-score-band .bar-wrap { background:rgba(255,255,255,.08); border-radius:999px; overflow:hidden; height:12px; }
+    .pdf-score-band .bar-fill { height:100%; border-radius:999px; background:linear-gradient(90deg,var(--accent2),var(--accent)); min-width:20%; }
+    .pdf-swot-matrix { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:18px; }
+    .pdf-swot-card { position:relative; padding:18px; min-height:150px; border-radius:20px; background:rgba(255,255,255,.04); border:1px solid rgba(148,163,184,.18); }
+    .pdf-swot-card[data-label]::before { content:attr(data-label); position:absolute; top:14px; right:14px; font-size:9px; letter-spacing:.18em; text-transform:uppercase; color:var(--muted); }
+    .pdf-swot-card .pdf-swot-title { font-size:12px; font-weight:800; color:white; margin-bottom:10px; }
+    .pdf-swot-card ul { margin:0;padding-left:18px; list-style:disc; color:var(--text); font-size:11px; line-height:1.65; }
+    .pdf-swot-card li { margin-bottom:8px; }
+    .pdf-market-strip { border:1px solid rgba(148,163,184,.18); border-radius:18px; padding:16px; background:rgba(255,255,255,.03); display:flex; justify-content:space-between; gap:16px; }
+    .pdf-market-strip .metric { font-size:11px; color:var(--muted); }
+    .pdf-market-strip .metric strong { display:block; font-size:16px; color:white; margin-top:6px; }
+    .pdf-bar-row { display:grid; gap:10px; }
+    .pdf-bar-row .pdf-bar-label { display:flex; justify-content:space-between; font-size:10px; color:var(--muted); letter-spacing:.1em; text-transform:uppercase; }
+    .pdf-bar-row .pdf-bar-track { width:100%; height:12px; border-radius:999px; background:rgba(255,255,255,.08); overflow:hidden; }
+    .pdf-bar-row .pdf-bar-fill { height:100%; border-radius:999px; background:linear-gradient(90deg,var(--accent2),var(--accent)); }
+    .pdf-tam-grid { display:grid; grid-template-columns:repeat(3,minmax(120px,1fr)); gap:12px; margin-bottom:18px; }
+    .pdf-segment-card { background:rgba(255,255,255,.04); border:1px solid rgba(148,163,184,.18); border-radius:18px; padding:16px; min-height:130px; }
+    .pdf-segment-card .title { font-size:11px; font-weight:800; margin-bottom:8px; color:white; }
+    .pdf-segment-card .metric { font-size:14px; font-family:'Space Mono',monospace; color:white; margin-bottom:8px; }
+    .pdf-segment-card .line { font-size:10px; color:var(--muted); line-height:1.6; }
+    .pdf-persona-panel { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:14px; }
+    .pdf-persona-card { background:rgba(255,255,255,.04); border:1px solid rgba(148,163,184,.18); border-radius:20px; padding:18px; }
+    .pdf-persona-top { display:flex; align-items:center; gap:14px; margin-bottom:16px; }
+    .pdf-avatar { width:56px; height:56px; border-radius:18px; background:rgba(168,85,247,.16); display:flex; align-items:center; justify-content:center; font-size:22px; color:var(--accent); }
+    .pdf-persona-label { font-size:10px; text-transform:uppercase; letter-spacing:.16em; color:var(--muted); margin-bottom:6px; }
+    .pdf-persona-name { font-size:16px; font-weight:900; color:white; margin-bottom:6px; }
+    .pdf-chip-row { display:flex; flex-wrap:wrap; gap:8px; margin-top:10px; }
+    .pdf-chip { padding:8px 12px; border-radius:999px; font-size:10px; color:white; background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12); }
+    .pdf-chip.green { background:rgba(34,197,94,.16); border-color:rgba(34,197,94,.24); color:var(--green); }
+    .pdf-chip.blue { background:rgba(59,130,246,.15); border-color:rgba(59,130,246,.25); color:var(--blue); }
+    .pdf-chip.amber { background:rgba(245,158,11,.15); border-color:rgba(245,158,11,.25); color:var(--amber); }
+    .pdf-bullet-map { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-top:16px; }
+    .pdf-map-card { background:rgba(255,255,255,.04); border:1px solid rgba(148,163,184,.18); border-radius:18px; padding:16px; min-height:120px; }
+    .pdf-map-card .title { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.14em; margin-bottom:10px; font-weight:700; }
+    .pdf-map-card .value { font-size:12px; color:white; line-height:1.75; }
+    .pdf-pipeline { display:grid; grid-template-columns:repeat(4,minmax(140px,1fr)); gap:12px; margin-top:18px; }
+    .pdf-pipeline-step { background:rgba(255,255,255,.04); border:1px solid rgba(148,163,184,.18); border-radius:20px; padding:16px; min-height:120px; display:flex; flex-direction:column; justify-content:space-between; }
+    .pdf-pipeline-step .step-label { font-size:9px; text-transform:uppercase; letter-spacing:.16em; color:var(--muted); margin-bottom:10px; font-weight:700; }
+    .pdf-pipeline-step .step-value { font-size:14px; font-weight:800; color:white; margin-bottom:10px; }
+    .pdf-pipeline-step .step-note { font-size:10px; color:var(--muted); line-height:1.6; }
+    .pdf-analog-grid { display:grid; grid-template-columns:repeat(3,minmax(140px,1fr)); gap:12px; margin-top:18px; }
+    .pdf-analog-card { background:rgba(255,255,255,.04); border:1px solid rgba(148,163,184,.18); border-radius:18px; padding:16px; min-height:120px; }
+    .pdf-analog-card .analog-name { font-size:12px; font-weight:800; color:white; margin-bottom:8px; }
+    .pdf-fit-bar { height:10px; background:rgba(255,255,255,.08); border-radius:999px; overflow:hidden; margin-top:12px; }
+    .pdf-fit-bar .fill { height:100%; border-radius:999px; background:linear-gradient(90deg,var(--accent2),var(--accent)); }
+    .pdf-cloud { display:flex; flex-wrap:wrap; gap:9px; margin-top:14px; }
+    .pdf-funnel { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-top:16px; }
+    .pdf-funnel-step { background:rgba(255,255,255,.04); border:1px solid rgba(148,163,184,.18); border-radius:18px; padding:16px; }
+    .pdf-funnel-step .label { font-size:9px; text-transform:uppercase; color:var(--muted); letter-spacing:.16em; margin-bottom:8px; font-weight:700; }
+    .pdf-funnel-step .title { font-size:13px; font-weight:800; color:white; margin-bottom:10px; }
+    .pdf-command-card { background:rgba(255,255,255,.04); border:1px solid rgba(148,163,184,.18); border-radius:18px; padding:16px; font-family:'Space Mono',monospace; font-size:11px; color:white; margin-top:12px; }
+    .pdf-command-card .label { font-size:9px; text-transform:uppercase; letter-spacing:.16em; color:var(--muted); margin-bottom:8px; }
+    .pdf-timeline { position:relative; margin-top:18px; padding-left:26px; }
+    .pdf-timeline::before { content:''; position:absolute; left:10px; top:0; bottom:0; width:2px; background:linear-gradient(180deg,rgba(168,85,247,.6),rgba(59,130,246,.8)); }
+    .pdf-timeline-item { position:relative; background:rgba(255,255,255,.04); border:1px solid rgba(148,163,184,.18); border-radius:18px; padding:16px 18px 16px 24px; margin-bottom:14px; }
+    .pdf-timeline-item::before { content:attr(data-step); position:absolute; left:-10px; top:16px; width:28px; height:28px; border-radius:50%; background:linear-gradient(135deg,var(--accent2),var(--accent)); color:white; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:900; border:3px solid #0B0F1A; }
+    .pdf-timeline-item .ti-title { font-size:12px; font-weight:800; color:white; margin-bottom:8px; }
+    .pdf-timeline-item .ti-body { font-size:11px; color:var(--text); line-height:1.7; }
+    .pdf-timeline-item .ti-chip { margin-top:10px; display:inline-flex; padding:7px 12px; border-radius:999px; background:rgba(59,130,246,.12); color:var(--blue); font-size:10px; font-weight:700; }
+    .pdf-decision-grid { display:grid; grid-template-columns:1.2fr 1fr; gap:16px; margin-top:18px; }
+    .pdf-verdict-panel { background:rgba(255,255,255,.05); border:1px solid rgba(148,163,184,.18); border-radius:24px; padding:22px; min-height:220px; }
+    .pdf-verdict-panel .title { font-size:13px; text-transform:uppercase; letter-spacing:.16em; color:var(--muted); margin-bottom:10px; font-weight:700; }
+    .pdf-verdict-panel .score { font-size:44px; font-weight:900; font-family:'Space Mono',monospace; color:white; margin-bottom:10px; }
+    .pdf-verdict-panel .reason { font-size:11px; color:var(--text); line-height:1.7; margin-bottom:16px; }
+    .pdf-meter { height:16px; background:rgba(255,255,255,.08); border-radius:999px; overflow:hidden; margin-top:12px; }
+    .pdf-meter-fill { height:100%; background:linear-gradient(90deg,var(--accent2),var(--accent)); min-width:20%; }
+    .pdf-mcc-grid { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-top:16px; }
+    .pdf-mcc-card { background:rgba(255,255,255,.04); border:1px solid rgba(148,163,184,.18); border-radius:18px; padding:16px; min-height:108px; }
+    .pdf-mcc-card .label { font-size:9px; text-transform:uppercase; color:var(--muted); margin-bottom:8px; font-weight:700; }
+    .pdf-mcc-card .value { font-size:12px; color:white; line-height:1.6; }
+    .pdf-risk-strip { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-top:16px; }
+    .pdf-risk-pill { padding:12px 14px; border-radius:18px; font-size:11px; font-weight:700; }
+    .pdf-risk-pill.red { background:rgba(239,68,68,.12); color:var(--red); border:1px solid rgba(239,68,68,.2); }
+    .pdf-risk-pill.amber { background:rgba(245,158,11,.12); color:var(--amber); border:1px solid rgba(245,158,11,.2); }
+    .pdf-risk-pill.green { background:rgba(34,197,94,.12); color:var(--green); border:1px solid rgba(34,197,94,.2); }
+    .pdf-priority-card { background:rgba(255,255,255,.04); border:1px solid rgba(148,163,184,.18); border-radius:20px; padding:18px; margin-top:14px; }
+    .pdf-priority-card .title { font-size:10px; text-transform:uppercase; letter-spacing:.16em; color:var(--muted); margin-bottom:8px; font-weight:700; }
+    .pdf-priority-card .text { font-size:12px; color:white; line-height:1.7; }
+    .pdf-scorebar-row { display:grid; gap:12px; margin-top:18px; }
+    .pdf-scorebar { display:grid; grid-template-columns:1fr auto; gap:10px; align-items:center; }
+    .pdf-scorebar-label { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.14em; }
+    .pdf-scorebar-track { background:rgba(255,255,255,.08); border-radius:999px; overflow:hidden; height:12px; }
+    .pdf-scorebar-fill { height:100%; width:0; border-radius:999px; background:linear-gradient(90deg,var(--accent2),var(--accent)); }
+    .pdf-scorebar-value { font-size:11px; font-family:'Space Mono',monospace; color:white; }
+    .pdf-gauge { position:relative; background:rgba(255,255,255,.08); border-radius:999px; height:18px; overflow:hidden; margin-top:12px; }
+    .pdf-gauge-fill { position:absolute; left:0; top:0; bottom:0; width:0; background:linear-gradient(90deg, #3b82f6, var(--accent)); }
+    .pdf-gauge-label { position:absolute; right:12px; top:50%; transform:translateY(-50%); font-size:10px; color:var(--white); font-weight:700; }
+    .pdf-appendix-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:18px; }
+    .pdf-appendix-card { background:rgba(255,255,255,.04); border:1px solid rgba(148,163,184,.18); border-radius:20px; padding:18px; min-height:120px; }
+    .pdf-appendix-card .title { font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.14em; margin-bottom:8px; font-weight:700; }
+    .pdf-appendix-card .text { font-size:12px; color:white; line-height:1.7; }
+    .pdf-warning-banner { background:rgba(245,158,11,.12); border:1px solid rgba(245,158,11,.24); border-left:4px solid var(--amber); border-radius:16px; padding:16px; color:var(--amber); font-size:11px; line-height:1.7; margin-bottom:16px; }
     /* ── SOURCE NOTES ── */
     .src-note { font-size:9px; color:var(--faint); font-style:italic; margin:4px 0 10px; }
     .truth-card { background:rgba(31,41,55,.75); border:1px solid rgba(168,85,247,.18); border-radius:16px; padding:18px 20px; margin-bottom:20px; }
@@ -260,6 +376,19 @@
     .truth-badge { padding:6px 12px; border-radius:999px; font-size:10px; font-weight:800; letter-spacing:.15em; text-transform:uppercase; border:1px solid transparent; }
     .truth-badge-verified { background:rgba(34,197,94,.12); color:var(--green); border-color:rgba(34,197,94,.24); }
     .truth-badge-warning  { background:rgba(245,158,11,.12); color:var(--amber); border-color:rgba(245,158,11,.24); }
+    .section-highlight { background:rgba(168,85,247,.05); border:1px solid rgba(168,85,247,.16); border-radius:18px; padding:18px 20px; margin-bottom:18px; }
+    .info-strip { display:grid; grid-template-columns:repeat(3,minmax(160px,1fr)); gap:12px; margin:18px 0; }
+    .info-chip { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:16px; padding:14px 16px; }
+    .info-chip strong { display:block; font-size:10px; font-weight:800; text-transform:uppercase; letter-spacing:.16em; color:var(--muted); margin-bottom:8px; }
+    .info-chip span { display:block; font-size:11px; color:var(--text); line-height:1.5; }
+    .metric-segment { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:18px; }
+    .matrix-card { background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.08); border-radius:18px; padding:18px; min-height:100px; }
+    .matrix-card .ml { color:var(--muted); margin-bottom:8px; }
+    .matrix-card .mv { color:white; font-size:16px; line-height:1.5; }
+    .trend-strip { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:18px; }
+    .trend-pill { display:inline-flex; align-items:center; gap:8px; padding:8px 12px; background:rgba(255,255,255,.05); border:1px solid rgba(255,255,255,.12); border-radius:999px; font-size:10px; color:var(--text); }
+    .sec-context { color:var(--muted); margin-bottom:18px; }
+    .section .field { margin-bottom:16px; }
     /* ── APPENDIX ── */
     .appendix-table { width:100%; border-collapse:collapse; font-size:11px; margin:8px 0 16px; }
     .appendix-table th { text-align:left; color:var(--muted); font-weight:700; font-size:8px; text-transform:uppercase; letter-spacing:.1em; padding:8px 10px; border-bottom:1px solid var(--border); }
@@ -455,9 +584,23 @@ function renderKeywordIntent(s5) {
   const secondary = Array.isArray(s5.secondary_keywords) ? s5.secondary_keywords : [];
   const intent = Array.isArray(s5.intent_signals) ? s5.intent_signals : [];
   return `<div class="intent-grid">
-    <div><div class="intent-level">Problem-aware</div>${primary.map(k=>`<span class="intent-pill">${esc(k)}</span>`).join('')}</div>
-    <div><div class="intent-level">Solution-aware</div>${secondary.map(k=>`<span class="intent-pill">${esc(k)}</span>`).join('')}</div>
+    <div><div class="intent-level">Problem-aware</div>${primary.map(k=>`<span class="intent-pill">${esc(k)}</span>`).join('') || '<span style="color:var(--muted);font-size:11px">No keywords available</span>'}</div>
+    <div><div class="intent-level">Solution-aware</div>${secondary.map(k=>`<span class="intent-pill">${esc(k)}</span>`).join('') || '<span style="color:var(--muted);font-size:11px">No keywords available</span>'}</div>
     <div><div class="intent-level">High-intent</div>${intent.map(k=>`<span class="intent-pill amber">${esc(k)}</span>`).join('') || '<span style="color:var(--muted);font-size:11px">No strong intent signals extracted</span>'}</div>
+  </div>`;
+}
+function renderMarketTrend(s1) {
+  const trend = safe(s1.market_movement || s1.market_trend || s1.timing_signals || s1.growth_signals);
+  if (!trend) return '';
+  return `<div class="section-highlight"><div class="fl">Market movement</div><div class="fv">${esc(trend)}</div></div>`;
+}
+function renderOpportunityRiskSplit(s1) {
+  const opportunity = safe(s1.key_opportunity || s1.priority_opportunities || (Array.isArray(s1.growth_signals) ? s1.growth_signals[0] : s1.growth_signals));
+  const risk = safe(s1.key_risk || s1.market_risks || (Array.isArray(s1.threats) ? s1.threats[0] : s1.threats));
+  if (!opportunity && !risk) return '';
+  return `<div class="metric-segment">
+    <div class="matrix-card" style="border-color:rgba(34,197,94,.2);"><div class="ml">Key Opportunity</div><div class="mv">${esc(opportunity || 'Opportunity signal not explicit')}</div></div>
+    <div class="matrix-card" style="border-color:rgba(239,68,68,.2);"><div class="ml">Key Risk</div><div class="mv">${esc(risk || 'Risk signal not explicit')}</div></div>
   </div>`;
 }
 function renderSDRTimeline(s6) {
@@ -468,7 +611,7 @@ function renderSDRTimeline(s6) {
     {label:'LinkedIn', angle:'Social touch', body:s6.linkedin_message, cta:'Connect / engage'},
     {label:'Follow-up', angle:'Persistence', body:s6.linkedin_follow_up, cta:'Nudge with next step'},
   ];
-  return `<div class="timeline">${steps.filter(step=>step.subject||step.body||step.angle).map((step,idx)=>`<div class="timeline-item"><div class="ti-step">${idx+1}</div><div><div class="ti-title">${esc(step.label)} — ${esc(step.angle)}</div>${step.subject?`<div style="font-size:11px;color:var(--text);margin-bottom:4px"><strong>Subject:</strong> ${esc(step.subject)}</div>`:''}${step.body?`<div class="ti-body">${esc(step.body)}</div>`:''}${step.cta?`<div class="tag green" style="margin-top:10px">${esc(step.cta)}</div>`:''}</div></div>`).join('')}</div>`;
+  return `<div class="pdf-timeline">${steps.filter(step=>step.subject||step.body||step.angle).map((step,idx)=>`<div class="pdf-timeline-item" data-step="${idx+1}"><div class="ti-title">${esc(step.label)}</div><div class="ti-body"><strong>${esc(step.angle)}</strong></div>${step.subject?`<div class="ti-body" style="margin-top:8px;"><strong>Subject:</strong> ${esc(step.subject)}</div>`:''}${step.body?`<div class="ti-body">${esc(step.body)}</div>`:''}${step.cta?`<div class="ti-chip">${esc(step.cta)}</div>`:''}</div>`).join('')}</div>`;
 }
 function callout(text, type='') {
   if (!text) return '';
@@ -684,6 +827,111 @@ function renderKeywordTaxonomy(s5) {
   ${is.length ? `<div class="field"><div class="fl">Intent Signals</div><div class="tags">${is.map(s=>`<span class="tag amber">${esc(s)}</span>`).join('')}</div></div>` : ''}`;
 }
 
+function renderPdfSwotMatrix(s1) {
+  const sw = s1.swot || {};
+  const listItems = arr => (Array.isArray(arr) ? arr : (arr ? String(arr).split(',') : [])).filter(Boolean).slice(0,4).map(item => `<li>${esc(item.trim())}</li>`).join('');
+  return `<div class="pdf-swot-matrix">
+    <div class="pdf-swot-card" data-label="Strengths"><div class="pdf-swot-title">Strengths</div><ul>${listItems(sw.strengths) || `<li>${esc(s1.market_position || 'Market positioning clarity')}</li>`}</ul></div>
+    <div class="pdf-swot-card" data-label="Weaknesses"><div class="pdf-swot-title">Weaknesses</div><ul>${listItems(sw.weaknesses) || `<li>${esc(s1.revenue_stage || 'Execution risk in scaling')}</li>`}</ul></div>
+    <div class="pdf-swot-card" data-label="Opportunities"><div class="pdf-swot-title">Opportunities</div><ul>${listItems(sw.opportunities) || `<li>${esc(s1.priority_opportunities || 'Growth adjacent to core offering')}</li>`}</ul></div>
+    <div class="pdf-swot-card" data-label="Threats"><div class="pdf-swot-title">Threats</div><ul>${listItems(sw.threats) || `<li>${esc(s1.market_risks || 'Competitive pressure')}</li>`}</ul></div>
+  </div>`;
+}
+
+function compactRationale(text) {
+  const raw = safe(text);
+  if (!raw) return '';
+  const first = raw.split('. ').slice(0,2).join('. ') + (raw.includes('.') ? '.' : '');
+  return `<div class="pdf-priority-card"><div class="title">Scoring Rationale</div><div class="text">${esc(first)}</div></div>`;
+}
+
+function renderPdfSegmentCards(s2) {
+  const segments = Array.isArray(s2.market_segments) ? s2.market_segments.slice(0,4) : [];
+  if (!segments.length) return `<div class="pdf-segment-card"><div class="title">Segment analysis not available</div><div class="metric">Est. segment fit pending</div><div class="line">Use company data to replace this summary.</div></div>`;
+  return `<div class="pdf-tam-grid">${segments.map((seg, idx) => {
+    const name = typeof seg === 'string' ? seg : safe(seg.name || seg.segment_name || 'Segment');
+    const size = typeof seg === 'string' ? safe(seg) : safe(seg.size || seg.est_size || seg.market_size || 'Undisclosed');
+    const priority = typeof seg === 'string' ? '' : safe(seg.priority || seg.priority_level || 'Moderate');
+    const growth = typeof seg === 'string' ? '' : safe(seg.growth || 'Stable');
+    const rationale = typeof seg === 'string' ? '' : safe(seg.rationale || seg.segment_rationale || 'Alignment with current GTM focus');
+    return `<div class="pdf-segment-card"><div class="title">${esc(name)}</div><div class="metric">${esc(size)}</div><div class="line">${esc(priority ? `Priority: ${priority}` : 'Priority: not set')}${growth ? ` · Growth: ${growth}` : ''}</div>${rationale ? `<div class="line" style="margin-top:10px">${esc(rationale)}</div>` : ''}</div>`;
+  }).join('')}</div>`;
+}
+
+function renderPdfBuyingCommittee(s3) {
+  const dms = Array.isArray(s3.decision_makers) ? s3.decision_makers : [];
+  if (!dms.length) return '';
+  return `<div class="pdf-persona-card"><div class="pdf-persona-label">Buying Committee</div><div class="pdf-chip-row">${dms.slice(0,6).map((item, idx) => `<span class="pdf-chip ${idx===0?'green':''}">${esc(item)}</span>`).join('')}</div></div>`;
+}
+
+function renderPdfTriggerChips(s3) {
+  const triggers = Array.isArray(s3.buying_triggers) ? s3.buying_triggers : [];
+  if (!triggers.length) return '';
+  return `<div class="pdf-persona-card"><div class="pdf-persona-label">Buying Triggers</div><div class="pdf-chip-row">${triggers.slice(0,8).map(trigger => `<span class="pdf-chip blue">${esc(trigger)}</span>`).join('')}</div></div>`;
+}
+
+function renderPdfObjectionChips(s3) {
+  const objections = Array.isArray(s3.objections) ? s3.objections : [];
+  if (!objections.length) return '';
+  return `<div class="pdf-persona-card"><div class="pdf-persona-label">Objections / Risk Signals</div><div class="pdf-chip-row">${objections.slice(0,6).map(obs => `<span class="pdf-chip amber">${esc(obs)}</span>`).join('')}</div></div>`;
+}
+
+function renderPdfPainImpactMap(s3) {
+  const psm = Array.isArray(s3.pain_solution_map) ? s3.pain_solution_map.slice(0,3) : [];
+  const cards = psm.length ? psm : [
+    { label: 'Pain', value: s3.core_pain_points || 'Key operational friction points' },
+    { label: 'Impact', value: s3.business_impact || 'Revenue / cost implications' },
+    { label: 'Intervention', value: s3.recommended_intervention || 'Recommended engagement strategy' },
+  ];
+  return `<div class="pdf-bullet-map">${cards.map(card => `<div class="pdf-map-card"><div class="title">${esc(card.label)}</div><div class="value">${esc(safe(card.value))}</div></div>`).join('')}</div>`;
+}
+
+function renderPdfAccountPipeline(s4) {
+  const steps = [
+    {label:'Database', value:safe(s4.recommended_databases) || 'CRM / Apollo / LinkedIn'},
+    {label:'Filter', value:safe(s4.filter_criteria) || 'Firmographic + buying stage'},
+    {label:'Exclusion', value:safe(s4.exclusion_criteria) || 'Existing customers / low-fit accounts'},
+    {label:'Priority', value:safe(s4.estimated_universe) || 'High-fit accounts first'},
+  ];
+  return `<div class="pdf-pipeline">${steps.map(step => `<div class="pdf-pipeline-step"><div class="step-label">${esc(step.label)}</div><div class="step-value">${esc(step.value)}</div><div class="step-note">${esc(step.label === 'Database' ? 'Primary source systems' : step.label === 'Priority' ? 'Shortlist guidance' : 'Target logic')}</div></div>`).join('')}</div>`;
+}
+
+function renderPdfAccountAnalogs(s4) {
+  let analogs = Array.isArray(s4.account_analogs) ? s4.account_analogs.slice(0,3) : [];
+  if (!analogs.length && s4.estimated_universe) analogs = [s4.estimated_universe];
+  if (!analogs.length) return '';
+  return `<div class="pdf-analog-grid">${analogs.map((item, idx) => `<div class="pdf-analog-card"><div class="analog-name">${esc(cleanAccountName(item, idx))}</div><div class="line">${esc(safe(s4.filter_criteria) || 'Derived from the sourcing model')}</div><div class="pdf-fit-bar"><div class="fill" style="width:${Math.min(90, 40 + idx * 18)}%;"></div></div></div>`).join('')}</div>`;
+}
+
+function renderPdfKeywordCloud(s5) {
+  const cloud = [...(Array.isArray(s5.primary_keywords) ? s5.primary_keywords : []), ...(Array.isArray(s5.secondary_keywords) ? s5.secondary_keywords : []), ...(Array.isArray(s5.intent_signals) ? s5.intent_signals : [])].filter(Boolean).slice(0,20);
+  if (!cloud.length) return '<div class="pdf-cloud"><span class="pdf-chip">No keyword cloud available</span></div>';
+  return `<div class="pdf-cloud">${cloud.map(term => `<span class="pdf-chip">${esc(term)}</span>`).join('')}</div>`;
+}
+
+function renderPdfIntentFunnel(s5) {
+  const primary  = Array.isArray(s5.primary_keywords)   ? s5.primary_keywords.slice(0,4)   : [];
+  const secondary= Array.isArray(s5.secondary_keywords) ? s5.secondary_keywords.slice(0,4) : [];
+  const intent   = Array.isArray(s5.intent_signals)      ? s5.intent_signals.slice(0,4)      : [];
+  const steps = [
+    {label:'Problem-aware', title:'Problem-aware', items:primary},
+    {label:'Solution-aware', title:'Solution-aware', items:secondary},
+    {label:'High-intent', title:'High-intent', items:intent},
+  ];
+  return `<div class="pdf-funnel">${steps.map(step => `<div class="pdf-funnel-step"><div class="label">${esc(step.label)}</div><div class="title">${esc(step.title)}</div>${step.items.length ? step.items.map(item => `<span class="pdf-chip">${esc(item)}</span>`).join('') : `<div class="line" style="color:var(--muted);font-size:11px;">No signals available</div>`}</div>`).join('')}</div>`;
+}
+
+function renderPdfQueryCard(label, value) {
+  if (!value) return '';
+  return `<div class="pdf-command-card"><div class="label">${esc(label)}</div><div>${esc(safe(value))}</div></div>`;
+}
+
+function scoreToPercent(score) {
+  const n = parseInt(score, 10);
+  if (Number.isNaN(n)) return 0;
+  return Math.max(0, Math.min(100, n));
+}
+
 // ── Step 7 Decision Engine ────────────────────────────────────────
 function renderDecisionEngine(r, s1, s2, s3) {
   // 1. Prioritize real Step 7 enterprise data
@@ -897,6 +1145,11 @@ function renderReport(r) {
           <span class="cover-badge" style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.12);color:var(--text)">Confidential</span>
         </div>
         <div class="cover-detail">Boardroom-ready GTM insight designed for enterprise strategy reviews, opportunity qualification, and executive decision-making.</div>
+        <div class="info-strip">
+          <div class="info-chip"><strong>Opportunity focus</strong><span>${esc(safe(s2.priority_opportunities) || 'Opportunity signal not explicit')}</span></div>
+          <div class="info-chip"><strong>Risk focus</strong><span>${esc(safe(s1.market_risks) || s1.threats || 'Review competitive inertia')}</span></div>
+          <div class="info-chip"><strong>Primary signal</strong><span>${esc(safe(s1.demand_signals) || s1.timing_signals || 'Demand and timing signals')}</span></div>
+        </div>
       </div>
       <div class="cover-kpis">
         <div class="cover-card"><div class="cc-label">Total Addressable Market</div><div class="cc-value">${esc(safe(s2.tam_size_estimate) || '—')}</div><div class="cc-note">Market size signal</div></div>
@@ -924,11 +1177,19 @@ function renderReport(r) {
     `<div class="section">
       <div class="sec-header"><div class="sec-num">TL</div><div class="sec-title">Truth Layer / Evidence Status</div></div>
       <div class="sec-context">Provenance metadata from the GTM step outputs. Displays whether the report is backed by verified profile data or AI estimate fallback.</div>
+      <div class="info-strip">
+        <div class="info-chip"><strong>Evidence confidence</strong><span>${esc(s7.confidence_score || s1.gtm_relevance_score || 'N/A')} / 100</span></div>
+        <div class="info-chip"><strong>Profile source</strong><span>${esc(s7._profile_source || s1._profile_source || s2._profile_source || 'Verified / AI estimate')}</span></div>
+        <div class="info-chip"><strong>Missing evidence</strong><span>${esc(s7._missing_evidence || s1._missing_evidence || s2._missing_evidence || 'None flagged')}</span></div>
+      </div>
       ${renderTruthLayer(r)}
+      ${field('Recommended Action', s7.recommended_action || s1.recommended_action || s2.recommended_action)}
     </div>`,
 
     // Step 1 — Market Research
     sectionWrap('01', 'Market Research', 'Market pulse & positioning', 'Deconstructs positioning and isolates macro triggers. Identifies why a prospect would buy right now.', [
+      renderMarketTrend(s1),
+      renderOpportunityRiskSplit(s1),
       renderSWOT(s1),
       field('Market Position', s1.market_position),
       field('GTM Relevance Reasoning', s1.gtm_relevance_reasoning),
@@ -997,6 +1258,7 @@ function renderReport(r) {
 
     // Step 5 — Keywords
     sectionWrap('05', 'Keywords & Intent', 'Semantic funnel taxonomy', 'Maps the semantic footprint of the prospect before they issue an RFP.', [
+      renderKeywordTaxonomy(s5),
       renderKeywordIntent(s5),
       field('Boolean Search Query', s5.boolean_query),
       field('LinkedIn Search String', s5.linkedin_search_strings),
@@ -1232,32 +1494,43 @@ function buildPdfCoverPage(r) {
 
   const page = createPdfPage();
   page.innerHTML = `
-    <div style="display:flex;justify-content:space-between;gap:24px;align-items:flex-start;min-height:180px;">
-      <div style="max-width:420px;">
-        <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;">
-          <div style="width:52px;height:52px;border-radius:16px;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-size:16px;font-weight:900;color:white;">ABE</div>
-          <div>
-            <div style="font-size:10px;text-transform:uppercase;letter-spacing:.24em;color:var(--accent);font-weight:700;">ABE</div>
-            <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.22em;">Enterprise AI Revenue Infrastructure</div>
+    <section class="pdf-cover-hero">
+      <div class="pdf-cover-hero-inner">
+        <div>
+          <div class="pdf-cover-hero-head">
+            <div style="width:54px;height:54px;border-radius:18px;background:linear-gradient(135deg,var(--accent2),var(--accent));display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-size:16px;font-weight:900;color:white;">ABE</div>
+            <div>
+              <div style="font-size:10px;text-transform:uppercase;letter-spacing:.24em;color:var(--accent);font-weight:700;margin-bottom:4px;">ABE</div>
+              <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.22em;">Enterprise AI Revenue Infrastructure</div>
+            </div>
+          </div>
+          <div style="font-size:34px;font-weight:900;line-height:1.05;color:white;margin-bottom:12px;">GTM Intelligence Report</div>
+          <div style="font-size:22px;font-weight:900;color:white;margin-bottom:10px;">${esc(r.company_name || 'Unknown Company')}</div>
+          <div class="pdf-cover-intro">Boardroom-ready GTM insight designed for enterprise strategy reviews, opportunity qualification, and executive decision-making.</div>
+          <div class="pdf-cover-badges">
+            <span class="pdf-cover-pill accent">${demoMode ? 'DEMO MODE' : 'LIVE MODE'}</span>
+            <span class="pdf-cover-pill">Confidential</span>
+            <span class="pdf-cover-pill">Page 1 of 11</span>
           </div>
         </div>
-        <div style="font-size:36px;font-weight:900;line-height:1.05;color:white;margin-bottom:16px;">GTM Intelligence Report</div>
-        <div style="font-size:24px;font-weight:900;color:white;margin-bottom:10px;">${esc(r.company_name || 'Unknown Company')}</div>
-        <div style="font-size:11px;color:var(--muted);line-height:1.7;max-width:420px;">Generated ${new Date(r.updated_at || r.created_at).toLocaleDateString('en-GB',{year:'numeric',month:'long',day:'numeric'})}</div>
-        <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:18px;">
-          <div class="cover-badge ${demoMode ? 'demo' : 'live'}" style="font-size:9px;padding:8px 12px;">${demoMode ? 'DEMO MODE' : 'LIVE MODE'}</div>
-          <div class="cover-badge" style="font-size:9px;padding:8px 12px;background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.12);color:var(--text);">Confidential</div>
+        <div>
+          <div class="pdf-cover-grid">
+            ${pdfStatCard('GTM Score', score ? String(score) : '—', 'Strategy fit score')}
+            ${pdfStatCard('TAM Size', tam, 'Market opportunity')}
+            ${pdfStatCard('CAGR', cagr, 'Growth signal')}
+            ${pdfStatCard('Verdict', verdict, 'Go / Watch / No-Go')}
+          </div>
+          <div style="margin-top:18px;display:flex;gap:12px;flex-wrap:wrap;">
+            <div class="pdf-cover-pill">${esc(r.industry || 'Industry not specified')}</div>
+            <div class="pdf-cover-pill">${esc(r.step_2_tam?.priority_opportunities || 'Priority opportunity not explicit')}</div>
+          </div>
         </div>
       </div>
-      <div style="display:grid;grid-template-columns:repeat(2,minmax(140px,1fr));gap:14px;flex:1;">
-        ${pdfStatCard('GTM Score', score ? String(score) : '—', 'Strategy fit score')}
-        ${pdfStatCard('TAM Size', tam, 'Market opportunity')}
-        ${pdfStatCard('CAGR', cagr, 'Growth signal')}
-        ${pdfStatCard('Verdict', verdict, 'Go / Watch / No-Go')}
-        ${pdfStatCard('Steps Complete', steps, 'Report completion')}
+      <div class="pdf-opportunity-risk">
+        <div class="pdf-opportunity-card"><div class="title">Executive positioning</div><div class="text">${esc(safe(r.step_1_market?.gtm_relevance_reasoning) || 'Focus the first review on priority account entry criteria and executive alignment.')}</div></div>
+        <div class="pdf-opportunity-card"><div class="title">Strategic highlight</div><div class="text">${esc(safe(r.step_2_tam?.priority_opportunities) || safe(r.step_1_market?.market_risks) || 'Opportunity path and risk exposure defined by available enterprise signals.')}</div></div>
       </div>
-    </div>
-    <div class="analyst-callout" style="margin-top:24px;font-size:11px;line-height:1.6;">Boardroom-ready GTM insight built from the same report data already loaded in the platform. This export does not use a backend PDF template.</div>
+    </section>
   `;
   return page;
 }
@@ -1267,24 +1540,33 @@ function buildPdfTruthPage(r) {
   const s2 = r.step_2_tam || {};
   const s7 = r.step_7_intelligence || {};
   const demoMode = isDemoReport(r);
+  const confidence = scoreToPercent(s7.confidence_score || s1.gtm_relevance_score || 0);
   const page = createPdfPage();
-  const execHtml = renderExecSummary(r, s1, s2) || `<div class="field"><div class="fl">Executive Brief</div><div class="fv">Executive summary not available from the current report data.</div></div>`;
+  const execHtml = renderExecSummary(r, s1, s2) || `<div class="pdf-priority-card"><div class="title">Executive Brief</div><div class="text">Executive summary not available from the current report data.</div></div>`;
   const recommended = safe(s7.recommended_action || s1.recommended_action || s2.recommended_action || 'Recommend quick validation with the leadership team and next-step alignment workshop.');
   page.innerHTML = `
     <div class="section" style="margin-bottom:20px;">
       <div class="sec-header"><div class="sec-num">02</div><div><div class="sec-title">Truth Layer & Executive Summary</div><div class="sec-subtitle">Evidence status, profile source, and summary guidance.</div></div></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:18px;">
-        <div style="display:flex;flex-direction:column;gap:14px;">
+      <div class="pdf-dashboard">
+        <div class="pdf-panel">
+          <div class="pdf-panel-header"><div class="pdf-panel-title">Truth Layer</div><div class="pdf-panel-copy">Evidence provenance and source confidence.</div></div>
           ${renderTruthLayer(r)}
-          <div class="field"><div class="fl">Recommended Action</div><div class="fv">${esc(recommended)}</div></div>
+          <div class="pdf-opportunity-risk">
+            <div class="pdf-opportunity-card"><div class="title">Risk signal</div><div class="text">${esc(safe(s1.market_risks) || 'No explicit risk flagged from the current market inputs.')}</div></div>
+            <div class="pdf-opportunity-card"><div class="title">Opportunity signal</div><div class="text">${esc(safe(s2.priority_opportunities) || 'Opportunity definition is pending explicit signal extraction.')}</div></div>
+          </div>
         </div>
-        <div style="display:flex;flex-direction:column;gap:14px;">
+        <div class="pdf-panel">
+          <div class="pdf-panel-header"><div class="pdf-panel-title">Executive dashboard</div><div class="pdf-panel-copy">Strategic summary, recommendation and confidence.</div></div>
           ${execHtml}
-          <div class="field"><div class="fl">Confidence Basis</div><div class="fv">${esc(s7.confidence_basis || s7._confidence_basis || s1.gtm_relevance_reasoning || 'Derived from the report signal quality and source provenance.')}</div></div>
-          <div class="field"><div class="fl">Confidence Score</div><div class="confidence-bar-wrap"><div class="confidence-bar" style="width:${parseInt(s7.confidence_score) || (r.step_1_market?.gtm_relevance_score||0)}%"></div></div></div>
+          <div class="pdf-score-band"><div class="label">Confidence score</div><div class="bar-wrap"><div class="bar-fill" style="width:${confidence}%"></div></div></div>
+          <div class="pdf-opportunity-risk">
+            <div class="pdf-opportunity-card"><div class="title">Recommendation</div><div class="text">${esc(recommended)}</div></div>
+            <div class="pdf-opportunity-card"><div class="title">Confidence basis</div><div class="text">${esc(s7.confidence_basis || s7._confidence_basis || s1.gtm_relevance_reasoning || 'Derived from signal quality and source provenance.')}</div></div>
+          </div>
         </div>
       </div>
-      ${demoMode ? `<div class="analyst-callout amber" style="margin-top:18px;">DEMO REPORT — No live data was used. Validate before decision-making.</div>` : ''}
+      ${demoMode ? `<div class="pdf-warning-banner">DEMO REPORT — No live data was used. Validate before decision-making.</div>` : ''}
     </div>
   `;
   return page;
@@ -1296,12 +1578,17 @@ function buildPdfMarketPage(r) {
   page.innerHTML = `
     <div class="section">
       <div class="sec-header"><div class="sec-num">03</div><div><div class="sec-title">Market Research</div><div class="sec-subtitle">Market pulse, positioning, and demand timing.</div></div></div>
-      ${field('Company Overview', s1.company_overview)}
-      ${field('Market Position', s1.market_position)}
-      ${field('Demand Signals', s1.demand_signals)}
-      ${field('Timing Signals', s1.timing_signals)}
-      ${field('Growth Indicators', s1.growth_signals)}
-      ${renderSWOT(s1)}
+      <div class="pdf-market-strip">
+        <div class="metric"><span>Market movement</span><strong>${esc(safe(s1.market_movement || s1.market_trend || s1.timing_signals || 'Signal unavailable'))}</strong></div>
+        <div class="metric"><span>Demand signal</span><strong>${esc(safe(s1.demand_signals || 'Not explicit'))}</strong></div>
+        <div class="metric"><span>Positioning</span><strong>${esc(safe(s1.market_position || 'Positioning not explicit'))}</strong></div>
+      </div>
+      <div class="pdf-dashboard" style="margin-top:18px;">
+        <div class="pdf-panel"><div class="pdf-panel-title">Market narrative</div><div class="pdf-panel-copy">${esc(safe(s1.company_overview || 'No company overview available.'))}</div></div>
+        <div class="pdf-panel"><div class="pdf-panel-title">Timing signal</div><div class="pdf-panel-copy">${esc(safe(s1.timing_signals || s1.growth_signals || 'No timing indicator extracted.'))}</div></div>
+      </div>
+      ${renderPdfSwotMatrix(s1)}
+      ${renderOpportunityRiskSplit(s1)}
       ${callout(s1.analyst_insight)}
     </div>
   `;
@@ -1310,26 +1597,23 @@ function buildPdfMarketPage(r) {
 
 function buildPdfTamPage(r) {
   const s2 = r.step_2_tam || {};
-  const scoreCards = [
-    {label:'TAM', value:safe(s2.tam_size_estimate)},
-    {label:'SAM', value:safe(s2.sam_estimate) || s2.sam || '—'},
-    {label:'SOM', value:safe(s2.som_estimate) || '—'},
-    {label:'CAGR', value:safe(s2.growth_rate) || '—'},
-    {label:'Demand Score', value:safe(s2.demand_score) || '—'},
-    {label:'Timing Score', value:safe(s2.timing_score) || '—'},
-    {label:'ICP Fit', value:safe(s2.icp_fit_score) || '—'},
-    {label:'Data Completeness', value:safe(s2.data_completeness_score) || '—'},
-    {label:'Total Score', value:safe(s2.total_score) || '—'},
-  ];
-  const cardsHtml = scoreCards.map(card => `<div class="metric-box" style="padding:16px;"><div class="ml">${esc(card.label)}</div><div class="mv" style="font-size:24px;">${esc(card.value)}</div></div>`).join('');
+  const tam = safe(s2.tam_size_estimate) || '—';
+  const sam = safe(s2.sam_estimate) || s2.sam || '—';
+  const som = safe(s2.som_estimate) || '—';
+  const cagr = safe(s2.growth_rate) || '—';
   const page = createPdfPage();
   page.innerHTML = `
     <div class="section">
       <div class="sec-header"><div class="sec-num">04</div><div><div class="sec-title">TAM / Market Attractiveness</div><div class="sec-subtitle">Sizing, segmentation, and market-fit scoring.</div></div></div>
-      <div style="display:grid;grid-template-columns:repeat(3,minmax(120px,1fr));gap:12px;margin-bottom:18px;">${cardsHtml}</div>
+      <div class="pdf-tam-grid">
+        <div class="pdf-segment-card"><div class="title">TAM</div><div class="metric">${esc(tam)}</div><div class="line">Total addressable market.</div></div>
+        <div class="pdf-segment-card"><div class="title">SAM</div><div class="metric">${esc(sam)}</div><div class="line">Serviceable available market.</div></div>
+        <div class="pdf-segment-card"><div class="title">SOM</div><div class="metric">${esc(som)}</div><div class="line">Expected obtainable market.</div></div>
+        <div class="pdf-segment-card"><div class="title">CAGR</div><div class="metric">${esc(cagr)}</div><div class="line">Market growth velocity.</div></div>
+      </div>
       ${renderWaterfall(s2)}
-      ${renderSegments(s2)}
-      ${field('Scoring Rationale', s2.scoring_rationale)}
+      ${renderPdfSegmentCards(s2)}
+      ${compactRationale(s2.scoring_rationale)}
     </div>
   `;
   return page;
@@ -1341,15 +1625,37 @@ function buildPdfICPPage(r) {
   const page = createPdfPage();
   page.innerHTML = `
     <div class="section">
-      <div class="sec-header"><div class="sec-num">05</div><div><div class="sec-title">ICP Modeling</div><div class="sec-subtitle">Persona, firmographics and buying triggers.</div></div></div>
-      ${field('Primary ICP', repairICP(s3.primary_icp, 'primary', s3, industry))}
-      ${field('Secondary ICP', repairICP(s3.secondary_icp, 'secondary', s3, industry))}
-      ${field('Firmographics', s3.firmographics)}
-      ${field('Decision Makers', s3.decision_makers)}
-      ${field('Buying Triggers', s3.buying_triggers)}
-      ${field('Common Objections', s3.objections)}
-      ${renderPersonaCard(s3, industry)}
-      ${renderPainMap(s3)}
+      <div class="sec-header"><div class="sec-num">05</div><div><div class="sec-title">ICP Modeling</div><div class="sec-subtitle">Persona, buying committee and decision ecosystem.</div></div></div>
+      <div class="pdf-persona-panel">
+        <div class="pdf-persona-card">
+          <div class="pdf-persona-top">
+            <div class="pdf-avatar">👤</div>
+            <div>
+              <div class="pdf-persona-label">Primary ICP</div>
+              <div class="pdf-persona-name">${esc(repairICP(s3.primary_icp, 'primary', s3, industry))}</div>
+              <div class="pdf-panel-copy">${esc(safe(s3.firmographics || 'Firmographic summary unavailable.'))}</div>
+            </div>
+          </div>
+          <div class="pdf-chip-row">${Array.isArray(s3.buying_triggers) ? s3.buying_triggers.slice(0,5).map(t => `<span class="pdf-chip blue">${esc(t)}</span>`).join('') : `<span class="pdf-chip amber">No triggers extracted</span>`}</div>
+        </div>
+        <div class="pdf-persona-card">
+          <div class="pdf-persona-top">
+            <div class="pdf-avatar">⚙️</div>
+            <div>
+              <div class="pdf-persona-label">Secondary ICP</div>
+              <div class="pdf-persona-name">${esc(repairICP(s3.secondary_icp, 'secondary', s3, industry))}</div>
+              <div class="pdf-panel-copy">${esc(safe(s3.decision_makers ? s3.decision_makers.join(' · ') : 'Decision makers not defined.'))}</div>
+            </div>
+          </div>
+          ${renderPdfBuyingCommittee(s3)}
+          ${renderPdfObjectionChips(s3)}
+        </div>
+      </div>
+      ${renderPdfPainImpactMap(s3)}
+      <div class="pdf-opportunity-risk">
+        <div class="pdf-opportunity-card"><div class="title">Buying triggers</div><div class="text">${esc(safe(Array.isArray(s3.buying_triggers) ? s3.buying_triggers.join(' · ') : s3.buying_triggers || 'No structured triggers available.'))}</div></div>
+        <div class="pdf-opportunity-card"><div class="title">Objections</div><div class="text">${esc(safe(Array.isArray(s3.objections) ? s3.objections.join(' · ') : s3.objections || 'No objections captured.'))}</div></div>
+      </div>
     </div>
   `;
   return page;
@@ -1360,16 +1666,16 @@ function buildPdfAccountSourcingPage(r) {
   const page = createPdfPage();
   page.innerHTML = `
     <div class="section">
-      <div class="sec-header"><div class="sec-num">06</div><div><div class="sec-title">Account Sourcing</div><div class="sec-subtitle">Targeting playbook, filters, and outreach priorities.</div></div></div>
-      ${field('Target Roles', s4.target_roles)}
-      ${renderAccountPipeline(s4)}
-      ${tagRow('Recommended Databases', s4.recommended_databases, 'green')}
-      ${field('Filter Criteria', s4.filter_criteria)}
+      <div class="sec-header"><div class="sec-num">06</div><div><div class="sec-title">Account Sourcing</div><div class="sec-subtitle">Targeting pipeline, filters, and account prioritisation.</div></div></div>
+      ${renderPdfAccountPipeline(s4)}
+      <div class="pdf-persona-card" style="margin-top:18px;"><div class="pdf-persona-label">Target roles</div><div class="pdf-chip-row">${Array.isArray(s4.target_roles) && s4.target_roles.length ? s4.target_roles.slice(0,10).map(role => `<span class="pdf-chip green">${esc(role)}</span>`).join('') : '<span class="pdf-chip">No target roles defined</span>'}</div></div>
+      ${renderPdfAccountAnalogs(s4)}
+      <div class="pdf-opportunity-risk">
+        <div class="pdf-opportunity-card"><div class="title">Estimated deal size</div><div class="text">${esc(safe(s4.estimated_deal_size) || 'Deal size not provided')}</div></div>
+        <div class="pdf-opportunity-card"><div class="title">Sales approach</div><div class="text">${esc(safe(s4.sales_approach) || 'Sales approach summary unavailable')}</div></div>
+      </div>
       ${field('Exclusion Criteria', s4.exclusion_criteria, 'red')}
-      ${field('Outreach Priority', s4.estimated_universe)}
-      ${field('Estimated Deal Size', s4.estimated_deal_size)}
-      ${field('Sales Approach', s4.sales_approach)}
-      ${field('Account Analogues', s4.account_analogs)}
+      ${field('Data Enrichment Tips', s4.data_enrichment_tips)}
     </div>
   `;
   return page;
@@ -1380,13 +1686,16 @@ function buildPdfKeywordsPage(r) {
   const page = createPdfPage();
   page.innerHTML = `
     <div class="section">
-      <div class="sec-header"><div class="sec-num">07</div><div><div class="sec-title">Keywords & Intent</div><div class="sec-subtitle">Search taxonomy and demand signal capture.</div></div></div>
-      ${renderKeywordIntent(s5)}
-      ${field('Boolean Query', s5.boolean_query)}
-      ${field('LinkedIn Query', s5.linkedin_search_strings)}
-      ${tagRow('Keyword Clusters', s5.keyword_clusters)}
-      ${tagRow('Content Topics', s5.content_topics, 'blue')}
-      ${field('Intent Signals', s5.intent_signals)}
+      <div class="sec-header"><div class="sec-num">07</div><div><div class="sec-title">Keywords & Intent</div><div class="sec-subtitle">Semantic funnel taxonomy and search readiness.</div></div></div>
+      ${renderPdfKeywordCloud(s5)}
+      ${renderPdfIntentFunnel(s5)}
+      <div class="pdf-opportunity-risk">
+        <div class="pdf-opportunity-card"><div class="title">Priority signal</div><div class="text">${esc(safe(Array.isArray(s5.intent_signals) ? s5.intent_signals.slice(0,2).join(' · ') : s5.intent_signals || 'No high-intent signals captured'))}</div></div>
+        <div class="pdf-opportunity-card"><div class="title">Search readiness</div><div class="text">${esc(s5.boolean_query ? 'Boolean search ready' : 'Boolean query not available')}</div></div>
+      </div>
+      ${renderPdfQueryCard('Boolean Query', s5.boolean_query)}
+      ${renderPdfQueryCard('LinkedIn Search String', s5.linkedin_search_strings)}
+      <div class="pdf-panel" style="margin-top:16px;"><div class="pdf-panel-title">Content topics</div><div class="pdf-chip-row">${Array.isArray(s5.content_topics) && s5.content_topics.length ? s5.content_topics.slice(0,12).map(topic => `<span class="pdf-chip">${esc(topic)}</span>`).join('') : '<span class="pdf-chip">No content topics available</span>'}</div></div>
     </div>
   `;
   return page;
@@ -1397,11 +1706,12 @@ function buildPdfOutboundPage(r) {
   const page = createPdfPage();
   page.innerHTML = `
     <div class="section">
-      <div class="sec-header"><div class="sec-num">08</div><div><div class="sec-title">SDR / Outreach Sequence</div><div class="sec-subtitle">Email and LinkedIn cadence for engagement.</div></div></div>
+      <div class="sec-header"><div class="sec-num">08</div><div><div class="sec-title">SDR / Outreach Sequence</div><div class="sec-subtitle">Engagement timeline for high-conversion outreach.</div></div></div>
       ${renderSDRTimeline(s6)}
-      ${field('Follow-up Sequence', s6.follow_up_sequence)}
-      ${field('LinkedIn Message', s6.linkedin_message)}
-      ${field('LinkedIn Follow-up', s6.linkedin_follow_up)}
+      <div class="pdf-opportunity-risk">
+        <div class="pdf-opportunity-card"><div class="title">Primary channel</div><div class="text">${esc(s6.email_1?.angle || s6.linkedin_message ? 'Email / LinkedIn mix' : 'Channel not defined')}</div></div>
+        <div class="pdf-opportunity-card"><div class="title">Cadence focus</div><div class="text">${esc(s6.follow_up_sequence || 'Follow-up sequence detail not provided')}</div></div>
+      </div>
     </div>
   `;
   return page;
@@ -1412,33 +1722,39 @@ function buildPdfDecisionPage(r) {
   const s2 = r.step_2_tam || {};
   const s3 = r.step_3_icp || {};
   const s7 = r.step_7_intelligence || {};
-  const score = parseInt(s7.confidence_score) || s1.gtm_relevance_score || 0;
+  const score = scoreToPercent(s7.confidence_score || s1.gtm_relevance_score || 0);
   const verdict = (s7.go_no_go?.recommendation || (score >= 75 ? 'Go' : score >= 50 ? 'Watch' : 'No-Go') || 'Watch').toUpperCase();
-  const verdictClass = verdict === 'GO' ? 'decision-go' : verdict === 'NO-GO' ? 'decision-nogo' : 'decision-watch';
-  const buyingSignals = Array.isArray(s7.signal_summary) ? s7.signal_summary.slice(0,3).map(sig => `<li><strong style="color:${sig.strength === 'High' ? 'var(--green)' : sig.strength === 'Medium' ? 'var(--amber)' : 'var(--blue)'};text-transform:uppercase;font-size:10px;margin-right:6px">[${esc(sig.signal_type || 'SIGNAL')}]</strong>${esc(sig.signal_description || '')}</li>`).join('') : '';
   const mcc = s7.mcc_view || {};
   const page = createPdfPage();
   page.innerHTML = `
     <div class="section">
-      <div class="sec-header"><div class="sec-num">09</div><div><div class="sec-title">Revenue Intelligence / Decision Engine</div><div class="sec-subtitle">Go / Watch / No-Go verdict and execution guidance.</div></div></div>
-      <div class="decision-badge" style="margin-bottom:18px;padding:18px;">
-        <div class="verdict ${verdictClass}" style="font-size:32px;">${verdict}</div>
-        <div class="reason" style="font-size:12px;color:var(--text);margin-top:12px;">${esc(s7.go_no_go?.reason || s7.recommendation_reason || 'Balanced decision logic based on the available signals and market readiness.')}</div>
+      <div class="sec-header"><div class="sec-num">09</div><div><div class="sec-title">Revenue Intelligence / Decision Engine</div><div class="sec-subtitle">C-suite verdict, confidence cockpit and execution priorities.</div></div></div>
+      <div class="pdf-decision-grid">
+        <div class="pdf-verdict-panel">
+          <div class="title">Decision cockpit</div>
+          <div class="score">${esc(verdict)}</div>
+          <div class="reason">${esc(s7.go_no_go?.reason || s7.recommendation_reason || 'Balanced decision logic based on available signals and market readiness.')}</div>
+          <div class="pdf-meter"><div class="pdf-meter-fill" style="width:${score}%"></div><span class="pdf-gauge-label">${score}% confidence</span></div>
+          <div class="pdf-priority-card"><div class="title">Execution priority</div><div class="text">${esc(s7.execution_priority || s7.persona_priority?.reason || 'Priority guidance not yet formalised.')}</div></div>
+        </div>
+        <div>
+          <div class="pdf-mcc-grid">
+            ${['market','client','competitor'].map(label => `<div class="pdf-mcc-card"><div class="label">${label.toUpperCase()}</div><div class="value">${esc(mcc[label] || `No ${label} insight available.`)}</div></div>`).join('')}
+          </div>
+          <div class="pdf-risk-strip">
+            <span class="pdf-risk-pill red">${esc(s7.risk_summary || 'Incumbent inertia risk')}</span>
+            <span class="pdf-risk-pill amber">${esc(s7.constraint_summary || 'Approval cycle risk')}</span>
+            <span class="pdf-risk-pill green">${esc(s7.signal_strength || 'Signal alignment to ICP')}</span>
+          </div>
+        </div>
       </div>
-      ${field('Executive Brief', s7.executive_brief)}
-      ${field('Why Now', s7.why_now_analysis)}
-      ${field('Strategic Hook', s7.strategic_hook)}
-      ${buyingSignals ? `<div class="field"><div class="fl">Buying Signals</div><ul class="risk-list" style="background:rgba(59,130,246,.05);border-left-color:var(--blue);margin-top:6px;">${buyingSignals}</ul></div>` : ''}
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;">${['Market','Client','Competitor'].map(label => `<div style="background:rgba(0,0,0,.3);border:1px solid rgba(148,163,184,.2);border-radius:12px;padding:14px;"><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;margin-bottom:8px">${label}</div><div style="font-size:11px;color:var(--text);line-height:1.6">${esc(mcc[label.toLowerCase()] || `No ${label.toLowerCase()} insight available.`)}</div></div>`).join('')}</div>
-      ${field('Execution Priority', s7.execution_priority || s7.persona_priority?.reason)}
-      <div class="field"><div class="fl">Confidence Score</div><div class="fv"><strong>${score}/100</strong></div></div>
     </div>
   `;
   return page;
 }
 
 function buildPdfConfidenceMatrixPage(r) {
-  const score = parseInt(r.step_7_intelligence?.confidence_score) || parseInt(r.step_1_market?.gtm_relevance_score) || 0;
+  const score = scoreToPercent(r.step_7_intelligence?.confidence_score || r.step_1_market?.gtm_relevance_score || 0);
   const v = Math.round(score * 0.4);
   const t = Math.round(score * 0.25);
   const f = Math.round(score * 0.2);
@@ -1447,15 +1763,11 @@ function buildPdfConfidenceMatrixPage(r) {
   page.innerHTML = `
     <div class="section">
       <div class="sec-header"><div class="sec-num">10</div><div><div class="sec-title">Weighted Confidence Matrix</div><div class="sec-subtitle">Signal veracity, timing, persona fit and data completeness.</div></div></div>
-      <div class="field"><div class="fl">Overall Fidelity</div><div class="fv">${score}/100</div></div>
-      <table class="cm-table"><thead><tr><th>Dimension</th><th style="text-align:right">Score</th><th>Description</th></tr></thead><tbody>
-        <tr><td>Signal Veracity (40%)</td><td class="num">${v}/40</td><td>Buying signal reliability</td></tr>
-        <tr><td>Market Timing (25%)</td><td class="num">${t}/25</td><td>Opportunity window alignment</td></tr>
-        <tr><td>ICP Fit (20%)</td><td class="num">${f}/20</td><td>Target persona match</td></tr>
-        <tr><td>Data Completeness (15%)</td><td class="num">${c}/15</td><td>Source quality and depth</td></tr>
-      </tbody></table>
-      <div class="confidence-bar-wrap"><div class="confidence-bar" style="width:${score}%"></div></div>
-      ${field('Interpretation Note', r.step_7_intelligence?.matrix_note || 'A higher score indicates stronger evidence alignment and execution readiness.')}
+      <div class="pdf-scorebar-row">
+        ${[{label:'Signal Veracity (40%)',value:v,max:40},{label:'Market Timing (25%)',value:t,max:25},{label:'ICP Fit (20%)',value:f,max:20},{label:'Data Completeness (15%)',value:c,max:15}].map(item => `<div class="pdf-scorebar"><div><div class="pdf-scorebar-label">${esc(item.label)}</div><div class="pdf-scorebar-track"><div class="pdf-scorebar-fill" style="width:${item.max ? Math.round(item.value / item.max * 100) : 0}%"></div></div></div><div class="pdf-scorebar-value">${esc(item.value + '/' + item.max)}</div></div>`).join('')}
+      </div>
+      <div class="pdf-gauge"><div class="pdf-gauge-fill" style="width:${score}%"></div><span class="pdf-gauge-label">Overall fidelity ${score}%</span></div>
+      <div class="pdf-priority-card"><div class="title">Interpretation</div><div class="text">${esc(r.step_7_intelligence?.matrix_note || 'A higher score indicates stronger evidence alignment and execution readiness.')}</div></div>
     </div>
   `;
   return page;
@@ -1473,10 +1785,16 @@ function buildPdfAppendixPage(r) {
   page.innerHTML = `
     <div class="section">
       <div class="sec-header"><div class="sec-num">11</div><div><div class="sec-title">Appendix / Methodology</div><div class="sec-subtitle">Source notes, assumptions and AI estimate disclaimers.</div></div></div>
-      ${field('Data Sources', r.data_sources || r.step_7_intelligence?.data_sources || 'Company website, public filings, analyst estimates and enterprise signal feeds.')}
-      ${field('Assumptions', r.assumptions || 'Historical growth trends, available market benchmarks and inferred buyer intent were used.')}
-      <div class="analyst-callout amber">⚠️ AI-Estimated Content: TAM/SAM/SOM, ICP derivations, account analogs, and messaging sequences are AI-derived and should be validated with customer evidence before operational use.</div>
-      <div class="field"><div class="fl">Report Metadata</div><div class="fv">${esc(metadata)}</div></div>
+      <div class="pdf-appendix-grid">
+        <div class="pdf-appendix-card"><div class="title">Methodology</div><div class="text">${esc(r.methodology || r.data_sources || 'Analysis combines company signals, market benchmarks, and AI-extracted GTM evidence.')}</div></div>
+        <div class="pdf-appendix-card"><div class="title">Assumptions</div><div class="text">${esc(r.assumptions || 'Historical growth trends, available benchmarks and inferred buyer intent were used.')}</div></div>
+      </div>
+      <div class="pdf-appendix-grid" style="margin-top:14px;">
+        <div class="pdf-appendix-card"><div class="title">Source Quality</div><div class="text">${esc(r.step_7_intelligence?.data_sources || 'Company website, public filings, analyst estimates and inferred signal sources.')}</div></div>
+        <div class="pdf-appendix-card"><div class="title">Assumptions Matrix</div><div class="text">${esc(r.assumption_matrix || 'Geography, service fit, win rate and addressable universe are modeled from the available inputs.')}</div></div>
+      </div>
+      <div class="pdf-warning-banner">⚠️ AI-Estimated Content: TAM/SAM/SOM, ICP derivations, account analogs, and messaging sequences are AI-derived and should be validated with customer evidence before operational use.</div>
+      <div class="pdf-appendix-card"><div class="title">Report Metadata</div><div class="text">${esc(metadata)}</div></div>
     </div>
   `;
   return page;
