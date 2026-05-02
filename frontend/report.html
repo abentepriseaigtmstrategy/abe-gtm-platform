@@ -1139,6 +1139,13 @@ function sanitizeFilename(value) {
     .slice(0, 120) || 'GTM_Report';
 }
 
+const PAGE_WIDTH = 794;
+const PAGE_HEIGHT = 1123;
+const PAGE_PADDING_TOP = 32;
+const PAGE_PADDING_BOTTOM = 32;
+const BLOCK_GAP = 18;
+const PAGE_BODY_HEIGHT = PAGE_HEIGHT - PAGE_PADDING_TOP - PAGE_PADDING_BOTTOM;
+
 async function exportCurrentReportAsPDF() {
   const source = document.getElementById('report-content');
   if (!source) throw new Error('Report content is not available.');
@@ -1186,11 +1193,16 @@ async function exportCurrentReportAsPDF() {
   sandbox.appendChild(exportRoot);
   document.body.appendChild(sandbox);
 
+  const measurementContainer = sandbox._measurement;
+  if (!measurementContainer) {
+    throw new Error('PDF export failed: measurement container is not available.');
+  }
+
   try {
     await waitForRenderStability(exportRoot);
-    const pages = paginateReportClone(exportRoot);
+    const pages = paginateReportClone(exportRoot, measurementContainer);
     console.log('[PDF] pages created:', pages.length);
-    if (pages.length <= 1 && reportBlocks.length > 3) {
+    if (pages.length <= 1 && reportBlocks.length >= 8) {
       throw new Error('PDF pagination failed: only one page created for multi-section report.');
     }
     await capturePagesToPdf(pages, filename);
@@ -1202,7 +1214,7 @@ async function exportCurrentReportAsPDF() {
 function createPdfSandbox() {
   const sandbox = document.createElement('div');
   sandbox.id = 'pdf-export-sandbox';
-  sandbox.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;min-height:1123px;background:#0B0F1A;opacity:1;pointer-events:none;z-index:1000000;overflow:hidden;';
+  sandbox.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;min-height:1123px;background:#0B0F1A;opacity:1;pointer-events:none;z-index:1000000;overflow:visible;';
 
   const styleContainer = document.createElement('div');
   const styleLoadPromises = [];
@@ -1252,6 +1264,13 @@ function createPdfSandbox() {
   `;
   styleContainer.appendChild(resetStyle);
   sandbox.appendChild(styleContainer);
+
+  const measurementContainer = document.createElement('div');
+  measurementContainer.id = 'pdf-export-measurement';
+  measurementContainer.style.cssText = 'width:794px;position:absolute;left:-9999px;top:0;visibility:visible;opacity:1;pointer-events:none;background:#0B0F1A;box-sizing:border-box;';
+  sandbox._measurement = measurementContainer;
+  sandbox.appendChild(measurementContainer);
+
   return sandbox;
 }
 
@@ -1268,6 +1287,67 @@ function collectReportBlocks(root) {
     }
   });
   return blocks;
+}
+
+function measureBlockHeight(block, measurementContainer) {
+  const temp = block.cloneNode(true);
+  temp.style.cssText = 'width:100%;box-sizing:border-box;margin:0;padding:0;display:block;position:relative;visibility:visible;opacity:1;';
+  measurementContainer.appendChild(temp);
+  const height = temp.getBoundingClientRect().height || temp.offsetHeight || temp.scrollHeight || 0;
+  measurementContainer.removeChild(temp);
+  return height;
+}
+
+function splitOversizedBlock(block, measurementContainer, pages, createPage) {
+  const sectionHeader = block.querySelector('.sec-header');
+  const sectionContext = block.querySelector('.sec-context');
+  const contentChildren = Array.from(block.children).filter(child => child !== sectionHeader && child !== sectionContext);
+  if (!contentChildren.length) return null;
+
+  const createChunk = () => {
+    const chunk = block.cloneNode(false);
+    if (sectionHeader) chunk.appendChild(sectionHeader.cloneNode(true));
+    if (sectionContext) chunk.appendChild(sectionContext.cloneNode(true));
+    return chunk;
+  };
+
+  const chunks = [];
+  let currentChunk = createChunk();
+
+  for (const child of contentChildren) {
+    const childClone = child.cloneNode(true);
+    currentChunk.appendChild(childClone);
+    const chunkHeight = measureBlockHeight(currentChunk, measurementContainer);
+    if (chunkHeight + BLOCK_GAP > PAGE_BODY_HEIGHT) {
+      currentChunk.removeChild(childClone);
+      if (currentChunk.children.length <= (sectionHeader ? 1 : 0) + (sectionContext ? 1 : 0)) {
+        return null;
+      }
+      chunks.push(currentChunk);
+      currentChunk = createChunk();
+      currentChunk.appendChild(childClone);
+      const nextHeight = measureBlockHeight(currentChunk, measurementContainer);
+      if (nextHeight + BLOCK_GAP > PAGE_BODY_HEIGHT) {
+        return null;
+      }
+    }
+  }
+  chunks.push(currentChunk);
+
+  let page = createPage();
+  pages.push(page);
+  let usedHeight = PAGE_PADDING_TOP;
+  chunks.forEach((chunk, index) => {
+    page.appendChild(chunk);
+    const chunkHeight = measureBlockHeight(chunk, measurementContainer);
+    usedHeight = PAGE_PADDING_TOP + chunkHeight + BLOCK_GAP;
+    if (index < chunks.length - 1) {
+      page = createPage();
+      pages.push(page);
+    }
+  });
+
+  return { currentPage: page, usedHeight };
 }
 
 function blockNameForExportBlock(block) {
@@ -1289,13 +1369,12 @@ function isElementVisible(el) {
   return style.display !== 'none' && style.visibility !== 'hidden' && style.opacity !== '0';
 }
 
-function paginateReportClone(root) {
-  const pageHeight = 1123;
+function paginateReportClone(root, measurementContainer) {
   const createPage = () => {
     const page = document.createElement('div');
     page.className = 'page pdf-page';
-    page.style.width = '794px';
-    page.style.height = '1123px';
+    page.style.width = `${PAGE_WIDTH}px`;
+    page.style.height = `${PAGE_HEIGHT}px`;
     page.style.overflow = 'hidden';
     page.style.background = '#0B0F1A';
     page.style.position = 'relative';
@@ -1309,70 +1388,55 @@ function paginateReportClone(root) {
   const pages = [];
   let page = createPage();
   pages.push(page);
+  let usedHeight = PAGE_PADDING_TOP;
+  const blockHeights = [];
 
-  const appendToCurrentPage = (block) => {
-    page.appendChild(block);
-    const height = page.scrollHeight;
-    if (height <= pageHeight) return true;
-    page.removeChild(block);
-    return false;
-  };
+  blocks.forEach((block, index) => {
+    const name = blockNameForExportBlock(block);
+    const blockHeight = measureBlockHeight(block, measurementContainer);
+    blockHeights.push(blockHeight);
+    console.log('[PDF] block height', index + 1, `(${name}):`, blockHeight);
 
-  const splitOversizedBlock = (block) => {
-    if (!block.children.length) return false;
-    const sectionHeader = block.querySelector('.sec-header');
-    const sectionContext = block.querySelector('.sec-context');
-    const contentChildren = Array.from(block.children).filter(child => child !== sectionHeader && child !== sectionContext);
-    if (!contentChildren.length) return false;
+    const fitsOnCurrentPage = usedHeight + blockHeight + BLOCK_GAP <= PAGE_HEIGHT - PAGE_PADDING_BOTTOM;
+    const blockOversized = blockHeight > PAGE_BODY_HEIGHT;
 
-    let currentPage = page;
-    const createSectionChunk = () => {
-      const chunk = block.cloneNode(false);
-      if (sectionHeader) chunk.appendChild(sectionHeader.cloneNode(true));
-      if (sectionContext) chunk.appendChild(sectionContext.cloneNode(true));
-      currentPage.appendChild(chunk);
-      return chunk;
-    };
-
-    let pageBlock = createSectionChunk();
-    for (const child of contentChildren) {
-      const childClone = child.cloneNode(true);
-      pageBlock.appendChild(childClone);
-      if (currentPage.scrollHeight > pageHeight) {
-        pageBlock.removeChild(childClone);
-        currentPage.removeChild(pageBlock);
-        currentPage = createPage();
-        pages.push(currentPage);
-        pageBlock = createSectionChunk();
-        pageBlock.appendChild(childClone);
-        if (currentPage.scrollHeight > pageHeight) {
-          return false;
-        }
-      }
-      if (child !== contentChildren[contentChildren.length - 1]) {
-        pageBlock = createSectionChunk();
+    if (!fitsOnCurrentPage) {
+      if (!blockOversized) {
+        page = createPage();
+        pages.push(page);
+        usedHeight = PAGE_PADDING_TOP;
       }
     }
 
-    page = currentPage;
-    return true;
-  };
+    if (blockOversized) {
+      const splitResult = splitOversizedBlock(block, measurementContainer, pages, createPage);
+      if (splitResult) {
+        page = splitResult.currentPage;
+        usedHeight = splitResult.usedHeight;
+        return;
+      }
 
-  blocks.forEach(block => {
-    if (appendToCurrentPage(block)) return;
-    if (block.scrollHeight <= pageHeight) {
+      console.warn('[PDF] oversized block:', name, blockHeight);
       page = createPage();
       pages.push(page);
+      page.style.overflow = 'visible';
       page.appendChild(block);
+      usedHeight = PAGE_HEIGHT;
       return;
     }
-    if (splitOversizedBlock(block)) return;
-    console.warn('[PDF] oversized report block rendered on its own page:', blockNameForExportBlock(block));
-    page = createPage();
-    pages.push(page);
+
+    if (!fitsOnCurrentPage) {
+      // start a fresh page for this block
+      page = createPage();
+      pages.push(page);
+      usedHeight = PAGE_PADDING_TOP;
+    }
+
     page.appendChild(block);
+    usedHeight += blockHeight + BLOCK_GAP;
   });
 
+  console.log('[PDF] block heights:', blockHeights);
   while (pages.length > 1 && pages[pages.length - 1].children.length === 0) pages.pop();
   root.append(...pages);
   return pages;
