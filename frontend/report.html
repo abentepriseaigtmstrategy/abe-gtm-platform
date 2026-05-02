@@ -1117,68 +1117,210 @@ function showError(msg) {
 // ── PDF Export ────────────────────────────────────────────────────
 async function exportPDF() {
   const btn = document.getElementById('btn-export') || document.getElementById('btn-export2');
+  const originalText = btn?.textContent || 'Export PDF';
   if (btn) { btn.disabled = true; btn.textContent = 'Generating…'; }
   try {
-    const data = await window.APP.api('/api/export-pdf', { strategy: window._strategy });
-    if (!data.html) throw new Error(data.error || 'Export failed');
-    await renderHtmlToPdf(data.html, data.filename || 'GTM_Report.pdf');
+    await exportCurrentReportAsPDF();
   } catch (e) {
-    alert('PDF export failed: ' + e.message);
+    alert('PDF export failed: ' + (e?.message || e));
+    console.error('PDF export failed', e);
   } finally {
-    if (btn) { btn.disabled = false; btn.textContent = 'Export PDF'; }
+    if (btn) { btn.disabled = false; btn.textContent = originalText; }
   }
 }
 
-async function renderHtmlToPdf(html, filename) {
-  const iframe = document.createElement('iframe');
-  iframe.style.cssText = 'position:fixed;top:0;left:0;width:794px;height:auto;opacity:0;pointer-events:none;z-index:-9999;';
-  iframe.srcdoc = html;
-  document.body.appendChild(iframe);
-  await new Promise(resolve => { iframe.onload = resolve; setTimeout(resolve, 8000); });
-  const iDoc = iframe.contentDocument || iframe.contentWindow.document;
-  if (!iDoc) throw new Error('Failed to load PDF content');
-  iDoc.documentElement.style.backgroundColor = '#0B0F1A';
-  iDoc.body.style.backgroundColor = '#0B0F1A';
-  iDoc.body.style.margin = '0';
-  iDoc.documentElement.style.margin = '0';
-  await new Promise(r => setTimeout(r, 500));
+async function exportCurrentReportAsPDF() {
+  const source = document.getElementById('report-content');
+  if (!source) throw new Error('Report content is not available.');
+  if (source.style.display === 'none' || source.offsetParent === null) {
+    throw new Error('Report is not visible for export.');
+  }
+
+  const reportName = (window._strategy?.company_name || document.getElementById('r-company')?.textContent || 'GTM_Report').trim() || 'GTM_Report';
+  const filename = sanitizeFilename(`GTM_${reportName}_${new Date().toISOString().slice(0,10)}.pdf`);
+
+  const sandbox = createPdfSandbox();
+  const clone = source.cloneNode(true);
+  clone.style.display = 'block';
+  clone.style.width = '794px';
+  clone.style.background = '#0B0F1A';
+  clone.style.color = 'inherit';
+  clone.style.boxSizing = 'border-box';
+  clone.style.margin = '0';
+  clone.style.padding = '0';
+  unhideHiddenElements(clone);
+  await promoteLazyImages(clone);
+  sandbox.appendChild(clone);
+  document.body.appendChild(sandbox);
+
   try {
-    const pages = Array.from(iDoc.querySelectorAll('.pdf-page'));
-    const validPages = pages.filter(page => hasMeaningfulPdfPage(page));
-    if (!validPages.length) throw new Error('No valid PDF pages found');
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({ unit:'pt', format:'a4', orientation:'portrait', compress:true });
-    const A4_W = 595.28;
-    for (let pageIndex = 0; pageIndex < validPages.length; pageIndex++) {
-      const pageElement = validPages[pageIndex];
-      pageElement.style.width = '794px';
-      const canvas = await html2canvas(pageElement, {
-        scale:2,
-        useCORS:true,
-        allowTaint:true,
-        backgroundColor:'#0B0F1A',
-        logging:false,
-        width:794,
-        windowWidth:794,
-        height: pageElement.scrollHeight,
-        windowHeight: pageElement.scrollHeight,
-      });
-      const pageHeight = (canvas.height / canvas.width) * A4_W;
-      if (pageIndex > 0) pdf.addPage();
-      pdf.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, A4_W, pageHeight);
-    }
-    pdf.save(filename);
+    await waitForRenderStability(clone);
+    const pages = paginateReportClone(clone);
+    if (!pages.length) throw new Error('No PDF pages were generated from the report.');
+    await capturePagesToPdf(pages, filename);
   } finally {
-    document.body.removeChild(iframe);
+    if (sandbox.parentNode) sandbox.parentNode.removeChild(sandbox);
   }
 }
 
-function hasMeaningfulPdfPage(page) {
-  const content = page.querySelector('.page-content');
-  if (!content) return false;
-  const text = content.textContent.replace(/\s+/g, ' ').trim();
-  if (text.length > 20) return true;
-  return content.querySelector('.panel, .metric-card, .segment-card, .timeline-step, .mcc-card, .risk-item, .appendix-card') !== null;
+function sanitizeFilename(value) {
+  return String(value)
+    .replace(/[^a-zA-Z0-9._-]/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '') || 'GTM_Report.pdf';
+}
+
+function createPdfSandbox() {
+  const sandbox = document.createElement('div');
+  sandbox.id = 'pdf-export-sandbox';
+  sandbox.style.cssText = 'position:fixed;left:-9999px;top:0;width:794px;background:#0B0F1A;opacity:1;pointer-events:none;z-index:1000000;';
+
+  const styleContainer = document.createElement('div');
+  const styleLoadPromises = [];
+  Array.from(document.querySelectorAll('link[rel="stylesheet"],style')).forEach(node => {
+    if (node.tagName === 'LINK') {
+      const clone = document.createElement('link');
+      clone.rel = 'stylesheet';
+      clone.href = node.href;
+      styleLoadPromises.push(new Promise(resolve => {
+        clone.addEventListener('load', () => resolve(), { once: true });
+        clone.addEventListener('error', () => resolve(), { once: true });
+      }));
+      styleContainer.appendChild(clone);
+    } else {
+      const clone = document.createElement('style');
+      clone.textContent = node.textContent;
+      styleContainer.appendChild(clone);
+    }
+  });
+  sandbox._styleLoadPromises = styleLoadPromises;
+
+  const resetStyle = document.createElement('style');
+  resetStyle.textContent = `
+    @media print {
+      * { display:unset !important; visibility:visible !important; opacity:1 !important; }
+    }
+    html, body, #pdf-export-sandbox, .pdf-page { background:#0B0F1A !important; color:inherit !important; }
+    .pdf-page { width:794px !important; height:1123px !important; overflow:hidden !important; background:#0B0F1A !important; box-sizing:border-box !important; }
+    * { -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; }
+  `;
+  styleContainer.appendChild(resetStyle);
+  sandbox.appendChild(styleContainer);
+  return sandbox;
+}
+
+function unhideHiddenElements(root) {
+  root.querySelectorAll('[hidden], [style*="display:none"], [style*="visibility:hidden"]').forEach(el => {
+    el.hidden = false;
+    el.style.display = 'block';
+    el.style.visibility = 'visible';
+    el.style.opacity = '1';
+  });
+}
+
+async function promoteLazyImages(root) {
+  const images = Array.from(root.querySelectorAll('img'));
+  const promises = images.map(img => {
+    const srcFromData = img.dataset?.src || img.getAttribute('data-src');
+    if (srcFromData && !img.src) img.src = srcFromData;
+    if (img.complete) return Promise.resolve();
+    return new Promise(resolve => {
+      img.addEventListener('load', resolve, { once: true });
+      img.addEventListener('error', resolve, { once: true });
+    });
+  });
+  await Promise.all(promises);
+}
+
+async function waitForRenderStability(root) {
+  const waits = [];
+  if (document.fonts?.ready) waits.push(document.fonts.ready);
+  const frameFonts = Array.from(root.querySelectorAll('iframe')).map(frame => frame.contentDocument?.fonts?.ready).filter(Boolean);
+  waits.push(...frameFonts);
+  const sandbox = root.closest('#pdf-export-sandbox');
+  if (sandbox?._styleLoadPromises) waits.push(...sandbox._styleLoadPromises);
+  waits.push(promoteLazyImages(root));
+  await Promise.all(waits);
+  await new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve)));
+  await new Promise(resolve => setTimeout(resolve, 250));
+}
+
+function paginateReportClone(root) {
+  const pageHeight = 1123;
+  const pageWidth = 794;
+  const children = Array.from(root.children);
+  root.innerHTML = '';
+
+  const createPage = () => {
+    const page = document.createElement('div');
+    page.className = 'page pdf-page';
+    page.style.width = `${pageWidth}px`;
+    page.style.height = `${pageHeight}px`;
+    page.style.overflow = 'hidden';
+    page.style.background = '#0B0F1A';
+    page.style.position = 'relative';
+    page.style.padding = '0';
+    page.style.margin = '0';
+    return page;
+  };
+
+  const pages = [];
+  let page = createPage();
+  pages.push(page);
+
+  children.forEach(child => {
+    page.appendChild(child);
+    const overflow = page.scrollHeight > pageHeight;
+    if (!overflow) return;
+
+    page.removeChild(child);
+    if (child.scrollHeight > pageHeight) {
+      console.warn('PDF export: block exceeds a single A4 page height and will be placed on its own page.', child);
+      const oversizedPage = createPage();
+      oversizedPage.appendChild(child);
+      pages.push(oversizedPage);
+      page = oversizedPage;
+      return;
+    }
+
+    const nextPage = createPage();
+    nextPage.appendChild(child);
+    pages.push(nextPage);
+    page = nextPage;
+  });
+
+  if (pages.length > 1 && pages[pages.length - 1].children.length === 0) pages.pop();
+  root.append(...pages);
+  return pages;
+}
+
+async function capturePagesToPdf(pages, filename) {
+  const { jsPDF } = window.jspdf;
+  if (!jsPDF) throw new Error('jsPDF is not available for PDF generation.');
+
+  const pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait', compress: true });
+  const widthMM = 210;
+  const heightMM = 297;
+
+  for (let i = 0; i < pages.length; i++) {
+    const page = pages[i];
+    const canvas = await html2canvas(page, {
+      scale: 2,
+      backgroundColor: '#0B0F1A',
+      useCORS: true,
+      allowTaint: false,
+      logging: false,
+      width: page.offsetWidth,
+      height: page.offsetHeight,
+      windowWidth: page.offsetWidth,
+      windowHeight: page.offsetHeight,
+    });
+    const imageData = canvas.toDataURL('image/png');
+    if (i > 0) pdf.addPage();
+    pdf.addImage(imageData, 'PNG', 0, 0, widthMM, heightMM);
+  }
+
+  pdf.save(filename);
 }
 
 // ── Init (preserve existing auth guard pattern) ───────────────────
