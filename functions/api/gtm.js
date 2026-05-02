@@ -206,6 +206,32 @@ function getDemoIndustryProfile(company, industry) {
   const media = /(media|entertainment|streaming|content platform|publishing|broadcast|creative agency|gaming|music)/;
   const insurance = /(insurance|bfs|bfsi|insurer|broking|underwriting|claims|risk transfer)/;
 
+  if (/(bank of america|banking|financial services|bfsi|bfs|digital banking|retail banking|corporate banking|commercial banking|consumer banking|payment modernization|financial services firm)/.test(source)) {
+    return {
+      category: 'financial_services',
+      industryLabel: 'Banking and Financial Services',
+      primary_icp: 'Chief Digital Officer, Head of Retail Banking, or Head of Payments at banks and financial services firms',
+      secondary_icp: 'VP Risk & Compliance, Digital Banking Product Lead, or Fraud Operations Leader',
+      decision_makers: ['Chief Digital Officer', 'Head of Retail Banking', 'Head of Payments'],
+      firmographics: 'Large banking and financial services organizations with digital banking, payments modernization, and regulatory compliance priorities.',
+      buying_triggers: ['Digital banking adoption', 'fraud and risk control pressure', 'regulatory compliance demands'],
+      core_pain_points: 'The business needs to accelerate digital banking experiences while managing fraud, risk, compliance and legacy core modernization.',
+      common_objections: ['Legacy core banking systems', 'regulatory complexity', 'existing banking IT vendors'],
+      sourcing_filters: 'Banks and financial services firms focused on digital transformation, payments modernization, fraud analytics, and customer retention.',
+      keywords: 'digital banking transformation, payment modernization, fraud analytics, banking customer experience, regulatory compliance automation, core banking modernization',
+      messaging_angle: 'Position the solution as the execution layer that makes banking digital, secure, and compliant.',
+      risks: ['Operational risk from legacy core systems', 'regulatory program complexity', 'integration risk with banking platforms'],
+      strategic_hook: 'Position the solution as the secure and compliant digital banking layer that accelerates customer journeys and reduces friction.',
+      why_now: 'Banks are under pressure to modernize payments, strengthen fraud controls and improve customer digital experiences.',
+      account_analogs: ['Digital banking division', 'Payments modernization program', 'Fraud analytics center of excellence'],
+      target_roles: ['Chief Digital Officer', 'Head of Retail Banking', 'Head of Payments', 'VP Risk & Compliance', 'Digital Banking Product Lead', 'Fraud Operations Leader'],
+      keyword_focus: 'digital banking transformation, payment modernization, fraud analytics, regulatory compliance automation',
+      outreach_language: 'digital banking modernization and risk-controlled payments',
+      primary_role_title: 'Chief Digital Officer',
+      primary_role_responsibility: 'Lead digital banking transformation, payments modernization, and customer experience innovation',
+    };
+  }
+
   if (saas.test(source)) {
     return {
       category: 'saas',
