@@ -1129,6 +1129,16 @@ async function exportPDF() {
   }
 }
 
+function sanitizeFilename(value) {
+  const raw = String(value || 'GTM_Report').trim();
+  return raw
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, '_')
+    .replace(/\s+/g, '_')
+    .replace(/_+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 120) || 'GTM_Report';
+}
+
 async function exportCurrentReportAsPDF() {
   const source = document.getElementById('report-content');
   if (!source) throw new Error('Report content is not available.');
