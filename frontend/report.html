@@ -138,6 +138,17 @@
     .score-strip { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin-bottom:32px; }
     .sc  { background:rgba(18,24,39,.7); border:1px solid var(--border); border-radius:14px; padding:20px 22px; transition:border-color .2s; }
     .sc:hover { border-color:var(--accent); }
+    .insight-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:14px; margin-top:18px; }
+    .chart-card { background:rgba(255,255,255,.04); border:1px solid rgba(148,163,184,.18); border-radius:20px; padding:20px; min-height:132px; display:flex; flex-direction:column; justify-content:space-between; }
+    .chart-card-header { display:flex; justify-content:space-between; gap:10px; align-items:flex-start; margin-bottom:14px; }
+    .chart-label { font-size:12px; font-weight:700; color:white; }
+    .chart-detail { font-size:11px; color:var(--muted); text-align:right; }
+    .chart-value { font-size:20px; font-weight:900; color:white; font-family:'Space Mono',monospace; margin-bottom:12px; }
+    .chart-series { display:flex; flex-direction:column; gap:10px; }
+    .chart-series-bar { width:100%; height:12px; background:rgba(255,255,255,.05); border-radius:999px; overflow:hidden; }
+    .chart-series-fill { height:100%; border-radius:999px; background:linear-gradient(90deg,var(--accent2),var(--accent)); }
+    .insight-grid span, .chart-card span { word-break:break-word; }
+    @media (max-width:900px) { .insight-grid { grid-template-columns:1fr; } }
     .sv  { font-size:26px; font-weight:900; font-family:'Space Mono',monospace; color:white; letter-spacing:-1px; }
     .sl  { font-size:9px; text-transform:uppercase; letter-spacing:.18em; color:var(--muted); font-weight:700; margin-top:4px; }
     .sv.green { color:var(--green); } .sv.amber { color:var(--amber); } .sv.purple { color:var(--accent); } .sv.red { color:var(--red); }
@@ -583,6 +594,11 @@ function renderPdfTamAssumptionStrip(s2) {
   if (!assumptions.length) return '';
   return `<div class="pdf-assumption-strip">${assumptions.map(text => `<div class="pdf-chip amber">${esc(text)}</div>`).join('')}</div>`;
 }
+function renderMiniChartCard(label, value, detail='', pct=72, color='var(--accent2)') {
+  const score = Number(pct);
+  const safePct = Math.max(8, Math.min(100, Number.isFinite(score) ? score : 72));
+  return `<div class="chart-card"><div class="chart-card-header"><div class="chart-label">${esc(label)}</div>${detail ? `<div class="chart-detail">${esc(detail)}</div>` : ''}</div><div class="chart-value">${esc(value)}</div><div class="chart-series"><div class="chart-series-bar"><div class="chart-series-fill" style="width:${safePct}%;background:linear-gradient(90deg,${color},var(--accent));"></div></div></div></div>`;
+}
 function tagRow(label, arr, cls='') {
   const a = Array.isArray(arr) ? arr : (arr ? [String(arr)] : []); if (!a.length) return '';
   return `<div class="field"><div class="fl">${esc(label)}</div><div class="tags">${a.slice(0,20).map(t=>`<span class="tag ${cls}">${esc(String(t))}</span>`).join('')}</div></div>`;
@@ -681,7 +697,7 @@ function renderSDRTimeline(s6) {
     {label:'LinkedIn', angle:s6.linkedin_message ? 'LinkedIn engagement' : 'Social touch', body:s6.linkedin_message || 'Engage with the buying committee via LI.', cta:'Connect / engage'},
     {label:'Follow-up', angle:s6.linkedin_follow_up ? 'Follow-up persistence' : 'Nudge for next step', body:s6.linkedin_follow_up || 'Reinforce urgency with a clear CTA.', cta:'Schedule next call'},
   ];
-  return `<div class="step-timeline">${steps.filter(step=>step.angle||step.body).map((step,idx)=>`<div class="timeline-item"><strong>${esc(step.label)}</strong><p style="margin:8px 0 0;font-size:11px;color:var(--muted);line-height:1.6">${esc(step.angle)}</p><p style="margin:10px 0 0;font-size:11px;color:var(--text);line-height:1.7">${esc(step.body)}</p>${step.cta?`<div class="tag blue" style="margin-top:12px;display:inline-flex;padding:6px 10px;border-radius:999px;font-size:10px;font-weight:700;color:var(--blue);background:rgba(59,130,246,.1);border:1px solid rgba(59,130,246,.2);">${esc(step.cta)}</div>`:''}</div>`).join('')}</div>`;
+  return `<div class="pdf-timeline">${steps.filter(step=>step.angle||step.body).map((step,idx)=>`<div class="pdf-timeline-item" data-step="${idx+1}"><div class="ti-title">${esc(step.label)}</div><div class="ti-body"><strong>${esc(step.angle)}</strong></div><div class="ti-body" style="margin-top:8px;">${esc(step.body)}</div>${step.cta?`<div class="ti-chip">${esc(step.cta)}</div>`:''}</div>`).join('')}</div>`;
 }
 function callout(text, type='') {
   if (!text) return '';
@@ -1003,7 +1019,7 @@ function scoreToPercent(score) {
 }
 
 // ── Step 7 Decision Engine ────────────────────────────────────────
-function renderDecisionEngine(r, s1, s2, s3) {
+function renderDecisionEngine(r, s1, s2, s3, pageNum = '07') {
   // 1. Prioritize real Step 7 enterprise data
   const s7 = r.step_7_intelligence || (r.full_report && r.full_report.step_7_intelligence) || r.step7_decision_engine;
 
@@ -1038,7 +1054,7 @@ function renderDecisionEngine(r, s1, s2, s3) {
     const dms = Array.isArray(s3.decision_makers) ? s3.decision_makers : [];
 
     return `<div class="section" style="border:1px solid rgba(168,85,247,.3);background:rgba(168,85,247,.03)">
-      <div class="sec-header"><div class="sec-num" style="background:var(--amber);font-size:9px;">07</div><div class="sec-title">Revenue Intelligence — Decision Engine</div></div>
+      <div class="sec-header"><div class="sec-num" style="background:var(--amber);font-size:9px;">${esc(pageNum)}</div><div class="sec-title">Revenue Intelligence — Decision Engine</div></div>
       <div class="sec-context">Boardroom-grade decision layer. Actionable verdict derived from enterprise intelligence.</div>
 
       ${s7.executive_brief ? `<div class="field"><div class="fl">Executive Brief</div><div class="fv" style="border-left-color:var(--blue);font-size:12px">${esc(s7.executive_brief)}</div></div>` : ''}
@@ -1118,7 +1134,7 @@ function renderDecisionEngine(r, s1, s2, s3) {
   const execTarget = dms[0] || icp;
 
   return `<div class="section" style="border:1px solid rgba(168,85,247,.3);background:rgba(168,85,247,.03)">
-    <div class="sec-header"><div class="sec-num" style="background:var(--amber);font-size:9px;">07</div><div class="sec-title">Revenue Intelligence — Decision Engine (Derived)</div></div>
+    <div class="sec-header"><div class="sec-num" style="background:var(--amber);font-size:9px;">${esc(pageNum)}</div><div class="sec-title">Revenue Intelligence — Decision Engine (Derived)</div></div>
     <div class="sec-context">Boardroom-grade decision layer. Not a summary. Actionable verdict before entering this account.</div>
 
     <div class="field"><div class="fl">Why Now (Trigger Logic)</div>
@@ -1346,7 +1362,7 @@ function renderReport(r) {
     ]),
 
     // Step 7 — Decision Engine
-    renderDecisionEngine(r, s1, s2, s3),
+    renderDecisionEngine(r, s1, s2, s3, '07'),
 
     // Weighted Confidence Matrix
     (function() {
@@ -1549,58 +1565,43 @@ function buildPdfExportDom(r) {
 
 function buildPdfCoverPage(r) {
   const score = r.step_1_market?.gtm_relevance_score || r.full_report?.gtm_relevance_score || r.step_2_tam?.total_score || 0;
-  const tam = safe(r.step_2_tam?.tam_size_estimate) || '—';
-  const cagr = safe(r.step_2_tam?.growth_rate) || '—';
-  const verdict = (r.step_7_intelligence?.go_no_go?.recommendation || (score >= 75 ? 'Go' : score >= 50 ? 'Watch' : 'No-Go') || '—').toUpperCase();
-  const steps = r.steps_completed || Object.values({
-    s1: r.step_1_market || {},
-    s2: r.step_2_tam || {},
-    s3: r.step_3_icp || {},
-    s4: r.step_4_sourcing || {},
-    s5: r.step_5_keywords || {},
-    s6: r.step_6_messaging || {},
-  }).filter(x => Object.keys(x).length).length + '/7';
+  const s1 = r.step_1_market || {};
+  const s2 = r.step_2_tam || {};
   const demoMode = isDemoReport(r);
-
   const page = createPdfPage();
   page.innerHTML = `
-    <section class="pdf-cover-hero">
-      <div class="pdf-cover-hero-inner">
-        <div>
-          <div class="pdf-cover-hero-head">
-            <div style="width:54px;height:54px;border-radius:18px;background:linear-gradient(135deg,var(--accent2),var(--accent));display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-size:16px;font-weight:900;color:white;">ABE</div>
-            <div>
-              <div style="font-size:10px;text-transform:uppercase;letter-spacing:.24em;color:var(--accent);font-weight:700;margin-bottom:4px;">ABE</div>
-              <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.22em;">Enterprise AI Revenue Infrastructure</div>
-            </div>
+    <div class="report-cover">
+      <div class="cover-hero">
+        <div class="cover-info">
+          <div class="cover-label"><span class="cover-mark">ABE</span><span class="cover-subtitle">Enterprise AI Revenue Infrastructure</span></div>
+          <div class="cover-title">GTM Intelligence Report</div>
+          <div class="cover-company">${esc(r.company_name || 'Unknown Company')}</div>
+          <div class="cover-meta">
+            <span>Generated ${new Date(r.updated_at||r.created_at).toLocaleDateString('en-GB',{year:'numeric',month:'long',day:'numeric'})}</span>
+            <span class="cover-badge ${demoMode ? 'demo' : 'live'}">${demoMode ? 'DEMO MODE' : 'LIVE MODE'}</span>
+            <span class="cover-badge" style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.12);color:var(--text)">Confidential</span>
+            <span class="cover-badge" style="background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.12);color:var(--text)">Page 1 of 11</span>
           </div>
-          <div style="font-size:34px;font-weight:900;line-height:1.05;color:white;margin-bottom:12px;">GTM Intelligence Report</div>
-          <div style="font-size:22px;font-weight:900;color:white;margin-bottom:10px;">${esc(r.company_name || 'Unknown Company')}</div>
-          <div class="pdf-cover-intro">Boardroom-ready GTM insight designed for enterprise strategy reviews, opportunity qualification, and executive decision-making.</div>
-          <div class="pdf-cover-badges">
-            <span class="pdf-cover-pill accent">${demoMode ? 'DEMO MODE' : 'LIVE MODE'}</span>
-            <span class="pdf-cover-pill">Confidential</span>
-            <span class="pdf-cover-pill">Page 1 of 11</span>
+          <div class="cover-detail">Boardroom-ready GTM insight designed for enterprise strategy reviews, opportunity qualification, and executive decision-making.</div>
+          <div class="insight-grid">
+            ${renderMiniChartCard('Opportunity signal', safe(s2.priority_opportunities) || safe(s1.key_opportunity) || 'Priority opportunity not explicit', 'Primary buying trigger', score)}
+            ${renderMiniChartCard('Risk horizon', safe(s1.market_risks) || 'Competitive inertia', 'Approval / procurement exposure', 45, 'var(--amber)')}
+            ${renderMiniChartCard('Confidence lens', `${score ? String(score) : '—'}%`, 'Strategy fit confidence', score, 'var(--green)')}
           </div>
-        </div>
-        <div>
-          <div class="pdf-cover-grid">
-            ${pdfStatCard('GTM Score', score ? String(score) : '—', 'Strategy fit score')}
-            ${pdfStatCard('TAM Size', tam, 'Market opportunity')}
-            ${pdfStatCard('CAGR', cagr, 'Growth signal')}
-            ${pdfStatCard('Verdict', verdict, 'Go / Watch / No-Go')}
-          </div>
-          <div style="margin-top:18px;display:flex;gap:12px;flex-wrap:wrap;">
-            <div class="pdf-cover-pill">${esc(r.industry || 'Industry not specified')}</div>
-            <div class="pdf-cover-pill">${esc(r.step_2_tam?.priority_opportunities || 'Priority opportunity not explicit')}</div>
+          <div class="info-strip">
+            <div class="info-chip"><strong>Opportunity focus</strong><span>${esc(safe(s2.priority_opportunities) || 'Opportunity signal not explicit')}</span></div>
+            <div class="info-chip"><strong>Risk focus</strong><span>${esc(safe(s1.market_risks) || s1.threats || 'Review competitive inertia')}</span></div>
+            <div class="info-chip"><strong>Primary signal</strong><span>${esc(safe(s1.demand_signals) || s1.timing_signals || 'Demand and timing signals')}</span></div>
           </div>
         </div>
+        <div class="cover-kpis">
+          <div class="cover-card"><div class="cc-label">Total Addressable Market</div><div class="cc-value">${esc(safe(s2.tam_size_estimate) || '—')}</div><div class="cc-note">Market size signal</div></div>
+          <div class="cover-card"><div class="cc-label">Compound Annual Growth Rate</div><div class="cc-value">${esc(safe(s2.growth_rate) || '—')}</div><div class="cc-note">Momentum assessment</div></div>
+          <div class="cover-card"><div class="cc-label">GTM Relevance</div><div class="cc-value">${esc(score ? String(score) : '—')}</div><div class="cc-note">Strategy fit score</div></div>
+          <div class="cover-card"><div class="cc-label">Verdict</div><div class="cc-value">${esc((r.step_7_intelligence?.go_no_go?.recommendation || (score >= 75 ? 'Go' : score >= 50 ? 'Watch' : 'No-Go') || '—').toUpperCase())}</div><div class="cc-note">Go / Watch / No-Go</div></div>
+        </div>
       </div>
-      <div class="pdf-opportunity-risk">
-        <div class="pdf-opportunity-card"><div class="title">Executive positioning</div><div class="text">${esc(safe(r.step_1_market?.gtm_relevance_reasoning) || 'Focus the first review on priority account entry criteria and executive alignment.')}</div></div>
-        <div class="pdf-opportunity-card"><div class="title">Strategic highlight</div><div class="text">${esc(safe(r.step_2_tam?.priority_opportunities) || safe(r.step_1_market?.market_risks) || 'Opportunity path and risk exposure defined by available enterprise signals.')}</div></div>
-      </div>
-    </section>
+    </div>
   `;
   return page;
 }
@@ -1609,34 +1610,26 @@ function buildPdfTruthPage(r) {
   const s1 = r.step_1_market || {};
   const s2 = r.step_2_tam || {};
   const s7 = r.step_7_intelligence || {};
-  const demoMode = isDemoReport(r);
-  const confidence = scoreToPercent(s7.confidence_score || s1.gtm_relevance_score || 0);
+  const evidenceScore = scoreToPercent(s7.confidence_score || s1.gtm_relevance_score || 0);
+  const missingEvidence = safe(s7._missing_evidence || s1._missing_evidence || s2._missing_evidence || 'None flagged');
   const page = createPdfPage();
-  const execHtml = renderExecSummary(r, s1, s2) || `<div class="pdf-priority-card"><div class="title">Executive Brief</div><div class="text">Executive summary not available from the current report data.</div></div>`;
-  const recommended = safe(s7.recommended_action || s1.recommended_action || s2.recommended_action || 'Recommend quick validation with the leadership team and next-step alignment workshop.');
   page.innerHTML = `
-    <div class="section" style="margin-bottom:20px;">
-      <div class="sec-header"><div class="sec-num">02</div><div><div class="sec-title">Truth Layer & Executive Summary</div><div class="sec-subtitle">Evidence status, profile source, and summary guidance.</div></div></div>
-      <div class="pdf-dashboard">
-        <div class="pdf-panel">
-          <div class="pdf-panel-header"><div class="pdf-panel-title">Truth Layer</div><div class="pdf-panel-copy">Evidence provenance and source confidence.</div></div>
-          ${renderTruthLayer(r)}
-          <div class="pdf-opportunity-risk">
-            <div class="pdf-opportunity-card"><div class="title">Risk signal</div><div class="text">${esc(safe(s1.market_risks) || 'No explicit risk flagged from the current market inputs.')}</div></div>
-            <div class="pdf-opportunity-card"><div class="title">Opportunity signal</div><div class="text">${esc(safe(s2.priority_opportunities) || 'Opportunity definition is pending explicit signal extraction.')}</div></div>
-          </div>
-        </div>
-        <div class="pdf-panel">
-          <div class="pdf-panel-header"><div class="pdf-panel-title">Executive dashboard</div><div class="pdf-panel-copy">Strategic summary, recommendation and confidence.</div></div>
-          ${execHtml}
-          <div class="pdf-score-band"><div class="label">Confidence score</div><div class="bar-wrap"><div class="bar-fill" style="width:${confidence}%"></div></div></div>
-          <div class="pdf-opportunity-risk">
-            <div class="pdf-opportunity-card"><div class="title">Recommendation</div><div class="text">${esc(recommended)}</div></div>
-            <div class="pdf-opportunity-card"><div class="title">Confidence basis</div><div class="text">${esc(s7.confidence_basis || s7._confidence_basis || s1.gtm_relevance_reasoning || 'Derived from signal quality and source provenance.')}</div></div>
-          </div>
-        </div>
+    <div class="section">
+      <div class="sec-header"><div class="sec-num">02</div><div><div class="sec-title">Truth Layer / Executive Summary</div><div class="sec-subtitle">Evidence status, profile source, and summary guidance.</div></div></div>
+      <div class="sec-context">Provenance metadata from the GTM step outputs. Displays whether the report is backed by verified profile data or AI estimate fallback.</div>
+      <div class="info-strip">
+        <div class="info-chip"><strong>Evidence confidence</strong><span>${esc(evidenceScore)}%</span></div>
+        <div class="info-chip"><strong>Profile source</strong><span>${esc(s7._profile_source || s1._profile_source || s2._profile_source || 'Verified / AI estimate')}</span></div>
+        <div class="info-chip"><strong>Missing evidence</strong><span>${esc(missingEvidence)}</span></div>
       </div>
-      ${demoMode ? `<div class="pdf-warning-banner">DEMO REPORT — No live data was used. Validate before decision-making.</div>` : ''}
+      <div class="insight-grid">
+        ${renderMiniChartCard('Evidence confidence', `${evidenceScore}%`, 'Source-quality estimate', evidenceScore)}
+        ${renderMiniChartCard('Profile source', s7._profile_source || s2._profile_source || 'Mixed source', safe(s7._source_context || s2._source_context || 'Source metadata available'), 65, 'var(--blue)')}
+        ${renderMiniChartCard('Missing evidence', missingEvidence || 'None flagged', 'Validate before decision', missingEvidence && missingEvidence !== 'None flagged' ? 40 : 95, missingEvidence && missingEvidence !== 'None flagged' ? 'var(--amber)' : 'var(--green)')}
+      </div>
+      ${renderTruthLayer(r)}
+      ${field('Recommended Action', s7.recommended_action || s1.recommended_action || s2.recommended_action)}
+      ${renderExecSummary(r, s1, s2)}
     </div>
   `;
   return page;
@@ -1644,22 +1637,28 @@ function buildPdfTruthPage(r) {
 
 function buildPdfMarketPage(r) {
   const s1 = r.step_1_market || {};
+  const marketPulse = safe(s1.demand_signals || s1.market_movement || s1.market_trend || 'Moderate');
+  const position = safe(s1.market_position || 'Positioning not explicit');
+  const timing = safe(s1.timing_signals || s1.growth_signals || 'Timing unclear');
+  const marketScore = scoreToPercent(s1.gtm_relevance_score || 68);
   const page = createPdfPage();
   page.innerHTML = `
     <div class="section">
       <div class="sec-header"><div class="sec-num">03</div><div><div class="sec-title">Market Research</div><div class="sec-subtitle">Market pulse, positioning, and demand timing.</div></div></div>
-      <div class="pdf-market-strip">
-        <div class="metric"><span>Market movement</span><strong>${esc(safe(s1.market_movement || s1.market_trend || s1.timing_signals || 'Signal unavailable'))}</strong></div>
-        <div class="metric"><span>Demand signal</span><strong>${esc(safe(s1.demand_signals || 'Not explicit'))}</strong></div>
-        <div class="metric"><span>Positioning</span><strong>${esc(safe(s1.market_position || 'Positioning not explicit'))}</strong></div>
+      <div class="sec-context">Deconstructs positioning and isolates macro triggers. Identifies why a prospect would buy right now.</div>
+      <div class="insight-grid">
+        ${renderMiniChartCard('Demand strength', marketPulse, 'Buyer interest signal', marketScore)}
+        ${renderMiniChartCard('Positioning clarity', position, 'Value differentiation', Math.min(94, marketScore + 4), 'var(--green)')}
+        ${renderMiniChartCard('Timing urgency', timing, 'Go-to-market window', Math.max(42, marketScore - 10), 'var(--amber)')}
       </div>
-      <div class="pdf-dashboard" style="margin-top:18px;">
-        <div class="pdf-panel"><div class="pdf-panel-title">Market narrative</div><div class="pdf-panel-copy">${esc(safe(s1.company_overview || 'No company overview available.'))}</div></div>
-        <div class="pdf-panel"><div class="pdf-panel-title">Timing signal</div><div class="pdf-panel-copy">${esc(safe(s1.timing_signals || s1.growth_signals || 'No timing indicator extracted.'))}</div></div>
-      </div>
-      ${renderPdfSwotMatrix(s1)}
+      ${renderMarketTrend(s1)}
       ${renderOpportunityRiskSplit(s1)}
-      ${callout(s1.analyst_insight)}
+      ${renderSWOT(s1)}
+      ${field('Market Position', s1.market_position)}
+      ${field('GTM Relevance Reasoning', s1.gtm_relevance_reasoning)}
+      ${tagRow('Growth Signals', s1.growth_signals, 'green')}
+      ${tagRow('Tech Stack Hints', s1.tech_stack_hints, 'blue')}
+      ${callout(s1.gtm_relevance_reasoning ? `GTM Score ${s1.gtm_relevance_score || ''}: ${safe(s1.gtm_relevance_reasoning).split('.')[0]}.` : '')}
     </div>
   `;
   return page;
@@ -1667,29 +1666,28 @@ function buildPdfMarketPage(r) {
 
 function buildPdfTamPage(r) {
   const s2 = r.step_2_tam || {};
-  const tam = safe(s2.tam_size_estimate) || '—';
-  const sam = safe(s2.sam_estimate) || s2.sam || '—';
-  const som = safe(s2.som_estimate) || '—';
-  const cagr = safe(s2.growth_rate) || '—';
   const page = createPdfPage();
   page.innerHTML = `
     <div class="section">
-      <div class="sec-header"><div class="sec-num">04</div><div><div class="sec-title">TAM / Market Attractiveness</div><div class="sec-subtitle">Sizing, segmentation, and market-fit scoring.</div></div></div>
-      <div class="pdf-tam-bars">
-        ${renderPdfTamBars(s2)}
+      <div class="sec-header"><div class="sec-num">04</div><div><div class="sec-title">TAM Mapping</div><div class="sec-subtitle">Sizing, segmentation, and market-fit analysis.</div></div></div>
+      <div class="sec-context">Translates addressable market into an action plan for the first revenue wave.</div>
+      <div class="insight-grid">
+        ${renderMiniChartCard('Global TAM', safe(s2.tam_size_estimate) || '—', 'Total addressable market', 92)}
+        ${renderMiniChartCard('Serviceable SAM', safe(s2.sam_estimate || s2.sam) || '—', 'Serviceable market', 75, 'var(--green)')}
+        ${renderMiniChartCard('Obtainable SOM', safe(s2.som_estimate) || '—', 'Near-term opportunity', 48, 'var(--amber)')}
       </div>
-      <div class="pdf-tam-grid">
-        <div class="pdf-segment-card"><div class="title">TAM</div><div class="metric">${esc(tam)}</div><div class="line">Total addressable market.</div></div>
-        <div class="pdf-segment-card"><div class="title">SAM</div><div class="metric">${esc(sam)}</div><div class="line">Serviceable available market.</div></div>
-        <div class="pdf-segment-card"><div class="title">SOM</div><div class="metric">${esc(som)}</div><div class="line">Expected obtainable market.</div></div>
-        <div class="pdf-segment-card"><div class="title">CAGR</div><div class="metric">${esc(cagr)}</div><div class="line">Market growth velocity.</div></div>
-      </div>
-      <div class="cover-kpis">
-        <div class="cover-card"><div class="cc-label">CAGR</div><div class="cc-value">${esc(cagr)}%</div></div>
-        <div class="cover-card"><div class="cc-label">Market Pulse</div><div class="cc-value">${esc(safe(s2.market_pulse || s2.market_signal || 'Moderate'))}</div></div>
+      <div class="grid2" style="margin-bottom:18px;">
+        <div class="metric-box"><div class="mv">${esc(safe(s2.tam_size_estimate) || '—')}</div><div class="ml">TAM</div></div>
+        <div class="metric-box"><div class="mv">${esc(safe(s2.sam_estimate || s2.sam) || '—')}</div><div class="ml">SAM</div></div>
+        <div class="metric-box"><div class="mv">${esc(safe(s2.som_estimate) || '—')}</div><div class="ml">SOM</div></div>
+        <div class="metric-box"><div class="mv">${esc(safe(s2.growth_rate) || '—')}</div><div class="ml">CAGR</div></div>
       </div>
       ${renderWaterfall(s2)}
-      ${renderPdfTamAssumptionStrip(s2)}
+      ${renderSegments(s2)}
+      ${field('Priority Markets', s2.priority_opportunities)}
+      ${field('TAM Assumptions', s2.assumptions)}
+      ${field('Market Maturity', s2.market_maturity)}
+      ${callout(s2.tam_assumption_note || s2.priority_opportunities)}
     </div>
   `;
   return page;
@@ -1702,36 +1700,17 @@ function buildPdfICPPage(r) {
   page.innerHTML = `
     <div class="section">
       <div class="sec-header"><div class="sec-num">05</div><div><div class="sec-title">ICP Modeling</div><div class="sec-subtitle">Persona, buying committee and decision ecosystem.</div></div></div>
-      <div class="pdf-persona-panel">
-        <div class="pdf-persona-card">
-          <div class="pdf-persona-top">
-            <div class="pdf-avatar">👤</div>
-            <div>
-              <div class="pdf-persona-label">Primary ICP</div>
-              <div class="pdf-persona-name">${esc(repairICP(s3.primary_icp, 'primary', s3, industry))}</div>
-              <div class="pdf-panel-copy">${esc(safe(s3.firmographics || 'Firmographic summary unavailable.'))}</div>
-            </div>
-          </div>
-          <div class="pdf-chip-row">${Array.isArray(s3.buying_triggers) ? s3.buying_triggers.slice(0,5).map(t => `<span class="pdf-chip blue">${esc(t)}</span>`).join('') : `<span class="pdf-chip amber">No triggers extracted</span>`}</div>
-        </div>
-        <div class="pdf-persona-card">
-          <div class="pdf-persona-top">
-            <div class="pdf-avatar">⚙️</div>
-            <div>
-              <div class="pdf-persona-label">Secondary ICP</div>
-              <div class="pdf-persona-name">${esc(repairICP(s3.secondary_icp, 'secondary', s3, industry))}</div>
-              <div class="pdf-panel-copy">${esc(safe(s3.decision_makers ? s3.decision_makers.join(' · ') : 'Decision makers not defined.'))}</div>
-            </div>
-          </div>
-          ${renderPdfBuyingCommittee(s3)}
-          ${renderPdfObjectionChips(s3)}
-        </div>
-      </div>
-      ${renderPdfPainImpactMap(s3)}
-      <div class="pdf-opportunity-risk">
-        <div class="pdf-opportunity-card"><div class="title">Buying triggers</div><div class="text">${esc(safe(Array.isArray(s3.buying_triggers) ? s3.buying_triggers.join(' · ') : s3.buying_triggers || 'No structured triggers available.'))}</div></div>
-        <div class="pdf-opportunity-card"><div class="title">Objections</div><div class="text">${esc(safe(Array.isArray(s3.objections) ? s3.objections.join(' · ') : s3.objections || 'No objections captured.'))}</div></div>
-      </div>
+      <div class="sec-context">Profiles the ideal buyer and the decision landscape for fast-moving enterprise sales.</div>
+      ${renderPersonaCard(s3, industry)}
+      ${field('Primary ICP', repairICP(s3.primary_icp, 'primary', s3, industry))}
+      ${field('Secondary ICP', repairICP(s3.secondary_icp, 'secondary', s3, industry))}
+      ${field('Firmographics', s3.firmographics)}
+      ${renderPainMap(s3)}
+      ${tagRow('Buying Triggers', s3.buying_triggers, 'green')}
+      ${tagRow('Decision Makers', s3.decision_makers)}
+      ${tagRow('Common Objections', s3.objections, 'amber')}
+      ${field('Deal Cycle', s3.deal_cycle)}
+      ${callout(s3.analyst_insight)}
     </div>
   `;
   return page;
@@ -1743,13 +1722,12 @@ function buildPdfAccountSourcingPage(r) {
   page.innerHTML = `
     <div class="section">
       <div class="sec-header"><div class="sec-num">06</div><div><div class="sec-title">Account Sourcing</div><div class="sec-subtitle">Targeting pipeline, filters, and account prioritisation.</div></div></div>
-      ${renderPdfAccountPipeline(s4)}
-      <div class="pdf-persona-card" style="margin-top:18px;"><div class="pdf-persona-label">Target roles</div><div class="pdf-chip-row">${Array.isArray(s4.target_roles) && s4.target_roles.length ? s4.target_roles.slice(0,10).map(role => `<span class="pdf-chip green">${esc(role)}</span>`).join('') : '<span class="pdf-chip">No target roles defined</span>'}</div></div>
-      ${renderPdfAccountAnalogs(s4)}
-      <div class="pdf-opportunity-risk">
-        <div class="pdf-opportunity-card"><div class="title">Estimated deal size</div><div class="text">${esc(safe(s4.estimated_deal_size) || 'Deal size not provided')}</div></div>
-        <div class="pdf-opportunity-card"><div class="title">Sales approach</div><div class="text">${esc(safe(s4.sales_approach) || 'Sales approach summary unavailable')}</div></div>
-      </div>
+      <div class="sec-context">Maps the ideal account set and filtering criteria for outreach readiness.</div>
+      ${renderAccountPipeline(s4)}
+      ${tagRow('Target Roles', s4.target_roles, 'blue')}
+      ${tagRow('Account Filters', s4.account_filters, 'green')}
+      ${field('Estimated Deal Size', s4.estimated_deal_size)}
+      ${field('Sales Approach', s4.sales_approach)}
       ${field('Exclusion Criteria', s4.exclusion_criteria, 'red')}
       ${field('Data Enrichment Tips', s4.data_enrichment_tips)}
     </div>
@@ -1763,15 +1741,14 @@ function buildPdfKeywordsPage(r) {
   page.innerHTML = `
     <div class="section">
       <div class="sec-header"><div class="sec-num">07</div><div><div class="sec-title">Keywords & Intent</div><div class="sec-subtitle">Semantic funnel taxonomy and search readiness.</div></div></div>
-      ${renderPdfKeywordCloud(s5)}
-      ${renderPdfIntentFunnel(s5)}
-      <div class="pdf-opportunity-risk">
-        <div class="pdf-opportunity-card"><div class="title">Priority signal</div><div class="text">${esc(safe(Array.isArray(s5.intent_signals) ? s5.intent_signals.slice(0,2).join(' · ') : s5.intent_signals || 'No high-intent signals captured'))}</div></div>
-        <div class="pdf-opportunity-card"><div class="title">Search readiness</div><div class="text">${esc(s5.boolean_query ? 'Boolean search ready' : 'Boolean query not available')}</div></div>
-      </div>
-      ${renderPdfQueryCard('Boolean Query', s5.boolean_query)}
-      ${renderPdfQueryCard('LinkedIn Search String', s5.linkedin_search_strings)}
-      <div class="pdf-panel" style="margin-top:16px;"><div class="pdf-panel-title">Content topics</div><div class="pdf-chip-row">${Array.isArray(s5.content_topics) && s5.content_topics.length ? s5.content_topics.slice(0,12).map(topic => `<span class="pdf-chip">${esc(topic)}</span>`).join('') : '<span class="pdf-chip">No content topics available</span>'}</div></div>
+      <div class="sec-context">Aligns keyword taxonomy with intent signals for demand capture.</div>
+      ${renderKeywordTaxonomy(s5)}
+      ${renderKeywordIntent(s5)}
+      ${field('Priority Intent Signals', Array.isArray(s5.intent_signals) ? s5.intent_signals.join(' · ') : s5.intent_signals)}
+      ${field('Boolean Query', s5.boolean_query)}
+      ${field('LinkedIn Search String', s5.linkedin_search_strings)}
+      ${tagRow('Content Topics', s5.content_topics)}
+      ${callout(s5.keyword_insight)}
     </div>
   `;
   return page;
@@ -1797,34 +1774,8 @@ function buildPdfDecisionPage(r) {
   const s1 = r.step_1_market || {};
   const s2 = r.step_2_tam || {};
   const s3 = r.step_3_icp || {};
-  const s7 = r.step_7_intelligence || {};
-  const score = scoreToPercent(s7.confidence_score || s1.gtm_relevance_score || 0);
-  const verdict = (s7.go_no_go?.recommendation || (score >= 75 ? 'Go' : score >= 50 ? 'Watch' : 'No-Go') || 'Watch').toUpperCase();
-  const mcc = s7.mcc_view || {};
   const page = createPdfPage();
-  page.innerHTML = `
-    <div class="section">
-      <div class="sec-header"><div class="sec-num">09</div><div><div class="sec-title">Decision Cockpit</div><div class="sec-subtitle">Revenue Intelligence, verdict and execution priority.</div></div></div>
-      <div class="verdict-cockpit">
-        <div class="verdict-hero">${esc(verdict)}</div>
-        <div class="cc-label">Confidence Score: ${score}%</div>
-        <div class="confidence-meter"><div class="vis-bar-track"><div class="vis-bar-fill" style="width:${score}%; background: var(--amber);"></div></div></div>
-      </div>
-      <div class="grid-2">
-        <div class="section" style="padding:18px; background:rgba(255,255,255,.03); border:1px solid rgba(148,163,184,.18); border-radius:18px;"><h4 style="font-size:12px;color:white;margin-bottom:10px;">Strategic Context</h4><p style="font-size:11px;color:var(--muted);line-height:1.7;">Market is maturing with strong scrutiny on B2B execution and value delivery.</p></div>
-        <div class="section" style="padding:18px; background:rgba(255,255,255,.03); border:1px solid rgba(148,163,184,.18); border-radius:18px;"><h4 style="font-size:12px;color:white;margin-bottom:10px;">Primary Risk</h4><p style="font-size:11px;color:var(--muted);line-height:1.7;">High incumbent inertia risk in enterprise accounts; execution velocity will determine win rate.</p></div>
-      </div>
-      <div class="pdf-mcc-grid">
-        ${['market','client','competitor'].map(label => `<div class="pdf-mcc-card"><div class="label">${label.toUpperCase()}</div><div class="value">${esc(mcc[label] || `No ${label} insight available.`)}</div></div>`).join('')}
-      </div>
-      <div class="risk-strip">
-        <span class="risk-pill red">${esc(s7.risk_summary || 'Incumbent inertia risk')}</span>
-        <span class="risk-pill amber">${esc(s7.constraint_summary || 'Approval cycle risk')}</span>
-        <span class="risk-pill green">${esc(s7.signal_strength || 'Signal alignment to ICP')}</span>
-      </div>
-      <div class="pdf-priority-card"><div class="title">Execution Priority</div><div class="text">${esc(s7.execution_priority || 'Deploy the highest-signal ICP pockets first, backed by executive alignment and risk mitigation.')}</div></div>
-    </div>
-  `;
+  page.innerHTML = renderDecisionEngine(r, s1, s2, s3, '09');
   return page;
 }
 
@@ -1846,11 +1797,14 @@ function buildPdfConfidenceMatrixPage(r) {
   page.innerHTML = `
     <div class="section">
       <div class="sec-header"><div class="sec-num">10</div><div><div class="sec-title">Weighted Confidence Matrix</div><div class="sec-subtitle">Signal veracity, timing, ICP fit and data completeness.</div></div></div>
-      <div class="pdf-scorebar-row">
-        ${metrics.map(item => `<div class="pdf-scorebar"><div><div class="pdf-scorebar-label">${esc(item.label)}</div><div class="pdf-scorebar-track"><div class="pdf-scorebar-fill" style="width:${Math.max(6, item.value)}%"></div></div></div><div class="pdf-scorebar-value">${esc(item.value)}%</div></div>`).join('')}
-      </div>
-      <div class="pdf-gauge"><div class="pdf-gauge-fill" style="width:${overall}%"></div><span class="pdf-gauge-label">Overall fidelity ${overall}%</span></div>
-      <div class="pdf-priority-card"><div class="title">Interpretation</div><div class="text">${esc(s7.matrix_note || 'A higher score indicates stronger signal alignment, market timing and execution readiness.')}</div></div>
+      <div class="sec-context">Summarizes the integrated confidence picture using the same signal framework as the report.</div>
+      <table class="cm-table">
+        <tbody>
+          ${metrics.map(metric => `<tr><td>${esc(metric.label)}</td><td><div class="confidence-bar-wrap"><div class="confidence-bar" style="width:${metric.value}%"></div></div></td><td>${esc(metric.value)}%</td></tr>`).join('')}
+        </tbody>
+      </table>
+      ${field('Confidence Interpretation', s7.matrix_note || 'Higher scores indicate stronger signal alignment and execution readiness.')}
+      ${callout(s7.confidence_summary || 'Review this section with the go/no-go committee before committing resources.')}
     </div>
   `;
   return page;
@@ -1868,16 +1822,13 @@ function buildPdfAppendixPage(r) {
   page.innerHTML = `
     <div class="section">
       <div class="sec-header"><div class="sec-num">11</div><div><div class="sec-title">Appendix / Methodology</div><div class="sec-subtitle">Source notes, assumptions and AI estimate disclaimers.</div></div></div>
-      <div class="pdf-appendix-grid">
-        <div class="pdf-appendix-card"><div class="title">Methodology</div><div class="text">${esc(r.methodology || r.data_sources || 'Analysis combines company signals, market benchmarks, and AI-extracted GTM evidence.')}</div></div>
-        <div class="pdf-appendix-card"><div class="title">Assumptions</div><div class="text">${esc(r.assumptions || 'Historical growth trends, available benchmarks and inferred buyer intent were used.')}</div></div>
-      </div>
-      <div class="pdf-appendix-grid" style="margin-top:14px;">
-        <div class="pdf-appendix-card"><div class="title">Source Quality</div><div class="text">${esc(r.step_7_intelligence?.data_sources || 'Company website, public filings, analyst estimates and inferred signal sources.')}</div></div>
-        <div class="pdf-appendix-card"><div class="title">Assumptions Matrix</div><div class="text">${esc(r.assumption_matrix || 'Geography, service fit, win rate and addressable universe are modeled from the available inputs.')}</div></div>
-      </div>
-      <div class="pdf-warning-banner">⚠️ AI-Estimated Content: TAM/SAM/SOM, ICP derivations, account analogs, and messaging sequences are AI-derived and should be validated with customer evidence before operational use.</div>
-      <div class="pdf-appendix-card"><div class="title">Report Metadata</div><div class="text">${esc(metadata)}</div></div>
+      <div class="sec-context">Documents the inputs, assumptions, and validation guidance for the GTM intelligence output.</div>
+      ${field('Methodology', r.methodology || r.data_sources || 'Analysis combines company signals, market benchmarks, and AI-extracted GTM evidence.')}
+      ${field('Assumptions', r.assumptions || 'Historical growth patterns, benchmark data, and inferred buyer intent were used.')}
+      ${field('Source Quality', r.step_7_intelligence?.data_sources || 'Company website, public filings, analyst estimates and inferred sources.')}
+      ${field('Assumptions Matrix', r.assumption_matrix || 'Geography, service fit, win rate, and addressable universe are modeled from available inputs.')}
+      <div class="analyst-callout">⚠️ AI-Estimated Content: TAM/SAM/SOM, ICP derivations, account analogs, and messaging sequences are AI-derived and should be validated before operational use.</div>
+      ${field('Report Metadata', metadata)}
     </div>
   `;
   return page;
