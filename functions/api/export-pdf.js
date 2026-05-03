@@ -113,7 +113,9 @@ export async function onRequestPost(context) {
     charts.confidence = cm.status==='fulfilled' ? cm.value : null;
 
     // ── Optional mini charts (max 2 additional calls) ──
-    const intentSignals = arr(s5?.intent_signals||s5?.intent_topics||[]);
+    const _s5 = strategy.step_5_keywords || strategy.steps?.[5] || {};
+    const _arr = v => Array.isArray(v)?v:(v?[String(v)]:[]);
+    const intentSignals = _arr(_s5?.intent_signals||_s5?.intent_topics||[]);
     const intentItems = intentSignals.slice(0,4).map((s,i)=>({
       label: typeof s==='string'?s:(s.signal||s.label||`Signal ${i+1}`),
       strength: typeof s==='object'&&s.strength ? s.strength : [72,58,65,50][i]||60
