@@ -18,8 +18,67 @@ export async function onRequestPost(context) {
   if (errors.length) return errRes(errors[0], 400, cors);
   const { strategy } = body;
   if (!strategy.company_name) return errRes('Missing strategy.company_name', 400, cors);
+
+  // ── QuickChart env config ──
+  const QC = {
+    enabled: (env?.QUICKCHART_ENABLED ?? 'true') !== 'false',
+    apiKey:  env?.QUICKCHART_API_KEY || '',
+    timeout: parseInt(env?.QUICKCHART_TIMEOUT_MS) || 5000,
+    maxPer:  parseInt(env?.QUICKCHART_MAX_PER_REPORT) || 5,
+  };
+
+  // ── Detect demo vs live mode ──
+  const isDemoMode = !!(
+    strategy.demo_mode || strategy.report_mode === 'demo' ||
+    strategy._profile_source === 'demo_mode_simulated' ||
+    strategy.step_7_intelligence?.demo_mode ||
+    (strategy.step_1_market?.analyst_insight||'').toLowerCase().includes('demo mode')
+  );
+
+  // ── Pre-fetch QuickChart images ──
+  const charts = { gauge: null, waterfall: null, confidence: null };
+  if (QC.enabled) {
+    const s2 = strategy.step_2_tam || {};
+    const s7 = strategy.step_7_intelligence || {};
+    const s1 = strategy.step_1_market || {};
+    const gtmScore = parseInt(s1.gtm_relevance_score) || (isDemoMode ? 60 : 0);
+    const verdict  = s7.go_no_go?.recommendation || (gtmScore>=75?'Go':gtmScore>=50?'Watch':'No-Go');
+    const confScore = parseInt(s7.confidence_score) || gtmScore || (isDemoMode ? 60 : 0);
+
+    const tamRaw = safe_val(s2.tam_size_estimate); const tamNum = parseMoneyValue(tamRaw, isDemoMode ? 1800 : 0);
+    const samRaw = safe_val(s2.sam_estimate || s2.waterfall?.sam_value);
+    const somRaw = safe_val(s2.waterfall?.som_value || '5-10% of TAM');
+    const samNum = samRaw && samRaw !== '—' ? parseMoneyValue(samRaw, tamNum * 0.4) : tamNum * 0.4;
+    const somNum = parseMoneyValue(somRaw, tamNum * 0.07);
+
+    let chartCount = 0;
+    const tryFetch = async (type, config, w, h) => {
+      if (chartCount >= QC.maxPer) return null;
+      chartCount++;
+      try {
+        return await fetchQuickChartBase64(config, w, h, QC);
+      } catch(err) {
+        console.warn(`[QuickChart] ${type} failed:`, err.message);
+        return null;
+      }
+    };
+
+    const [g, wf, cm] = await Promise.allSettled([
+      tryFetch('gauge',      buildGtmGaugeChartConfig(gtmScore, verdict), 200, 120),
+      tryFetch('waterfall',  buildTamWaterfallChartConfig(tamNum, samNum, somNum), 480, 180),
+      tryFetch('confidence', buildConfidenceMatrixChartConfig({
+        veracity: Math.round(confScore*0.4), timing: Math.round(confScore*0.25),
+        icpFit: Math.round(confScore*0.2), completeness: Math.round(confScore*0.15),
+        overall: confScore
+      }), 480, 200),
+    ]);
+    charts.gauge      = g.status==='fulfilled'  ? g.value  : null;
+    charts.waterfall  = wf.status==='fulfilled' ? wf.value : null;
+    charts.confidence = cm.status==='fulfilled' ? cm.value : null;
+  }
+
   const filename = `GTM_${strategy.company_name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
-  const html = buildReportHTML(strategy);
+  const html = buildReportHTML(strategy, charts, isDemoMode);
   return new Response(JSON.stringify({ html, filename, mode: 'html2pdf' }), {
     status: 200, headers: { ...cors, 'Content-Type': 'application/json' },
   });
@@ -30,9 +89,214 @@ export async function onRequestOptions(context) {
 }
 
 // ══════════════════════════════════════════════════════════════
+// QUICKCHART HELPERS
+// ══════════════════════════════════════════════════════════════
+
+function safeNumber(value, fallback = 0) {
+  if (value === null || value === undefined || value === '') return fallback;
+  const n = parseFloat(String(value).replace(/[^0-9.\-]/g, ''));
+  return isNaN(n) ? fallback : n;
+}
+
+function renderChartOrFallback(type, base64, fallbackHtml, dimensions = { width: 480, height: 180 }) {
+  if (base64) {
+    return `<div style="margin:3mm 0;line-height:0">
+      <img src="data:image/png;base64,${base64}"
+        width="${dimensions.width}" height="${dimensions.height}"
+        style="width:100%;max-height:${dimensions.height}px;object-fit:contain;border-radius:8px"
+        alt="${type} chart"/>
+    </div>`;
+  }
+  return fallbackHtml;
+}
+
+function normalizeCompanyName(name) {
+  if (!name) return 'Company';
+  let n = String(name).trim();
+  // Remove leading/trailing dots and punctuation
+  n = n.replace(/^[\.\s]+|[\.\s]+$/g, '');
+  // Capitalize first letter if all lowercase
+  if (n === n.toLowerCase()) n = n.charAt(0).toUpperCase() + n.slice(1);
+  return n || 'Company';
+}
+
+function safe_val(v) {
+  if (!v && v !== 0) return '';
+  if (Array.isArray(v)) return v.join(', ');
+  if (typeof v === 'object') return Object.values(v).join(', ');
+  return String(v);
+}
+
+function parseMoneyValue(str, fallback = 0) {
+  if (!str) return fallback;
+  const s = String(str).replace(/,/g,'').toUpperCase();
+  const m = s.match(/([\d.]+)\s*(B|M|K)?/);
+  if (!m) return fallback;
+  const n = parseFloat(m[1]);
+  const unit = m[2] || '';
+  if (unit === 'B') return n * 1000;
+  if (unit === 'M') return n;
+  if (unit === 'K') return n / 1000;
+  return n > 1000 ? n / 1e6 : n; // treat large raw numbers as millions
+}
+
+function buildGtmGaugeChartConfig(score, verdict) {
+  const color = /^go$/i.test(verdict) ? '#22c55e' : /no/i.test(verdict) ? '#ef4444' : '#f59e0b';
+  return {
+    type: 'doughnut',
+    data: {
+      datasets: [{
+        data: [score, 100 - score],
+        backgroundColor: [color, 'rgba(255,255,255,0.05)'],
+        borderWidth: 0, circumference: 180, rotation: 270,
+      }]
+    },
+    options: {
+      cutout: '75%',
+      plugins: {
+        legend: { display: false },
+        datalabels: { display: false },
+      },
+      layout: { padding: { bottom: 20 } }
+    }
+  };
+}
+
+function buildTamWaterfallChartConfig(tamM, samM, somM) {
+  const fmt = v => v >= 1000 ? `$${(v/1000).toFixed(1)}B` : `$${Math.round(v)}M`;
+  return {
+    type: 'bar',
+    data: {
+      labels: ['TAM', 'SAM', 'SOM'],
+      datasets: [{
+        data: [tamM, samM, somM],
+        backgroundColor: ['#3b82f6','#a855f7','#f59e0b'],
+        borderRadius: 6,
+        barThickness: 40,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      plugins: { legend: { display: false }, datalabels: {
+        color: '#fff', font: { weight: 'bold', size: 11 },
+        formatter: v => fmt(v), anchor: 'end', align: 'right',
+      }},
+      scales: {
+        x: { ticks: { color: '#6B7280', font: { size: 9 }, callback: v => fmt(v) }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y: { ticks: { color: '#E5E7EB', font: { size: 11, weight: 'bold' } }, grid: { display: false } }
+      },
+      layout: { padding: { right: 80 } }
+    }
+  };
+}
+
+function buildConfidenceMatrixChartConfig({ veracity, timing, icpFit, completeness, overall }) {
+  return {
+    type: 'bar',
+    data: {
+      labels: ['Signal Veracity (40%)', 'Market Timing (25%)', 'ICP Fit (20%)', 'Data Completeness (15%)', 'Overall Fidelity'],
+      datasets: [{
+        data: [
+          Math.round((veracity/40)*100),
+          Math.round((timing/25)*100),
+          Math.round((icpFit/20)*100),
+          Math.round((completeness/15)*100),
+          overall
+        ],
+        backgroundColor: ['#7c3aed','#7c3aed','#7c3aed','#7c3aed','#a855f7'],
+        borderRadius: 4, barThickness: 18,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      plugins: { legend: { display: false }, datalabels: {
+        color: '#fff', font: { size: 10, weight: 'bold' },
+        formatter: v => v + '%', anchor: 'end', align: 'right',
+      }},
+      scales: {
+        x: { min: 0, max: 100, ticks: { color: '#6B7280', font: { size: 9 }, callback: v => v+'%' }, grid: { color: 'rgba(255,255,255,0.05)' } },
+        y: { ticks: { color: '#E5E7EB', font: { size: 9 } }, grid: { display: false } }
+      },
+      layout: { padding: { right: 60 } }
+    }
+  };
+}
+
+async function withTimeout(promise, ms) {
+  return Promise.race([
+    promise,
+    new Promise((_, rej) => setTimeout(() => rej(new Error(`Timeout after ${ms}ms`)), ms))
+  ]);
+}
+
+async function fetchQuickChartBase64(config, width, height, qc) {
+  const payload = JSON.stringify({
+    chart: config,
+    width, height,
+    backgroundColor: '#0B0F1A',
+    format: 'png',
+    ...(qc.apiKey ? { key: qc.apiKey } : {})
+  });
+  const res = await withTimeout(
+    fetch('https://quickchart.io/chart', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: payload,
+    }),
+    qc.timeout
+  );
+  if (!res.ok) throw new Error(`QuickChart HTTP ${res.status}`);
+  const buf = await res.arrayBuffer();
+  const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+  if (!b64 || b64.length < 100) throw new Error('QuickChart returned empty image');
+  return b64;
+}
+
+// ── Fallback renderers ──
+function renderGaugeFallback(score, verdict) {
+  const color = /^go$/i.test(verdict)?'var(--green)':/no/i.test(verdict)?'var(--red)':'var(--amber)';
+  const circ = 157, filled = Math.round((score/100)*circ);
+  return `<svg width="130" height="80" viewBox="0 0 130 80" xmlns="http://www.w3.org/2000/svg">
+    <defs><linearGradient id="gaugeGrad2" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#7c3aed"/><stop offset="100%" stop-color="${color}"/></linearGradient></defs>
+    <path d="M 15 72 A 50 50 0 0 1 115 72" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="8" stroke-linecap="round"/>
+    <path d="M 15 72 A 50 50 0 0 1 115 72" fill="none" stroke="url(#gaugeGrad2)" stroke-width="8" stroke-linecap="round" stroke-dasharray="${filled} ${circ}"/>
+    <text x="65" y="65" text-anchor="middle" font-family="monospace" font-size="22" font-weight="900" fill="white">${score}</text>
+    <text x="65" y="78" text-anchor="middle" font-family="sans-serif" font-size="7" fill="#6B7280" letter-spacing="1.5">GTM SCORE</text>
+  </svg>`;
+}
+
+function renderWaterfallFallback(tamV, samV, somV) {
+  const bar = (label,val,w,cls) => `<div style="display:flex;align-items:center;margin-bottom:3mm">
+    <div style="width:100px;font-family:monospace;font-size:10px;text-align:right;padding-right:3mm;color:white;font-weight:700">${val}</div>
+    <div style="flex:1;background:rgba(255,255,255,.08);border-radius:6px;height:14px;overflow:hidden">
+      <div style="height:100%;border-radius:6px;width:${w}" class="${cls}"></div>
+    </div>
+    <span style="margin-left:2mm;font-size:9px;color:#6B7280">${label}</span>
+  </div>`;
+  return `<div style="margin:3mm 0">
+    ${bar('TAM',tamV,'80%','wfb')}${bar('SAM',samV,'50%','wfa')}${bar('SOM',somV,'20%','wfm')}
+  </div>`;
+}
+
+function renderConfidenceFallback(v, t, f, c, overall) {
+  const cmBar = (label, sc, max) => `<div style="margin-bottom:3.5mm">
+    <div style="display:flex;justify-content:space-between;margin-bottom:1.5mm">
+      <span style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:#6B7280">${label}</span>
+      <span style="font-family:monospace;font-size:11px;font-weight:900;color:#a855f7">${sc}<span style="font-size:8px;font-weight:400;color:#6B7280">/${max}</span></span>
+    </div>
+    <div style="background:rgba(255,255,255,.07);border-radius:5px;height:9px;overflow:hidden">
+      <div style="height:100%;border-radius:5px;background:linear-gradient(90deg,#7c3aed,#a855f7);width:${Math.round((sc/max)*100)}%;min-width:3px"></div>
+    </div>
+  </div>`;
+  return cmBar('Signal Veracity (40%)',v,40)+cmBar('Market Timing (25%)',t,25)+cmBar('ICP Fit (20%)',f,20)+cmBar('Data Completeness (15%)',c,15)+
+    `<div style="border-top:1px solid rgba(168,85,247,.2);margin:3mm 0"></div>`+
+    `<div style="margin-bottom:2mm"><div style="display:flex;justify-content:space-between;margin-bottom:1.5mm"><span style="font-size:10px;font-weight:900;color:white">Overall Fidelity</span><span style="font-family:monospace;font-size:14px;font-weight:900;color:white">${overall}<span style="font-size:8px;font-weight:400;color:#6B7280">/100</span></span></div><div style="background:rgba(168,85,247,.12);border:1px solid rgba(168,85,247,.2);border-radius:6px;height:13px;overflow:hidden"><div style="height:100%;border-radius:6px;background:linear-gradient(90deg,#5b21b6,#7c3aed,#a855f7,#c084fc);width:${overall}%;min-width:3px"></div></div></div>`;
+}
+
+// ══════════════════════════════════════════════════════════════
 // TIER-1 ENTERPRISE A4 REPORT — dark-theme, rendered to PDF
 // ══════════════════════════════════════════════════════════════
-export function buildReportHTML(strategy) {
+export function buildReportHTML(strategy, charts = {}, isDemoMode = false) {
   const s1 = strategy.step_1_market || strategy.steps?.[1] || {};
   const s2 = strategy.step_2_tam || strategy.steps?.[2] || {};
   const s3 = strategy.step_3_icp || strategy.steps?.[3] || {};
@@ -40,14 +304,45 @@ export function buildReportHTML(strategy) {
   const s5 = strategy.step_5_keywords || strategy.steps?.[5] || {};
   const s6 = strategy.step_6_messaging || strategy.steps?.[6] || {};
   const s7 = strategy.step_7_intelligence || {};
-  const co = strategy.company_name || 'Company';
+  const coRaw = strategy.company_name || 'Company';
+  const co = normalizeCompanyName(coRaw);
   const ind = strategy.industry || '';
   const date = new Date().toLocaleDateString('en-GB',{year:'numeric',month:'long',day:'numeric'});
   const score = parseInt(s1.gtm_relevance_score) || 0;
   const confScore = parseInt(s7.confidence_score) || score || 0;
+
+  // ── String helpers ──
   const e = s => { if(typeof s!=='string') return String(s||''); return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); };
   const safe = v => { if(!v&&v!==0) return ''; if(Array.isArray(v)) return v.join(', '); if(typeof v==='object') return Object.entries(v).map(([k,x])=>`${k}: ${Array.isArray(x)?x.join(', '):x}`).join('; '); return String(v); };
   const arr = v => Array.isArray(v)?v:(v?[String(v)]:[]);
+
+  // ── Strategic positioning: robust first sentence extraction ──
+  const getFirstSentence = (text) => {
+    if (!text) return '';
+    // Strip leading dots/spaces/newlines (e.g. ".cloudflare is..." → "cloudflare is...")
+    const clean = String(text).replace(/^[\s.\-–—]+/, '').trim();
+    // Find first sentence boundary after at least 20 chars
+    const idx = clean.search(/\.(?=\s|$)/);
+    if (idx > 15) return clean.slice(0, idx);
+    // Fallback: first line or first 150 chars
+    const line = clean.split(/\n/)[0];
+    return line.length > 20 ? line : clean.slice(0, 150);
+  };
+  // Strategic positioning fallback chain
+  const getStrategicPositioning = () => {
+    const candidates = [
+      s7.strategic_hook,
+      s1.company_overview,
+      s1.market_position,
+      s7.go_no_go?.reason,
+    ];
+    for (const c of candidates) {
+      const text = safe(c);
+      if (text && text.length > 20) return getFirstSentence(text);
+    }
+    return `${co} is a commercially relevant target based on inferred market fit, GTM maturity, and revenue operations alignment. Validate with live data before decisioning.`;
+  };
+  const strategicPositioning = getStrategicPositioning();
   const rec = s7.go_no_go?.recommendation || (score>=75?'Go':score>=50?'Watch':'No-Go');
   const recUp = rec.toUpperCase();
   const recColor = /go$/i.test(rec)&&!/no/i.test(rec)?'var(--green)':/no/i.test(rec)?'var(--red)':'var(--amber)';
@@ -388,24 +683,9 @@ ul{padding-left:5mm}li{margin-bottom:1.5mm}
     <div style="font-size:20px;font-weight:300;color:var(--muted);margin-top:2mm;letter-spacing:2px;text-transform:uppercase">GTM Intelligence Report</div>
     ${ind?`<div style="margin-top:3mm"><span class="tg blue" style="font-size:9px">${e(ind)}</span></div>`:''}
   </div>
-  <!-- SVG Score Gauge -->
+  <!-- GTM Score Gauge -->
   <div style="display:flex;justify-content:center;margin-bottom:8mm">
-    <svg width="130" height="80" viewBox="0 0 130 80" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stop-color="#7c3aed"/>
-          <stop offset="100%" stop-color="#c084fc"/>
-        </linearGradient>
-      </defs>
-      <!-- Track arc -->
-      <path d="M 15 72 A 50 50 0 0 1 115 72" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="8" stroke-linecap="round"/>
-      <!-- Score arc: circumference of semicircle ~157px, score% of that -->
-      <path d="M 15 72 A 50 50 0 0 1 115 72" fill="none" stroke="url(#gaugeGrad)" stroke-width="8" stroke-linecap="round"
-        stroke-dasharray="${Math.round((score/100)*157)} 157"/>
-      <!-- Score text -->
-      <text x="65" y="65" text-anchor="middle" font-family="'Space Mono',monospace" font-size="22" font-weight="900" fill="white">${score||'—'}</text>
-      <text x="65" y="78" text-anchor="middle" font-family="Inter,sans-serif" font-size="7" fill="#6B7280" letter-spacing="1.5">GTM SCORE</text>
-    </svg>
+    ${renderChartOrFallback('GTM Gauge', charts.gauge, renderGaugeFallback(score, rec), {width:200,height:120})}
   </div>
   <!-- KPI Row -->
   <div style="display:flex;gap:3mm;justify-content:center;margin-bottom:6mm">
@@ -422,9 +702,9 @@ ul{padding-left:5mm}li{margin-bottom:1.5mm}
       <div style="font-size:7px;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-top:1mm">Verdict</div>
     </div>
   </div>
-  ${s1.company_overview?`<div style="margin:0 auto;max-width:145mm;background:rgba(168,85,247,.05);border:1px solid rgba(168,85,247,.15);border-left:3px solid var(--accent);border-radius:8px;padding:3.5mm 5mm;text-align:left">
+  ${s1.company_overview || s7.strategic_hook ?`<div style="margin:0 auto;max-width:145mm;background:rgba(168,85,247,.05);border:1px solid rgba(168,85,247,.15);border-left:3px solid var(--accent);border-radius:8px;padding:3.5mm 5mm;text-align:left">
     <div style="font-size:7px;font-weight:900;text-transform:uppercase;letter-spacing:.18em;color:var(--accent);margin-bottom:1.5mm">Strategic Positioning</div>
-    <div style="font-size:10.5px;color:var(--text);line-height:1.6">${e((safe(s1.company_overview)||'').split('.')[0])}.</div>
+    <div style="font-size:10.5px;color:var(--text);line-height:1.6">${e(strategicPositioning)}.</div>
   </div>`:''}
 </div>
 <div style="position:absolute;bottom:12mm;left:0;right:0;font-size:8px;color:var(--faint);text-align:center;z-index:1">Classification: CONFIDENTIAL — Not for External Distribution</div>
@@ -483,11 +763,20 @@ ${secCtx(s2.section_context||'Quantifies total market velocity and filters it to
 <div style="display:flex;gap:4mm;margin-bottom:5mm">
   <div class="card" style="flex:1;text-align:center"><div class="mn">${e(safe(s2.tam_size_estimate)||'—')}</div><div class="bl">TAM</div></div>
   <div class="card" style="flex:1;text-align:center"><div class="mn" style="color:var(--green)">${e(safe(s2.growth_rate)||'—')}</div><div class="bl">CAGR</div></div>
-  <div class="card" style="flex:1;text-align:center"><div class="mn" style="color:var(--amber)">${e(safe(s2.market_maturity)||'—')}</div><div class="bl">Maturity</div></div>
+  <div class="card" style="flex:1;text-align:center">
+    ${(()=>{ const mv = safe(s2.market_maturity)||'—'; const isLong = mv.length > 12;
+      if (isLong) {
+        const parts = mv.split(/\s+with\s+|\s+—\s+|\s*,\s*/i);
+        return `<div style="font-size:14px;font-weight:900;font-family:'Space Mono',monospace;color:var(--amber);line-height:1.2">${e(parts[0]||mv)}</div>${parts[1]?`<div style="font-size:9px;color:var(--muted);margin-top:1.5mm;line-height:1.3">${e(parts[1])}</div>`:''}`;
+      }
+      return `<div class="mn" style="color:var(--amber)">${e(mv)}</div>`;
+    })()}
+    <div class="bl">Maturity</div>
+  </div>
 </div>
 ${srcNote('TAM/CAGR: AI market estimate; Maturity: AI assessment — cross-reference with industry analyst reports')}
 <h3>2.2 · Waterfall Logic: TAM → SAM → SOM</h3>
-${waterfall()}
+${renderChartOrFallback('TAM Waterfall', charts.waterfall, waterfall(), {width:480,height:180})}
 ${segTable()}
 ${s2.priority_opportunities?`<h3>2.4 · Priority Opportunities</h3><div class="card"><p>${e(safe(s2.priority_opportunities))}</p></div>`:''}
 ${callout(s2.analyst_insight,'amber')}
@@ -578,7 +867,7 @@ ${callout(s5.analyst_insight)}
 ${pageFtr('Keywords & Intent',6)}
 </div>
 
-<!-- STEP 6: ENTERPRISE SDR SEQUENCE -->
+<!-- STEP 6: ENTERPRISE SDR SEQUENCE — PAGE 8: EMAILS -->
 <div class="page">
 ${pageHdr()}
 ${secHead('06','Enterprise SDR Sequence — The Engagement')}
@@ -587,27 +876,57 @@ ${secCtx(s6.section_context||'Hyper-targeted sequences designed to agitate pain 
 ${emailBlock('email_1',0)}
 ${emailBlock('email_2',1)}
 ${emailBlock('email_3',2)}
+${pageFtr('Engagement Playbook — Emails',7)}
+</div>
+
+<!-- STEP 6 CONTINUED — PAGE 9: FOLLOW-UP + LINKEDIN -->
+<div class="page">
+${pageHdr()}
+${secHead('06','Enterprise SDR Sequence — Follow-up & Social')}
+${secCtx('Cadence continuation and LinkedIn direct outreach hook.')}
 ${s6.follow_up_sequence?`<h3>6.2 · Follow-up Cadence</h3><div class="card"><p>${e(safe(s6.follow_up_sequence))}</p></div>`:''}
 ${s6.linkedin_message?`<h3>6.3 · LinkedIn Hook</h3><div class="card"><p style="font-size:12px"><strong>Direct Message:</strong><br>"${e(safe(s6.linkedin_message))}"</p></div>`:''}
 ${s6.linkedin_follow_up?`<h3>6.4 · LinkedIn Follow-up</h3><div class="card"><p>${e(safe(s6.linkedin_follow_up))}</p></div>`:''}
 ${callout(s6.analyst_insight)}
-${pageFtr('Engagement Playbook',7)}
+${pageFtr('Engagement Playbook — Cadence',8)}
 </div>
 
-<!-- STEP 7: REVENUE INTELLIGENCE -->
+<!-- STEP 7: REVENUE INTELLIGENCE — Decision Engine -->
 <div class="page">
 ${pageHdr()}
 ${decisionEngine()}
-${confidenceMatrix()}
-${pageFtr('Revenue Intelligence',8)}
+${pageFtr('Revenue Intelligence',9)}
 </div>
 
-<!-- APPENDIX -->
+<!-- STEP 7 CONTINUED: CONFIDENCE MATRIX -->
+<div class="page">
+${pageHdr()}
+${secHead('07','Revenue Intelligence — Confidence Matrix')}
+${secCtx('Weighted fidelity assessment of signal quality, market timing, and ICP alignment.')}
+<h3>7.6 · Weighted Confidence Matrix</h3>
+${renderChartOrFallback('Confidence Matrix', charts.confidence,
+  `<div style="display:flex;gap:6mm;align-items:flex-start">${(()=>{
+    const circ=176, filled=Math.round((confScore/100)*circ);
+    const gc = confScore>=75?'var(--green)':confScore>=50?'var(--amber)':'var(--red)';
+    return `<svg width="90" height="90" viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0">
+      <circle cx="45" cy="45" r="28" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="9"/>
+      <circle cx="45" cy="45" r="28" fill="none" stroke="${gc}" stroke-width="9" stroke-dasharray="${filled} ${circ}" stroke-dashoffset="${Math.round(circ*0.25)}" stroke-linecap="round" transform="rotate(-90 45 45)"/>
+      <text x="45" y="42" text-anchor="middle" font-family="monospace" font-size="16" font-weight="900" fill="white">${confScore}</text>
+      <text x="45" y="54" text-anchor="middle" font-size="6.5" fill="#6B7280" letter-spacing="1">FIDELITY</text>
+    </svg><div style="flex:1">${renderConfidenceFallback(veracity,timing,icpFit,completeness,confScore)}</div>`;
+  })()}</div>`,
+  {width:480, height:200}
+)}
+${srcNote('Confidence score is algorithmic — weights fixed (40/25/20/15), capped by data richness')}
+${callout(s7.analyst_insight)}
+${pageFtr('Revenue Intelligence — Confidence',10)}
+</div>
+
+<!-- APPENDIX PAGE 1: A.1-A.4 -->
 <div class="page">
 ${pageHdr()}
 ${secHead('A','Appendix — Methodology & Data Quality')}
 ${secCtx('Transparency layer. Documents data provenance, scoring methodology, and known limitations.')}
-
 <h3>A.1 · Data Sources</h3>
 <table class="dt">
   <tr><th>Data Point</th><th>Source Type</th><th>Reliability</th></tr>
@@ -621,27 +940,24 @@ ${secCtx('Transparency layer. Documents data provenance, scoring methodology, an
   <tr><td>Email sequences</td><td>AI-generated, personalized</td><td>High — review before sending</td></tr>
   <tr><td>Confidence score</td><td>Algorithmic (capped by data richness)</td><td>High</td></tr>
 </table>
-
 <h3>A.2 · TAM Calculation Methodology</h3>
 <table class="dt">
   <tr><th>Step</th><th>Method</th></tr>
   <tr><td>1. Global TAM</td><td>AI estimate from industry classification, public market reports, and comparable company analysis</td></tr>
-  <tr><td>2. Geography filter</td><td>Uses company-provided geography_eligibility when available; defaults to conservative 60–70%</td></tr>
-  <tr><td>3. Service-line fit</td><td>Uses company-provided service_line_fit when available; defaults to conservative 30–40%</td></tr>
-  <tr><td>4. Win rate</td><td>Uses company-provided win_rate when available; defaults to 8–12% (enterprise benchmark)</td></tr>
-  <tr><td>5. SOM derivation</td><td>Product of steps 1–4; dynamic values override defaults when strategy data provides them</td></tr>
+  <tr><td>2. Geography filter</td><td>Uses company-provided geography_eligibility when available; defaults to conservative 60-70%</td></tr>
+  <tr><td>3. Service-line fit</td><td>Uses company-provided service_line_fit when available; defaults to conservative 30-40%</td></tr>
+  <tr><td>4. Win rate</td><td>Uses company-provided win_rate when available; defaults to 8-12% (enterprise benchmark)</td></tr>
+  <tr><td>5. SOM derivation</td><td>Product of steps 1-4; dynamic values override defaults when strategy data provides them</td></tr>
 </table>
-
 <h3>A.3 · Key Assumptions</h3>
 <table class="dt">
   <tr><th>Assumption</th><th>Default Value</th><th>Override Guidance</th></tr>
-  <tr><td>Geography eligibility</td><td>Dynamic when available; else 60–70%</td><td>Auto-populated from strategy.waterfall.geography_eligibility</td></tr>
-  <tr><td>Service-line fit</td><td>Dynamic when available; else 30–40%</td><td>Auto-populated from strategy.waterfall.service_line_fit</td></tr>
-  <tr><td>Win/capture rate</td><td>Dynamic when available; else 8–12%</td><td>Auto-populated from strategy.waterfall.win_rate</td></tr>
+  <tr><td>Geography eligibility</td><td>Dynamic when available; else 60-70%</td><td>Auto-populated from strategy.waterfall.geography_eligibility</td></tr>
+  <tr><td>Service-line fit</td><td>Dynamic when available; else 30-40%</td><td>Auto-populated from strategy.waterfall.service_line_fit</td></tr>
+  <tr><td>Win/capture rate</td><td>Dynamic when available; else 8-12%</td><td>Auto-populated from strategy.waterfall.win_rate</td></tr>
   <tr><td>ICP derivation</td><td>Inferred from decision-makers + industry</td><td>Replace with validated buyer persona research</td></tr>
   <tr><td>Account analogs</td><td>AI-generated archetypes</td><td>Replace with actual target account list from sales</td></tr>
 </table>
-
 <h3>A.4 · Confidence Scoring Explanation</h3>
 <table class="dt">
   <tr><th>Dimension</th><th>Weight</th><th>Description</th></tr>
@@ -651,19 +967,24 @@ ${secCtx('Transparency layer. Documents data provenance, scoring methodology, an
   <tr><td>Data Completeness</td><td class="num">15%</td><td>Depth and quality of source data used in analysis</td></tr>
 </table>
 <div class="card"><p>The AI confidence score is <strong>hard-capped</strong> by measured data richness. The AI cannot claim higher confidence than the underlying data supports. If data richness = 40, confidence is capped at 40 regardless of AI output.</p></div>
+${pageFtr('Appendix — Methodology',11)}
+</div>
 
+<!-- APPENDIX PAGE 2: A.5-A.7 -->
+<div class="page">
+${pageHdr()}
+${secHead('A','Appendix — Data Quality & Report Metadata')}
+${secCtx('Data quality audit, AI-estimated fields disclaimer, and report metadata.')}
 ${s7._data_quality?`<h3>A.5 · Data Quality Audit</h3><table class="dt"><tr><th>Metric</th><th>Value</th></tr><tr><td>Data Richness Score</td><td class="num">${s7._data_quality.richness_score||'—'}</td></tr><tr><td>Signals (Pre-filter)</td><td class="num">${s7._data_quality.signals_before_filter||'—'}</td></tr><tr><td>Signals (Post-filter)</td><td class="num">${s7._data_quality.signals_after_filter||'—'}</td></tr><tr><td>AI Confidence (Claimed)</td><td class="num">${s7._data_quality.confidence_ai_claimed||'—'}</td></tr><tr><td>Confidence (After Cap)</td><td class="num">${s7._data_quality.confidence_after_cap||'—'}</td></tr></table>`:''}
-
 <h3>A.6 · AI-Estimated Fields Disclaimer</h3>
-<div class="ac amber"><strong>⚠️ AI-Estimated Content:</strong> The following fields in this report are generated by AI and should be independently validated before use in strategic decisions:<br>
-• TAM / SAM / SOM sizing and growth rates<br>
-• Market segment estimates and priorities<br>
-• ICP persona derivations (when original data was placeholder)<br>
-• Account target analogs and fit scores<br>
-• Buying trigger identification and signal strength<br>
-• Confidence score components<br><br>
+<div class="ac amber"><strong>AI-Estimated Content:</strong> The following fields in this report are generated by AI and should be independently validated before use in strategic decisions:<br>
+TAM / SAM / SOM sizing and growth rates<br>
+Market segment estimates and priorities<br>
+ICP persona derivations (when original data was placeholder)<br>
+Account target analogs and fit scores<br>
+Buying trigger identification and signal strength<br>
+Confidence score components<br><br>
 All competitive intelligence reflects publicly available data only. Manual validation of exact revenue figures, headcount, and funding data is recommended prior to boardroom presentation.</div>
-
 <h3>A.7 · Report Metadata</h3>
 <table class="dt">
   <tr><th>Field</th><th>Value</th></tr>
@@ -671,16 +992,20 @@ All competitive intelligence reflects publicly available data only. Manual valid
   ${ind?`<tr><td>Industry</td><td>${e(ind)}</td></tr>`:''}
   <tr><td>Generated</td><td>${date}</td></tr>
   <tr><td>Platform</td><td>ABE Enterprise AI Revenue Infrastructure</td></tr>
+  <tr><td>Report Mode</td><td>${isDemoMode ? 'Demo — illustrative only' : 'Live / Realtime'}</td></tr>
   <tr><td>Steps Completed</td><td>${strategy.steps_completed||6}/7</td></tr>
   <tr><td>GTM Relevance Score</td><td>${score}/100</td></tr>
   <tr><td>Confidence Score</td><td>${confScore}/100</td></tr>
+  <tr><td>QuickChart Used</td><td>${(charts.gauge||charts.waterfall||charts.confidence) ? 'Yes' : 'No — fallback HTML'}</td></tr>
 </table>
-<div style="text-align:center;margin-top:10mm;padding-top:5mm;border-top:1px solid var(--border)">
+<div style="text-align:center;margin-top:8mm;padding-top:5mm;border-top:1px solid var(--border)">
   <div class="am" style="margin:0 auto 3mm;width:28px;height:28px;font-size:9px">ABE</div>
   <p style="font-size:9px;color:var(--faint)">End of Report · ${e(co)} · ${date} · Confidential</p>
 </div>
-${pageFtr('Appendix',9)}
+${pageFtr('Appendix — Report Metadata',12)}
 </div>
 
+</body></html>`;
+}
 </body></html>`;
 }
