@@ -56,8 +56,8 @@ export function buildReportHTML(strategy) {
   const icpFit = Math.round(confScore*0.2);
   const completeness = Math.round(confScore*0.15);
 
-  // ── Source attribution ──
-  const srcNote = (src) => `<div style="font-size:8px;color:var(--faint);margin:2mm 0;font-style:italic">Source: ${e(src)} — validate manually</div>`;
+  const srcNote = (src) => `<div style="font-size:7.5px;color:var(--faint);margin:1.5mm 0;font-style:italic">◆ ${e(src)} — validate manually</div>`;
+  const callout = (text,cls='') => text?`<div class="ac ${cls}"><strong><svg width="11" height="11" viewBox="0 0 16 16" fill="none" style="display:inline;vertical-align:middle;margin-right:3px"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><path d="M8 7v4M8 5.5v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg> Analyst Insight:</strong> ${e(text)}</div>`:'';
 
   // ── ICP placeholder detection & repair ──
   const ICP_BAD = /^(persona|secondary|unknown|n\/a|—|-|\s*)$/i;
@@ -87,9 +87,25 @@ export function buildReportHTML(strategy) {
   // ── Helper builders ──
   const pageHdr = () => `<div class="ph"><div class="phb"><div class="am">ABE</div><div><div class="abn">AI Revenue Infrastructure</div><div class="abs">Enterprise GTM Platform</div></div></div><div class="cb">Confidential</div></div>`;
   const pageFtr = (label,num) => `<div class="pf"><span>ABE · ${e(label)}</span><span>${num}</span></div>`;
-  const secHead = (num,title) => `<h2><span class="sa">${num}</span> ${e(title)}</h2>`;
+
+  // SVG icons for each section (inline, no external deps)
+  const ICONS = {
+    ES:  `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="2" rx="1" fill="white"/><rect x="2" y="7" width="8" height="2" rx="1" fill="white" opacity=".7"/><rect x="2" y="11" width="10" height="2" rx="1" fill="white" opacity=".5"/></svg>`,
+    '01':`<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5" stroke="white" stroke-width="1.5"/><path d="M8 5v3l2 2" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+    '02':`<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M2 13L6 7l3 3 2-4 3 4" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    '03':`<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="2.5" stroke="white" stroke-width="1.5"/><path d="M3 13c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+    '04':`<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="5" cy="5" r="2" stroke="white" stroke-width="1.5"/><circle cx="11" cy="8" r="2" stroke="white" stroke-width="1.5"/><circle cx="5" cy="11" r="2" stroke="white" stroke-width="1.5"/><path d="M7 5h2M7 11h2M6 7l3-1" stroke="white" stroke-width="1" opacity=".6"/></svg>`,
+    '05':`<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="4" stroke="white" stroke-width="1.5"/><path d="M10.5 10.5L14 14" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+    '06':`<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 12V6l5-3 5 3v6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><rect x="6" y="8" width="4" height="4" rx=".5" stroke="white" stroke-width="1.2"/></svg>`,
+    '07':`<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2l1.5 4h4l-3.5 2.5 1.5 4L8 10l-3.5 2.5 1.5-4L2.5 6h4z" stroke="white" stroke-width="1.3" stroke-linejoin="round"/></svg>`,
+    A:   `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2L10 7H15L11 10L13 15L8 12L3 15L5 10L1 7H6Z" stroke="white" stroke-width="1.2" stroke-linejoin="round"/></svg>`,
+  };
+  const secHead = (num, title) => {
+    const icon = ICONS[num] || '';
+    return `<h2><span class="sa" style="background:linear-gradient(135deg,var(--accent2),var(--accent))">${icon||num}</span> ${e(title)}</h2>`;
+  };
   const secCtx = text => text?`<div class="sc">${e(text)}</div>`:'';
-  const callout = (text,cls='') => text?`<div class="ac ${cls}"><strong>👉 Analyst Insight:</strong> ${e(text)}</div>`:'';
+  const tags = (items,cls='') => arr(items).slice(0,15).map(t=>`<span class="tg ${cls}">${e(String(t))}</span>`).join('');
   const tags = (items,cls='') => arr(items).slice(0,15).map(t=>`<span class="tg ${cls}">${e(String(t))}</span>`).join('');
   const fieldRow = (label,val) => { const v=safe(val); return v?`<tr><th>${e(label)}</th><td>${e(v)}</td></tr>`:''; };
 
@@ -138,8 +154,21 @@ export function buildReportHTML(strategy) {
   // ── Segments Table ──
   const segTable = () => { const sg=s2.market_segments; if(!Array.isArray(sg)||!sg.length) return ''; return `<h3>2.3 · Market Segments</h3><table class="dt"><thead><tr><th>Segment</th><th class="num">Est. Size</th><th>Priority</th><th class="num">Growth</th></tr></thead><tbody>${sg.slice(0,6).map(s=>`<tr><td>${e(safe(s.name||s.segment_name||'—'))}</td><td class="num">${e(safe(s.size||s.market_size||'—'))}</td><td>${e(safe(s.priority||'—'))}</td><td class="num">${e(safe(s.growth_rate||'—'))}</td></tr>`).join('')}</tbody></table>${srcNote('AI market estimate — validate with industry reports')}`; };
 
-  // ── Emails ──
-  const emailBlock = (k,i) => { const em=s6[k]; if(!em) return ''; return `<div class="card"><div class="bl">Email ${i+1} — ${e(em.angle||'')}</div><p><strong>Subject:</strong> ${e(em.subject||'—')}</p><p style="white-space:pre-line;word-break:break-word;overflow-wrap:break-word;min-width:0;width:100%;display:block;font-size:10.5px">${e(em.body||'—')}</p><p><span class="tg green" style="margin-top:2mm">CTA: ${e(em.cta||'—')}</span></p></div>`; };
+  // ── Emails — SDR Timeline ──
+  const emailBlock = (k,i) => {
+    const em=s6[k]; if(!em) return '';
+    const icons = ['✉','✉','✉','🔗','📞'];
+    const labels = ['Email 1','Email 2','Email 3','LinkedIn','Follow-up'];
+    return `<div class="sdr-step">
+      <div class="sdr-num">${icons[i]||i+1}</div>
+      <div class="sdr-body">
+        <div class="sdr-angle">${labels[i]||'Step '+(i+1)} — ${e(em.angle||'')}</div>
+        <div class="sdr-subject">${e(em.subject||'—')}</div>
+        <div class="sdr-preview">${e(em.body||'—')}</div>
+        <span class="tg green" style="margin-top:2mm;display:inline-block">CTA: ${e(em.cta||'—')}</span>
+      </div>
+    </div>`;
+  };
 
   // ── ICP Repair Logic ──
   const icpRepair = () => {
@@ -162,7 +191,18 @@ export function buildReportHTML(strategy) {
   ${secHead('07','Revenue Intelligence — Decision Engine')}
   ${secCtx('Final strategic audit. Validates execution viability and dictates immediate next steps.')}
   <h3>7.1 · Go / No-Go Validation</h3>
-  <div class="card"><div style="display:flex;align-items:center;gap:5mm"><span class="mn" style="color:${recColor};font-size:32px">${e(recUp)}</span><div><strong>Verdict Rationale:</strong><br>${e(reason)}</div></div></div>
+  <div class="card" style="border-left:4px solid ${recColor}">
+    <div style="display:flex;align-items:center;gap:5mm">
+      <svg width="52" height="52" viewBox="0 0 52 52" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0">
+        <circle cx="26" cy="26" r="24" fill="rgba(168,85,247,.06)" stroke="${recColor}" stroke-width="1.5"/>
+        ${/no/i.test(rec)?`<path d="M18 18L34 34M34 18L18 34" stroke="${recColor}" stroke-width="3" stroke-linecap="round"/>`:/go$/i.test(rec)&&!/no/i.test(rec)?`<path d="M15 27L22 34L37 18" stroke="${recColor}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`:`<path d="M26 18v10M26 32v2" stroke="${recColor}" stroke-width="3" stroke-linecap="round"/>`}
+      </svg>
+      <div>
+        <div style="font-family:'Space Mono',monospace;font-size:26px;font-weight:900;color:${recColor};line-height:1">${e(recUp)}</div>
+        <div style="font-size:10px;color:var(--muted);margin-top:1.5mm"><strong style="color:var(--text)">Verdict Rationale:</strong> ${e(reason)}</div>
+      </div>
+    </div>
+  </div>
   ${srcNote(hasS7?'Source: Step 7 AI intelligence layer — algorithmic composite':'Source: derived from GTM relevance score ('+score+'/100) — algorithmic')}
   <h3>7.2 · Why Now</h3>
   <div class="card"><p style="font-size:12px">${e(whyNow)}</p></div>
@@ -171,34 +211,80 @@ export function buildReportHTML(strategy) {
   <div class="ac"><strong>"${e(hook)}"</strong></div>
   ${srcNote(hasS7&&s7.strategic_hook?'Source: Step 7 AI strategic analysis':'Source: derived from buying triggers — AI estimate')}
   <h3>7.4 · Risk &amp; Constraint Analysis</h3>
-  <div class="ac red"><strong>🚩 Identified Constraints:</strong><br>
-    <strong>Decision Cycle:</strong> ${dms.length?`Buying committee spans ${dms.slice(0,3).join(', ')}. Multi-stakeholder alignment extends cycle 30–60 days.`:'Expect extended multi-stakeholder approval cycles.'}<br>
-    <strong>Vendor Lock-in:</strong> Entrenched incumbent relationships reduce switching probability. Lead with differentiated outcome data.<br>
-    <strong>Budget Friction:</strong> Capital commitments require CFO-level ROI framing. Surface quantifiable efficiency recovery.
+  <div class="card" style="border-left:4px solid var(--red);background:rgba(239,68,68,.03)">
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3mm">
+      <div>
+        <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--red);margin-bottom:1.5mm">
+          <svg width="9" height="9" viewBox="0 0 12 12" fill="none" style="display:inline;vertical-align:middle;margin-right:2px"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.2"/><path d="M6 4v3M6 8v.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg> Decision Cycle</div>
+        <div style="font-size:9.5px;color:var(--text)">${dms.length?`Buying committee: ${dms.slice(0,2).join(', ')}. Extends cycle 30–60 days.`:'Multi-stakeholder approval cycle expected.'}</div>
+      </div>
+      <div>
+        <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--amber);margin-bottom:1.5mm">
+          <svg width="9" height="9" viewBox="0 0 12 12" fill="none" style="display:inline;vertical-align:middle;margin-right:2px"><rect x="1" y="4" width="10" height="7" rx="1" stroke="currentColor" stroke-width="1.2"/><path d="M4 4V3a2 2 0 014 0v1" stroke="currentColor" stroke-width="1.2"/></svg> Vendor Lock-in</div>
+        <div style="font-size:9.5px;color:var(--text)">Incumbent relationships reduce switching probability. Lead with differentiated outcomes.</div>
+      </div>
+      <div>
+        <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--amber);margin-bottom:1.5mm">
+          <svg width="9" height="9" viewBox="0 0 12 12" fill="none" style="display:inline;vertical-align:middle;margin-right:2px"><path d="M6 2v2M6 8v2M2 6h2M8 6h2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><circle cx="6" cy="6" r="2" stroke="currentColor" stroke-width="1.2"/></svg> Budget Friction</div>
+        <div style="font-size:9.5px;color:var(--text)">CFO-level ROI framing required. Surface quantifiable efficiency recovery.</div>
+      </div>
+    </div>
   </div>
-  ${srcNote('Source: 30–60 day cycle estimate is an industry benchmark (AI estimate) — validate with actual deal-cycle data from CRM')}
+  ${srcNote('30–60 day cycle estimate is an industry benchmark (AI estimate) — validate with CRM data')}
   <h3>7.5 · Execution Priority</h3>
-  <div class="card"><p><strong>Target:</strong> ${e(dms[0]||safe(s3.primary_icp)||'Senior decision-makers')}<br><strong>Lead With:</strong> ${e(triggers[0]||'Operational pressure')}<br><strong>Close With:</strong> ${safe(s2.growth_rate)?`Market growing at ${safe(s2.growth_rate)} — quantify cost of delayed adoption`:'Quantified ROI recovery and risk elimination'}</p></div>
-  ${safe(s2.growth_rate)?srcNote('Source: CAGR ('+safe(s2.growth_rate)+') is an AI market estimate — cross-reference with analyst reports'):''}`;
+  <div class="card">
+    <div style="display:flex;gap:5mm">
+      <div style="flex:1;border-right:1px solid var(--border);padding-right:4mm">
+        <div style="font-size:7.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:1.5mm">Target</div>
+        <div style="font-size:11px;font-weight:700;color:white">${e(dms[0]||safe(s3.primary_icp)||'Senior decision-makers')}</div>
+      </div>
+      <div style="flex:1;border-right:1px solid var(--border);padding-right:4mm">
+        <div style="font-size:7.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:1.5mm">Lead With</div>
+        <div style="font-size:11px;font-weight:700;color:var(--amber)">${e(triggers[0]||'Operational pressure')}</div>
+      </div>
+      <div style="flex:1">
+        <div style="font-size:7.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:1.5mm">Close With</div>
+        <div style="font-size:11px;font-weight:700;color:var(--green)">${safe(s2.growth_rate)?`${safe(s2.growth_rate)} market — quantify cost of delay`:'Quantified ROI recovery'}</div>
+      </div>
+    </div>
+  </div>
+  ${safe(s2.growth_rate)?srcNote('CAGR ('+safe(s2.growth_rate)+') is an AI market estimate — cross-reference with analyst reports'):''}`;
 
   };
 
   // ── Weighted Confidence Matrix ──
   const confidenceMatrix = () => {
     if(!confScore) return '';
-    const cmBar = (label, score, max, cls='') => `<div class="cmrow ${cls}">
-      <div class="cmhdr"><span class="cmlbl">${label}</span><span class="cmscore">${score}<span style="font-size:8px;font-weight:400;color:var(--muted)">/${max}</span></span></div>
-      <div class="cmtrack"><div class="cmfill" style="width:${Math.round((score/max)*100)}%"></div></div>
+    const cmBar = (label, sc, max, cls='') => `<div class="cmrow ${cls}">
+      <div class="cmhdr"><span class="cmlbl">${label}</span><span class="cmscore">${sc}<span style="font-size:8px;font-weight:400;color:var(--muted)">/${max}</span></span></div>
+      <div class="cmtrack"><div class="cmfill" style="width:${Math.round((sc/max)*100)}%"></div></div>
     </div>`;
+    // SVG donut: r=28, circumference=176
+    const circ = 176;
+    const filled = Math.round((confScore/100)*circ);
+    const gaugeColor = confScore>=75?'var(--green)':confScore>=50?'var(--amber)':'var(--red)';
     return `
   <h3>7.6 · Weighted Confidence Matrix</h3>
-  ${cmBar('Signal Veracity (40%)', veracity, 40)}
-  ${cmBar('Market Timing (25%)', timing, 25)}
-  ${cmBar('ICP Fit (20%)', icpFit, 20)}
-  ${cmBar('Data Completeness (15%)', completeness, 15)}
-  <div style="border-top:1px solid rgba(168,85,247,.2);margin:4mm 0 3mm"></div>
-  ${cmBar('Overall Fidelity', confScore, 100, 'cmrow-overall')}
-  ${srcNote('Source: confidence score is algorithmic — weights are fixed (40/25/20/15), sub-scores derived from data richness measurement, capped by server-side hallucination guard')}`;
+  <div style="display:flex;gap:6mm;align-items:flex-start">
+    <svg width="90" height="90" viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0">
+      <circle cx="45" cy="45" r="28" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="9"/>
+      <circle cx="45" cy="45" r="28" fill="none" stroke="${gaugeColor}" stroke-width="9"
+        stroke-dasharray="${filled} ${circ}" stroke-dashoffset="${Math.round(circ*0.25)}"
+        stroke-linecap="round" transform="rotate(-90 45 45)"/>
+      <text x="45" y="42" text-anchor="middle" font-family="'Space Mono',monospace" font-size="16" font-weight="900" fill="white">${confScore}</text>
+      <text x="45" y="54" text-anchor="middle" font-family="Inter,sans-serif" font-size="6.5" fill="#6B7280" letter-spacing="1">FIDELITY</text>
+    </svg>
+    <div style="flex:1">
+      ${cmBar('Signal Veracity (40%)', veracity, 40)}
+      ${cmBar('Market Timing (25%)', timing, 25)}
+      ${cmBar('ICP Fit (20%)', icpFit, 20)}
+      ${cmBar('Data Completeness (15%)', completeness, 15)}
+      <div style="border-top:1px solid rgba(168,85,247,.2);margin:3mm 0 2mm"></div>
+      ${cmBar('Overall Fidelity', confScore, 100, 'cmrow-overall')}
+    </div>
+  </div>
+  ${srcNote('Confidence score is algorithmic — weights fixed (40/25/20/15), capped by data richness')}`;
+  };`;
   };
 
   // ════════════════════════════════════════════════════════════
@@ -218,20 +304,20 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-
 .abs{font-family:'Space Mono',monospace;font-size:8px;color:var(--muted);letter-spacing:.12em;text-transform:uppercase}
 .cb{background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.25);border-radius:20px;padding:4px 14px;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
 h1{font-size:36px;font-weight:900;color:white;letter-spacing:-.5px}
-h2{font-size:18px;font-weight:700;color:white;margin-bottom:4mm;display:flex;align-items:center;gap:8px}
-h3{font-size:14px;font-weight:600;color:var(--text);margin-top:5mm;margin-bottom:3mm}
-p{margin-bottom:3mm}
-.sa{display:inline-flex;width:28px;height:28px;background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.3);border-radius:8px;align-items:center;justify-content:center;font-size:12px;font-weight:800}
-.sc{font-size:13px;color:var(--muted);margin-bottom:6mm;border-bottom:1px dashed var(--border);padding-bottom:3mm}
-.card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:5mm 6mm;margin-bottom:5mm}
-.bl{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-bottom:2mm}
-.dt{width:100%;border-collapse:collapse;margin-top:2mm;font-size:10px;margin-bottom:4mm}
-.dt th{text-align:left;color:var(--muted);font-weight:600;padding:2mm 3mm;border-bottom:1px solid var(--border)}
-.dt td{padding:2mm 3mm;border-bottom:1px solid rgba(31,41,55,.5);vertical-align:top}
+h2{font-size:17px;font-weight:700;color:white;margin-bottom:3mm;display:flex;align-items:center;gap:8px}
+h3{font-size:13px;font-weight:600;color:var(--text);margin-top:4mm;margin-bottom:2mm}
+p{margin-bottom:2mm}
+.sa{display:inline-flex;width:26px;height:26px;background:linear-gradient(135deg,var(--accent2),var(--accent));border-radius:7px;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:white}
+.sc{font-size:11.5px;color:var(--muted);margin-bottom:4mm;border-bottom:1px dashed var(--border);padding-bottom:2.5mm}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:4mm 5mm;margin-bottom:3.5mm}
+.bl{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-bottom:1.5mm}
+.dt{width:100%;border-collapse:collapse;margin-top:1.5mm;font-size:10px;margin-bottom:3mm}
+.dt th{text-align:left;color:var(--muted);font-weight:600;padding:1.5mm 2.5mm;border-bottom:1px solid var(--border)}
+.dt td{padding:1.5mm 2.5mm;border-bottom:1px solid rgba(31,41,55,.5);vertical-align:top}
 .num{font-family:'Space Mono',monospace;text-align:right}
 .ha{color:var(--accent);font-weight:700}
-.mn{font-size:24px;font-weight:900;font-family:'Space Mono',monospace;color:var(--accent)}
-.ac{background:rgba(168,85,247,.04);border:1px solid rgba(168,85,247,.2);border-left:4px solid var(--accent);border-radius:8px;padding:4mm 5mm;margin:4mm 0;font-size:11px}
+.mn{font-size:22px;font-weight:900;font-family:'Space Mono',monospace;color:var(--accent)}
+.ac{background:rgba(168,85,247,.04);border:1px solid rgba(168,85,247,.2);border-left:4px solid var(--accent);border-radius:8px;padding:3mm 4mm;margin:3mm 0;font-size:10.5px}
 .ac strong{color:var(--accent)}
 .ac.amber{border-left-color:var(--amber);background:rgba(245,158,11,.04);border-color:rgba(245,158,11,.2)}
 .ac.amber strong{color:var(--amber)}
@@ -239,16 +325,30 @@ p{margin-bottom:3mm}
 .ac.green strong{color:var(--green)}
 .ac.red{border-left-color:var(--red);background:rgba(239,68,68,.04);border-color:rgba(239,68,68,.2)}
 .ac.red strong{color:var(--red)}
-.tg{display:inline-block;background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.2);border-radius:6px;padding:1.5mm 4mm;font-size:9px;font-weight:600;color:#c4b5fd;margin:1mm 2mm 1mm 0}
+.tg{display:inline-block;background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.2);border-radius:5px;padding:1mm 3mm;font-size:8.5px;font-weight:600;color:#c4b5fd;margin:1mm 1.5mm 1mm 0}
 .tg.green{background:rgba(34,197,94,.08);border-color:rgba(34,197,94,.2);color:#86efac}
 .tg.amber{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.2);color:#fcd34d}
 .tg.blue{background:rgba(59,130,246,.08);border-color:rgba(59,130,246,.2);color:#93c5fd}
 .tg.red{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.2);color:#fca5a5}
-.sg{display:grid;grid-template-columns:1fr 1fr;gap:3mm;margin:2mm 0 4mm}
-.sc2{border:1px solid var(--border);border-radius:8px;padding:3mm 4mm}
-.sc2 ul{padding-left:5mm;font-size:9.5px;line-height:1.6}
-.sc2 li{margin-bottom:1.5mm}
-.sl{font-size:9px;font-weight:900;text-transform:uppercase;letter-spacing:.15em;margin-bottom:1.5mm}
+.sg{display:grid;grid-template-columns:1fr 1fr;gap:2.5mm;margin:1.5mm 0 3mm}
+.sc2{border:1px solid var(--border);border-radius:7px;padding:2.5mm 3.5mm}
+.sc2 ul{padding-left:4mm;font-size:9px;line-height:1.55}
+.sc2 li{margin-bottom:1mm}
+.sl{font-size:8.5px;font-weight:900;text-transform:uppercase;letter-spacing:.15em;margin-bottom:1.5mm}
+/* ── ICON UTILITIES (inline SVG helpers) ── */
+.icon-badge{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;margin-right:2mm;flex-shrink:0}
+.kpi-row{display:flex;gap:3mm;margin-bottom:4mm}
+.kpi{flex:1;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:3.5mm 4mm;text-align:center;position:relative;overflow:hidden}
+.kpi::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2.5px;border-radius:0 0 10px 10px}
+.kpi-v{font-size:20px;font-weight:900;font-family:'Space Mono',monospace}
+.kpi-l{font-size:7px;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-top:1mm}
+/* ── SDR TIMELINE ── */
+.sdr-step{display:flex;gap:4mm;margin-bottom:3.5mm;align-items:flex-start}
+.sdr-num{width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,var(--accent2),var(--accent));display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;color:white;flex-shrink:0;margin-top:1mm}
+.sdr-body{flex:1;background:var(--card);border:1px solid var(--border);border-radius:9px;padding:3.5mm 4.5mm}
+.sdr-angle{font-size:7.5px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:1.5mm}
+.sdr-subject{font-size:11px;font-weight:700;color:white;margin-bottom:1.5mm}
+.sdr-preview{font-size:10px;color:var(--text);line-height:1.55;white-space:pre-line;word-break:break-word}
 .ww{margin:3mm 0}
 .wb{display:flex;align-items:center;margin-bottom:3mm}
 .wv{width:110px;font-family:'Space Mono',monospace;font-size:10px;text-align:right;padding-right:3mm;color:white;font-weight:700}
@@ -275,33 +375,61 @@ ul{padding-left:5mm}li{margin-bottom:1.5mm}
 
 <!-- COVER -->
 <div class="page" style="display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center">
-<div style="position:absolute;inset:0;background-image:linear-gradient(rgba(168,85,247,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(168,85,247,.025) 1px,transparent 1px);background-size:32px 32px;pointer-events:none;border-radius:inherit"></div>
-<div style="position:relative;z-index:1">
-  <div class="am" style="width:56px;height:56px;font-size:18px;margin:0 auto 8mm">ABE</div>
-  <h1>${e(co)}<br>GTM Intelligence Report</h1>
-  <p style="font-size:15px;color:var(--muted);margin-top:6mm">Confidential · Senior Strategy Brief</p>
-  <p style="font-size:12px;color:var(--muted);margin-top:4mm">Prepared by ABE AI Revenue Infrastructure<br>${date}</p>
-  ${ind?`<p style="font-size:11px;color:var(--faint);margin-top:3mm">${e(ind)}</p>`:''}
-  <div style="display:flex;gap:4mm;margin-top:10mm;justify-content:center">
-    <div style="background:rgba(18,24,39,.8);border:1px solid rgba(168,85,247,.25);border-bottom:3px solid var(--accent);border-radius:10px;padding:5mm 7mm;min-width:35mm;text-align:center">
-      <div style="font-family:'Space Mono',monospace;font-size:22px;font-weight:900;color:white">${score||'—'}</div>
-      <div style="font-size:7px;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-top:1mm">GTM Score</div>
+<div style="position:absolute;inset:0;background-image:linear-gradient(rgba(168,85,247,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(168,85,247,.025) 1px,transparent 1px);background-size:28px 28px;pointer-events:none"></div>
+<div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent2),var(--accent),#c084fc)"></div>
+<div style="position:relative;z-index:1;width:100%">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12mm">
+    <div style="display:flex;align-items:center;gap:8px">
+      <div class="am" style="width:38px;height:38px;font-size:13px">ABE</div>
+      <div style="text-align:left"><div style="font-size:11px;font-weight:800;color:white">AI Revenue Infrastructure</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em">Enterprise GTM Platform</div></div>
     </div>
-    <div style="background:rgba(18,24,39,.8);border:1px solid rgba(168,85,247,.25);border-bottom:3px solid var(--accent);border-radius:10px;padding:5mm 7mm;min-width:35mm;text-align:center">
-      <div style="font-family:'Space Mono',monospace;font-size:22px;font-weight:900;color:var(--accent)">${e(safe(s2.tam_size_estimate)||'—')}</div>
+    <div style="font-size:8px;color:var(--faint);text-align:right;padding-top:2mm">${date}<br>CONFIDENTIAL</div>
+  </div>
+  <div style="margin-bottom:8mm">
+    <h1 style="font-size:42px;font-weight:900;color:white;letter-spacing:-1px;line-height:1.1">${e(co)}</h1>
+    <div style="font-size:20px;font-weight:300;color:var(--muted);margin-top:2mm;letter-spacing:2px;text-transform:uppercase">GTM Intelligence Report</div>
+    ${ind?`<div style="margin-top:3mm"><span class="tg blue" style="font-size:9px">${e(ind)}</span></div>`:''}
+  </div>
+  <!-- SVG Score Gauge -->
+  <div style="display:flex;justify-content:center;margin-bottom:8mm">
+    <svg width="130" height="80" viewBox="0 0 130 80" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="gaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#7c3aed"/>
+          <stop offset="100%" stop-color="#c084fc"/>
+        </linearGradient>
+      </defs>
+      <!-- Track arc -->
+      <path d="M 15 72 A 50 50 0 0 1 115 72" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="8" stroke-linecap="round"/>
+      <!-- Score arc: circumference of semicircle ~157px, score% of that -->
+      <path d="M 15 72 A 50 50 0 0 1 115 72" fill="none" stroke="url(#gaugeGrad)" stroke-width="8" stroke-linecap="round"
+        stroke-dasharray="${Math.round((score/100)*157)} 157"/>
+      <!-- Score text -->
+      <text x="65" y="65" text-anchor="middle" font-family="'Space Mono',monospace" font-size="22" font-weight="900" fill="white">${score||'—'}</text>
+      <text x="65" y="78" text-anchor="middle" font-family="Inter,sans-serif" font-size="7" fill="#6B7280" letter-spacing="1.5">GTM SCORE</text>
+    </svg>
+  </div>
+  <!-- KPI Row -->
+  <div style="display:flex;gap:3mm;justify-content:center;margin-bottom:6mm">
+    <div style="background:rgba(18,24,39,.85);border:1px solid rgba(168,85,247,.2);border-bottom:3px solid var(--accent);border-radius:10px;padding:4mm 6mm;min-width:38mm;text-align:center">
+      <div style="font-family:'Space Mono',monospace;font-size:18px;font-weight:900;color:var(--accent)">${e(safe(s2.tam_size_estimate)||'—')}</div>
       <div style="font-size:7px;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-top:1mm">TAM Size</div>
     </div>
-    <div style="background:rgba(18,24,39,.8);border:1px solid rgba(168,85,247,.25);border-bottom:3px solid ${/go$/i.test(rec)&&!/no/i.test(rec)?'var(--green)':/no/i.test(rec)?'var(--red)':'var(--amber)'};border-radius:10px;padding:5mm 7mm;min-width:35mm;text-align:center">
-      <div style="font-family:'Space Mono',monospace;font-size:22px;font-weight:900;color:${recColor}">${e(recUp)}</div>
+    <div style="background:rgba(18,24,39,.85);border:1px solid rgba(34,197,94,.2);border-bottom:3px solid var(--green);border-radius:10px;padding:4mm 6mm;min-width:38mm;text-align:center">
+      <div style="font-family:'Space Mono',monospace;font-size:18px;font-weight:900;color:var(--green)">${e(safe(s2.growth_rate)||'—')}</div>
+      <div style="font-size:7px;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-top:1mm">CAGR</div>
+    </div>
+    <div style="background:rgba(18,24,39,.85);border:1px solid rgba(245,158,11,.2);border-bottom:3px solid ${/go$/i.test(rec)&&!/no/i.test(rec)?'var(--green)':/no/i.test(rec)?'var(--red)':'var(--amber)'};border-radius:10px;padding:4mm 6mm;min-width:38mm;text-align:center">
+      <div style="font-family:'Space Mono',monospace;font-size:18px;font-weight:900;color:${recColor}">${e(recUp)}</div>
       <div style="font-size:7px;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-top:1mm">Verdict</div>
     </div>
   </div>
-  ${s3.primary_icp||s1.company_overview?`<div style="margin-top:8mm;background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.15);border-left:3px solid var(--accent);border-radius:8px;padding:4mm 6mm;text-align:left;max-width:140mm">
-    <div style="font-size:7px;font-weight:900;text-transform:uppercase;letter-spacing:.18em;color:var(--accent);margin-bottom:2mm">Strategic Positioning</div>
-    <div style="font-size:10.5px;color:var(--text);line-height:1.6">${e((safe(s1.company_overview)||'').split('.')[0] || (co + ' GTM intelligence report'))}.</div>
+  ${s1.company_overview?`<div style="margin:0 auto;max-width:145mm;background:rgba(168,85,247,.05);border:1px solid rgba(168,85,247,.15);border-left:3px solid var(--accent);border-radius:8px;padding:3.5mm 5mm;text-align:left">
+    <div style="font-size:7px;font-weight:900;text-transform:uppercase;letter-spacing:.18em;color:var(--accent);margin-bottom:1.5mm">Strategic Positioning</div>
+    <div style="font-size:10.5px;color:var(--text);line-height:1.6">${e((safe(s1.company_overview)||'').split('.')[0])}.</div>
   </div>`:''}
 </div>
-<div style="position:absolute;bottom:15mm;font-size:9px;color:var(--faint);z-index:1">Classification: CONFIDENTIAL — Not for External Distribution</div>
+<div style="position:absolute;bottom:12mm;left:0;right:0;font-size:8px;color:var(--faint);text-align:center;z-index:1">Classification: CONFIDENTIAL — Not for External Distribution</div>
 </div>
 
 <!-- EXECUTIVE SUMMARY -->
