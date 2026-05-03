@@ -41,9 +41,19 @@ export async function onRequestPost(context) {
     const s2 = strategy.step_2_tam || {};
     const s7 = strategy.step_7_intelligence || {};
     const s1 = strategy.step_1_market || {};
-    const gtmScore = parseInt(s1.gtm_relevance_score) || (isDemoMode ? 60 : 0);
-    const verdict  = s7.go_no_go?.recommendation || (gtmScore>=75?'Go':gtmScore>=50?'Watch':'No-Go');
-    const confScore = parseInt(s7.confidence_score) || gtmScore || (isDemoMode ? 60 : 0);
+    const gtmScore = parseInt(
+      s1.gtm_relevance_score ||
+      s7.score_breakdown?.total ||
+      s7.gtm_score ||
+      strategy.gtm_score
+    ) || (isDemoMode ? 60 : 0);
+    const verdict = s7.go_no_go?.recommendation ||
+      s7.verdict || strategy.verdict ||
+      (gtmScore>=75?'Go':gtmScore>=50?'Watch':'No-Go') ||
+      (isDemoMode ? 'Watch' : 'Watch');
+    const confScore = parseInt(
+      s7.confidence_score || s7.overall_fidelity || s7._data_quality?.confidence_after_cap
+    ) || gtmScore || (isDemoMode ? 60 : 0);
 
     const tamRaw = safe_val(s2.tam_size_estimate); const tamNum = parseMoneyValue(tamRaw, isDemoMode ? 1800 : 0);
     const samRaw = safe_val(s2.sam_estimate || s2.waterfall?.sam_value);
@@ -51,7 +61,30 @@ export async function onRequestPost(context) {
     const samNum = samRaw && samRaw !== '—' ? parseMoneyValue(samRaw, tamNum * 0.4) : tamNum * 0.4;
     const somNum = parseMoneyValue(somRaw, tamNum * 0.07);
 
-    let chartCount = 0;
+    // ── Live-mode confidence sub-field extraction ──
+    const liveVeracity     = safeNumber(s7.signal_veracity     || s7.confidence_breakdown?.signal_veracity,     0);
+    const liveTiming       = safeNumber(s7.market_timing       || s7.confidence_breakdown?.market_timing,       0);
+    const liveIcpFit       = safeNumber(s7.icp_fit             || s7.confidence_breakdown?.icp_fit,             0);
+    const liveCompleteness = safeNumber(s7.data_completeness   || s7.confidence_breakdown?.data_completeness,   0);
+    // If live sub-fields exist use them; else derive from confScore weights
+    const hasLiveSubs = liveVeracity > 0 || liveTiming > 0 || liveIcpFit > 0 || liveCompleteness > 0;
+    const matrixVeracity     = hasLiveSubs ? liveVeracity     : Math.round(confScore * 0.4);
+    const matrixTiming       = hasLiveSubs ? liveTiming       : Math.round(confScore * 0.25);
+    const matrixIcpFit       = hasLiveSubs ? liveIcpFit       : Math.round(confScore * 0.2);
+    const matrixCompleteness = hasLiveSubs ? liveCompleteness : Math.round(confScore * 0.15);
+
+    // ── KV Chart Caching (DEFERRED — add env.KV when available) ──
+  // When env.KV is present, wrap fetchQuickChartBase64 with:
+  //   const cacheKey = `chart:gauge:${gtmScore}:${verdict}`;        TTL demo=604800 live=86400
+  //   const cacheKey = `chart:waterfall:${tamNum}:${samNum}:${somNum}`;
+  //   const cacheKey = `chart:confidence:${matrixVeracity}:${matrixTiming}:${matrixIcpFit}:${matrixCompleteness}`;
+  //   const cached = await env.KV.get(cacheKey);
+  //   if (cached) return cached;
+  //   const b64 = await fetchQuickChartBase64(...);
+  //   await env.KV.put(cacheKey, b64, { expirationTtl: isDemoMode ? 604800 : 86400 });
+  //   return b64;
+
+  let chartCount = 0;
     const tryFetch = async (type, config, w, h) => {
       if (chartCount >= QC.maxPer) return null;
       chartCount++;
@@ -67,8 +100,8 @@ export async function onRequestPost(context) {
       tryFetch('gauge',      buildGtmGaugeChartConfig(gtmScore, verdict), 200, 120),
       tryFetch('waterfall',  buildTamWaterfallChartConfig(tamNum, samNum, somNum), 480, 180),
       tryFetch('confidence', buildConfidenceMatrixChartConfig({
-        veracity: Math.round(confScore*0.4), timing: Math.round(confScore*0.25),
-        icpFit: Math.round(confScore*0.2), completeness: Math.round(confScore*0.15),
+        veracity: matrixVeracity, timing: matrixTiming,
+        icpFit: matrixIcpFit, completeness: matrixCompleteness,
         overall: confScore
       }), 480, 200),
     ]);
@@ -397,7 +430,7 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false) {
   };
   const secHead = (num, title) => {
     const icon = ICONS[num] || '';
-    return `<h2><span class="sa" style="background:linear-gradient(135deg,var(--accent2),var(--accent))">${icon||num}</span> ${e(title)}</h2>`;
+    return `<h2 class="section-header"><span class="sa" style="background:linear-gradient(135deg,var(--accent2),var(--accent))">${icon||num}</span> ${e(title)}</h2>`;
   };
   const secCtx = text => text?`<div class="sc">${e(text)}</div>`:'';
   const tags = (items,cls='') => arr(items).slice(0,15).map(t=>`<span class="tg ${cls}">${e(String(t))}</span>`).join('');
@@ -405,7 +438,7 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false) {
 
   // ── SWOT ──
   const swotCell = (label,items,color) => { const a=arr(items); return a.length?`<div class="sc2" style="border-top:3px solid ${color}"><div class="sl" style="color:${color}">${label}</div><ul>${a.slice(0,4).map(i=>`<li>${e(String(i))}</li>`).join('')}</ul></div>`:''; };
-  const swotGrid = () => { const sw=s1.swot; if(!sw||typeof sw!=='object') return ''; const h=swotCell('STRENGTHS',sw.strengths,'var(--green)')+swotCell('WEAKNESSES',sw.weaknesses,'var(--red)')+swotCell('OPPORTUNITIES',sw.opportunities,'var(--blue)')+swotCell('THREATS',sw.threats,'var(--amber)'); return h?`<div class="sg">${h}</div>`:''; };
+  const swotGrid = () => { const sw=s1.swot; if(!sw||typeof sw!=='object') return ''; const h=swotCell('STRENGTHS',sw.strengths,'var(--green)')+swotCell('WEAKNESSES',sw.weaknesses,'var(--red)')+swotCell('OPPORTUNITIES',sw.opportunities,'var(--blue)')+swotCell('THREATS',sw.threats,'var(--amber)'); return h?`<div class="sg swot-grid">${h}</div>`:''; };
 
   // ── TAM Waterfall with math ──
   const wfBar = (label,value,w,cls) => value?`<div class="wb"><div class="wv">${e(safe(value))}</div><div class="wftrack"><div class="wf ${cls}" style="width:${w}"></div></div><span style="margin-left:2mm;font-size:9px;color:var(--muted)">${label}</span></div>`:'';
@@ -425,7 +458,7 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false) {
     const wrSrc  = wrRaw  ? 'Company data' : 'AI estimate ⚠️ (default)';
     return `<div class="ww">${wfBar('TAM (Total Addressable)',tamV,'80%','wfb')}${wfBar('SAM (Serviceable Addressable)',samV,'50%','wfa')}${wfBar('SOM (Serviceable Obtainable)',somV,'20%','wfm')}</div>
     <h3>2.2b · TAM Derivation Formula</h3>
-    <div class="card"><table class="dt">
+    <div class="table-wrap card"><table class="dt">
       <tr><th>Step</th><th>Factor</th><th class="num">Value</th><th>Source</th></tr>
       <tr><td>Global TAM</td><td>Total market size</td><td class="num">${e(tamV)}</td><td>${tamSrc}</td></tr>
       <tr><td>× Geography eligibility</td><td>Addressable regions</td><td class="num">${e(geoVal)}</td><td>${geoSrc}</td></tr>
@@ -589,7 +622,7 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false) {
 :root{--bg:#0B0F1A;--bg2:#0D1120;--card:#121827;--border:#1F2937;--accent:#a855f7;--accent2:#7c3aed;--green:#22c55e;--amber:#f59e0b;--red:#ef4444;--blue:#3b82f6;--text:#E5E7EB;--muted:#6B7280;--faint:#374151;--white:#fff}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:11.5px;line-height:1.65;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.page{width:210mm;min-height:297mm;overflow:hidden;margin:0;background:var(--bg);padding:15mm 18mm;position:relative;page-break-after:always}
+.page{width:210mm;min-height:297mm;overflow:visible;margin:0;background:var(--bg);padding:15mm 18mm 20mm;position:relative;page-break-after:always;box-sizing:border-box}
 .ph{display:flex;align-items:center;justify-content:space-between;margin-bottom:8mm;border-bottom:1px solid var(--border);padding-bottom:4mm}
 .phb{display:flex;align-items:center;gap:10px}
 .am{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:white}
@@ -602,7 +635,7 @@ h3{font-size:13px;font-weight:600;color:var(--text);margin-top:4mm;margin-bottom
 p{margin-bottom:2mm}
 .sa{display:inline-flex;width:26px;height:26px;background:linear-gradient(135deg,var(--accent2),var(--accent));border-radius:7px;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:white}
 .sc{font-size:11.5px;color:var(--muted);margin-bottom:4mm;border-bottom:1px dashed var(--border);padding-bottom:2.5mm}
-.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:4mm 5mm;margin-bottom:3.5mm}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:4mm 5mm;margin-bottom:3.5mm;break-inside:avoid;page-break-inside:avoid;box-sizing:border-box}
 .bl{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-bottom:1.5mm}
 .dt{width:100%;border-collapse:collapse;margin-top:1.5mm;font-size:10px;margin-bottom:3mm}
 .dt th{text-align:left;color:var(--muted);font-weight:600;padding:1.5mm 2.5mm;border-bottom:1px solid var(--border)}
@@ -610,7 +643,18 @@ p{margin-bottom:2mm}
 .num{font-family:'Space Mono',monospace;text-align:right}
 .ha{color:var(--accent);font-weight:700}
 .mn{font-size:22px;font-weight:900;font-family:'Space Mono',monospace;color:var(--accent)}
-.ac{background:rgba(168,85,247,.04);border:1px solid rgba(168,85,247,.2);border-left:4px solid var(--accent);border-radius:8px;padding:3mm 4mm;margin:3mm 0;font-size:10.5px}
+.ac{background:rgba(168,85,247,.04);border:1px solid rgba(168,85,247,.2);border-left:4px solid var(--accent);border-radius:8px;padding:3mm 4mm;margin:3mm 0;font-size:10.5px;break-inside:avoid;page-break-inside:avoid}
+.insight-box{break-inside:avoid;page-break-inside:avoid}
+.kpi-row{display:flex;gap:3mm;margin-bottom:4mm;break-inside:avoid;page-break-inside:avoid}
+.kpi-card,.kpi{flex:1;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:3.5mm 4mm;text-align:center;position:relative;overflow:hidden;break-inside:avoid;page-break-inside:avoid}
+.table-wrap{break-inside:avoid;page-break-inside:avoid;overflow:visible}
+.swot-grid{display:grid;grid-template-columns:1fr 1fr;gap:2.5mm;margin:1.5mm 0 3mm;break-inside:avoid;page-break-inside:avoid}
+.risk-grid{break-inside:avoid;page-break-inside:avoid}
+.email-card{break-inside:avoid;page-break-inside:avoid}
+.chart-block{break-inside:avoid;page-break-inside:avoid;margin:3mm 0}
+.confidence-matrix{break-inside:avoid;page-break-inside:avoid}
+.appendix-section{break-inside:avoid;page-break-inside:avoid;margin-bottom:4mm}
+.section-header{break-after:avoid;page-break-after:avoid}
 .ac strong{color:var(--accent)}
 .ac.amber{border-left-color:var(--amber);background:rgba(245,158,11,.04);border-color:rgba(245,158,11,.2)}
 .ac.amber strong{color:var(--amber)}
@@ -623,7 +667,7 @@ p{margin-bottom:2mm}
 .tg.amber{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.2);color:#fcd34d}
 .tg.blue{background:rgba(59,130,246,.08);border-color:rgba(59,130,246,.2);color:#93c5fd}
 .tg.red{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.2);color:#fca5a5}
-.sg{display:grid;grid-template-columns:1fr 1fr;gap:2.5mm;margin:1.5mm 0 3mm}
+.sg{display:grid;grid-template-columns:1fr 1fr;gap:2.5mm;margin:1.5mm 0 3mm;break-inside:avoid;page-break-inside:avoid}
 .sc2{border:1px solid var(--border);border-radius:7px;padding:2.5mm 3.5mm}
 .sc2 ul{padding-left:4mm;font-size:9px;line-height:1.55}
 .sc2 li{margin-bottom:1mm}
@@ -904,6 +948,7 @@ ${pageHdr()}
 ${secHead('07','Revenue Intelligence — Confidence Matrix')}
 ${secCtx('Weighted fidelity assessment of signal quality, market timing, and ICP alignment.')}
 <h3>7.6 · Weighted Confidence Matrix</h3>
+<div class="confidence-matrix">
 ${renderChartOrFallback('Confidence Matrix', charts.confidence,
   `<div style="display:flex;gap:6mm;align-items:flex-start">${(()=>{
     const circ=176, filled=Math.round((confScore/100)*circ);
@@ -917,6 +962,7 @@ ${renderChartOrFallback('Confidence Matrix', charts.confidence,
   })()}</div>`,
   {width:480, height:200}
 )}
+</div>
 ${srcNote('Confidence score is algorithmic — weights fixed (40/25/20/15), capped by data richness')}
 ${callout(s7.analyst_insight)}
 ${pageFtr('Revenue Intelligence — Confidence',10)}
@@ -927,6 +973,7 @@ ${pageFtr('Revenue Intelligence — Confidence',10)}
 ${pageHdr()}
 ${secHead('A','Appendix — Methodology & Data Quality')}
 ${secCtx('Transparency layer. Documents data provenance, scoring methodology, and known limitations.')}
+<div class="appendix-section">
 <h3>A.1 · Data Sources</h3>
 <table class="dt">
   <tr><th>Data Point</th><th>Source Type</th><th>Reliability</th></tr>
@@ -940,6 +987,8 @@ ${secCtx('Transparency layer. Documents data provenance, scoring methodology, an
   <tr><td>Email sequences</td><td>AI-generated, personalized</td><td>High — review before sending</td></tr>
   <tr><td>Confidence score</td><td>Algorithmic (capped by data richness)</td><td>High</td></tr>
 </table>
+</div>
+<div class="appendix-section">
 <h3>A.2 · TAM Calculation Methodology</h3>
 <table class="dt">
   <tr><th>Step</th><th>Method</th></tr>
