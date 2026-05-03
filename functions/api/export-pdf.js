@@ -346,8 +346,6 @@ function buildConfidenceMatrixChartConfig({ veracity, timing, icpFit, completene
           anchor: 'end', align: 'right', offset: 4,
           formatter: (v, ctx) => {
             if (ctx.dataIndex === 4) return v + '/100';
-            const maxes = [40, 25, 20, 15];
-            const rawScores = [${JSON.stringify([0,0,0,0])}.map((_, i) => i)];
             return v + '%';
           },
         },
