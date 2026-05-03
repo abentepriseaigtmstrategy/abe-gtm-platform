@@ -518,7 +518,6 @@ ${callout(s3.analyst_insight)}
 ${pageFtr('ICP Modeling',4)}
 </div>
 
-<!-- STEP 4: ACCOUNT SOURCING -->
 <div class="page">
 ${pageHdr()}
 ${secHead('04','Account Sourcing — The Targets')}
@@ -526,13 +525,37 @@ ${secCtx(s4.section_context||'Translates persona into actionable technographic f
 <h3>4.1 · Sourcing Infrastructure</h3>
 <table class="dt">
 ${fieldRow('Recommended Databases',s4.recommended_databases)}
-${fieldRow('Filter Criteria',s4.filter_criteria)}
 ${fieldRow('Estimated Universe',s4.estimated_universe)}
-${fieldRow('Exclusion Criteria',s4.exclusion_criteria)}
 </table>
-<h3>4.2 · Sourcing Playbook</h3>
-<div class="card"><p>${e(safe(s4.sourcing_playbook)||'—')}</p></div>
-${s4.data_enrichment_tips?`<h3>4.3 · Data Enrichment</h3><div class="card"><p>${e(safe(s4.data_enrichment_tips))}</p></div>`:''}
+<h3>4.2 · Filter Criteria</h3>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:2.5mm;margin-bottom:3mm">
+  <div style="background:var(--card);border:1px solid var(--border);border-radius:7px;padding:2.5mm 3.5mm">
+    <div style="font-size:7.5px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:1.5mm">Include</div>
+    <div style="font-size:10px;color:var(--text)">${e(safe(s4.filter_criteria)||'Company size 200–800 employees, B2B revenue operations focus, modern digitization capacity')}</div>
+  </div>
+  <div style="background:var(--card);border:1px solid rgba(239,68,68,.2);border-radius:7px;padding:2.5mm 3.5mm">
+    <div style="font-size:7.5px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--red);margin-bottom:1.5mm">Exclude</div>
+    <div style="font-size:10px;color:var(--text)">${e(safe(s4.exclusion_criteria)||'Pre-revenue, non-B2B, outside target geography, weak digital presence')}</div>
+  </div>
+</div>
+<h3>4.3 · 3-Step Sourcing Motion</h3>
+<div style="display:flex;gap:2.5mm;margin-bottom:3mm">
+  ${['Identify','Validate','Prioritize'].map((step,i)=>{
+    const descs = [
+      safe(s4.sourcing_playbook)||'Build list from Crunchbase, LinkedIn Sales Navigator, ZoomInfo using firmographic filters.',
+      'Cross-reference with intent data. Confirm buyer title, tech stack signal, and growth stage.',
+      'Score accounts by ICP fit, signal recency, and deal-cycle alignment. Lead with high-fit.'
+    ];
+    return `<div style="flex:1;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:3mm 3.5mm;border-top:2.5px solid var(--accent)">
+      <div style="display:flex;align-items:center;gap:2mm;margin-bottom:1.5mm">
+        <div style="width:16px;height:16px;border-radius:50%;background:linear-gradient(135deg,var(--accent2),var(--accent));display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;color:white;flex-shrink:0">${i+1}</div>
+        <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:white">${step}</div>
+      </div>
+      <div style="font-size:9.5px;color:var(--text);line-height:1.5">${descs[i]}</div>
+    </div>`;
+  }).join('')}
+</div>
+${s4.data_enrichment_tips?`<h3>4.4 · Data Enrichment</h3><div class="card"><p>${e(safe(s4.data_enrichment_tips))}</p></div>`:''}
 ${acctTable()}
 ${callout(s4.analyst_insight)}
 ${pageFtr('Account Sourcing',5)}
