@@ -89,7 +89,10 @@ export async function onRequestPost(context) {
       if (chartCount >= QC.maxPer) return null;
       chartCount++;
       try {
-        return await fetchQuickChartBase64(config, w, h, QC);
+        console.info(`[QuickChart] ${type} config built successfully`);
+        const result = await fetchQuickChartBase64(config, w, h, QC);
+        console.info(`[QuickChart] ${type} success`);
+        return result;
       } catch(err) {
         console.warn(`[QuickChart] ${type} failed:`, err.message);
         return null;
@@ -97,13 +100,13 @@ export async function onRequestPost(context) {
     };
 
     const [g, wf, cm] = await Promise.allSettled([
-      tryFetch('gauge',      buildGtmGaugeChartConfig(gtmScore, verdict), 200, 120),
-      tryFetch('waterfall',  buildTamWaterfallChartConfig(tamNum, samNum, somNum), 480, 180),
+      tryFetch('gauge',      buildGtmGaugeChartConfig(gtmScore, verdict), 280, 170),
+      tryFetch('waterfall',  buildTamWaterfallChartConfig(tamNum, samNum, somNum), 720, 260),
       tryFetch('confidence', buildConfidenceMatrixChartConfig({
         veracity: matrixVeracity, timing: matrixTiming,
         icpFit: matrixIcpFit, completeness: matrixCompleteness,
         overall: confScore
-      }), 480, 200),
+      }), 720, 280),
     ]);
     charts.gauge      = g.status==='fulfilled'  ? g.value  : null;
     charts.waterfall  = wf.status==='fulfilled' ? wf.value : null;
@@ -136,11 +139,28 @@ function renderChartOrFallback(type, base64, fallbackHtml, dimensions = { width:
     return `<div style="margin:3mm 0;line-height:0">
       <img src="data:image/png;base64,${base64}"
         width="${dimensions.width}" height="${dimensions.height}"
-        style="width:100%;max-height:${dimensions.height}px;object-fit:contain;border-radius:8px"
+        style="width:100%;max-height:${dimensions.height}px;object-fit:contain;border-radius:8px;background:rgba(255,255,255,.02)"
         alt="${type} chart"/>
     </div>`;
   }
+  console.info(`[QuickChart] ${type} fallback used`);
   return fallbackHtml;
+}
+
+function renderGaugeChart(base64, score, verdict, dimensions = { width: 280, height: 170 }) {
+  if (!base64) return renderGaugeFallback(score, verdict);
+  const color = /^go$/i.test(verdict) ? '#22c55e' : /no/i.test(verdict) ? '#ef4444' : '#f59e0b';
+  return `<div style="position:relative;width:${dimensions.width}px;height:${dimensions.height}px;margin:3mm 0;">
+    <img src="data:image/png;base64,${base64}"
+      width="${dimensions.width}" height="${dimensions.height}"
+      style="width:100%;height:100%;object-fit:contain;border-radius:14px;"
+      alt="GTM Score gauge"/>
+    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%, -35%);text-align:center;width:100%;pointer-events:none">
+      <div style="font-family:'Space Mono',monospace;font-size:28px;font-weight:900;color:white;line-height:1">${score}</div>
+      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.15em;color:${color};margin-top:2px">${verdict.toUpperCase()}</div>
+      <div style="font-size:8px;color:#9CA3AF;text-transform:uppercase;letter-spacing:.2em;margin-top:2px">GTM SCORE</div>
+    </div>
+  </div>`;
 }
 
 function normalizeCompanyName(name) {
@@ -174,83 +194,155 @@ function parseMoneyValue(str, fallback = 0) {
 }
 
 function buildGtmGaugeChartConfig(score, verdict) {
+  const pct = Math.max(0, Math.min(100, parseInt(score) || 0));
   const color = /^go$/i.test(verdict) ? '#22c55e' : /no/i.test(verdict) ? '#ef4444' : '#f59e0b';
   return {
     type: 'doughnut',
     data: {
+      labels: ['Score', 'Remaining'],
       datasets: [{
-        data: [score, 100 - score],
-        backgroundColor: [color, 'rgba(255,255,255,0.05)'],
-        borderWidth: 0, circumference: 180, rotation: 270,
+        label: 'GTM Score',
+        data: [pct, 100 - pct],
+        backgroundColor: [color, 'rgba(255,255,255,0.08)'],
+        borderWidth: 0,
+        circumference: 180,
+        rotation: 180,
+        cutout: '70%',
       }]
     },
     options: {
-      cutout: '75%',
+      responsive: false,
+      maintainAspectRatio: false,
+      animation: false,
       plugins: {
         legend: { display: false },
-        datalabels: { display: false },
+        tooltip: { enabled: false },
       },
-      layout: { padding: { bottom: 20 } }
+      layout: { padding: { top: 10, bottom: 10, left: 10, right: 10 } },
     }
   };
 }
 
 function buildTamWaterfallChartConfig(tamM, samM, somM) {
-  const fmt = v => v >= 1000 ? `$${(v/1000).toFixed(1)}B` : `$${Math.round(v)}M`;
+  const safeNum = v => Number.isFinite(v) ? v : 0;
+  const values = [safeNum(tamM), safeNum(samM), safeNum(somM)];
+  const maxVal = Math.max(100, ...values) * 1.08;
+  const fmt = v => {
+    const n = Number(v) || 0;
+    if (n >= 1000) return `$${(n/1000).toFixed(1)}B`;
+    if (n > 0) return `$${Math.round(n)}M`;
+    return '$0M';
+  };
   return {
     type: 'bar',
     data: {
       labels: ['TAM', 'SAM', 'SOM'],
       datasets: [{
-        data: [tamM, samM, somM],
-        backgroundColor: ['#3b82f6','#a855f7','#f59e0b'],
-        borderRadius: 6,
-        barThickness: 40,
+        label: 'Opportunity',
+        data: values,
+        backgroundColor: ['#6366f1', '#7c3aed', '#f59e0b'],
+        borderRadius: 10,
+        borderSkipped: false,
+        barThickness: 26,
+        maxBarThickness: 36,
       }]
     },
     options: {
+      responsive: false,
+      maintainAspectRatio: false,
+      animation: false,
       indexAxis: 'y',
-      plugins: { legend: { display: false }, datalabels: {
-        color: '#fff', font: { weight: 'bold', size: 11 },
-        formatter: v => fmt(v), anchor: 'end', align: 'right',
-      }},
-      scales: {
-        x: { ticks: { color: '#6B7280', font: { size: 9 }, callback: v => fmt(v) }, grid: { color: 'rgba(255,255,255,0.05)' } },
-        y: { ticks: { color: '#E5E7EB', font: { size: 11, weight: 'bold' } }, grid: { display: false } }
+      plugins: {
+        legend: { display: false },
+        tooltip: { enabled: false },
       },
-      layout: { padding: { right: 80 } }
+      scales: {
+        x: {
+          min: 0,
+          max: Math.round(maxVal),
+          ticks: {
+            color: '#9CA3AF',
+            font: { size: 10 },
+            callback: v => fmt(v),
+          },
+          grid: { color: 'rgba(255,255,255,0.08)', drawBorder: false },
+        },
+        y: {
+          ticks: {
+            color: '#E5E7EB',
+            font: { size: 11, weight: '700' },
+            autoSkip: false,
+            maxRotation: 0,
+            minRotation: 0,
+          },
+          grid: { display: false },
+        }
+      },
+      layout: { padding: { right: 20, left: 10, top: 10, bottom: 10 } },
+      elements: { bar: { borderRadius: 10 } }
     }
   };
 }
 
 function buildConfidenceMatrixChartConfig({ veracity, timing, icpFit, completeness, overall }) {
+  const safe = (value) => {
+    const n = Number(value);
+    return Number.isFinite(n) ? Math.max(0, Math.min(100, Math.round(n))) : 0;
+  };
+  const values = [
+    safe(Math.round((veracity / 40) * 100)),
+    safe(Math.round((timing / 25) * 100)),
+    safe(Math.round((icpFit / 20) * 100)),
+    safe(Math.round((completeness / 15) * 100)),
+    safe(overall),
+  ];
   return {
     type: 'bar',
     data: {
-      labels: ['Signal Veracity (40%)', 'Market Timing (25%)', 'ICP Fit (20%)', 'Data Completeness (15%)', 'Overall Fidelity'],
+      labels: ['Signal Veracity', 'Market Timing', 'ICP Fit', 'Data Completeness', 'Overall Fidelity'],
       datasets: [{
-        data: [
-          Math.round((veracity/40)*100),
-          Math.round((timing/25)*100),
-          Math.round((icpFit/20)*100),
-          Math.round((completeness/15)*100),
-          overall
-        ],
-        backgroundColor: ['#7c3aed','#7c3aed','#7c3aed','#7c3aed','#a855f7'],
-        borderRadius: 4, barThickness: 18,
+        label: 'Confidence Score',
+        data: values,
+        backgroundColor: values.map((v, idx) => idx === 4 ? (v >= 75 ? '#22c55e' : v >= 50 ? '#f59e0b' : '#ef4444') : '#8b5cf6'),
+        borderRadius: 8,
+        borderSkipped: false,
+        barThickness: 18,
+        maxBarThickness: 24,
       }]
     },
     options: {
+      responsive: false,
+      maintainAspectRatio: false,
+      animation: false,
       indexAxis: 'y',
-      plugins: { legend: { display: false }, datalabels: {
-        color: '#fff', font: { size: 10, weight: 'bold' },
-        formatter: v => v + '%', anchor: 'end', align: 'right',
-      }},
-      scales: {
-        x: { min: 0, max: 100, ticks: { color: '#6B7280', font: { size: 9 }, callback: v => v+'%' }, grid: { color: 'rgba(255,255,255,0.05)' } },
-        y: { ticks: { color: '#E5E7EB', font: { size: 9 } }, grid: { display: false } }
+      plugins: {
+        legend: { display: false },
+        tooltip: { enabled: false },
       },
-      layout: { padding: { right: 60 } }
+      scales: {
+        x: {
+          min: 0,
+          max: 100,
+          ticks: {
+            color: '#9CA3AF',
+            font: { size: 10 },
+            callback: v => `${v}%`,
+          },
+          grid: { color: 'rgba(255,255,255,0.08)', drawBorder: false },
+        },
+        y: {
+          ticks: {
+            color: '#E5E7EB',
+            font: { size: 10, weight: '600' },
+            autoSkip: false,
+            maxRotation: 0,
+            minRotation: 0,
+          },
+          grid: { display: false },
+        }
+      },
+      layout: { padding: { top: 10, right: 10, bottom: 10, left: 10 } },
+      elements: { bar: { borderRadius: 8 } }
     }
   };
 }
@@ -729,7 +821,7 @@ ul{padding-left:5mm}li{margin-bottom:1.5mm}
   </div>
   <!-- GTM Score Gauge -->
   <div style="display:flex;justify-content:center;margin-bottom:8mm">
-    ${renderChartOrFallback('GTM Gauge', charts.gauge, renderGaugeFallback(score, rec), {width:200,height:120})}
+    ${renderGaugeChart(charts.gauge, score, rec, {width:280,height:170})}
   </div>
   <!-- KPI Row -->
   <div style="display:flex;gap:3mm;justify-content:center;margin-bottom:6mm">
