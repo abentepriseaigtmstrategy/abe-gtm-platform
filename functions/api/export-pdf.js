@@ -106,7 +106,6 @@ export function buildReportHTML(strategy) {
   };
   const secCtx = text => text?`<div class="sc">${e(text)}</div>`:'';
   const tags = (items,cls='') => arr(items).slice(0,15).map(t=>`<span class="tg ${cls}">${e(String(t))}</span>`).join('');
-  const tags = (items,cls='') => arr(items).slice(0,15).map(t=>`<span class="tg ${cls}">${e(String(t))}</span>`).join('');
   const fieldRow = (label,val) => { const v=safe(val); return v?`<tr><th>${e(label)}</th><td>${e(v)}</td></tr>`:''; };
 
   // ── SWOT ──
@@ -284,7 +283,6 @@ export function buildReportHTML(strategy) {
     </div>
   </div>
   ${srcNote('Confidence score is algorithmic — weights fixed (40/25/20/15), capped by data richness')}`;
-  };`;
   };
 
   // ════════════════════════════════════════════════════════════
