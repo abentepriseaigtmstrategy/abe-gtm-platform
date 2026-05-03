@@ -1485,7 +1485,146 @@ const VALID_STRENGTHS     = new Set(['High','Medium','Low']);
 const VALID_GNG           = new Set(['Go','Watch','No-Go']);
 const VALID_PERSONAS      = new Set(['CEO','Founder','CTO','CFO','COO','Head of Sales','Head of Marketing','VP Sales','VP Marketing','CMO','CRO','Director of Sales','Director of Marketing','Head of Growth','Head of Product','Head of Operations']);
 
+function sanitizeReportPages(pages, warnings = []) {
+  const canonicalTitles = {
+    1: 'Strategic Positioning',
+    2: 'Executive Summary',
+    3: 'Market Research',
+    4: 'TAM Mapping',
+    5: 'ICP Modeling',
+    6: 'Account Sourcing',
+    7: 'Keywords & Intent',
+    8: 'Engagement Playbook',
+    9: 'Engagement Playbook',
+    10: 'Revenue Intelligence + Appendix / Methodology / Data Quality',
+  };
+
+  const makeFallbackPage = (pageNumber) => ({
+    page_number: pageNumber,
+    page_title: canonicalTitles[pageNumber] || 'Revenue Intelligence + Appendix / Methodology / Data Quality',
+    sections: [{
+      section_number: `${pageNumber}.1`,
+      heading: `Validation Notice — ${canonicalTitles[pageNumber] || `Page ${pageNumber}`}`,
+      content: 'This page was not produced by the AI generator. Review structure and rerun Step 7 to recover missing content.',
+    }],
+  });
+
+  if (!Array.isArray(pages) || pages.length === 0) {
+    warnings.push('No report pages were generated. Inserted validation fallback page.');
+    return [makeFallbackPage(1)];
+  }
+
+  const pageMap = new Map();
+  const duplicatePageNumbers = new Set();
+
+  for (const page of pages) {
+    if (!page || typeof page !== 'object') continue;
+    const rawPageNumber = Number(page.page_number);
+    if (!Number.isInteger(rawPageNumber) || rawPageNumber < 1) continue;
+    const pageNumber = rawPageNumber;
+
+    const pageTitle = typeof page.page_title === 'string' && page.page_title.trim()
+      ? page.page_title.trim().slice(0, 100)
+      : '';
+
+    const sections = [];
+    let fallbackIndex = 1;
+    if (Array.isArray(page.sections)) {
+      for (const sec of page.sections) {
+        if (!sec || typeof sec !== 'object') continue;
+        const rawSectionNumber = typeof sec.section_number === 'string' ? sec.section_number.trim() : '';
+        const sectionNumber = rawSectionNumber.match(/^\d+(\.\d+)*$/)
+          ? rawSectionNumber
+          : `${pageNumber}.${fallbackIndex++}`;
+        const heading = typeof sec.heading === 'string' ? sec.heading.trim().slice(0, 80) : '';
+        const content = typeof sec.content === 'string' ? sec.content.trim().slice(0, 1600) : '';
+        if (!heading && !content) continue;
+        sections.push({
+          section_number: sectionNumber,
+          heading: heading || 'Section',
+          content: content || 'Limited evidence available for this section.',
+        });
+      }
+    }
+
+    if (sections.length === 0) continue;
+
+    if (pageMap.has(pageNumber)) {
+      duplicatePageNumbers.add(pageNumber);
+      const existing = pageMap.get(pageNumber);
+      existing.sections.push(...sections);
+      if (!existing.page_title && pageTitle) existing.page_title = pageTitle;
+    } else {
+      pageMap.set(pageNumber, {
+        page_number: pageNumber,
+        page_title: pageTitle,
+        sections,
+      });
+    }
+  }
+
+  if (duplicatePageNumbers.size) {
+    warnings.push(`Duplicate page numbers detected and merged: ${[...duplicatePageNumbers].sort((a, b) => a - b).join(', ')}.`);
+  }
+
+  const validPages = [...pageMap.values()].filter(page => page.sections.length > 0);
+  if (validPages.length === 0) {
+    warnings.push('No valid report pages remained after sanitization. Inserted fallback page.');
+    return [makeFallbackPage(1)];
+  }
+
+  const sortedPages = validPages.map((page) => {
+    const uniqueSections = [];
+    const seenSectionNumbers = new Set();
+    page.sections.forEach((section) => {
+      const key = `${section.section_number}|${section.heading}`;
+      if (seenSectionNumbers.has(key)) return;
+      seenSectionNumbers.add(key);
+      uniqueSections.push(section);
+    });
+
+    uniqueSections.sort((a, b) => {
+      const aParts = a.section_number.split('.').map(Number);
+      const bParts = b.section_number.split('.').map(Number);
+      for (let i = 0; i < Math.max(aParts.length, bParts.length); i += 1) {
+        const ai = aParts[i] || 0;
+        const bi = bParts[i] || 0;
+        if (ai !== bi) return ai - bi;
+      }
+      return 0;
+    });
+
+    const canonicalTitle = canonicalTitles[page.page_number] || (page.page_number >= 10 ? canonicalTitles[10] : `Page ${page.page_number}`);
+    return {
+      page_number: page.page_number,
+      page_title: page.page_title || canonicalTitle,
+      sections: uniqueSections,
+    };
+  }).sort((a, b) => a.page_number - b.page_number);
+
+  const normalizedPages = new Map();
+  const maxPage = sortedPages.reduce((max, page) => Math.max(max, page.page_number), 1);
+  for (let i = 1; i <= maxPage; i += 1) {
+    if (sortedPages.some((page) => page.page_number === i)) {
+      normalizedPages.set(i, sortedPages.find((page) => page.page_number === i));
+    } else {
+      normalizedPages.set(i, makeFallbackPage(i));
+      warnings.push(`Missing page ${i}: inserted safe validation fallback page.`);
+    }
+  }
+
+  const outputPages = [...normalizedPages.values()].sort((a, b) => a.page_number - b.page_number);
+  if (outputPages.length > 14) {
+    const warning = `Report contains ${outputPages.length} pages, which is allowed if the structure is valid. Review density above 14 pages.`;
+    warnings.push(warning);
+    console.warn('sanitizeReportPages warning:', warning);
+  }
+
+  return outputPages;
+}
+
 function sanitiseStep7Output(d, richnessScore) {
+  const pageWarnings = [];
   const out = {};
 
   // ── signal_summary: filter out invalid enums, keep max 5 ─────────
@@ -1554,6 +1693,14 @@ function sanitiseStep7Output(d, richnessScore) {
     ? d.executive_brief.slice(0, 800)
     : '';
 
+  // ── report_pages ──────────────────────────────────────────────────
+  out.report_pages = sanitizeReportPages(d.report_pages || d.report_outline, pageWarnings);
+
+  // ── full_report_text ─────────────────────────────────────────────
+  out.full_report_text = typeof d.full_report_text === 'string'
+    ? d.full_report_text.slice(0, 4000)
+    : '';
+
   // ── Attach data quality metadata (shown in UI as audit trail) ─────
   out._data_quality = {
     richness_score:          richnessScore,
@@ -1561,6 +1708,7 @@ function sanitiseStep7Output(d, richnessScore) {
     signals_after_filter:    out.signal_summary.length,
     confidence_ai_claimed:   clampedAI,
     confidence_after_cap:    out.confidence_score,
+    page_warnings:           pageWarnings,
   };
 
   return out;
@@ -1641,48 +1789,61 @@ function buildStep7Prompt(company, industry, steps, evidenceManifest) {
     linkedin_msg:  steps[6].linkedin_message,
   } : null;
 
-  const inputBlock = JSON.stringify({ company, s1, s2, s3, s4, s5, s6 }, null, 1);
+  const inputBlock = JSON.stringify({ company, industry, s1, s2, s3, s4, s5, s6 }, null, 2);
 
-  return `You are a senior revenue intelligence analyst. Analyse the GTM data for "${company}"${ind} and produce a Revenue Intelligence Enhancement report.
+  return `You are the Enterprise GTM Architect. Produce a flexible GTM Intelligence Report for "${company}"${ind}, with soft page governance.
 
-GTM DATA (compressed):
+EVIDENCE MANIFEST:
+${evidenceManifest || 'No evidence manifest provided.'}
+
+INPUT DATA (compressed):
 ${inputBlock}
 
-${evidenceManifest || ''}
+REPORT INSTRUCTIONS:
+- Use ONLY facts from the EVIDENCE MANIFEST. Do not invent company names, revenue figures, competitors, or funding details.
+- If evidence is missing, omit the claim and keep the language conservative.
+- signal_type MUST be exactly one of: hiring, funding, growth, tech_replacement, competitor_pressure, expansion, market_timing.
+- strength MUST be exactly one of: High, Medium, Low.
+- go_no_go.recommendation MUST be exactly one of: Go, Watch, No-Go.
+- confidence_score MUST be an integer between 0 and 100 and must not exceed the data richness ceiling.
+- strategic_hook must be one crisp sentence suitable for cold outreach.
+- executive_brief must be 3-5 sentences, board-ready, concise, and evidence-based.
+- Prefer 10–14 pages for a normal report, but do not reject or truncate valid reports above 14 pages.
+- Maintain strict page ordering:
+  Page 1: Strategic Positioning
+  Page 2: Executive Summary
+  Page 3: Market Research
+  Page 4: TAM Mapping
+  Page 5: ICP Modeling
+  Page 6: Account Sourcing
+  Page 7: Keywords & Intent
+  Page 8: Engagement Playbook
+  Page 9: Engagement Playbook
+  Page 10+: Revenue Intelligence + Appendix / Methodology / Data Quality
+- Use short paragraphs, compact cards, compact tables, and avoid long unbroken blocks of text.
+- Preserve every valid report section. If pages are missing, include placeholder content with a clear validation notice.
+- Duplicate pages may be merged but retain all valid content and normalize numbering.
+- report_pages must be an array of pages numbered in order.
+- Each page must include a page_title and an ordered sections array.
+- Each section must include section_number (like 1.1, 2.2, 3.4), heading, and content.
+- Return ONLY valid JSON. No markdown, no prose, no code fences. Start with { and end with }.
 
-ANALYSIS RULES:
-- ONLY reference facts listed in the EVIDENCE MANIFEST above. Never invent company details, funding amounts, competitor names, or growth metrics.
-- If a signal is not evidenced by the manifest, omit it entirely. Do not fabricate.
-- signal_type MUST be one of: hiring, funding, growth, tech_replacement, competitor_pressure, expansion, market_timing
-- signal strength MUST be one of: High, Medium, Low
-- Include 2-4 signals only. Quality over quantity.
-- go_no_go recommendation MUST be exactly "Go", "Watch", or "No-Go" — nothing else
-- strategic_hook must be ONE crisp sentence usable in a cold email opener — max 30 words
-- executive_brief must be 3-4 sentences. Board-ready. No fluff.
-- why_now_analysis must be ONE clear paragraph explaining timing urgency — grounded in evidence only
-
-Return ONLY this JSON (no markdown, no prose):
+OUTPUT SCHEMA:
 {
-  "signal_summary": [
-    {"signal_type": "growth", "signal_description": "...", "strength": "High"}
+  "signal_summary": [{"signal_type":"growth","signal_description":"...","strength":"High"}],
+  "why_now_analysis":"...",
+  "mcc_view":{"market":"...","client":"...","competitor":"..."},
+  "strategic_hook":"...",
+  "persona_priority":{"persona":"...","reason":"..."},
+  "go_no_go":{"recommendation":"Go","reason":"..."},
+  "confidence_score":82,
+  "executive_brief":"...",
+  "report_pages":[
+    {"page_number":1,"page_title":"Strategic Positioning","sections":[{"section_number":"1.1","heading":"Company Positioning","content":"..."}]},
+    {"page_number":2,"page_title":"Executive Summary","sections":[{"section_number":"2.1","heading":"Opportunity Overview","content":"..."}]},
+    {"page_number":3,"page_title":"Market Research","sections":[{"section_number":"3.1","heading":"Market Context","content":"..."}]}
   ],
-  "why_now_analysis": "...",
-  "mcc_view": {
-    "market": "...",
-    "client": "...",
-    "competitor": "..."
-  },
-  "strategic_hook": "...",
-  "persona_priority": {
-    "persona": "...",
-    "reason": "..."
-  },
-  "go_no_go": {
-    "recommendation": "Go",
-    "reason": "..."
-  },
-  "confidence_score": 82,
-  "executive_brief": "..."
+  "full_report_text":"Optional multi-page report summary string"
 }`;
 }
 
