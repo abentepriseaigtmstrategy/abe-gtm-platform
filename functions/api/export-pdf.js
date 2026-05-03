@@ -176,13 +176,26 @@ function truncateWords(text, limit = 70) {
 function renderPageInsight(title, text, isDemoMode) {
   if (!text) return '';
   const clean = truncateWords(escapeHtml(text), 70);
-  const final = isDemoMode && !/demo mode/i.test(clean) ? `${clean} In demo mode, this should be validated with live data.` : clean;
+  const final = isDemoMode && !/demo mode/i.test(clean) ? `${clean} In demo mode, validate with live data.` : clean;
   return `<div class="page-insight"><div class="page-insight-title">${escapeHtml(title)}</div><div class="page-insight-text">${final}</div></div>`;
+}
+
+function renderExpandedPageInsight(insight, isDemoMode) {
+  if (!insight || !insight.title || !insight.what_this_means || !insight.recommended_action) return renderPageInsight(insight?.title, insight?.text, isDemoMode);
+  const what = truncateWords(escapeHtml(insight.what_this_means), 60);
+  const action = truncateWords(escapeHtml(insight.recommended_action), 60);
+  const title = escapeHtml(insight.title);
+  const demoNote = isDemoMode ? '<div class="page-insight-demo">In demo mode, validate with live data.</div>' : '';
+  return `<div class="page-insight page-insight-expanded"><div class="page-insight-title">${title}</div><div class="page-insight-grid"><div><div class="mini-label">What this means</div><p>${what}</p></div><div><div class="mini-label">Recommended action</div><p>${action}</p></div></div>${demoNote}</div>`;
 }
 
 function renderPageInsightBlock(pageKey, strategy, isDemoMode) {
   const insight = getPageInsight(pageKey, strategy, isDemoMode);
-  return insight && insight.text ? renderPageInsight(insight.title, insight.text, isDemoMode) : '';
+  if (!insight || !insight.text) return '';
+  if (insight.expanded && insight.what_this_means && insight.recommended_action) {
+    return renderExpandedPageInsight(insight, isDemoMode);
+  }
+  return renderPageInsight(insight.title, insight.text, isDemoMode);
 }
 
 function safeText(value) {
@@ -216,7 +229,14 @@ function getPageInsight(pageKey, strategy, isDemoMode) {
         title: 'Strategic Interpretation',
         text: score
           ? `A GTM score of ${score}/100 is a directional signal for prioritization, telling leadership whether to pursue, monitor, or pause this go-to-market motion.`
-          : `This executive summary highlights the current GTM opportunity and the degree of validation available; confirm the score with live customer and pipeline data before acting.`
+          : `This executive summary highlights the current GTM opportunity and the degree of validation available; confirm the score with live customer and pipeline data before acting.`,
+        what_this_means: score
+          ? `A strong GTM score means this motion is directionally attractive and should guide prioritization rather than dictate execution.`
+          : `This page signals how much validation exists for the GTM motion and whether the strategy still needs stronger evidence before moving forward.`,
+        recommended_action: score
+          ? `Review the assumptions behind the score, then prioritize the highest-scoring motion while validating the weakest fit areas with live data.`
+          : `Hold this motion for additional customer validation and tighten the focus to the most likely account segments before committing resources.`,
+        expanded: true
       };
     case 'market_research':
       return {
@@ -238,14 +258,20 @@ function getPageInsight(pageKey, strategy, isDemoMode) {
     case 'account_sourcing':
       return {
         title: 'Sourcing Implication',
-        text: `Filters and exclusions on this page are meant to improve account quality and reduce wasted outreach. Use these criteria to keep the pipeline focused on accounts with the strongest fit and intent.`
+        text: `Filters and exclusions on this page are meant to improve account quality and reduce wasted outreach. Use these criteria to keep the pipeline focused on accounts with the strongest fit and intent.`,
+        what_this_means: `The sourcing criteria narrow the target universe to higher-fit accounts and reduce wasted outreach against borderline names.`,
+        recommended_action: `Use these filters to prioritize accounts with strong fit and exclude low-fit names from active outreach.`,
+        expanded: true
       };
     case 'keywords_intent':
       return {
         title: 'Intent Interpretation',
         text: keywords
           ? `Keyword clusters and intent signals here should guide messaging and search strategy so outreach matches where buyers are in the funnel.`
-          : `Use the keyword and intent signals on this page to shape content and personalization for higher relevance.`
+          : `Use the keyword and intent signals on this page to shape content and personalization for higher relevance.`,
+        what_this_means: `The signal clusters show where buyer intent is strongest and which themes should be prioritized in outreach.`,
+        recommended_action: `Build messaging around the highest-priority intent themes and keep outreach concise and aligned to buyer needs.`,
+        expanded: true
       };
     case 'sdr_sequence':
       return {
@@ -257,17 +283,30 @@ function getPageInsight(pageKey, strategy, isDemoMode) {
         title: 'Channel Strategy',
         text: sequence
           ? `LinkedIn and follow-up messaging extend this outreach motion with a second channel, increasing the chance of connecting with enterprise buyers who require repeated, credible touch points.`
-          : `This page supports multi-touch validation by reinforcing the primary outreach through follow-up and social channels.`
+          : `This page supports multi-touch validation by reinforcing the primary outreach through follow-up and social channels.`,
+        what_this_means: sequence
+          ? `This page shows how follow-up and social outreach broaden the core engagement sequence without adding friction.`
+          : `It highlights why reinforcing the primary outreach with a second channel matters for enterprise connections.`,
+        recommended_action: sequence
+          ? `Use the follow-up schedule and LinkedIn messaging to keep the prospect engaged and to surface interest across multiple contact points.`
+          : `Activate a short follow-up sequence after the first outreach touch to increase response rates from higher-fit accounts.`,
+        expanded: true
       };
     case 'decision_engine':
       return {
         title: 'Decision Interpretation',
-        text: `The verdict on this page is a directional recommendation. Confirm the assumptions behind the score and timing before committing to execution or re-prioritizing resources.`
+        text: `The verdict on this page is a directional recommendation. Confirm the assumptions behind the score and timing before committing to execution or re-prioritizing resources.`,
+        what_this_means: `The decision score is a directional signal for execution readiness, not a substitute for stakeholder review.`,
+        recommended_action: `Review the recommendation, validate weak assumptions, and only advance the motion if the evidence support is aligned with your go-to-market timing.`,
+        expanded: true
       };
     case 'confidence_matrix':
       return {
         title: 'Confidence Interpretation',
-        text: `This matrix shows which evidence areas most affect trust in the recommendation. Use it to identify where additional verification is required before moving forward.`
+        text: `This matrix shows which evidence areas most affect trust in the recommendation. Use it to identify where additional verification is required before moving forward.`,
+        what_this_means: `The confidence matrix lets you see which evidence pillars are strong and which need more validation before execution.`,
+        recommended_action: `Focus follow-up research on the lowest-confidence areas and update the recommendation before you commit resources.`,
+        expanded: true
       };
     default:
       return null;
@@ -472,28 +511,40 @@ async function withTimeout(promise, ms) {
 }
 
 async function fetchQuickChartBase64(config, width, height, qc) {
-  const payload = JSON.stringify({
-    chart: config,
-    width, height,
-    backgroundColor: '#0B0F1A',
-    format: 'png',
-    cacheBust: Date.now(),
-    chartVersion: 2,
-    ...(qc.apiKey ? { key: qc.apiKey } : {})
-  });
-  const res = await withTimeout(
-    fetch('https://quickchart.io/chart', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: payload,
-    }),
-    qc.timeout
-  );
-  if (!res.ok) throw new Error(`QuickChart HTTP ${res.status}`);
-  const buf = await res.arrayBuffer();
-  const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
-  if (!b64 || b64.length < 100) throw new Error('QuickChart returned empty image');
-  return b64;
+  let lastError = null;
+  for (const version of ['4', '3']) {
+    const payload = JSON.stringify({
+      chart: config,
+      width,
+      height,
+      backgroundColor: '#0B0F1A',
+      format: 'png',
+      version,
+      cacheBust: Date.now(),
+      ...(qc.apiKey ? { key: qc.apiKey } : {})
+    });
+    console.info('[QuickChart Payload]', version, payload);
+    try {
+      const res = await withTimeout(
+        fetch('https://quickchart.io/chart', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: payload,
+        }),
+        qc.timeout
+      );
+      if (!res.ok) throw new Error(`QuickChart HTTP ${res.status}`);
+      const buf = await res.arrayBuffer();
+      const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+      if (!b64 || b64.length < 100) throw new Error('QuickChart returned empty image');
+      return b64;
+    } catch (err) {
+      lastError = err;
+      console.warn(`[QuickChart] version ${version} failed:`, err.message);
+      if (version === '3') break;
+    }
+  }
+  throw lastError || new Error('QuickChart failed');
 }
 
 // ── Fallback renderers ──
@@ -866,7 +917,12 @@ p{margin-bottom:2mm}
 .chart-block{break-inside:avoid;page-break-inside:avoid;margin:3mm 0}
 .confidence-matrix{break-inside:avoid;page-break-inside:avoid}
 .page-insight{margin-top:5mm;padding:3.5mm 4.5mm;border-left:3px solid var(--accent);background:rgba(168,85,247,.035);border:1px solid rgba(168,85,247,.14);border-radius:9px;break-inside:avoid;page-break-inside:avoid}
+.page-insight-expanded{margin-top:6mm;padding:4.5mm 5mm}
 .page-insight-title{font-size:8px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:1.5mm}
+.page-insight-grid{display:grid;grid-template-columns:1fr 1fr;gap:5mm}
+.mini-label{font-size:7.5px;font-weight:800;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);margin-bottom:1.5mm}
+.page-insight-expanded p{font-size:10px;line-height:1.55;color:var(--text);margin:0}
+.page-insight-demo{font-size:9px;color:var(--muted);margin-top:4mm}
 .page-insight-text{font-size:10px;line-height:1.55;color:var(--text)}
 .appendix-section{break-inside:avoid;page-break-inside:avoid;margin-bottom:4mm}
 .section-header{break-after:avoid;page-break-after:avoid}
