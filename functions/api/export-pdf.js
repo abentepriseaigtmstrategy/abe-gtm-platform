@@ -36,7 +36,7 @@ export async function onRequestPost(context) {
   );
 
   // ── Pre-fetch QuickChart images ──
-  const charts = { gauge: null, waterfall: null, confidence: null };
+  const charts = { gauge: null, waterfall: null, confidence: null, intent: null, risk: null };
   if (QC.enabled) {
     const s2 = strategy.step_2_tam || {};
     const s7 = strategy.step_7_intelligence || {};
@@ -85,33 +85,46 @@ export async function onRequestPost(context) {
   //   return b64;
 
   let chartCount = 0;
-    const tryFetch = async (type, config, w, h) => {
-      if (chartCount >= QC.maxPer) return null;
-      chartCount++;
-      try {
-        console.info('[QuickChart Config]', type, JSON.stringify(config));
-        console.info(`[QuickChart] ${type} config built successfully`);
-        const result = await fetchQuickChartBase64(config, w, h, QC);
-        console.info(`[QuickChart] ${type} success`);
-        return result;
-      } catch(err) {
-        console.warn(`[QuickChart] ${type} failed:`, err.message);
-        return null;
-      }
-    };
+  const tryFetch = async (type, config, w, h) => {
+    if (chartCount >= QC.maxPer) {
+      console.warn(`[QuickChart] max calls (${QC.maxPer}) reached — fallback for ${type}`);
+      return null;
+    }
+    chartCount++;
+    try {
+      return await fetchQuickChartBase64(config, w, h, QC, type);
+    } catch(err) {
+      console.warn(`[QuickChart] ${type} fallback triggered:`, err.message);
+      return null;
+    }
+  };
 
     const [g, wf, cm] = await Promise.allSettled([
-      tryFetch('gauge',      buildGtmGaugeChartConfig(gtmScore, verdict), 280, 170),
-      tryFetch('waterfall',  buildTamWaterfallChartConfig(tamNum, samNum, somNum), 720, 260),
+      tryFetch('gauge',      buildGtmGaugeChartConfig(gtmScore, verdict), 320, 200),
+      tryFetch('waterfall',  buildTamWaterfallChartConfig(tamNum, samNum, somNum), 760, 280),
       tryFetch('confidence', buildConfidenceMatrixChartConfig({
         veracity: matrixVeracity, timing: matrixTiming,
         icpFit: matrixIcpFit, completeness: matrixCompleteness,
         overall: confScore
-      }), 720, 280),
+      }), 760, 300),
     ]);
     charts.gauge      = g.status==='fulfilled'  ? g.value  : null;
     charts.waterfall  = wf.status==='fulfilled' ? wf.value : null;
     charts.confidence = cm.status==='fulfilled' ? cm.value : null;
+
+    // ── Optional mini charts (max 2 additional calls) ──
+    const intentSignals = arr(s5?.intent_signals||s5?.intent_topics||[]);
+    const intentItems = intentSignals.slice(0,4).map((s,i)=>({
+      label: typeof s==='string'?s:(s.signal||s.label||`Signal ${i+1}`),
+      strength: typeof s==='object'&&s.strength ? s.strength : [72,58,65,50][i]||60
+    }));
+    const [intent, risk] = await Promise.allSettled([
+      tryFetch('intent', buildIntentSignalChartConfig(intentItems), 480, 180),
+      tryFetch('risk',   buildRiskSeverityChartConfig(verdict, gtmScore), 480, 180),
+    ]);
+    charts.intent = intent.status==='fulfilled' ? intent.value : null;
+    charts.risk   = risk.status==='fulfilled'   ? risk.value   : null;
+    console.info(`[QuickChart] total calls=${chartCount}/${QC.maxPer} gauge=${!!charts.gauge} waterfall=${!!charts.waterfall} confidence=${!!charts.confidence} intent=${!!charts.intent} risk=${!!charts.risk}`);
   }
 
   const filename = `GTM_${strategy.company_name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
@@ -140,177 +153,11 @@ function renderChartOrFallback(type, base64, fallbackHtml, dimensions = { width:
     return `<div style="margin:3mm 0;line-height:0">
       <img src="data:image/png;base64,${base64}"
         width="${dimensions.width}" height="${dimensions.height}"
-        style="width:100%;max-height:${dimensions.height}px;object-fit:contain;border-radius:8px;background:rgba(255,255,255,.02)"
+        style="width:100%;max-height:${dimensions.height}px;object-fit:contain;border-radius:8px"
         alt="${type} chart"/>
     </div>`;
   }
-  console.info(`[QuickChart] ${type} fallback used`);
   return fallbackHtml;
-}
-
-function renderGaugeChart(base64, score, verdict, dimensions = { width: 280, height: 170 }) {
-  if (!base64) return renderGaugeFallback(score, verdict);
-  const color = /^go$/i.test(verdict) ? '#22c55e' : /no/i.test(verdict) ? '#ef4444' : '#f59e0b';
-  return `<div style="position:relative;width:${dimensions.width}px;height:${dimensions.height}px;margin:3mm 0;">
-    <img src="data:image/png;base64,${base64}"
-      width="${dimensions.width}" height="${dimensions.height}"
-      style="width:100%;height:100%;object-fit:contain;border-radius:14px;"
-      alt="GTM Score gauge"/>
-    <div style="position:absolute;top:50%;left:50%;transform:translate(-50%, -35%);text-align:center;width:100%;pointer-events:none">
-      <div style="font-family:'Space Mono',monospace;font-size:28px;font-weight:900;color:white;line-height:1">${score}</div>
-      <div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.15em;color:${color};margin-top:2px">${verdict.toUpperCase()}</div>
-      <div style="font-size:8px;color:#9CA3AF;text-transform:uppercase;letter-spacing:.2em;margin-top:2px">GTM SCORE</div>
-    </div>
-  </div>`;
-}
-
-function escapeHtml(value) {
-  return String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\s+/g, ' ').trim();
-}
-
-function truncateWords(text, limit = 70) {
-  const words = String(text).trim().split(/\s+/).filter(Boolean);
-  return words.length <= limit ? words.join(' ') : `${words.slice(0, limit).join(' ')}...`;
-}
-
-function renderPageInsight(title, text, isDemoMode) {
-  if (!text) return '';
-  const clean = truncateWords(escapeHtml(text), 70);
-  const final = isDemoMode && !/demo mode/i.test(clean) ? `${clean} In demo mode, validate with live data.` : clean;
-  return `<div class="page-insight"><div class="page-insight-title">${escapeHtml(title)}</div><div class="page-insight-text">${final}</div></div>`;
-}
-
-function renderExpandedPageInsight(insight, isDemoMode) {
-  if (!insight || !insight.title || !insight.what_this_means || !insight.recommended_action) return renderPageInsight(insight?.title, insight?.text, isDemoMode);
-  const what = truncateWords(escapeHtml(insight.what_this_means), 60);
-  const action = truncateWords(escapeHtml(insight.recommended_action), 60);
-  const title = escapeHtml(insight.title);
-  const demoNote = isDemoMode ? '<div class="page-insight-demo">In demo mode, validate with live data.</div>' : '';
-  return `<div class="page-insight page-insight-expanded"><div class="page-insight-title">${title}</div><div class="page-insight-grid"><div><div class="mini-label">What this means</div><p>${what}</p></div><div><div class="mini-label">Recommended action</div><p>${action}</p></div></div>${demoNote}</div>`;
-}
-
-function renderPageInsightBlock(pageKey, strategy, isDemoMode) {
-  const insight = getPageInsight(pageKey, strategy, isDemoMode);
-  if (!insight || !insight.text) return '';
-  if (insight.expanded && insight.what_this_means && insight.recommended_action) {
-    return renderExpandedPageInsight(insight, isDemoMode);
-  }
-  return renderPageInsight(insight.title, insight.text, isDemoMode);
-}
-
-function safeText(value) {
-  if (value === null || value === undefined || value === '') return '';
-  if (Array.isArray(value)) return value.filter(Boolean).join(', ');
-  if (typeof value === 'object') return Object.values(value).filter(Boolean).join(', ');
-  return String(value).trim();
-}
-
-function getPageInsight(pageKey, strategy, isDemoMode) {
-  const s1 = strategy.step_1_market || strategy.steps?.[1] || {};
-  const s2 = strategy.step_2_tam || strategy.steps?.[2] || {};
-  const s3 = strategy.step_3_icp || strategy.steps?.[3] || {};
-  const s4 = strategy.step_4_sourcing || strategy.steps?.[4] || {};
-  const s5 = strategy.step_5_keywords || strategy.steps?.[5] || {};
-  const s6 = strategy.step_6_messaging || strategy.steps?.[6] || {};
-  const s7 = strategy.step_7_intelligence || {};
-  const score = parseInt(s1.gtm_relevance_score) || 0;
-  const rec = s7.go_no_go?.recommendation || s7.verdict || strategy.verdict || (score>=75?'Go':score>=50?'Watch':'No-Go');
-  const tam = safeText(s2.tam_size_estimate) || safeText(s2.waterfall?.tam_value) || 'the total addressable market';
-  const sam = safeText(s2.sam_estimate) || safeText(s2.waterfall?.sam_value) || 'the serviceable market';
-  const som = safeText(s2.waterfall?.som_value) || 'the obtainable market';
-  const primary = safeText(s3.primary_icp);
-  const objections = safeText(s3.objections);
-  const filters = safeText(s4.filter_criteria) || 'targeted fit and exclusion rules';
-  const keywords = safeText(s5.keyword_taxonomy?.early_funnel || s5.keyword_taxonomy?.late_funnel || s5.primary_keywords || s5.secondary_keywords);
-  const sequence = safeText(s6.follow_up_sequence || s6.linkedin_message || s6.linkedin_follow_up);
-  switch(pageKey) {
-    case 'executive_summary':
-      return {
-        title: 'Strategic Interpretation',
-        text: score
-          ? `A GTM score of ${score}/100 is a directional signal for prioritization, telling leadership whether to pursue, monitor, or pause this go-to-market motion.`
-          : `This executive summary highlights the current GTM opportunity and the degree of validation available; confirm the score with live customer and pipeline data before acting.`,
-        what_this_means: score
-          ? `A strong GTM score means this motion is directionally attractive and should guide prioritization rather than dictate execution.`
-          : `This page signals how much validation exists for the GTM motion and whether the strategy still needs stronger evidence before moving forward.`,
-        recommended_action: score
-          ? `Review the assumptions behind the score, then prioritize the highest-scoring motion while validating the weakest fit areas with live data.`
-          : `Hold this motion for additional customer validation and tighten the focus to the most likely account segments before committing resources.`,
-        expanded: true
-      };
-    case 'market_research':
-      return {
-        title: 'Market Implication',
-        text: `Positioning, SWOT, and growth signals show whether the current strategy is ready for active engagement or needs refinement before scaling. Use this page to align timing and messaging to realistic market conditions.`
-      };
-    case 'tam_mapping':
-      return {
-        title: 'Commercial Impact',
-        text: `TAM defines the total universe, SAM defines the addressable slice, and SOM defines what is realistically captureable. This helps keep prioritization focused on high-probability account selection rather than broad opportunity estimates.`
-      };
-    case 'icp_modeling':
-      return {
-        title: 'ICP Interpretation',
-        text: primary
-          ? `The primary ICP and identified pain points are the foundation for targeting. Align outreach to the buyer roles and objections here to reduce wasted effort and improve response quality.`
-          : `This page defines who matters most. Keep the profile and objections aligned to the highest-fit buyers so outbound resonates sooner.`
-      };
-    case 'account_sourcing':
-      return {
-        title: 'Sourcing Implication',
-        text: `Filters and exclusions on this page are meant to improve account quality and reduce wasted outreach. Use these criteria to keep the pipeline focused on accounts with the strongest fit and intent.`,
-        what_this_means: `The sourcing criteria narrow the target universe to higher-fit accounts and reduce wasted outreach against borderline names.`,
-        recommended_action: `Use these filters to prioritize accounts with strong fit and exclude low-fit names from active outreach.`,
-        expanded: true
-      };
-    case 'keywords_intent':
-      return {
-        title: 'Intent Interpretation',
-        text: keywords
-          ? `Keyword clusters and intent signals here should guide messaging and search strategy so outreach matches where buyers are in the funnel.`
-          : `Use the keyword and intent signals on this page to shape content and personalization for higher relevance.`,
-        what_this_means: `The signal clusters show where buyer intent is strongest and which themes should be prioritized in outreach.`,
-        recommended_action: `Build messaging around the highest-priority intent themes and keep outreach concise and aligned to buyer needs.`,
-        expanded: true
-      };
-    case 'sdr_sequence':
-      return {
-        title: 'Engagement Logic',
-        text: `A three-touch SDR sequence helps move buyers from problem awareness to interest and urgency without overloading them too early. This structure aims to build credibility while surfacing high-fit responses.`
-      };
-    case 'followup_social':
-      return {
-        title: 'Channel Strategy',
-        text: sequence
-          ? `LinkedIn and follow-up messaging extend this outreach motion with a second channel, increasing the chance of connecting with enterprise buyers who require repeated, credible touch points.`
-          : `This page supports multi-touch validation by reinforcing the primary outreach through follow-up and social channels.`,
-        what_this_means: sequence
-          ? `This page shows how follow-up and social outreach broaden the core engagement sequence without adding friction.`
-          : `It highlights why reinforcing the primary outreach with a second channel matters for enterprise connections.`,
-        recommended_action: sequence
-          ? `Use the follow-up schedule and LinkedIn messaging to keep the prospect engaged and to surface interest across multiple contact points.`
-          : `Activate a short follow-up sequence after the first outreach touch to increase response rates from higher-fit accounts.`,
-        expanded: true
-      };
-    case 'decision_engine':
-      return {
-        title: 'Decision Interpretation',
-        text: `The verdict on this page is a directional recommendation. Confirm the assumptions behind the score and timing before committing to execution or re-prioritizing resources.`,
-        what_this_means: `The decision score is a directional signal for execution readiness, not a substitute for stakeholder review.`,
-        recommended_action: `Review the recommendation, validate weak assumptions, and only advance the motion if the evidence support is aligned with your go-to-market timing.`,
-        expanded: true
-      };
-    case 'confidence_matrix':
-      return {
-        title: 'Confidence Interpretation',
-        text: `This matrix shows which evidence areas most affect trust in the recommendation. Use it to identify where additional verification is required before moving forward.`,
-        what_this_means: `The confidence matrix lets you see which evidence pillars are strong and which need more validation before execution.`,
-        recommended_action: `Focus follow-up research on the lowest-confidence areas and update the recommendation before you commit resources.`,
-        expanded: true
-      };
-    default:
-      return null;
-  }
 }
 
 function normalizeCompanyName(name) {
@@ -346,159 +193,200 @@ function parseMoneyValue(str, fallback = 0) {
 function buildGtmGaugeChartConfig(score, verdict) {
   const pct = Math.max(0, Math.min(100, parseInt(score) || 0));
   const color = /^go$/i.test(verdict) ? '#22c55e' : /no/i.test(verdict) ? '#ef4444' : '#f59e0b';
+  const verLabel = /^go$/i.test(verdict) ? 'GO' : /no/i.test(verdict) ? 'NO-GO' : 'WATCH';
   return {
     type: 'doughnut',
     data: {
       labels: ['Score', 'Remaining'],
-      datasets: [{
-        label: 'GTM Score',
-        data: [pct, 100 - pct],
-        backgroundColor: [color, 'rgba(255,255,255,0.08)'],
-        borderWidth: 0,
-        circumference: 180,
-        rotation: 180,
-        cutout: '70%',
-      }]
+      datasets: [
+        {
+          data: [100],
+          backgroundColor: ['rgba(255,255,255,0.04)'],
+          borderWidth: 0, circumference: 220, rotation: 250, cutout: '82%', radius: '100%',
+        },
+        {
+          data: [pct, 100 - pct],
+          backgroundColor: [color, 'rgba(255,255,255,0.06)'],
+          borderWidth: 0, circumference: 220, rotation: 250, cutout: '70%', radius: '88%',
+        },
+      ],
     },
     options: {
-      responsive: false,
-      maintainAspectRatio: false,
-      animation: false,
+      responsive: false, maintainAspectRatio: false, animation: false,
+      layout: { padding: 10 },
       plugins: {
         legend: { display: false },
         tooltip: { enabled: false },
+        doughnutlabel: {
+          labels: [
+            { text: String(pct), font: { size: 36, weight: '900', family: 'monospace' }, color: '#ffffff' },
+            { text: verLabel, font: { size: 13, weight: '800', family: 'Inter, sans-serif' }, color: color },
+            { text: 'GTM SCORE', font: { size: 8, weight: '600', family: 'Inter, sans-serif' }, color: '#9CA3AF' },
+          ],
+        },
       },
-      layout: { padding: { top: 10, bottom: 10, left: 10, right: 10 } },
-    }
+    },
   };
 }
 
 function buildTamWaterfallChartConfig(tamM, samM, somM) {
-  const safeNum = v => Number.isFinite(v) ? v : 0;
+  const safeNum = v => (Number.isFinite(v) && v > 0) ? v : 0;
   const values = [safeNum(tamM), safeNum(samM), safeNum(somM)];
-  const maxVal = Math.max(100, ...values) * 1.08;
-  const fmt = v => {
-    const n = Number(v) || 0;
-    if (n >= 1000) return `$${(n/1000).toFixed(1)}B`;
-    if (n > 0) return `$${Math.round(n)}M`;
-    return '$0M';
-  };
+  const maxVal = Math.max(100, ...values) * 1.22;
+  const fmt = v => { const n = Number(v)||0; if(n>=1000) return '$'+(n/1000).toFixed(1)+'B'; if(n>0) return '$'+Math.round(n)+'M'; return '$0'; };
+  const somPct = values[0]>0 ? Math.round((values[2]/values[0])*100) : 0;
   return {
     type: 'bar',
     data: {
-      labels: ['TAM', 'SAM', 'SOM'],
+      labels: ['Total Addressable\nMarket (TAM)', 'Serviceable\nAvailable (SAM)', 'Serviceable\nObtainable (SOM)'],
       datasets: [{
         label: '',
         data: values,
-        backgroundColor: ['#6366f1', '#7c3aed', '#f59e0b'],
-        borderRadius: 10,
-        borderSkipped: false,
-        barThickness: 26,
-        maxBarThickness: 36,
+        backgroundColor: ['#6366f1', '#8b5cf6', '#f59e0b'],
+        borderRadius: 10, borderSkipped: false, barThickness: 30, maxBarThickness: 38,
       }]
     },
     options: {
-      responsive: false,
-      maintainAspectRatio: false,
-      animation: false,
+      responsive: false, maintainAspectRatio: false, animation: false,
       indexAxis: 'y',
-      legend: { display: false },
-      tooltip: { enabled: false },
+      layout: { padding: { right: 30, left: 10, top: 16, bottom: 16 } },
       plugins: {
         legend: { display: false },
         tooltip: { enabled: false },
+        datalabels: {
+          display: true,
+          color: '#ffffff',
+          font: { size: 11, weight: '700', family: 'monospace' },
+          anchor: 'end', align: 'right', offset: 4,
+          formatter: v => v > 0 ? fmt(v) : '',
+        },
+        annotation: {
+          annotations: {
+            captureZone: {
+              type: 'line',
+              xMin: values[2] > 0 ? values[2] : values[0] * 0.07,
+              xMax: values[2] > 0 ? values[2] : values[0] * 0.07,
+              borderColor: 'rgba(245,158,11,0.5)',
+              borderWidth: 1.5,
+              borderDash: [4, 3],
+              label: {
+                enabled: true,
+                content: somPct > 0 ? `Capture Zone ~${somPct}%` : 'Capture Zone',
+                position: 'start',
+                backgroundColor: 'rgba(245,158,11,0.12)',
+                color: '#f59e0b',
+                font: { size: 9, weight: '600' },
+                padding: { x: 4, y: 2 },
+                xAdjust: 0, yAdjust: -16,
+              },
+            },
+            aiNote: {
+              type: 'label',
+              xValue: maxVal * 0.01,
+              yValue: 2.48,
+              content: ['AI-estimated · validate with analyst data'],
+              color: 'rgba(156,163,175,0.7)',
+              font: { size: 8, style: 'italic' },
+            },
+          },
+        },
       },
       scales: {
         x: {
-          beginAtZero: true,
-          min: 0,
-          max: Math.round(maxVal),
-          ticks: {
-            color: '#9CA3AF',
-            font: { size: 10 },
-            callback: v => fmt(v),
-          },
-          grid: { color: 'rgba(255,255,255,0.08)', drawBorder: false },
+          beginAtZero: true, min: 0, max: Math.round(maxVal),
+          ticks: { color: '#9CA3AF', font: { size: 9 }, callback: v => fmt(v) },
+          grid: { color: 'rgba(255,255,255,0.06)', drawBorder: false },
         },
         y: {
           ticks: {
-            color: '#E5E7EB',
-            font: { size: 11, weight: '700' },
-            autoSkip: false,
-            maxRotation: 0,
-            minRotation: 0,
+            color: '#E5E7EB', font: { size: 10, weight: '700' },
+            autoSkip: false, maxRotation: 0, minRotation: 0,
           },
           grid: { display: false },
         }
       },
-      layout: { padding: { right: 20, left: 10, top: 10, bottom: 10 } },
-      elements: { bar: { borderRadius: 10 } }
     }
   };
 }
 
 function buildConfidenceMatrixChartConfig({ veracity, timing, icpFit, completeness, overall }) {
-  const safe = (value) => {
-    const n = Number(value);
-    return Number.isFinite(n) ? Math.max(0, Math.min(100, Math.round(n))) : 0;
-  };
+  const safe = v => { const n=Number(v); return Number.isFinite(n)?Math.max(0,Math.min(100,Math.round(n))):0; };
+  const toPercent = (sc, max) => safe(Math.round((sc/max)*100));
   const values = [
-    safe(Math.round((veracity / 40) * 100)),
-    safe(Math.round((timing / 25) * 100)),
-    safe(Math.round((icpFit / 20) * 100)),
-    safe(Math.round((completeness / 15) * 100)),
+    toPercent(veracity, 40),
+    toPercent(timing, 25),
+    toPercent(icpFit, 20),
+    toPercent(completeness, 15),
     safe(overall),
   ];
+  const overallColor = values[4] >= 75 ? '#22c55e' : values[4] >= 50 ? '#f59e0b' : '#ef4444';
+  const bgColors = ['#7c3aed','#8b5cf6','#6366f1','#a78bfa', overallColor];
   return {
     type: 'bar',
     data: {
-      labels: ['Signal Veracity', 'Market Timing', 'ICP Fit', 'Data Completeness', 'Overall Fidelity'],
+      labels: ['Signal Veracity (40%)', 'Market Timing (25%)', 'ICP Fit (20%)', 'Data Completeness (15%)', 'Overall Fidelity'],
       datasets: [{
         label: '',
         data: values,
-        backgroundColor: values.map((v, idx) => idx === 4 ? (v >= 75 ? '#22c55e' : v >= 50 ? '#f59e0b' : '#ef4444') : '#8b5cf6'),
-        borderRadius: 8,
-        borderSkipped: false,
-        barThickness: 18,
-        maxBarThickness: 24,
+        backgroundColor: bgColors,
+        borderRadius: 8, borderSkipped: false, barThickness: 20, maxBarThickness: 26,
       }]
     },
     options: {
-      responsive: false,
-      maintainAspectRatio: false,
-      animation: false,
+      responsive: false, maintainAspectRatio: false, animation: false,
       indexAxis: 'y',
-      legend: { display: false },
-      tooltip: { enabled: false },
+      layout: { padding: { right: 30, left: 10, top: 14, bottom: 14 } },
       plugins: {
         legend: { display: false },
         tooltip: { enabled: false },
+        datalabels: {
+          display: true,
+          color: ctx => ctx.dataIndex === 4 ? '#ffffff' : 'rgba(255,255,255,0.85)',
+          font: ctx => ({ size: ctx.dataIndex === 4 ? 12 : 10, weight: '700', family: 'monospace' }),
+          anchor: 'end', align: 'right', offset: 4,
+          formatter: (v, ctx) => {
+            if (ctx.dataIndex === 4) return v + '/100';
+            const maxes = [40, 25, 20, 15];
+            const rawScores = [${JSON.stringify([0,0,0,0])}.map((_, i) => i)];
+            return v + '%';
+          },
+        },
+        annotation: {
+          annotations: {
+            weakLine: {
+              type: 'line',
+              xMin: 50, xMax: 50,
+              borderColor: 'rgba(245,158,11,0.35)', borderWidth: 1.5, borderDash: [3,3],
+              label: {
+                enabled: true, content: 'Validate', position: 'start',
+                backgroundColor: 'rgba(245,158,11,0.08)', color: '#f59e0b',
+                font: { size: 8, weight: '600' }, padding: { x:4, y:2 }, yAdjust: -14,
+              },
+            },
+            strongLine: {
+              type: 'line',
+              xMin: 75, xMax: 75,
+              borderColor: 'rgba(34,197,94,0.30)', borderWidth: 1.5, borderDash: [3,3],
+              label: {
+                enabled: true, content: 'Strong', position: 'start',
+                backgroundColor: 'rgba(34,197,94,0.08)', color: '#22c55e',
+                font: { size: 8, weight: '600' }, padding: { x:4, y:2 }, yAdjust: -14,
+              },
+            },
+          },
+        },
       },
       scales: {
         x: {
-          beginAtZero: true,
-          min: 0,
-          max: 100,
-          ticks: {
-            color: '#9CA3AF',
-            font: { size: 10 },
-            callback: v => `${v}%`,
-          },
-          grid: { color: 'rgba(255,255,255,0.08)', drawBorder: false },
+          beginAtZero: true, min: 0, max: 110,
+          ticks: { color: '#9CA3AF', font: { size: 9 }, callback: v => v <= 100 ? v+'%' : '' },
+          grid: { color: 'rgba(255,255,255,0.06)', drawBorder: false },
         },
         y: {
-          ticks: {
-            color: '#E5E7EB',
-            font: { size: 10, weight: '600' },
-            autoSkip: false,
-            maxRotation: 0,
-            minRotation: 0,
-          },
+          ticks: { color: '#E5E7EB', font: { size: 9, weight: '600' }, autoSkip: false, maxRotation: 0 },
           grid: { display: false },
         }
       },
-      layout: { padding: { top: 10, right: 10, bottom: 10, left: 10 } },
-      elements: { bar: { borderRadius: 8 } }
     }
   };
 }
@@ -510,40 +398,43 @@ async function withTimeout(promise, ms) {
   ]);
 }
 
-async function fetchQuickChartBase64(config, width, height, qc) {
+async function fetchQuickChartBase64(config, width, height, qc, chartType = 'default') {
+  const versionMap = { gauge:['4','3'], waterfall:['3','4'], confidence:['4','3'], intent:['4','3'], risk:['4','3'] };
+  const versions = versionMap[chartType] || ['4','3'];
+  const configStr = JSON.stringify(config);
+  const hasDatalabels = configStr.includes('datalabels');
+  const hasAnnotation = configStr.includes('annotation');
+  const hasDoughnutlabel = configStr.includes('doughnutlabel');
+  console.info(`[QuickChart] type=${chartType} w=${width} h=${height} datalabels=${hasDatalabels} annotation=${hasAnnotation} doughnutlabel=${hasDoughnutlabel}`);
   let lastError = null;
-  for (const version of ['4', '3']) {
+  for (const version of versions) {
     const payload = JSON.stringify({
-      chart: config,
-      width,
-      height,
-      backgroundColor: '#0B0F1A',
-      format: 'png',
-      version,
-      cacheBust: Date.now(),
+      chart: config, width, height,
+      backgroundColor: '#0B0F1A', format: 'png', version,
       ...(qc.apiKey ? { key: qc.apiKey } : {})
     });
-    console.info('[QuickChart Payload]', version, payload);
     try {
       const res = await withTimeout(
         fetch('https://quickchart.io/chart', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: payload,
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload,
         }),
         qc.timeout
       );
-      if (!res.ok) throw new Error(`QuickChart HTTP ${res.status}`);
+      if (!res.ok) {
+        const errBody = await res.text().catch(() => '');
+        throw new Error(`QuickChart HTTP ${res.status}: ${errBody.slice(0,80)}`);
+      }
       const buf = await res.arrayBuffer();
       const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
-      if (!b64 || b64.length < 100) throw new Error('QuickChart returned empty image');
+      if (!b64 || b64.length < 200) throw new Error('QuickChart returned empty image');
+      console.info(`[QuickChart] ${chartType} v${version} success (${b64.length} chars)`);
       return b64;
     } catch (err) {
       lastError = err;
-      console.warn(`[QuickChart] version ${version} failed:`, err.message);
-      if (version === '3') break;
+      console.warn(`[QuickChart] ${chartType} v${version} failed:`, err.message);
     }
   }
+  console.warn(`[QuickChart] ${chartType} all versions failed — using fallback`);
   throw lastError || new Error('QuickChart failed');
 }
 
@@ -586,6 +477,226 @@ function renderConfidenceFallback(v, t, f, c, overall) {
   return cmBar('Signal Veracity (40%)',v,40)+cmBar('Market Timing (25%)',t,25)+cmBar('ICP Fit (20%)',f,20)+cmBar('Data Completeness (15%)',c,15)+
     `<div style="border-top:1px solid rgba(168,85,247,.2);margin:3mm 0"></div>`+
     `<div style="margin-bottom:2mm"><div style="display:flex;justify-content:space-between;margin-bottom:1.5mm"><span style="font-size:10px;font-weight:900;color:white">Overall Fidelity</span><span style="font-family:monospace;font-size:14px;font-weight:900;color:white">${overall}<span style="font-size:8px;font-weight:400;color:#6B7280">/100</span></span></div><div style="background:rgba(168,85,247,.12);border:1px solid rgba(168,85,247,.2);border-radius:6px;height:13px;overflow:hidden"><div style="height:100%;border-radius:6px;background:linear-gradient(90deg,#5b21b6,#7c3aed,#a855f7,#c084fc);width:${overall}%;min-width:3px"></div></div></div>`;
+}
+
+// ══════════════════════════════════════════════════════════════
+// OPTIONAL MINI CHART CONFIGS (max 2 extra calls per report)
+// ══════════════════════════════════════════════════════════════
+
+function buildIntentSignalChartConfig(signals) {
+  // signals: array of { label, strength (0-100) }
+  const defaults = [
+    { label: 'High buyer research', strength: 72 },
+    { label: 'Decision-maker outreach', strength: 58 },
+    { label: 'Funnel velocity', strength: 65 },
+  ];
+  const items = (Array.isArray(signals) && signals.length >= 2) ? signals.slice(0,4) : defaults;
+  const labels = items.map(s => typeof s === 'string' ? s : (s.label || String(s)));
+  const values = items.map(s => typeof s === 'object' && s.strength ? s.strength : 65);
+  return {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: values.map(v => v >= 70 ? '#22c55e' : v >= 50 ? '#f59e0b' : '#ef4444'),
+        borderRadius: 6, borderSkipped: false, barThickness: 14, maxBarThickness: 20,
+      }]
+    },
+    options: {
+      responsive: false, maintainAspectRatio: false, animation: false,
+      indexAxis: 'y',
+      layout: { padding: { right: 28, left: 8, top: 8, bottom: 8 } },
+      plugins: {
+        legend: { display: false }, tooltip: { enabled: false },
+        datalabels: {
+          display: true, color: '#ffffff',
+          font: { size: 9, weight: '700', family: 'monospace' },
+          anchor: 'end', align: 'right', offset: 3,
+          formatter: v => v + '%',
+        },
+      },
+      scales: {
+        x: { beginAtZero: true, min: 0, max: 110,
+          ticks: { color: '#6B7280', font: { size: 8 }, callback: v => v<=100?v+'%':'' },
+          grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false } },
+        y: { ticks: { color: '#E5E7EB', font: { size: 9, weight: '600' }, autoSkip: false, maxRotation: 0 },
+          grid: { display: false } }
+      },
+    }
+  };
+}
+
+function buildRiskSeverityChartConfig(verdict, score) {
+  const cycle = score >= 75 ? 35 : score >= 50 ? 65 : 85;
+  const lock  = score >= 75 ? 40 : score >= 50 ? 60 : 75;
+  const budget = score >= 75 ? 45 : score >= 50 ? 65 : 80;
+  const compete = score >= 75 ? 50 : score >= 50 ? 55 : 70;
+  return {
+    type: 'bar',
+    data: {
+      labels: ['Decision Cycle', 'Vendor Lock-in', 'Budget Friction', 'Competitive Pressure'],
+      datasets: [{
+        data: [cycle, lock, budget, compete],
+        backgroundColor: [
+          cycle>=70?'#ef4444':cycle>=50?'#f59e0b':'#22c55e',
+          lock>=70?'#ef4444':lock>=50?'#f59e0b':'#22c55e',
+          budget>=70?'#ef4444':budget>=50?'#f59e0b':'#22c55e',
+          compete>=70?'#ef4444':compete>=50?'#f59e0b':'#22c55e',
+        ],
+        borderRadius: 6, borderSkipped: false, barThickness: 14, maxBarThickness: 20,
+      }]
+    },
+    options: {
+      responsive: false, maintainAspectRatio: false, animation: false,
+      indexAxis: 'y',
+      layout: { padding: { right: 28, left: 8, top: 8, bottom: 8 } },
+      plugins: {
+        legend: { display: false }, tooltip: { enabled: false },
+        datalabels: {
+          display: true, color: '#ffffff',
+          font: { size: 9, weight: '700', family: 'monospace' },
+          anchor: 'end', align: 'right', offset: 3,
+          formatter: v => v >= 70 ? 'High' : v >= 50 ? 'Med' : 'Low',
+        },
+        annotation: {
+          annotations: {
+            highThreshold: {
+              type: 'line', xMin: 70, xMax: 70,
+              borderColor: 'rgba(239,68,68,0.3)', borderWidth: 1, borderDash: [3,3],
+            },
+          },
+        },
+      },
+      scales: {
+        x: { beginAtZero: true, min: 0, max: 110, display: false },
+        y: { ticks: { color: '#E5E7EB', font: { size: 9, weight: '600' }, autoSkip: false, maxRotation: 0 },
+          grid: { display: false } }
+      },
+    }
+  };
+}
+
+function escapeHtml(value) {
+  return String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\s+/g, ' ').trim();
+}
+
+function truncateWords(text, limit = 70) {
+  const words = String(text).trim().split(/\s+/).filter(Boolean);
+  return words.length <= limit ? words.join(' ') : `${words.slice(0, limit).join(' ')}...`;
+}
+
+function safeText(value) {
+  if (!value) return '';
+  if (Array.isArray(value)) return value.filter(Boolean).join(', ');
+  if (typeof value === 'object') return Object.values(value).filter(Boolean).join(', ');
+  return String(value).trim();
+}
+
+function renderGaugeChart(base64, score, verdict, dimensions = { width: 320, height: 200 }) {
+  if (!base64) return renderGaugeFallback(score, verdict);
+  const color = /^go$/i.test(verdict) ? '#22c55e' : /no/i.test(verdict) ? '#ef4444' : '#f59e0b';
+  return `<div style="position:relative;width:${dimensions.width}px;height:${dimensions.height}px;margin:3mm auto;">
+    <img src="data:image/png;base64,${base64}"
+      width="${dimensions.width}" height="${dimensions.height}"
+      style="width:100%;height:100%;object-fit:contain;border-radius:14px;"
+      alt="GTM Score gauge"/>
+  </div>`;
+}
+
+function renderPageInsight(title, text, isDemoMode) {
+  if (!text) return '';
+  const clean = truncateWords(escapeHtml(text), 70);
+  const final = isDemoMode && !/demo mode/i.test(clean) ? `${clean} In demo mode, validate with live data.` : clean;
+  return `<div class="page-insight"><div class="page-insight-title">${escapeHtml(title)}</div><div class="page-insight-text">${final}</div></div>`;
+}
+
+function renderExpandedPageInsight(insight, isDemoMode) {
+  if (!insight || !insight.title || !insight.what_this_means || !insight.recommended_action) return renderPageInsight(insight?.title, insight?.text, isDemoMode);
+  const what = truncateWords(escapeHtml(insight.what_this_means), 60);
+  const action = truncateWords(escapeHtml(insight.recommended_action), 60);
+  const demoNote = isDemoMode ? '<div class="page-insight-demo">In demo mode, validate with live data.</div>' : '';
+  return `<div class="page-insight page-insight-expanded"><div class="page-insight-title">${escapeHtml(insight.title)}</div><div class="page-insight-grid"><div><div class="mini-label">What this means</div><p>${what}</p></div><div><div class="mini-label">Recommended action</div><p>${action}</p></div></div>${demoNote}</div>`;
+}
+
+function getPageInsight(pageKey, strategy, isDemoMode) {
+  const s1 = strategy.step_1_market || {};
+  const s2 = strategy.step_2_tam || {};
+  const s3 = strategy.step_3_icp || {};
+  const s4 = strategy.step_4_sourcing || {};
+  const s5 = strategy.step_5_keywords || {};
+  const s6 = strategy.step_6_messaging || {};
+  const s7 = strategy.step_7_intelligence || {};
+  const score = parseInt(s1.gtm_relevance_score) || 0;
+  const keywords = safeText(s5.primary_keywords || s5.secondary_keywords);
+  const sequence = safeText(s6.follow_up_sequence || s6.linkedin_message);
+  const primary  = safeText(s3.primary_icp);
+  switch(pageKey) {
+    case 'executive_summary': return {
+      title: 'Strategic Interpretation', expanded: true,
+      text: score ? `A GTM score of ${score}/100 signals directional attractiveness for this market motion — prioritize, monitor, or pause based on data richness.` : `This summary sets the commercial context. Validate the score with live pipeline and buyer data before taking action.`,
+      what_this_means: score >= 75 ? `Strong alignment across TAM, ICP, and timing signals. This motion is ready for active engagement.` : score >= 50 ? `Moderate alignment. Validate the weakest evidence areas before committing outbound resources.` : `Limited fit signals detected. Consider re-evaluating in 60–90 days with richer data.`,
+      recommended_action: score >= 75 ? `Initiate outbound with the top-tier ICP accounts and validate conversion signals within 30 days.` : score >= 50 ? `Run a small test batch with high-fit accounts before scaling. Strengthen weak signal areas first.` : `Pause full-scale execution. Identify the root cause of low fit and re-qualify the TAM before proceeding.`,
+    };
+    case 'market_research': return {
+      title: 'Market Implication',
+      text: `Positioning, SWOT signals, and growth indicators show whether the current strategy is ready for active engagement or needs refinement. Use this page to align timing and messaging to realistic market conditions.`
+    };
+    case 'tam_mapping': return {
+      title: 'Commercial Impact', expanded: true,
+      text: `TAM defines the total universe, SAM defines the addressable slice, and SOM defines what is realistically capturable. These figures anchor prioritization to high-probability account selection.`,
+      what_this_means: `The narrowing from TAM to SOM represents realistic go-to-market scope — not just market size. Over-targeting the full TAM is a common execution failure.`,
+      recommended_action: `Focus immediate sourcing on the SOM tier. Expand only after win rate and deal cycle data from early accounts are validated.`,
+    };
+    case 'icp_modeling': return {
+      title: 'ICP Interpretation',
+      text: primary ? `The primary ICP and pain points identified here are the targeting foundation. Align outreach to buyer roles and objections to reduce wasted effort and improve response rates.` : `Define the highest-fit buyer profile before initiating outbound. Weak ICP clarity is the most common reason for low reply rates.`
+    };
+    case 'account_sourcing': return {
+      title: 'Sourcing Implication', expanded: true,
+      text: `Filters and exclusions on this page improve account quality and reduce wasted outreach. These criteria keep the pipeline focused on accounts with the strongest fit and intent.`,
+      what_this_means: `The sourcing criteria narrow the target universe to higher-fit accounts, reducing wasted outreach cycles against borderline names.`,
+      recommended_action: `Use these filters to prioritize accounts with strong fit and exclude low-fit names from active sequencing immediately.`,
+    };
+    case 'keywords_intent': return {
+      title: 'Intent Interpretation', expanded: true,
+      text: keywords ? `Keyword clusters and intent signals here guide messaging and search strategy so outreach matches where buyers are in the funnel.` : `Use the keyword and intent signals to shape content and personalization for higher relevance and reply rates.`,
+      what_this_means: `The signal clusters show where buyer intent is strongest and which themes should be prioritized in outreach personalization.`,
+      recommended_action: `Build messaging around the highest-priority intent themes. Keep outreach concise and directly aligned to buyer needs.`,
+    };
+    case 'sdr_sequence': return {
+      title: 'Engagement Logic',
+      text: `A three-touch SDR sequence moves buyers from problem awareness to interest and urgency without overloading them early. This structure builds credibility while surfacing high-fit responses.`
+    };
+    case 'followup_social': return {
+      title: 'Channel Strategy', expanded: true,
+      text: sequence ? `LinkedIn and follow-up messaging extend the outreach motion with a second channel, increasing the chance of connecting with enterprise buyers who require multiple credible touch points.` : `Reinforcing primary outreach with a second channel matters for enterprise connections where single-touch response rates are typically low.`,
+      what_this_means: `Follow-up and social outreach broaden the core engagement sequence without adding friction to the buyer journey.`,
+      recommended_action: `Activate follow-up within 3–5 days of the first touch. Use LinkedIn to reinforce credibility before the second email touch.`,
+    };
+    case 'decision_engine': return {
+      title: 'Decision Interpretation', expanded: true,
+      text: `The verdict is a directional recommendation. Confirm the assumptions behind the score and timing before committing execution resources or re-prioritizing the commercial pipeline.`,
+      what_this_means: `The decision score is a prioritization signal for execution readiness — not a substitute for stakeholder review and live validation.`,
+      recommended_action: `Review the recommendation, validate weak assumptions, and only advance the motion if evidence support aligns with your go-to-market timing window.`,
+    };
+    case 'confidence_matrix': return {
+      title: 'Confidence Interpretation', expanded: true,
+      text: `This matrix shows which evidence areas most affect trust in the recommendation. Use it to identify where additional verification is required before moving resources forward.`,
+      what_this_means: `The confidence matrix lets you see which evidence pillars are strong and which need more validation before scaling execution.`,
+      recommended_action: `Focus follow-up research on the lowest-confidence dimensions and update the recommendation before committing outbound resources.`,
+    };
+    default: return null;
+  }
+}
+
+function renderPageInsightBlock(pageKey, strategy, isDemoMode) {
+  const insight = getPageInsight(pageKey, strategy, isDemoMode);
+  if (!insight || !insight.text) return '';
+  if (insight.expanded && insight.what_this_means && insight.recommended_action) {
+    return renderExpandedPageInsight(insight, isDemoMode);
+  }
+  return renderPageInsight(insight.title, insight.text, isDemoMode);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -820,6 +931,10 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false) {
     </div>
   </div>
   ${srcNote('30–60 day cycle estimate is an industry benchmark (AI estimate) — validate with CRM data')}
+  ${charts.risk
+    ? `<div style="margin:2mm 0 4mm"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:2mm">RISK SEVERITY ASSESSMENT</div>${renderChartOrFallback('Risk Severity', charts.risk, '', {width:480,height:180})}</div>`
+    : ''
+}
   <h3>7.5 · Execution Priority</h3>
   <div class="card">
     <div style="display:flex;gap:5mm">
@@ -837,8 +952,7 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false) {
       </div>
     </div>
   </div>
-  ${safe(s2.growth_rate)?srcNote('CAGR ('+safe(s2.growth_rate)+') is an AI market estimate — cross-reference with analyst reports'):''}
-  ${renderPageInsightBlock('decision_engine', strategy, isDemoMode)}`;
+  ${safe(s2.growth_rate)?srcNote('CAGR ('+safe(s2.growth_rate)+') is an AI market estimate — cross-reference with analyst reports'):''}`;
 
   };
 
@@ -916,14 +1030,6 @@ p{margin-bottom:2mm}
 .email-card{break-inside:avoid;page-break-inside:avoid}
 .chart-block{break-inside:avoid;page-break-inside:avoid;margin:3mm 0}
 .confidence-matrix{break-inside:avoid;page-break-inside:avoid}
-.page-insight{margin-top:5mm;padding:3.5mm 4.5mm;border-left:3px solid var(--accent);background:rgba(168,85,247,.035);border:1px solid rgba(168,85,247,.14);border-radius:9px;break-inside:avoid;page-break-inside:avoid}
-.page-insight-expanded{margin-top:6mm;padding:4.5mm 5mm}
-.page-insight-title{font-size:8px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:1.5mm}
-.page-insight-grid{display:grid;grid-template-columns:1fr 1fr;gap:5mm}
-.mini-label{font-size:7.5px;font-weight:800;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);margin-bottom:1.5mm}
-.page-insight-expanded p{font-size:10px;line-height:1.55;color:var(--text);margin:0}
-.page-insight-demo{font-size:9px;color:var(--muted);margin-top:4mm}
-.page-insight-text{font-size:10px;line-height:1.55;color:var(--text)}
 .appendix-section{break-inside:avoid;page-break-inside:avoid;margin-bottom:4mm}
 .section-header{break-after:avoid;page-break-after:avoid}
 .ac strong{color:var(--accent)}
@@ -979,7 +1085,7 @@ p{margin-bottom:2mm}
 .cmrow-overall .cmscore{font-size:14px;color:white}
 .pf{position:absolute;bottom:12mm;left:18mm;right:18mm;font-size:8px;color:var(--faint);display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:4mm}
 ul{padding-left:5mm}li{margin-bottom:1.5mm}
-</style></head><body>
+</style><'+'/head><body>
 
 <!-- COVER -->
 <div class="page" style="display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center">
@@ -1000,7 +1106,7 @@ ul{padding-left:5mm}li{margin-bottom:1.5mm}
   </div>
   <!-- GTM Score Gauge -->
   <div style="display:flex;justify-content:center;margin-bottom:8mm">
-    ${renderGaugeChart(charts.gauge, score, rec, {width:280,height:170})}
+    ${renderGaugeChart(charts.gauge, score, rec, {width:320,height:200})}
   </div>
   <!-- KPI Row -->
   <div style="display:flex;gap:3mm;justify-content:center;margin-bottom:6mm">
@@ -1094,10 +1200,10 @@ ${secCtx(s2.section_context||'Quantifies total market velocity and filters it to
 ${srcNote('TAM/CAGR: AI market estimate; Maturity: AI assessment — cross-reference with industry analyst reports')}
 <h3>2.2 · Waterfall Logic: TAM → SAM → SOM</h3>
 ${renderChartOrFallback('TAM Waterfall', charts.waterfall, waterfall(), {width:480,height:180})}
-${renderPageInsightBlock('tam_mapping', strategy, isDemoMode)}
 ${segTable()}
 ${s2.priority_opportunities?`<h3>2.4 · Priority Opportunities</h3><div class="card"><p>${e(safe(s2.priority_opportunities))}</p></div>`:''}
 ${callout(s2.analyst_insight,'amber')}
+${renderPageInsightBlock('tam_mapping', strategy, isDemoMode)}
 ${pageFtr('TAM Analysis',3)}
 </div>
 
@@ -1121,8 +1227,8 @@ ${fieldRow('Deal Cycle',s3.deal_cycle)}
 <div style="margin:3mm 0"><strong style="font-size:9px;color:var(--muted)">COMMON OBJECTIONS</strong><br>${tags(s3.objections,'red')}</div>
 ${painMap()}
 ${icpRepair()}
-${renderPageInsightBlock('icp_modeling', strategy, isDemoMode)}
 ${callout(s3.analyst_insight)}
+${renderPageInsightBlock('icp_modeling', strategy, isDemoMode)}
 ${pageFtr('ICP Modeling',4)}
 </div>
 
@@ -1165,8 +1271,8 @@ ${fieldRow('Estimated Universe',s4.estimated_universe)}
 </div>
 ${s4.data_enrichment_tips?`<h3>4.4 · Data Enrichment</h3><div class="card"><p>${e(safe(s4.data_enrichment_tips))}</p></div>`:''}
 ${acctTable()}
-${renderPageInsightBlock('account_sourcing', strategy, isDemoMode)}
 ${callout(s4.analyst_insight)}
+${renderPageInsightBlock('account_sourcing', strategy, isDemoMode)}
 ${pageFtr('Account Sourcing',5)}
 </div>
 
@@ -1179,12 +1285,16 @@ ${secCtx(s5.section_context||'Maps the semantic footprint before RFP issuance an
 <div style="margin-bottom:3mm"><strong style="font-size:9px;color:var(--muted)">PRIMARY KEYWORDS</strong><br>${tags(s5.primary_keywords,'green')}</div>
 <div style="margin-bottom:3mm"><strong style="font-size:9px;color:var(--muted)">SECONDARY KEYWORDS</strong><br>${tags(s5.secondary_keywords,'blue')}</div>
 ${kwTaxonomy()}
-${renderPageInsightBlock('keywords_intent', strategy, isDemoMode)}
 ${s5.boolean_query?`<h3>5.3 · Boolean Query String</h3><div class="card"><code style="font-family:'Space Mono',monospace;font-size:10px;color:#c4b5fd;word-break:break-all">${e(safe(s5.boolean_query))}</code></div>`:''}
 ${s5.linkedin_search_strings?`<h3>5.4 · LinkedIn Search String</h3><div class="card"><code style="font-family:'Space Mono',monospace;font-size:10px;color:#93c5fd;word-break:break-all">${e(safe(s5.linkedin_search_strings))}</code></div>`:''}
 <div style="margin:3mm 0"><strong style="font-size:9px;color:var(--muted)">INTENT SIGNALS</strong><br>${tags(s5.intent_signals,'amber')}</div>
+${charts.intent
+  ? `<div style="margin:3mm 0 5mm"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:2mm">INTENT SIGNAL STRENGTH</div>${renderChartOrFallback('Intent Signal', charts.intent, '', {width:480,height:180})}</div>`
+  : ''
+}
 <div style="margin:3mm 0"><strong style="font-size:9px;color:var(--muted)">CONTENT TOPICS</strong><br>${tags(s5.content_topics,'blue')}</div>
 ${callout(s5.analyst_insight)}
+${renderPageInsightBlock('keywords_intent', strategy, isDemoMode)}
 ${pageFtr('Keywords & Intent',6)}
 </div>
 
@@ -1209,8 +1319,8 @@ ${secCtx('Cadence continuation and LinkedIn direct outreach hook.')}
 ${s6.follow_up_sequence?`<h3>6.2 · Follow-up Cadence</h3><div class="card"><p>${e(safe(s6.follow_up_sequence))}</p></div>`:''}
 ${s6.linkedin_message?`<h3>6.3 · LinkedIn Hook</h3><div class="card"><p style="font-size:12px"><strong>Direct Message:</strong><br>"${e(safe(s6.linkedin_message))}"</p></div>`:''}
 ${s6.linkedin_follow_up?`<h3>6.4 · LinkedIn Follow-up</h3><div class="card"><p>${e(safe(s6.linkedin_follow_up))}</p></div>`:''}
-${renderPageInsightBlock('followup_social', strategy, isDemoMode)}
 ${callout(s6.analyst_insight)}
+${renderPageInsightBlock('followup_social', strategy, isDemoMode)}
 ${pageFtr('Engagement Playbook — Cadence',8)}
 </div>
 
@@ -1218,6 +1328,7 @@ ${pageFtr('Engagement Playbook — Cadence',8)}
 <div class="page">
 ${pageHdr()}
 ${decisionEngine()}
+${renderPageInsightBlock('decision_engine', strategy, isDemoMode)}
 ${pageFtr('Revenue Intelligence',9)}
 </div>
 
@@ -1325,7 +1436,10 @@ All competitive intelligence reflects publicly available data only. Manual valid
   <tr><td>Steps Completed</td><td>${strategy.steps_completed||6}/7</td></tr>
   <tr><td>GTM Relevance Score</td><td>${score}/100</td></tr>
   <tr><td>Confidence Score</td><td>${confScore}/100</td></tr>
-  <tr><td>QuickChart Used</td><td>${(charts.gauge||charts.waterfall||charts.confidence) ? 'Yes' : 'No — fallback HTML'}</td></tr>
+  <tr><td>QuickChart Charts</td><td>${[
+    charts.gauge?'Gauge':'',charts.waterfall?'Waterfall':'',
+    charts.confidence?'Confidence':'',charts.intent?'Intent':'',charts.risk?'Risk':''
+  ].filter(Boolean).join(', ')||'Fallback HTML used'}</td></tr>
 </table>
 <div style="text-align:center;margin-top:8mm;padding-top:5mm;border-top:1px solid var(--border)">
   <div class="am" style="margin:0 auto 3mm;width:28px;height:28px;font-size:9px">ABE</div>
@@ -1334,5 +1448,5 @@ All competitive intelligence reflects publicly available data only. Manual valid
 ${pageFtr('Appendix — Report Metadata',12)}
 </div>
 
-</body></html>`;
+${'</body></html>'}`;
 }
