@@ -1056,5 +1056,3 @@ ${pageFtr('Appendix — Report Metadata',12)}
 
 </body></html>`;
 }
-</body></html>`;
-}
