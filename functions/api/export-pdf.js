@@ -89,6 +89,7 @@ export async function onRequestPost(context) {
       if (chartCount >= QC.maxPer) return null;
       chartCount++;
       try {
+        console.info('[QuickChart Config]', type, JSON.stringify(config));
         console.info(`[QuickChart] ${type} config built successfully`);
         const result = await fetchQuickChartBase64(config, w, h, QC);
         console.info(`[QuickChart] ${type} success`);
@@ -161,6 +162,116 @@ function renderGaugeChart(base64, score, verdict, dimensions = { width: 280, hei
       <div style="font-size:8px;color:#9CA3AF;text-transform:uppercase;letter-spacing:.2em;margin-top:2px">GTM SCORE</div>
     </div>
   </div>`;
+}
+
+function escapeHtml(value) {
+  return String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\s+/g, ' ').trim();
+}
+
+function truncateWords(text, limit = 70) {
+  const words = String(text).trim().split(/\s+/).filter(Boolean);
+  return words.length <= limit ? words.join(' ') : `${words.slice(0, limit).join(' ')}...`;
+}
+
+function renderPageInsight(title, text, isDemoMode) {
+  if (!text) return '';
+  const clean = truncateWords(escapeHtml(text), 70);
+  const final = isDemoMode && !/demo mode/i.test(clean) ? `${clean} In demo mode, this should be validated with live data.` : clean;
+  return `<div class="page-insight"><div class="page-insight-title">${escapeHtml(title)}</div><div class="page-insight-text">${final}</div></div>`;
+}
+
+function renderPageInsightBlock(pageKey, strategy, isDemoMode) {
+  const insight = getPageInsight(pageKey, strategy, isDemoMode);
+  return insight && insight.text ? renderPageInsight(insight.title, insight.text, isDemoMode) : '';
+}
+
+function safeText(value) {
+  if (value === null || value === undefined || value === '') return '';
+  if (Array.isArray(value)) return value.filter(Boolean).join(', ');
+  if (typeof value === 'object') return Object.values(value).filter(Boolean).join(', ');
+  return String(value).trim();
+}
+
+function getPageInsight(pageKey, strategy, isDemoMode) {
+  const s1 = strategy.step_1_market || strategy.steps?.[1] || {};
+  const s2 = strategy.step_2_tam || strategy.steps?.[2] || {};
+  const s3 = strategy.step_3_icp || strategy.steps?.[3] || {};
+  const s4 = strategy.step_4_sourcing || strategy.steps?.[4] || {};
+  const s5 = strategy.step_5_keywords || strategy.steps?.[5] || {};
+  const s6 = strategy.step_6_messaging || strategy.steps?.[6] || {};
+  const s7 = strategy.step_7_intelligence || {};
+  const score = parseInt(s1.gtm_relevance_score) || 0;
+  const rec = s7.go_no_go?.recommendation || s7.verdict || strategy.verdict || (score>=75?'Go':score>=50?'Watch':'No-Go');
+  const tam = safeText(s2.tam_size_estimate) || safeText(s2.waterfall?.tam_value) || 'the total addressable market';
+  const sam = safeText(s2.sam_estimate) || safeText(s2.waterfall?.sam_value) || 'the serviceable market';
+  const som = safeText(s2.waterfall?.som_value) || 'the obtainable market';
+  const primary = safeText(s3.primary_icp);
+  const objections = safeText(s3.objections);
+  const filters = safeText(s4.filter_criteria) || 'targeted fit and exclusion rules';
+  const keywords = safeText(s5.keyword_taxonomy?.early_funnel || s5.keyword_taxonomy?.late_funnel || s5.primary_keywords || s5.secondary_keywords);
+  const sequence = safeText(s6.follow_up_sequence || s6.linkedin_message || s6.linkedin_follow_up);
+  switch(pageKey) {
+    case 'executive_summary':
+      return {
+        title: 'Strategic Interpretation',
+        text: score
+          ? `A GTM score of ${score}/100 is a directional signal for prioritization, telling leadership whether to pursue, monitor, or pause this go-to-market motion.`
+          : `This executive summary highlights the current GTM opportunity and the degree of validation available; confirm the score with live customer and pipeline data before acting.`
+      };
+    case 'market_research':
+      return {
+        title: 'Market Implication',
+        text: `Positioning, SWOT, and growth signals show whether the current strategy is ready for active engagement or needs refinement before scaling. Use this page to align timing and messaging to realistic market conditions.`
+      };
+    case 'tam_mapping':
+      return {
+        title: 'Commercial Impact',
+        text: `TAM defines the total universe, SAM defines the addressable slice, and SOM defines what is realistically captureable. This helps keep prioritization focused on high-probability account selection rather than broad opportunity estimates.`
+      };
+    case 'icp_modeling':
+      return {
+        title: 'ICP Interpretation',
+        text: primary
+          ? `The primary ICP and identified pain points are the foundation for targeting. Align outreach to the buyer roles and objections here to reduce wasted effort and improve response quality.`
+          : `This page defines who matters most. Keep the profile and objections aligned to the highest-fit buyers so outbound resonates sooner.`
+      };
+    case 'account_sourcing':
+      return {
+        title: 'Sourcing Implication',
+        text: `Filters and exclusions on this page are meant to improve account quality and reduce wasted outreach. Use these criteria to keep the pipeline focused on accounts with the strongest fit and intent.`
+      };
+    case 'keywords_intent':
+      return {
+        title: 'Intent Interpretation',
+        text: keywords
+          ? `Keyword clusters and intent signals here should guide messaging and search strategy so outreach matches where buyers are in the funnel.`
+          : `Use the keyword and intent signals on this page to shape content and personalization for higher relevance.`
+      };
+    case 'sdr_sequence':
+      return {
+        title: 'Engagement Logic',
+        text: `A three-touch SDR sequence helps move buyers from problem awareness to interest and urgency without overloading them too early. This structure aims to build credibility while surfacing high-fit responses.`
+      };
+    case 'followup_social':
+      return {
+        title: 'Channel Strategy',
+        text: sequence
+          ? `LinkedIn and follow-up messaging extend this outreach motion with a second channel, increasing the chance of connecting with enterprise buyers who require repeated, credible touch points.`
+          : `This page supports multi-touch validation by reinforcing the primary outreach through follow-up and social channels.`
+      };
+    case 'decision_engine':
+      return {
+        title: 'Decision Interpretation',
+        text: `The verdict on this page is a directional recommendation. Confirm the assumptions behind the score and timing before committing to execution or re-prioritizing resources.`
+      };
+    case 'confidence_matrix':
+      return {
+        title: 'Confidence Interpretation',
+        text: `This matrix shows which evidence areas most affect trust in the recommendation. Use it to identify where additional verification is required before moving forward.`
+      };
+    default:
+      return null;
+  }
 }
 
 function normalizeCompanyName(name) {
@@ -238,7 +349,7 @@ function buildTamWaterfallChartConfig(tamM, samM, somM) {
     data: {
       labels: ['TAM', 'SAM', 'SOM'],
       datasets: [{
-        label: 'Opportunity',
+        label: '',
         data: values,
         backgroundColor: ['#6366f1', '#7c3aed', '#f59e0b'],
         borderRadius: 10,
@@ -252,12 +363,15 @@ function buildTamWaterfallChartConfig(tamM, samM, somM) {
       maintainAspectRatio: false,
       animation: false,
       indexAxis: 'y',
+      legend: { display: false },
+      tooltip: { enabled: false },
       plugins: {
         legend: { display: false },
         tooltip: { enabled: false },
       },
       scales: {
         x: {
+          beginAtZero: true,
           min: 0,
           max: Math.round(maxVal),
           ticks: {
@@ -301,7 +415,7 @@ function buildConfidenceMatrixChartConfig({ veracity, timing, icpFit, completene
     data: {
       labels: ['Signal Veracity', 'Market Timing', 'ICP Fit', 'Data Completeness', 'Overall Fidelity'],
       datasets: [{
-        label: 'Confidence Score',
+        label: '',
         data: values,
         backgroundColor: values.map((v, idx) => idx === 4 ? (v >= 75 ? '#22c55e' : v >= 50 ? '#f59e0b' : '#ef4444') : '#8b5cf6'),
         borderRadius: 8,
@@ -315,12 +429,15 @@ function buildConfidenceMatrixChartConfig({ veracity, timing, icpFit, completene
       maintainAspectRatio: false,
       animation: false,
       indexAxis: 'y',
+      legend: { display: false },
+      tooltip: { enabled: false },
       plugins: {
         legend: { display: false },
         tooltip: { enabled: false },
       },
       scales: {
         x: {
+          beginAtZero: true,
           min: 0,
           max: 100,
           ticks: {
@@ -360,6 +477,8 @@ async function fetchQuickChartBase64(config, width, height, qc) {
     width, height,
     backgroundColor: '#0B0F1A',
     format: 'png',
+    cacheBust: Date.now(),
+    chartVersion: 2,
     ...(qc.apiKey ? { key: qc.apiKey } : {})
   });
   const res = await withTimeout(
@@ -667,7 +786,8 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false) {
       </div>
     </div>
   </div>
-  ${safe(s2.growth_rate)?srcNote('CAGR ('+safe(s2.growth_rate)+') is an AI market estimate — cross-reference with analyst reports'):''}`;
+  ${safe(s2.growth_rate)?srcNote('CAGR ('+safe(s2.growth_rate)+') is an AI market estimate — cross-reference with analyst reports'):''}
+  ${renderPageInsightBlock('decision_engine', strategy, isDemoMode)}`;
 
   };
 
@@ -745,6 +865,9 @@ p{margin-bottom:2mm}
 .email-card{break-inside:avoid;page-break-inside:avoid}
 .chart-block{break-inside:avoid;page-break-inside:avoid;margin:3mm 0}
 .confidence-matrix{break-inside:avoid;page-break-inside:avoid}
+.page-insight{margin-top:5mm;padding:3.5mm 4.5mm;border-left:3px solid var(--accent);background:rgba(168,85,247,.035);border:1px solid rgba(168,85,247,.14);border-radius:9px;break-inside:avoid;page-break-inside:avoid}
+.page-insight-title{font-size:8px;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:var(--accent);margin-bottom:1.5mm}
+.page-insight-text{font-size:10px;line-height:1.55;color:var(--text)}
 .appendix-section{break-inside:avoid;page-break-inside:avoid;margin-bottom:4mm}
 .section-header{break-after:avoid;page-break-after:avoid}
 .ac strong{color:var(--accent)}
@@ -860,6 +983,7 @@ ${secCtx('Establishes the macro-opportunity and win-probability. Provides the hi
 </div>
 ${srcNote('TAM/CAGR: AI market estimate; Relevance: algorithmic scoring; Verdict: composite signal analysis')}
 ${callout(s1.gtm_relevance_reasoning||s1.analyst_insight||'')}
+${renderPageInsightBlock('executive_summary', strategy, isDemoMode)}
 <div style="display:flex;flex-wrap:wrap;gap:3mm;margin-top:5mm">
   <span class="tg green">01 Market</span><span class="tg green">02 TAM</span><span class="tg green">03 ICP</span><span class="tg green">04 Sourcing</span><span class="tg green">05 Keywords</span><span class="tg green">06 Messaging</span><span class="tg amber">07 Revenue Intel</span>
 </div>
@@ -887,6 +1011,7 @@ ${swotGrid()}
 <h3>1.5 · Tech Stack Indicators</h3>
 <div style="margin-bottom:3mm">${tags(s1.tech_stack_hints,'blue')}</div>
 ${callout(s1.analyst_insight)}
+${renderPageInsightBlock('market_research', strategy, isDemoMode)}
 ${pageFtr('Market Research',2)}
 </div>
 
@@ -913,6 +1038,7 @@ ${secCtx(s2.section_context||'Quantifies total market velocity and filters it to
 ${srcNote('TAM/CAGR: AI market estimate; Maturity: AI assessment — cross-reference with industry analyst reports')}
 <h3>2.2 · Waterfall Logic: TAM → SAM → SOM</h3>
 ${renderChartOrFallback('TAM Waterfall', charts.waterfall, waterfall(), {width:480,height:180})}
+${renderPageInsightBlock('tam_mapping', strategy, isDemoMode)}
 ${segTable()}
 ${s2.priority_opportunities?`<h3>2.4 · Priority Opportunities</h3><div class="card"><p>${e(safe(s2.priority_opportunities))}</p></div>`:''}
 ${callout(s2.analyst_insight,'amber')}
@@ -939,6 +1065,7 @@ ${fieldRow('Deal Cycle',s3.deal_cycle)}
 <div style="margin:3mm 0"><strong style="font-size:9px;color:var(--muted)">COMMON OBJECTIONS</strong><br>${tags(s3.objections,'red')}</div>
 ${painMap()}
 ${icpRepair()}
+${renderPageInsightBlock('icp_modeling', strategy, isDemoMode)}
 ${callout(s3.analyst_insight)}
 ${pageFtr('ICP Modeling',4)}
 </div>
@@ -982,6 +1109,7 @@ ${fieldRow('Estimated Universe',s4.estimated_universe)}
 </div>
 ${s4.data_enrichment_tips?`<h3>4.4 · Data Enrichment</h3><div class="card"><p>${e(safe(s4.data_enrichment_tips))}</p></div>`:''}
 ${acctTable()}
+${renderPageInsightBlock('account_sourcing', strategy, isDemoMode)}
 ${callout(s4.analyst_insight)}
 ${pageFtr('Account Sourcing',5)}
 </div>
@@ -995,6 +1123,7 @@ ${secCtx(s5.section_context||'Maps the semantic footprint before RFP issuance an
 <div style="margin-bottom:3mm"><strong style="font-size:9px;color:var(--muted)">PRIMARY KEYWORDS</strong><br>${tags(s5.primary_keywords,'green')}</div>
 <div style="margin-bottom:3mm"><strong style="font-size:9px;color:var(--muted)">SECONDARY KEYWORDS</strong><br>${tags(s5.secondary_keywords,'blue')}</div>
 ${kwTaxonomy()}
+${renderPageInsightBlock('keywords_intent', strategy, isDemoMode)}
 ${s5.boolean_query?`<h3>5.3 · Boolean Query String</h3><div class="card"><code style="font-family:'Space Mono',monospace;font-size:10px;color:#c4b5fd;word-break:break-all">${e(safe(s5.boolean_query))}</code></div>`:''}
 ${s5.linkedin_search_strings?`<h3>5.4 · LinkedIn Search String</h3><div class="card"><code style="font-family:'Space Mono',monospace;font-size:10px;color:#93c5fd;word-break:break-all">${e(safe(s5.linkedin_search_strings))}</code></div>`:''}
 <div style="margin:3mm 0"><strong style="font-size:9px;color:var(--muted)">INTENT SIGNALS</strong><br>${tags(s5.intent_signals,'amber')}</div>
@@ -1012,6 +1141,7 @@ ${secCtx(s6.section_context||'Hyper-targeted sequences designed to agitate pain 
 ${emailBlock('email_1',0)}
 ${emailBlock('email_2',1)}
 ${emailBlock('email_3',2)}
+${renderPageInsightBlock('sdr_sequence', strategy, isDemoMode)}
 ${pageFtr('Engagement Playbook — Emails',7)}
 </div>
 
@@ -1023,6 +1153,7 @@ ${secCtx('Cadence continuation and LinkedIn direct outreach hook.')}
 ${s6.follow_up_sequence?`<h3>6.2 · Follow-up Cadence</h3><div class="card"><p>${e(safe(s6.follow_up_sequence))}</p></div>`:''}
 ${s6.linkedin_message?`<h3>6.3 · LinkedIn Hook</h3><div class="card"><p style="font-size:12px"><strong>Direct Message:</strong><br>"${e(safe(s6.linkedin_message))}"</p></div>`:''}
 ${s6.linkedin_follow_up?`<h3>6.4 · LinkedIn Follow-up</h3><div class="card"><p>${e(safe(s6.linkedin_follow_up))}</p></div>`:''}
+${renderPageInsightBlock('followup_social', strategy, isDemoMode)}
 ${callout(s6.analyst_insight)}
 ${pageFtr('Engagement Playbook — Cadence',8)}
 </div>
@@ -1056,6 +1187,7 @@ ${renderChartOrFallback('Confidence Matrix', charts.confidence,
 )}
 </div>
 ${srcNote('Confidence score is algorithmic — weights fixed (40/25/20/15), capped by data richness')}
+${renderPageInsightBlock('confidence_matrix', strategy, isDemoMode)}
 ${callout(s7.analyst_insight)}
 ${pageFtr('Revenue Intelligence — Confidence',10)}
 </div>
