@@ -1272,16 +1272,44 @@ async function renderHtmlToPdf(html, filename) {
     const { jsPDF } = window.jspdf;
     const pdf = new jsPDF({ unit: 'pt', format: 'a4', orientation: 'portrait', compress: true });
 
-    for (let i = 0; i < numPages; i++) {
-      if (i > 0) pdf.addPage();
-      const srcY   = i * pageH;
-      const srcH   = Math.min(pageH, ch - srcY);
-      const pg     = document.createElement('canvas');
-      pg.width     = cw;
-      pg.height    = srcH;
-      pg.getContext('2d').drawImage(canvas, 0, srcY, cw, srcH, 0, 0, cw, srcH);
-      const imgH   = (srcH / cw) * A4_W;
-      pdf.addImage(pg.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, A4_W, imgH);
+    // Intelligent DOM-aware slicing
+    const scale = 2;
+    const maxPageH = Math.round((A4_H / A4_W) * cw);
+    const unbreakables = Array.from(iDoc.querySelectorAll('.keep-together, .card, .dt, p, h2, h3, .ph, .pf, .ac, .chart-block, .exec-card, .metric-box, .appendix-table, .analyst-callout, .insight-box'));
+    const boxes = unbreakables.map(el => {
+      const rect = el.getBoundingClientRect();
+      return { top: rect.top * scale, bottom: rect.bottom * scale };
+    }).sort((a, b) => a.top - b.top);
+
+    let currentY = 0;
+    let pageNum = 0;
+
+    while (currentY < ch) {
+      if (pageNum > 0) pdf.addPage();
+      pageNum++;
+
+      let sliceH = Math.min(maxPageH, ch - currentY);
+      let candidateBottom = currentY + sliceH;
+
+      if (candidateBottom < ch) {
+        const crossedBox = boxes.find(b => b.top < candidateBottom && b.bottom > candidateBottom);
+        if (crossedBox && crossedBox.top > currentY + 40) {
+          candidateBottom = crossedBox.top - 10; // Break cleanly before the element
+          sliceH = candidateBottom - currentY;
+        }
+      }
+
+      pdf.setFillColor(11, 15, 26); // ABE dark background
+      pdf.rect(0, 0, A4_W, A4_H, 'F');
+
+      const pg = document.createElement('canvas');
+      pg.width = cw; pg.height = sliceH;
+      pg.getContext('2d').drawImage(canvas, 0, currentY, cw, sliceH, 0, 0, cw, sliceH);
+      
+      const imgH = (sliceH / cw) * A4_W;
+      pdf.addImage(pg.toDataURL('image/jpeg', 0.98), 'JPEG', 0, 0, A4_W, imgH);
+
+      currentY = candidateBottom;
     }
 
     pdf.save(filename);
