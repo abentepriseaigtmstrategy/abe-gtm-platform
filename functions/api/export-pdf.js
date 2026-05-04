@@ -62,6 +62,14 @@ export async function onRequestPost(context) {
     const somIsPercent = somRawVal && /\d+.*%/.test(somRawVal);
     const somNum = (!somRawVal || somIsPercent) ? tamNum * 0.07 : parseMoneyValue(somRawVal, tamNum * 0.07);
 
+    const formatUSD = n => { if(n>=1000) return `USD ${(n/1000).toFixed(1).replace(/\.0$/,'')}B`; if(n>0) return `USD ${Math.round(n)}M`; return 'USD 0'; };
+    s2.tam_size_estimate = formatUSD(tamNum);
+    s2.sam_estimate = formatUSD(samNum);
+    if (!s2.waterfall) s2.waterfall = {};
+    s2.waterfall.tam_value = formatUSD(tamNum);
+    s2.waterfall.sam_value = formatUSD(samNum);
+    s2.waterfall.som_value = formatUSD(somNum);
+
     // ── Live-mode confidence sub-field extraction ──
     const liveVeracity     = safeNumber(s7.signal_veracity     || s7.confidence_breakdown?.signal_veracity,     0);
     const liveTiming       = safeNumber(s7.market_timing       || s7.confidence_breakdown?.market_timing,       0);
@@ -236,7 +244,7 @@ function buildTamWaterfallChartConfig(tamM, samM, somM) {
   const safeNum = v => (Number.isFinite(v) && v > 0) ? v : 0;
   const values = [safeNum(tamM), safeNum(samM), safeNum(somM)];
   const maxVal = Math.max(100, ...values) * 1.22;
-  const fmt = v => { const n = Number(v)||0; if(n>=1000) return '$'+(n/1000).toFixed(1)+'B'; if(n>0) return '$'+Math.round(n)+'M'; return '$0'; };
+  const fmt = v => { const n = Number(v)||0; if(n>=1000) return 'USD '+(n/1000).toFixed(1).replace(/\.0$/,'')+'B'; if(n>0) return 'USD '+Math.round(n)+'M'; return 'USD 0'; };
   const somPct = values[0]>0 ? Math.round((values[2]/values[0])*100) : 0;
   return {
     type: 'bar',
@@ -263,9 +271,9 @@ function buildTamWaterfallChartConfig(tamM, samM, somM) {
           anchor: 'end', align: 'right', offset: 4,
           formatter: function(v) {
             var n = Number(v) || 0;
-            if (n >= 1000) return '$' + (n/1000).toFixed(1) + 'B';
-            if (n >= 1) return '$' + Math.round(n) + 'M';
-            return n > 0 ? '$' + n : '$0';
+            if (n >= 1000) return 'USD ' + (n/1000).toFixed(1).replace(/\.0$/,'') + 'B';
+            if (n >= 1) return 'USD ' + Math.round(n) + 'M';
+            return n > 0 ? 'USD ' + n : 'USD 0';
           },
         },
         annotation: {
@@ -397,6 +405,16 @@ function buildConfidenceMatrixChartConfig({ veracity, timing, icpFit, completene
   };
 }
 
+function arrayBufferToBase64(buffer) {
+  let binary = '';
+  const bytes = new Uint8Array(buffer);
+  const chunkSize = 8192;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(null, bytes.slice(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
 async function withTimeout(promise, ms) {
   return Promise.race([
     promise,
@@ -431,7 +449,7 @@ async function fetchQuickChartBase64(config, width, height, qc, chartType = 'def
         throw new Error(`QuickChart HTTP ${res.status}: ${errBody.slice(0,80)}`);
       }
       const buf = await res.arrayBuffer();
-      const b64 = btoa(String.fromCharCode(...new Uint8Array(buf)));
+      const b64 = arrayBufferToBase64(buf);
       if (!b64 || b64.length < 200) throw new Error('QuickChart returned empty image');
       console.info(`[QuickChart] ${chartType} v${version} success (${b64.length} chars)`);
       return b64;
