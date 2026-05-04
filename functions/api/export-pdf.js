@@ -728,6 +728,45 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false) {
   const safe = v => { if(!v&&v!==0) return ''; if(Array.isArray(v)) return v.join(', '); if(typeof v==='object') return Object.entries(v).map(([k,x])=>`${k}: ${Array.isArray(x)?x.join(', '):x}`).join('; '); return String(v); };
   const arr = v => Array.isArray(v)?v:(v?[String(v)]:[]);
 
+  const numbering = {
+    "executive-summary":    { main: "ES", title: "Executive Summary" },
+    "market-research":      { main: "1", title: "Market Research" },
+    "tam-mapping":          { main: "2", title: "TAM Mapping" },
+    "icp-modeling":         { main: "3", title: "ICP Modeling" },
+    "account-sourcing":     { main: "4", title: "Account Sourcing" },
+    "keywords-intent":      { main: "5", title: "Keywords & Intent" },
+    "sdr-sequence":         { main: "6", title: "Enterprise SDR Sequence" },
+    "revenue-intelligence": { main: "7", title: "Revenue Intelligence" },
+    "appendix":             { main: "A", title: "Appendix" }
+  };
+  const h3 = (slug, sub, title) => {
+    const main = numbering[slug]?.main || '';
+    return `<h3 class="keep-together">${main}.${sub} · ${title}</h3>`;
+  };
+  const renderDarkTable = (data, note, source) => {
+    const { headers, rows } = data;
+    const tableHtml = `
+      <table class="dark-table" style="width:100%; border-collapse:collapse; margin-top:1.5mm; margin-bottom:1.5mm; font-family:inherit;">
+        <thead>
+          <tr>
+            ${headers.map(h => `<th style="background:#2a2a2a; color:#f0f0f0; font-weight:bold; text-align:center; border:0.5px solid #444; padding:6px; font-size:10px;">${h}</th>`).join('')}
+          </tr>
+        </thead>
+        <tbody>
+          ${rows.map((row, i) => {
+            const bg = i % 2 === 0 ? '#1e1e1e' : '#2a2a2a';
+            return `<tr style="background:${bg};">
+              ${row.map(cell => `<td style="border:0.5px solid #444; padding:6px; font-size:10px; vertical-align:top;">${cell}</td>`).join('')}
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+      ${note ? `<p class="table-note" style="font-size:8px; font-style:italic; color:#aaa; margin:1mm 0 0.5mm;">Note: ${note}</p>` : ''}
+      ${source ? `<p class="table-source" style="font-size:8px; font-style:italic; color:#aaa; margin:0 0 3mm;">Source: ${source}</p>` : ''}
+    `;
+    return `<div class="keep-together table-wrap">${tableHtml}</div>`;
+  };
+
   // ── Strategic positioning: robust first sentence extraction ──
   const getFirstSentence = (text) => {
     if (!text) return '';
@@ -835,37 +874,38 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false) {
     const geoSrc = geoRaw ? 'Company data' : 'AI estimate ⚠️ (default)';
     const slSrc  = slRaw  ? 'Company data' : 'AI estimate ⚠️ (default)';
     const wrSrc  = wrRaw  ? 'Company data' : 'AI estimate ⚠️ (default)';
-    return `<div class="ww">${wfBar('TAM (Total Addressable)',tamV,'80%','wfb')}${wfBar('SAM (Serviceable Addressable)',samV,'50%','wfa')}${wfBar('SOM (Serviceable Obtainable)',somV,'20%','wfm')}</div>
-    <h3>2.2b · TAM Derivation Formula</h3>
-    <div class="table-wrap card"><table class="dt">
-      <tr><th>Step</th><th>Factor</th><th class="num">Value</th><th>Source</th></tr>
-      <tr><td>Global TAM</td><td>Total market size</td><td class="num">${e(tamV)}</td><td>${tamSrc}</td></tr>
-      <tr><td>× Geography eligibility</td><td>Addressable regions</td><td class="num">${e(geoVal)}</td><td>${geoSrc}</td></tr>
-      <tr><td>× Service-line fit</td><td>Relevant segments</td><td class="num">${e(slVal)}</td><td>${slSrc}</td></tr>
-      <tr><td>× Capture / win rate</td><td>Realistic close rate</td><td class="num">${e(wrVal)}</td><td>${wrSrc}</td></tr>
-      <tr style="border-top:1px solid var(--accent)"><td><strong>= Obtainable opportunity</strong></td><td></td><td class="num ha">${e(somV)}</td><td>Derived</td></tr>
-    </table>
-    <div style="font-size:8px;color:var(--faint);margin-top:2mm;font-style:italic">⚠️ Factors marked "AI estimate" use conservative defaults. When company-specific data is available, it is used automatically.</div></div>`;
+    return `<div class="ww keep-together">${wfBar('TAM (Total Addressable)',tamV,'80%','wfb')}${wfBar('SAM (Serviceable Addressable)',samV,'50%','wfa')}${wfBar('SOM (Serviceable Obtainable)',somV,'20%','wfm')}</div>
+    ${h3('tam-mapping', '2b', 'TAM Derivation Formula')}
+    ${renderDarkTable({
+      headers: ['Step', 'Factor', 'Value', 'Source'],
+      rows: [
+        ['Global TAM', 'Total market size', `<span class="num">${e(tamV)}</span>`, tamSrc],
+        ['× Geography eligibility', 'Addressable regions', `<span class="num">${e(geoVal)}</span>`, geoSrc],
+        ['× Service-line fit', 'Relevant segments', `<span class="num">${e(slVal)}</span>`, slSrc],
+        ['× Capture / win rate', 'Realistic close rate', `<span class="num">${e(wrVal)}</span>`, wrSrc],
+        ['<strong>= Obtainable opportunity</strong>', '', `<span class="num ha">${e(somV)}</span>`, 'Derived']
+      ]
+    }, 'Factors marked "AI estimate" use conservative defaults. When company-specific data is available, it is used automatically.', 'ABE GTMS Engine v1.0')}`;
   };
 
   // ── Pain-Solution Map ──
-  const painMap = () => { const m=s3.pain_solution_map; if(!Array.isArray(m)||!m.length) return ''; return `<h3>3.3 · Pain → Impact → Intervention</h3><table class="dt"><thead><tr><th>Operational Friction</th><th>Business Impact</th><th>Intervention</th></tr></thead><tbody>${m.slice(0,5).map(p=>`<tr><td>${e(safe(p.operational_friction||'—'))}</td><td style="color:var(--amber)">${e(safe(p.business_impact||'—'))}</td><td style="color:var(--green)">${e(safe(p.recommended_intervention||'—'))}</td></tr>`).join('')}</tbody></table>`; };
+  const painMap = () => { const m=s3.pain_solution_map; if(!Array.isArray(m)||!m.length) return ''; return `${h3('icp-modeling', '3', 'Pain → Impact → Intervention')}${renderDarkTable({headers: ['Operational Friction', 'Business Impact', 'Intervention'], rows: m.slice(0,5).map(p=>[e(safe(p.operational_friction||'—')), `<span style="color:var(--amber)">${e(safe(p.business_impact||'—'))}</span>`, `<span style="color:var(--green)">${e(safe(p.recommended_intervention||'—'))}</span>`])}, '', 'ABE GTMS Engine v1.0')}`; };
 
   // ── Account Targets (sanitized) ──
-  const acctTable = () => { const t=s4.account_targets; if(!Array.isArray(t)||!t.length) return ''; return `<h3>4.3 · High-Fit Account Analogs</h3><table class="dt"><thead><tr><th>Account Profile</th><th style="text-align:center">Fit</th><th>Trigger</th></tr></thead><tbody>${t.slice(0,5).map((a,i)=>`<tr><td>${e(cleanAcct(a.account_name,i))}</td><td class="num" style="color:${(a.fit_score||0)>=80?'var(--green)':'var(--amber)'}">${a.fit_score||'—'}</td><td>${e(safe(a.actionable_trigger||'—'))}</td></tr>`).join('')}</tbody></table>${srcNote('Account names are anonymized analogs representing target archetypes — AI-generated profile matching')}`; };
+  const acctTable = () => { const t=s4.account_targets; if(!Array.isArray(t)||!t.length) return ''; return `${h3('account-sourcing', '5', 'High-Fit Account Analogs')}${renderDarkTable({headers: ['Account Profile', 'Fit', 'Trigger'], rows: t.slice(0,5).map((a,i)=>[`${e(cleanAcct(a.account_name,i))}`, `<span class="num" style="color:${(a.fit_score||0)>=80?'var(--green)':'var(--amber)'}">${a.fit_score||'—'}</span>`, e(safe(a.actionable_trigger||'—'))])}, '', 'Account names are anonymized analogs representing target archetypes — AI-generated profile matching')}`; };
 
   // ── Keyword Taxonomy ──
-  const kwTaxonomy = () => { const kt=s5.keyword_taxonomy; if(!kt||typeof kt!=='object') return ''; const ef=arr(kt.early_funnel), lf=arr(kt.late_funnel); if(!ef.length&&!lf.length) return ''; return `<h3>5.2 · Funnel Taxonomy</h3><div style="display:grid;grid-template-columns:1fr 1fr;gap:3mm"><div><div class="bl">Early Funnel (Problem-Aware)</div>${tags(ef,'blue')}</div><div><div class="bl">Late Funnel (Solution-Aware)</div>${tags(lf,'green')}</div></div>`; };
+  const kwTaxonomy = () => { const kt=s5.keyword_taxonomy; if(!kt||typeof kt!=='object') return ''; const ef=arr(kt.early_funnel), lf=arr(kt.late_funnel); if(!ef.length&&!lf.length) return ''; return `${h3('keywords-intent', '2', 'Funnel Taxonomy')}<div class="keep-together" style="display:grid;grid-template-columns:1fr 1fr;gap:3mm"><div><div class="bl">Early Funnel (Problem-Aware)</div>${tags(ef,'blue')}</div><div><div class="bl">Late Funnel (Solution-Aware)</div>${tags(lf,'green')}</div></div>`; };
 
   // ── Segments Table ──
-  const segTable = () => { const sg=s2.market_segments; if(!Array.isArray(sg)||!sg.length) return ''; return `<h3>2.3 · Market Segments</h3><table class="dt"><thead><tr><th>Segment</th><th class="num">Est. Size</th><th>Priority</th><th class="num">Growth</th></tr></thead><tbody>${sg.slice(0,6).map(s=>`<tr><td>${e(safe(s.name||s.segment_name||'—'))}</td><td class="num">${e(safe(s.size||s.market_size||'—'))}</td><td>${e(safe(s.priority||'—'))}</td><td class="num">${e(safe(s.growth_rate||'—'))}</td></tr>`).join('')}</tbody></table>${srcNote('AI market estimate — validate with industry reports')}`; };
+  const segTable = () => { const sg=s2.market_segments; if(!Array.isArray(sg)||!sg.length) return ''; return `${h3('tam-mapping', '3', 'Market Segments')}${renderDarkTable({headers: ['Segment', 'Est. Size', 'Priority', 'Growth'], rows: sg.slice(0,6).map(s=>[e(safe(s.name||s.segment_name||'—')), `<span class="num">${e(safe(s.size||s.market_size||'—'))}</span>`, e(safe(s.priority||'—')), `<span class="num">${e(safe(s.growth_rate||'—'))}</span>`])}, '', 'AI market estimate — validate with industry reports')}`; };
 
   // ── Emails — SDR Timeline ──
   const emailBlock = (k,i) => {
     const em=s6[k]; if(!em) return '';
     const icons = ['✉','✉','✉','🔗','📞'];
     const labels = ['Email 1','Email 2','Email 3','LinkedIn','Follow-up'];
-    return `<div class="sdr-step">
+    return `<div class="sdr-step keep-together">
       <div class="sdr-num">${icons[i]||i+1}</div>
       <div class="sdr-body">
         <div class="sdr-angle">${labels[i]||'Step '+(i+1)} — ${e(em.angle||'')}</div>
@@ -879,9 +919,9 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false) {
   // ── ICP Repair Logic ──
   const icpRepair = () => {
     const pm=s3.persona_map; if(!pm||typeof pm!=='object') return '';
-    const row = (role,obj) => { if(!obj||typeof obj!=='object') return ''; return `<tr><td><strong>${e(role)}</strong></td><td>${e(safe(obj.title||'—'))}</td><td>${e(safe(obj.key_responsibility||'—'))}</td></tr>`; };
-    const rows = row('Primary Contact',pm.primary_role)+row('Economic Buyer',pm.economic_buyer)+row('Internal Champion',pm.champion);
-    return rows?`<h3>3.4 · ICP Persona Map (Repair Logic)</h3><table class="dt"><thead><tr><th>Role</th><th>Title</th><th>Key Responsibility</th></tr></thead><tbody>${rows}</tbody></table>`:'';
+    const rows = [pm.primary_role ? ['Primary Contact', e(safe(pm.primary_role.title||'—')), e(safe(pm.primary_role.key_responsibility||'—'))] : null, pm.economic_buyer ? ['Economic Buyer', e(safe(pm.economic_buyer.title||'—')), e(safe(pm.economic_buyer.key_responsibility||'—'))] : null, pm.champion ? ['Internal Champion', e(safe(pm.champion.title||'—')), e(safe(pm.champion.key_responsibility||'—'))] : null].filter(Boolean);
+    if (!rows.length) return '';
+    return `${h3('icp-modeling', '4', 'ICP Persona Map (Repair Logic)')}${renderDarkTable({headers: ['Role', 'Title', 'Key Responsibility'], rows}, '', 'ABE GTMS Engine v1.0')}`;
   };
 
   // ── Decision Engine (Step 7) ──
@@ -896,8 +936,8 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false) {
     return `
   ${secHead('07','Revenue Intelligence — Decision Engine')}
   ${secCtx('Final strategic audit. Validates execution viability and dictates immediate next steps.')}
-  <h3>7.1 · Go / No-Go Validation</h3>
-  <div class="card" style="border-left:4px solid ${recColor}">
+  ${h3('revenue-intelligence', '1', 'Go / No-Go Validation')}
+  <div class="card keep-together" style="border-left:4px solid ${recColor}">
     <div style="display:flex;align-items:center;gap:5mm">
       <svg width="52" height="52" viewBox="0 0 52 52" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0">
         <circle cx="26" cy="26" r="24" fill="rgba(168,85,247,.06)" stroke="${recColor}" stroke-width="1.5"/>
@@ -910,14 +950,14 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false) {
     </div>
   </div>
   ${srcNote(hasS7?'Source: Step 7 AI intelligence layer — algorithmic composite':'Source: derived from GTM relevance score ('+score+'/100) — algorithmic')}
-  <h3>7.2 · Why Now</h3>
-  <div class="card"><p style="font-size:12px">${e(whyNow)}</p></div>
+  ${h3('revenue-intelligence', '2', 'Why Now')}
+  <div class="card keep-together"><p style="font-size:12px">${e(whyNow)}</p></div>
   ${srcNote(hasS7&&s7.why_now_analysis?'Source: Step 7 AI analysis of market signals':'Source: AI inference from buying triggers and market context — validate timing independently')}
-  <h3>7.3 · Strategic Hook</h3>
-  <div class="ac"><strong>"${e(hook)}"</strong></div>
+  ${h3('revenue-intelligence', '3', 'Strategic Hook')}
+  <div class="ac keep-together"><strong>"${e(hook)}"</strong></div>
   ${srcNote(hasS7&&s7.strategic_hook?'Source: Step 7 AI strategic analysis':'Source: derived from buying triggers — AI estimate')}
-  <h3>7.4 · Risk &amp; Constraint Analysis</h3>
-  <div class="card" style="border-left:4px solid var(--red);background:rgba(239,68,68,.03)">
+  ${h3('revenue-intelligence', '4', 'Risk &amp; Constraint Analysis')}
+  <div class="card keep-together" style="border-left:4px solid var(--red);background:rgba(239,68,68,.03)">
     <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3mm">
       <div>
         <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--red);margin-bottom:1.5mm">
@@ -938,11 +978,11 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false) {
   </div>
   ${srcNote('30–60 day cycle estimate is an industry benchmark (AI estimate) — validate with CRM data')}
   ${charts.risk
-    ? `<div style="margin:2mm 0 4mm"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:2mm">RISK SEVERITY ASSESSMENT</div>${renderChartOrFallback('Risk Severity', charts.risk, '', {width:480,height:180})}</div>`
+    ? `<div class="keep-together chart-block" style="margin:2mm 0 4mm"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:2mm">RISK SEVERITY ASSESSMENT</div>${renderChartOrFallback('Risk Severity', charts.risk, '', {width:480,height:180})}<p class="figure-caption" style="font-size:10px; font-weight:bold; color:#f5f5f5; margin:1mm 0 0.5mm;">Figure 4: Risk Severity Assessment</p><p class="figure-source" style="font-size:8px; font-style:italic; color:#aaa; margin:0;">Source: ABE GTMS Engine v1.0</p></div>`
     : ''
 }
-  <h3>7.5 · Execution Priority</h3>
-  <div class="card">
+  ${h3('revenue-intelligence', '5', 'Execution Priority')}
+  <div class="card keep-together">
     <div style="display:flex;gap:5mm">
       <div style="flex:1;border-right:1px solid var(--border);padding-right:4mm">
         <div style="font-size:7.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:1.5mm">Target</div>
@@ -974,8 +1014,8 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false) {
     const filled = Math.round((confScore/100)*circ);
     const gaugeColor = confScore>=75?'var(--green)':confScore>=50?'var(--amber)':'var(--red)';
     return `
-  <h3>7.6 · Weighted Confidence Matrix</h3>
-  <div style="display:flex;gap:6mm;align-items:flex-start">
+  ${h3('revenue-intelligence', '6', 'Weighted Confidence Matrix')}
+  <div class="keep-together" style="display:flex;gap:6mm;align-items:flex-start">
     <svg width="90" height="90" viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0">
       <circle cx="45" cy="45" r="28" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="9"/>
       <circle cx="45" cy="45" r="28" fill="none" stroke="${gaugeColor}" stroke-width="9"
@@ -1038,6 +1078,7 @@ p{margin-bottom:2mm}
 .confidence-matrix{break-inside:avoid;page-break-inside:avoid}
 .appendix-section{break-inside:avoid;page-break-inside:avoid;margin-bottom:4mm}
 .section-header{break-after:avoid;page-break-after:avoid}
+.keep-together{break-inside:avoid;page-break-inside:avoid}
 .ac strong{color:var(--accent)}
 .ac.amber{border-left-color:var(--amber);background:rgba(245,158,11,.04);border-color:rgba(245,158,11,.2)}
 .ac.amber strong{color:var(--amber)}
@@ -1144,10 +1185,14 @@ h3{font-size:13px;font-weight:700;color:var(--text);margin-top:5mm;margin-bottom
     <div style="font-size:13px;font-weight:300;color:var(--muted);letter-spacing:4px;text-transform:uppercase">GTM Intelligence Report</div>
     ${ind?`<div style="margin-top:3mm"><span class="tg blue" style="font-size:9px">${e(ind)}</span></div>`:''}
   </div>
-  <div style="display:flex;justify-content:center;margin-bottom:4mm">
-    ${renderGaugeChart(charts.gauge, score, rec, {width:280,height:170})}
+  <div class="keep-together chart-block" style="text-align:center; margin-bottom:4mm">
+    <div style="display:flex;justify-content:center;">
+      ${renderGaugeChart(charts.gauge, score, rec, {width:280,height:170})}
+    </div>
+    <p class="figure-caption" style="font-size:10px; font-weight:bold; color:#f5f5f5; margin:1mm 0 0.5mm;">Figure 1: GTM Score Gauge</p>
+    <p class="figure-source" style="font-size:8px; font-style:italic; color:#aaa; margin:0;">Source: ABE GTMS Engine v1.0</p>
   </div>
-  <div style="display:flex;gap:3mm;justify-content:center;margin-bottom:4mm">
+  <div class="keep-together" style="display:flex;gap:3mm;justify-content:center;margin-bottom:4mm">
     <div style="background:rgba(18,24,39,.9);border:1px solid rgba(168,85,247,.25);border-bottom:3px solid var(--accent);border-radius:12px;padding:4mm 6mm;min-width:42mm;text-align:center">
       <div style="font-family:'Space Mono',monospace;font-size:20px;font-weight:900;color:var(--accent)">${e(safe(s2.tam_size_estimate)||'—')}</div>
       <div style="font-size:7px;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-top:1.5mm">TAM Size</div>
@@ -1161,11 +1206,11 @@ h3{font-size:13px;font-weight:700;color:var(--text);margin-top:5mm;margin-bottom
       <div style="font-size:7px;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-top:1.5mm">Verdict</div>
     </div>
   </div>
-  ${(s1.company_overview || s7.strategic_hook) ?`<div style="max-width:148mm;margin:0 auto 4mm;background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.2);border-left:3px solid var(--accent);border-radius:10px;padding:4mm 5.5mm;text-align:left">
+  ${(s1.company_overview || s7.strategic_hook) ?`<div class="keep-together" style="max-width:148mm;margin:0 auto 4mm;background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.2);border-left:3px solid var(--accent);border-radius:10px;padding:4mm 5.5mm;text-align:left">
     <div style="font-size:7px;font-weight:900;text-transform:uppercase;letter-spacing:.2em;color:var(--accent);margin-bottom:2mm">Strategic Positioning</div>
     <div style="font-size:10.5px;color:var(--text);line-height:1.65">${e(strategicPositioning)}.</div>
   </div>`:''}
-  <div style="display:flex;gap:3mm;justify-content:center;max-width:148mm;margin:0 auto">
+  <div class="keep-together" style="display:flex;gap:3mm;justify-content:center;max-width:148mm;margin:0 auto">
     <div style="flex:1;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:3mm 4mm;text-align:center">
       <div style="font-size:7.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:1.5mm">GTM Score</div>
       <div style="font-family:'Space Mono',monospace;font-size:18px;font-weight:900;color:white">${score||'—'}<span style="font-size:9px;color:var(--muted)">/100</span></div>
@@ -1200,12 +1245,6 @@ ${secCtx('Establishes the macro-opportunity and win-probability. Provides the hi
 ${srcNote('TAM/CAGR: AI market estimate; Relevance: algorithmic scoring; Verdict: composite signal analysis')}
 ${callout(s1.gtm_relevance_reasoning||s1.analyst_insight||'')}
 ${renderPageInsightBlock('executive_summary', strategy, isDemoMode)}
-<div style="margin-top:5mm;padding-top:4mm;border-top:1px solid var(--border)">
-  <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-bottom:2.5mm">Report Navigation</div>
-  <div style="display:flex;flex-wrap:wrap;gap:2mm">
-    <span class="tg green">01 Market Research</span><span class="tg green">02 TAM Mapping</span><span class="tg green">03 ICP Modeling</span><span class="tg green">04 Account Sourcing</span><span class="tg green">05 Keywords & Intent</span><span class="tg green">06 SDR Sequence</span><span class="tg amber">07 Revenue Intelligence</span>
-  </div>
-</div>
 ${pageFtr('Executive Summary',1)}
 </div>
 
@@ -1214,21 +1253,24 @@ ${pageFtr('Executive Summary',1)}
 ${pageHdr()}
 ${secHead('01','Market Research — The Context')}
 ${secCtx(s1.section_context||'Deconstructs market positioning and isolates specific macro-triggers.')}
-<h3>1.1 · Company Overview</h3>
-<div class="card"><p>${e(safe(s1.company_overview)||'—')}</p></div>
-<h3>1.2 · Market Position & Stage</h3>
-<table class="dt">
-${fieldRow('Market Position',s1.market_position)}
-${fieldRow('Revenue Stage',s1.revenue_stage)}
-${fieldRow('Employee Count',s1.employee_count)}
-${fieldRow('Products/Services',s1.products_services)}
-</table>
-<h3>1.3 · SWOT Analysis</h3>
+${h3('market-research', '1', 'Company Overview')}
+<div class="card keep-together"><p>${e(safe(s1.company_overview)||'—')}</p></div>
+${h3('market-research', '2', 'Market Position & Stage')}
+${renderDarkTable({
+  headers: ['Attribute', 'Value'],
+  rows: [
+    ['Market Position', safe(s1.market_position)],
+    ['Revenue Stage', safe(s1.revenue_stage)],
+    ['Employee Count', safe(s1.employee_count)],
+    ['Products/Services', safe(s1.products_services)]
+  ].filter(r => r[1])
+}, '', 'ABE GTMS Engine v1.0')}
+${h3('market-research', '3', 'SWOT Analysis')}
 ${swotGrid()}
-<h3>1.4 · Strategic Growth Signals</h3>
-<div style="margin-bottom:3mm">${tags(s1.growth_signals,'green')}</div>
-<h3>1.5 · Tech Stack Indicators</h3>
-<div style="display:flex;flex-wrap:wrap;gap:2mm;margin-bottom:3mm">${arr(s1.tech_stack_hints).slice(0,6).map(t=>`<div style="display:inline-flex;align-items:center;gap:2mm;background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.2);border-radius:6px;padding:1.5mm 3mm"><svg width="8" height="8" viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="10" height="10" rx="2" stroke="#93c5fd" stroke-width="1.2"/><path d="M4 6h4M6 4v4" stroke="#93c5fd" stroke-width="1" stroke-linecap="round"/></svg><span style="font-size:8.5px;font-weight:600;color:#93c5fd">${e(String(t))}</span></div>`).join('')}</div>
+${h3('market-research', '4', 'Strategic Growth Signals')}
+<div class="keep-together" style="margin-bottom:3mm">${tags(s1.growth_signals,'green')}</div>
+${h3('market-research', '5', 'Tech Stack Indicators')}
+<div class="keep-together" style="display:flex;flex-wrap:wrap;gap:2mm;margin-bottom:3mm">${arr(s1.tech_stack_hints).slice(0,6).map(t=>`<div style="display:inline-flex;align-items:center;gap:2mm;background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.2);border-radius:6px;padding:1.5mm 3mm"><svg width="8" height="8" viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="10" height="10" rx="2" stroke="#93c5fd" stroke-width="1.2"/><path d="M4 6h4M6 4v4" stroke="#93c5fd" stroke-width="1" stroke-linecap="round"/></svg><span style="font-size:8.5px;font-weight:600;color:#93c5fd">${e(String(t))}</span></div>`).join('')}</div>
 ${callout(s1.analyst_insight)}
 ${renderPageInsightBlock('market_research', strategy, isDemoMode)}
 ${pageFtr('Market Research',2)}
@@ -1239,8 +1281,8 @@ ${pageFtr('Market Research',2)}
 ${pageHdr()}
 ${secHead('02','TAM Mapping — The Opportunity')}
 ${secCtx(s2.section_context||'Quantifies total market velocity and filters it to actionable scope.')}
-<h3>2.1 · Market Sizing</h3>
-<div style="display:flex;gap:4mm;margin-bottom:5mm">
+${h3('tam-mapping', '1', 'Market Sizing')}
+<div class="keep-together" style="display:flex;gap:4mm;margin-bottom:5mm">
   <div class="card" style="flex:1;text-align:center"><div class="mn">${e(safe(s2.tam_size_estimate)||'—')}</div><div class="bl">TAM</div></div>
   <div class="card" style="flex:1;text-align:center"><div class="mn" style="color:var(--green)">${e(safe(s2.growth_rate)||'—')}</div><div class="bl">CAGR</div></div>
   <div class="card" style="flex:1;text-align:center">
@@ -1255,10 +1297,14 @@ ${secCtx(s2.section_context||'Quantifies total market velocity and filters it to
   </div>
 </div>
 ${srcNote('TAM/CAGR: AI market estimate; Maturity: AI assessment — cross-reference with industry analyst reports')}
-<h3>2.2 · Waterfall Logic: TAM → SAM → SOM</h3>
-${renderChartOrFallback('TAM Waterfall', charts.waterfall, waterfall(), {width:480,height:180})}
+${h3('tam-mapping', '2', 'Waterfall Logic: TAM → SAM → SOM')}
+<div class="keep-together chart-block">
+  ${renderChartOrFallback('TAM Waterfall', charts.waterfall, waterfall(), {width:480,height:180})}
+  <p class="figure-caption" style="font-size:10px; font-weight:bold; color:#f5f5f5; margin:1mm 0 0.5mm;">Figure 2: TAM → SAM → SOM Waterfall</p>
+  <p class="figure-source" style="font-size:8px; font-style:italic; color:#aaa; margin:0;">Source: ABE GTMS Engine v1.0</p>
+</div>
 ${segTable()}
-${s2.priority_opportunities?`<h3>2.4 · Priority Opportunities</h3><div class="card"><p>${e(safe(s2.priority_opportunities))}</p></div>`:''}
+${s2.priority_opportunities?`${h3('tam-mapping', '4', 'Priority Opportunities')}<div class="card keep-together"><p>${e(safe(s2.priority_opportunities))}</p></div>`:''}
 ${callout(s2.analyst_insight,'amber')}
 ${renderPageInsightBlock('tam_mapping', strategy, isDemoMode)}
 ${pageFtr('TAM Analysis',3)}
@@ -1269,26 +1315,28 @@ ${pageFtr('TAM Analysis',3)}
 ${pageHdr()}
 ${secHead('03','ICP Modeling — The Persona')}
 ${secCtx(s3.section_context||'Identifies decision-makers and maps operational pain directly to solutions.')}
-<h3>3.1 · Primary Persona & Firmographics</h3>
-<table class="dt">
-${fieldRow('Primary ICP',primaryICP)}
-${fieldRow('Secondary ICP',secondaryICP)}
-${icpDerived?`<tr><td colspan="2" style="font-size:8px;color:var(--faint);font-style:italic">⚠️ One or more ICP values were derived from decision-maker / industry / trigger data (original was placeholder).</td></tr>`:''}
-${fieldRow('Decision Makers',s3.decision_makers)}
-${fieldRow('Firmographics',s3.firmographics)}
-${fieldRow('Deal Cycle',s3.deal_cycle)}
-</table>
-<h3>3.2 · Core Pain Points</h3>
+${h3('icp-modeling', '1', 'Primary Persona & Firmographics')}
+${renderDarkTable({
+  headers: ['Criteria', 'Details'],
+  rows: [
+    ['Primary ICP', primaryICP],
+    ['Secondary ICP', secondaryICP],
+    ['Decision Makers', safe(s3.decision_makers)],
+    ['Firmographics', safe(s3.firmographics)],
+    ['Deal Cycle', safe(s3.deal_cycle)]
+  ].filter(r => r[1])
+}, icpDerived ? '⚠️ One or more ICP values were derived from decision-maker / industry / trigger data.' : '', 'ABE GTMS Engine v1.0')}
+${h3('icp-modeling', '2', 'Core Pain Points')}
 ${(()=>{
   const pains = arr(s3.buying_triggers);
   const objs  = arr(s3.objections);
   const raw   = safe(s3.core_pain_points);
-  if (raw && raw !== '—') return `<div class="card"><p>${e(raw)}</p></div>`;
-  if (!pains.length) return `<div class="card"><p style="color:var(--muted);font-style:italic">Core pain points not specified — derived from buying triggers below.</p></div>`;
-  return `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2.5mm;margin-bottom:3mm">${pains.slice(0,3).map(p=>`<div style="background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.18);border-top:2px solid var(--amber);border-radius:8px;padding:3mm 3.5mm"><div style="font-size:7.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--amber);margin-bottom:1.5mm">Trigger</div><div style="font-size:10px;color:var(--text);line-height:1.5">${e(String(p))}</div></div>`).join('')}</div>`;
+  if (raw && raw !== '—') return `<div class="card keep-together"><p>${e(raw)}</p></div>`;
+  if (!pains.length) return `<div class="card keep-together"><p style="color:var(--muted);font-style:italic">Core pain points not specified — derived from buying triggers below.</p></div>`;
+  return `<div class="keep-together" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2.5mm;margin-bottom:3mm">${pains.slice(0,3).map(p=>`<div style="background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.18);border-top:2px solid var(--amber);border-radius:8px;padding:3mm 3.5mm"><div style="font-size:7.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--amber);margin-bottom:1.5mm">Trigger</div><div style="font-size:10px;color:var(--text);line-height:1.5">${e(String(p))}</div></div>`).join('')}</div>`;
 })()}
-<div style="margin:3mm 0"><strong style="font-size:9px;color:var(--muted)">BUYING TRIGGERS</strong><br>${tags(s3.buying_triggers,'amber')}</div>
-<div style="margin:3mm 0"><strong style="font-size:9px;color:var(--muted)">COMMON OBJECTIONS</strong><br>${tags(s3.objections,'red')}</div>
+<div class="keep-together" style="margin:3mm 0"><strong style="font-size:9px;color:var(--muted)">BUYING TRIGGERS</strong><br>${tags(s3.buying_triggers,'amber')}</div>
+<div class="keep-together" style="margin:3mm 0"><strong style="font-size:9px;color:var(--muted)">COMMON OBJECTIONS</strong><br>${tags(s3.objections,'red')}</div>
 ${painMap()}
 ${icpRepair()}
 ${callout(s3.analyst_insight)}
@@ -1300,24 +1348,27 @@ ${pageFtr('ICP Modeling',4)}
 ${pageHdr()}
 ${secHead('04','Account Sourcing — The Targets')}
 ${secCtx(s4.section_context||'Translates persona into actionable technographic filters and sourcing logic.')}
-<h3>4.1 · Sourcing Infrastructure</h3>
-<table class="dt">
-${fieldRow('Recommended Databases',s4.recommended_databases)}
-${fieldRow('Estimated Universe',s4.estimated_universe)}
-</table>
-<h3>4.2 · Filter Criteria</h3>
-<div style="display:grid;grid-template-columns:1fr 1fr;gap:2.5mm;margin-bottom:3mm">
+${h3('account-sourcing', '1', 'Sourcing Infrastructure')}
+${renderDarkTable({
+  headers: ['Category', 'Details'],
+  rows: [
+    ['Recommended Databases', safe(s4.recommended_databases)],
+    ['Estimated Universe', safe(s4.estimated_universe)]
+  ].filter(r => r[1])
+}, '', 'ABE GTMS Engine v1.0')}
+${h3('account-sourcing', '2', 'Filter Criteria')}
+<div class="keep-together" style="display:grid;grid-template-columns:1fr 1fr;gap:2.5mm;margin-bottom:3mm">
   <div style="background:var(--card);border:1px solid var(--border);border-radius:7px;padding:2.5mm 3.5mm">
     <div style="font-size:7.5px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:1.5mm">Include</div>
     <div style="font-size:10px;color:var(--text)">${e(safe(s4.filter_criteria)||'Company size 200–800 employees, B2B revenue operations focus, modern digitization capacity')}</div>
   </div>
-  <div style="background:var(--card);border:1px solid rgba(239,68,68,.2);border-radius:7px;padding:2.5mm 3.5mm">
+  <div class="keep-together" style="background:var(--card);border:1px solid rgba(239,68,68,.2);border-radius:7px;padding:2.5mm 3.5mm">
     <div style="font-size:7.5px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--red);margin-bottom:1.5mm">Exclude</div>
     <div style="font-size:10px;color:var(--text)">${e(safe(s4.exclusion_criteria)||'Pre-revenue, non-B2B, outside target geography, weak digital presence')}</div>
   </div>
 </div>
-<h3>4.3 · 3-Step Sourcing Motion</h3>
-<div style="display:flex;gap:2.5mm;margin-bottom:3mm">
+${h3('account-sourcing', '3', '3-Step Sourcing Motion')}
+<div class="keep-together" style="display:flex;gap:2.5mm;margin-bottom:3mm">
   ${['Identify','Validate','Prioritize'].map((step,i)=>{
     const descs = [
       safe(s4.sourcing_playbook)||'Build list from Crunchbase, LinkedIn Sales Navigator, ZoomInfo using firmographic filters.',
@@ -1333,7 +1384,7 @@ ${fieldRow('Estimated Universe',s4.estimated_universe)}
     </div>`;
   }).join('')}
 </div>
-${s4.data_enrichment_tips?`<h3>4.4 · Data Enrichment</h3><div class="card"><p>${e(safe(s4.data_enrichment_tips))}</p></div>`:''}
+${s4.data_enrichment_tips?`${h3('account-sourcing', '4', 'Data Enrichment')}<div class="card keep-together"><p>${e(safe(s4.data_enrichment_tips))}</p></div>`:''}
 ${acctTable()}
 ${callout(s4.analyst_insight)}
 ${renderPageInsightBlock('account_sourcing', strategy, isDemoMode)}
@@ -1345,18 +1396,18 @@ ${pageFtr('Account Sourcing',5)}
 ${pageHdr()}
 ${secHead('05','Keywords & Intent Intelligence')}
 ${secCtx(s5.section_context||'Maps the semantic footprint before RFP issuance and decodes intent signals.')}
-<h3>5.1 · Keyword Arsenal</h3>
-<div style="margin-bottom:3mm"><strong style="font-size:9px;color:var(--muted)">PRIMARY KEYWORDS</strong><br>${tags(s5.primary_keywords,'green')}</div>
-<div style="margin-bottom:3mm"><strong style="font-size:9px;color:var(--muted)">SECONDARY KEYWORDS</strong><br>${tags(s5.secondary_keywords,'blue')}</div>
+${h3('keywords-intent', '1', 'Keyword Arsenal')}
+<div class="keep-together" style="margin-bottom:3mm"><strong style="font-size:9px;color:var(--muted)">PRIMARY KEYWORDS</strong><br>${tags(s5.primary_keywords,'green')}</div>
+<div class="keep-together" style="margin-bottom:3mm"><strong style="font-size:9px;color:var(--muted)">SECONDARY KEYWORDS</strong><br>${tags(s5.secondary_keywords,'blue')}</div>
 ${kwTaxonomy()}
-${s5.boolean_query?`<h3>5.3 · Boolean Query String</h3><div class="card"><code style="font-family:'Space Mono',monospace;font-size:10px;color:#c4b5fd;word-break:break-all">${e(safe(s5.boolean_query))}</code></div>`:''}
-${s5.linkedin_search_strings?`<h3>5.4 · LinkedIn Search String</h3><div class="card"><code style="font-family:'Space Mono',monospace;font-size:10px;color:#93c5fd;word-break:break-all">${e(safe(s5.linkedin_search_strings))}</code></div>`:''}
-<div style="margin:3mm 0"><strong style="font-size:9px;color:var(--muted)">INTENT SIGNALS</strong><br>${tags(s5.intent_signals,'amber')}</div>
+${s5.boolean_query?`${h3('keywords-intent', '3', 'Boolean Query String')}<div class="card keep-together"><code style="font-family:'Space Mono',monospace;font-size:10px;color:#c4b5fd;word-break:break-all">${e(safe(s5.boolean_query))}</code></div>`:''}
+${s5.linkedin_search_strings?`${h3('keywords-intent', '4', 'LinkedIn Search String')}<div class="card keep-together"><code style="font-family:'Space Mono',monospace;font-size:10px;color:#93c5fd;word-break:break-all">${e(safe(s5.linkedin_search_strings))}</code></div>`:''}
+<div class="keep-together" style="margin:3mm 0"><strong style="font-size:9px;color:var(--muted)">INTENT SIGNALS</strong><br>${tags(s5.intent_signals,'amber')}</div>
 ${charts.intent
-  ? `<div style="margin:3mm 0 5mm"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:2mm">INTENT SIGNAL STRENGTH</div>${renderChartOrFallback('Intent Signal', charts.intent, '', {width:480,height:180})}</div>`
+  ? `<div class="keep-together chart-block" style="margin:3mm 0 5mm"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:2mm">INTENT SIGNAL STRENGTH</div>${renderChartOrFallback('Intent Signal', charts.intent, '', {width:480,height:180})}<p class="figure-caption" style="font-size:10px; font-weight:bold; color:#f5f5f5; margin:1mm 0 0.5mm;">Figure 3: Intent Signal Strength</p><p class="figure-source" style="font-size:8px; font-style:italic; color:#aaa; margin:0;">Source: ABE GTMS Engine v1.0</p></div>`
   : ''
 }
-<div style="margin:3mm 0"><strong style="font-size:9px;color:var(--muted)">CONTENT TOPICS</strong><br>${tags(s5.content_topics,'blue')}</div>
+<div class="keep-together" style="margin:3mm 0"><strong style="font-size:9px;color:var(--muted)">CONTENT TOPICS</strong><br>${tags(s5.content_topics,'blue')}</div>
 ${callout(s5.analyst_insight)}
 ${renderPageInsightBlock('keywords_intent', strategy, isDemoMode)}
 ${pageFtr('Keywords & Intent',6)}
@@ -1367,7 +1418,7 @@ ${pageFtr('Keywords & Intent',6)}
 ${pageHdr()}
 ${secHead('06','Enterprise SDR Sequence — The Engagement')}
 ${secCtx(s6.section_context||'Hyper-targeted sequences designed to agitate pain and validate scalability.')}
-<h3>6.1 · 3-Touch Triggered Sequence</h3>
+${h3('sdr-sequence', '1', '3-Touch Triggered Sequence')}
 ${emailBlock('email_1',0)}
 ${emailBlock('email_2',1)}
 ${emailBlock('email_3',2)}
@@ -1380,9 +1431,9 @@ ${pageFtr('Engagement Playbook — Emails',7)}
 ${pageHdr()}
 ${secHead('06','Enterprise SDR Sequence — Follow-up & Social')}
 ${secCtx('Cadence continuation and LinkedIn direct outreach hook.')}
-${s6.follow_up_sequence?`<h3>6.2 · Follow-up Cadence</h3><div class="card"><p>${e(safe(s6.follow_up_sequence))}</p></div>`:`<h3>6.2 · Follow-up Cadence</h3><div class="card"><p>Send Email 1 → wait 3 days → Email 2 → reach out on LinkedIn → follow-up call attempt.</p></div>`}
+${s6.follow_up_sequence?`${h3('sdr-sequence', '2', 'Follow-up Cadence')}<div class="card keep-together"><p>${e(safe(s6.follow_up_sequence))}</p></div>`:`${h3('sdr-sequence', '2', 'Follow-up Cadence')}<div class="card keep-together"><p>Send Email 1 → wait 3 days → Email 2 → reach out on LinkedIn → follow-up call attempt.</p></div>`}
 <!-- Visual cadence timeline -->
-<div style="margin:4mm 0 3mm">
+<div class="keep-together" style="margin:4mm 0 3mm">
   <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-bottom:3mm">ENGAGEMENT TIMELINE</div>
   <div style="display:flex;align-items:center;gap:0">
     ${[['Day 1','Email 1','var(--accent)'],['Day 4','Email 2','var(--accent)'],['Day 7','LinkedIn','#3b82f6'],['Day 10','Call','var(--green)'],['Day 14','Final','var(--amber)']].map((item,i,arr)=>`<div style="display:flex;align-items:center;flex:1">
@@ -1395,10 +1446,10 @@ ${s6.follow_up_sequence?`<h3>6.2 · Follow-up Cadence</h3><div class="card"><p>$
     </div>`).join('')}
   </div>
 </div>
-${s6.linkedin_message?`<h3>6.3 · LinkedIn Hook</h3><div class="card" style="border-left:3px solid #3b82f6"><p style="font-size:11.5px"><strong>Direct Message:</strong><br><br>"${e(safe(s6.linkedin_message))}"</p></div>`:''}
-${s6.linkedin_follow_up?`<h3>6.4 · LinkedIn Follow-up</h3><div class="card"><p>${e(safe(s6.linkedin_follow_up))}</p></div>`:''}
+${s6.linkedin_message?`${h3('sdr-sequence', '3', 'LinkedIn Hook')}<div class="card keep-together" style="border-left:3px solid #3b82f6"><p style="font-size:11.5px"><strong>Direct Message:</strong><br><br>"${e(safe(s6.linkedin_message))}"</p></div>`:''}
+${s6.linkedin_follow_up?`${h3('sdr-sequence', '4', 'LinkedIn Follow-up')}<div class="card keep-together"><p>${e(safe(s6.linkedin_follow_up))}</p></div>`:''}
 <!-- Channel best-practice strip -->
-<div style="margin-top:4mm">
+<div class="keep-together" style="margin-top:4mm">
   <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-bottom:2.5mm">CHANNEL PERFORMANCE BENCHMARKS</div>
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2.5mm">
     <div style="background:rgba(168,85,247,.05);border:1px solid rgba(168,85,247,.15);border-radius:8px;padding:3mm 3.5mm;text-align:center">
@@ -1433,8 +1484,7 @@ ${pageFtr('Revenue Intelligence',9)}
 ${pageHdr()}
 ${secHead('07','Revenue Intelligence — Confidence Matrix')}
 ${secCtx('Weighted fidelity assessment of signal quality, market timing, and ICP alignment.')}
-<h3>7.6 · Weighted Confidence Matrix</h3>
-<div class="confidence-matrix">
+<div class="confidence-matrix keep-together chart-block">
 ${renderChartOrFallback('Confidence Matrix', charts.confidence,
   `<div style="display:flex;gap:6mm;align-items:flex-start">${(()=>{
     const circ=176, filled=Math.round((confScore/100)*circ);
@@ -1448,6 +1498,8 @@ ${renderChartOrFallback('Confidence Matrix', charts.confidence,
   })()}</div>`,
   {width:480, height:200}
 )}
+<p class="figure-caption" style="font-size:10px; font-weight:bold; color:#f5f5f5; margin:1mm 0 0.5mm;">Figure 5: Weighted Confidence Matrix</p>
+<p class="figure-source" style="font-size:8px; font-style:italic; color:#aaa; margin:0;">Source: ABE GTMS Engine v1.0</p>
 </div>
 ${srcNote('Confidence score is algorithmic — weights fixed (40/25/20/15), capped by data richness')}
 ${renderPageInsightBlock('confidence_matrix', strategy, isDemoMode)}
@@ -1461,48 +1513,55 @@ ${pageHdr()}
 ${secHead('A','Appendix — Methodology & Data Quality')}
 ${secCtx('Transparency layer. Documents data provenance, scoring methodology, and known limitations.')}
 <div class="appendix-section">
-<h3>A.1 · Data Sources</h3>
-<table class="dt">
-  <tr><th>Data Point</th><th>Source Type</th><th>Reliability</th></tr>
-  <tr><td>Company overview, position</td><td>Company website / public data</td><td>High — verify currency</td></tr>
-  <tr><td>TAM / SAM / SOM</td><td>AI market estimate</td><td>Medium — cross-ref industry reports</td></tr>
-  <tr><td>CAGR / growth rate</td><td>AI market estimate</td><td>Medium — validate with analyst data</td></tr>
-  <tr><td>ICP / decision makers</td><td>AI inference from company profile</td><td>Medium — confirm with sales intel</td></tr>
-  <tr><td>Buying triggers</td><td>AI inference from market signals</td><td>Medium</td></tr>
-  <tr><td>Account targets</td><td>AI-generated analogs (anonymized)</td><td>Low — replace with real pipeline</td></tr>
-  <tr><td>Keywords / intent signals</td><td>AI inference from ICP + industry</td><td>Medium</td></tr>
-  <tr><td>Email sequences</td><td>AI-generated, personalized</td><td>High — review before sending</td></tr>
-  <tr><td>Confidence score</td><td>Algorithmic (capped by data richness)</td><td>High</td></tr>
-</table>
+${h3('appendix', '1', 'Data Sources')}
+${renderDarkTable({
+  headers: ['Data Point', 'Source Type', 'Reliability'],
+  rows: [
+    ['Company overview, position', 'Company website / public data', 'High — verify currency'],
+    ['TAM / SAM / SOM', 'AI market estimate', 'Medium — cross-ref industry reports'],
+    ['CAGR / growth rate', 'AI market estimate', 'Medium — validate with analyst data'],
+    ['ICP / decision makers', 'AI inference from company profile', 'Medium — confirm with sales intel'],
+    ['Buying triggers', 'AI inference from market signals', 'Medium'],
+    ['Account targets', 'AI-generated analogs (anonymized)', 'Low — replace with real pipeline'],
+    ['Keywords / intent signals', 'AI inference from ICP + industry', 'Medium'],
+    ['Email sequences', 'AI-generated, personalized', 'High — review before sending'],
+    ['Confidence score', 'Algorithmic (capped by data richness)', 'High']
+  ]
+}, '', 'ABE GTMS Engine v1.0')}
 </div>
 <div class="appendix-section">
-<h3>A.2 · TAM Calculation Methodology</h3>
-<table class="dt">
-  <tr><th>Step</th><th>Method</th></tr>
-  <tr><td>1. Global TAM</td><td>AI estimate from industry classification, public market reports, and comparable company analysis</td></tr>
-  <tr><td>2. Geography filter</td><td>Uses company-provided geography_eligibility when available; defaults to conservative 60-70%</td></tr>
-  <tr><td>3. Service-line fit</td><td>Uses company-provided service_line_fit when available; defaults to conservative 30-40%</td></tr>
-  <tr><td>4. Win rate</td><td>Uses company-provided win_rate when available; defaults to 8-12% (enterprise benchmark)</td></tr>
-  <tr><td>5. SOM derivation</td><td>Product of steps 1-4; dynamic values override defaults when strategy data provides them</td></tr>
-</table>
-<h3>A.3 · Key Assumptions</h3>
-<table class="dt">
-  <tr><th>Assumption</th><th>Default Value</th><th>Override Guidance</th></tr>
-  <tr><td>Geography eligibility</td><td>Dynamic when available; else 60-70%</td><td>Auto-populated from strategy.waterfall.geography_eligibility</td></tr>
-  <tr><td>Service-line fit</td><td>Dynamic when available; else 30-40%</td><td>Auto-populated from strategy.waterfall.service_line_fit</td></tr>
-  <tr><td>Win/capture rate</td><td>Dynamic when available; else 8-12%</td><td>Auto-populated from strategy.waterfall.win_rate</td></tr>
-  <tr><td>ICP derivation</td><td>Inferred from decision-makers + industry</td><td>Replace with validated buyer persona research</td></tr>
-  <tr><td>Account analogs</td><td>AI-generated archetypes</td><td>Replace with actual target account list from sales</td></tr>
-</table>
-<h3>A.4 · Confidence Scoring Explanation</h3>
-<table class="dt">
-  <tr><th>Dimension</th><th>Weight</th><th>Description</th></tr>
-  <tr><td>Signal Veracity</td><td class="num">40%</td><td>Density and recency of explicit buying signals observed</td></tr>
-  <tr><td>Market Timing</td><td class="num">25%</td><td>Alignment with macro tailwinds, budget cycles, and trigger events</td></tr>
-  <tr><td>ICP Fit</td><td class="num">20%</td><td>Firmographic and technographic match against ideal profile</td></tr>
-  <tr><td>Data Completeness</td><td class="num">15%</td><td>Depth and quality of source data used in analysis</td></tr>
-</table>
-<div class="card"><p>The AI confidence score is <strong>hard-capped</strong> by measured data richness. The AI cannot claim higher confidence than the underlying data supports. If data richness = 40, confidence is capped at 40 regardless of AI output.</p></div>
+${h3('appendix', '2', 'TAM Calculation Methodology')}
+${renderDarkTable({
+  headers: ['Step', 'Method'],
+  rows: [
+    ['1. Global TAM', 'AI estimate from industry classification, public market reports, and comparable company analysis'],
+    ['2. Geography filter', 'Uses company-provided geography_eligibility when available; defaults to conservative 60-70%'],
+    ['3. Service-line fit', 'Uses company-provided service_line_fit when available; defaults to conservative 30-40%'],
+    ['4. Win rate', 'Uses company-provided win_rate when available; defaults to 8-12% (enterprise benchmark)'],
+    ['5. SOM derivation', 'Product of steps 1-4; dynamic values override defaults when strategy data provides them']
+  ]
+}, '', 'ABE GTMS Engine v1.0')}
+${h3('appendix', '3', 'Key Assumptions')}
+${renderDarkTable({
+  headers: ['Assumption', 'Default Value', 'Override Guidance'],
+  rows: [
+    ['Geography eligibility', 'Dynamic when available; else 60-70%', 'Auto-populated from strategy.waterfall.geography_eligibility'],
+    ['Service-line fit', 'Dynamic when available; else 30-40%', 'Auto-populated from strategy.waterfall.service_line_fit'],
+    ['Win/capture rate', 'Dynamic when available; else 8-12%', 'Auto-populated from strategy.waterfall.win_rate'],
+    ['ICP derivation', 'Inferred from decision-makers + industry', 'Replace with validated buyer persona research'],
+    ['Account analogs', 'AI-generated archetypes', 'Replace with actual target account list from sales']
+  ]
+}, '', 'ABE GTMS Engine v1.0')}
+${h3('appendix', '4', 'Confidence Scoring Explanation')}
+${renderDarkTable({
+  headers: ['Dimension', 'Weight', 'Description'],
+  rows: [
+    ['Signal Veracity', '<span class="num">40%</span>', 'Density and recency of explicit buying signals observed'],
+    ['Market Timing', '<span class="num">25%</span>', 'Alignment with macro tailwinds, budget cycles, and trigger events'],
+    ['ICP Fit', '<span class="num">20%</span>', 'Firmographic and technographic match against ideal profile'],
+    ['Data Completeness', '<span class="num">15%</span>', 'Depth and quality of source data used in analysis']
+  ]
+}, 'The AI confidence score is hard-capped by measured data richness. The AI cannot claim higher confidence than the underlying data supports.', 'ABE GTMS Engine v1.0')}
 ${pageFtr('Appendix — Methodology',11)}
 </div>
 
@@ -1511,9 +1570,18 @@ ${pageFtr('Appendix — Methodology',11)}
 ${pageHdr()}
 ${secHead('A','Appendix — Data Quality & Report Metadata')}
 ${secCtx('Data quality audit, AI-estimated fields disclaimer, and report metadata.')}
-${s7._data_quality?`<h3>A.5 · Data Quality Audit</h3><table class="dt"><tr><th>Metric</th><th>Value</th></tr><tr><td>Data Richness Score</td><td class="num">${s7._data_quality.richness_score||'—'}</td></tr><tr><td>Signals (Pre-filter)</td><td class="num">${s7._data_quality.signals_before_filter||'—'}</td></tr><tr><td>Signals (Post-filter)</td><td class="num">${s7._data_quality.signals_after_filter||'—'}</td></tr><tr><td>AI Confidence (Claimed)</td><td class="num">${s7._data_quality.confidence_ai_claimed||'—'}</td></tr><tr><td>Confidence (After Cap)</td><td class="num">${s7._data_quality.confidence_after_cap||'—'}</td></tr></table>`:''}
-<h3>A.6 · AI-Estimated Fields Disclaimer</h3>
-<div class="ac amber"><strong>AI-Estimated Content:</strong> The following fields in this report are generated by AI and should be independently validated before use in strategic decisions:<br>
+${s7._data_quality?`${h3('appendix', '5', 'Data Quality Audit')}${renderDarkTable({
+  headers: ['Metric', 'Value'],
+  rows: [
+    ['Data Richness Score', `<span class="num">${s7._data_quality.richness_score||'—'}</span>`],
+    ['Signals (Pre-filter)', `<span class="num">${s7._data_quality.signals_before_filter||'—'}</span>`],
+    ['Signals (Post-filter)', `<span class="num">${s7._data_quality.signals_after_filter||'—'}</span>`],
+    ['AI Confidence (Claimed)', `<span class="num">${s7._data_quality.confidence_ai_claimed||'—'}</span>`],
+    ['Confidence (After Cap)', `<span class="num">${s7._data_quality.confidence_after_cap||'—'}</span>`]
+  ]
+}, '', 'ABE GTMS Engine v1.0')}`:''}
+${h3('appendix', '6', 'AI-Estimated Fields Disclaimer')}
+<div class="ac amber keep-together"><strong>AI-Estimated Content:</strong> The following fields in this report are generated by AI and should be independently validated before use in strategic decisions:<br>
 TAM / SAM / SOM sizing and growth rates<br>
 Market segment estimates and priorities<br>
 ICP persona derivations (when original data was placeholder)<br>
@@ -1521,22 +1589,21 @@ Account target analogs and fit scores<br>
 Buying trigger identification and signal strength<br>
 Confidence score components<br><br>
 All competitive intelligence reflects publicly available data only. Manual validation of exact revenue figures, headcount, and funding data is recommended prior to boardroom presentation.</div>
-<h3>A.7 · Report Metadata</h3>
-<table class="dt">
-  <tr><th>Field</th><th>Value</th></tr>
-  <tr><td>Subject Company</td><td>${e(co)}</td></tr>
-  ${ind?`<tr><td>Industry</td><td>${e(ind)}</td></tr>`:''}
-  <tr><td>Generated</td><td>${date}</td></tr>
-  <tr><td>Platform</td><td>ABE Enterprise AI Revenue Infrastructure</td></tr>
-  <tr><td>Report Mode</td><td>${isDemoMode ? 'Demo — illustrative only' : 'Live / Realtime'}</td></tr>
-  <tr><td>Steps Completed</td><td>${strategy.steps_completed||6}/7</td></tr>
-  <tr><td>GTM Relevance Score</td><td>${score}/100</td></tr>
-  <tr><td>Confidence Score</td><td>${confScore}/100</td></tr>
-  <tr><td>QuickChart Charts</td><td>${[
-    charts.gauge?'Gauge':'',charts.waterfall?'Waterfall':'',
-    charts.confidence?'Confidence':'',charts.intent?'Intent':'',charts.risk?'Risk':''
-  ].filter(Boolean).join(', ')||'Fallback HTML used'}</td></tr>
-</table>
+${h3('appendix', '7', 'Report Metadata')}
+${renderDarkTable({
+  headers: ['Field', 'Value'],
+  rows: [
+    ['Subject Company', e(co)],
+    ...(ind ? [['Industry', e(ind)]] : []),
+    ['Generated', date],
+    ['Platform', 'ABE Enterprise AI Revenue Infrastructure'],
+    ['Report Mode', isDemoMode ? 'Demo — illustrative only' : 'Live / Realtime'],
+    ['Steps Completed', `${strategy.steps_completed||6}/7`],
+    ['GTM Relevance Score', `${score}/100`],
+    ['Confidence Score', `${confScore}/100`],
+    ['QuickChart Charts', [charts.gauge?'Gauge':'',charts.waterfall?'Waterfall':'',charts.confidence?'Confidence':'',charts.intent?'Intent':'',charts.risk?'Risk':''].filter(Boolean).join(', ')||'Fallback HTML used']
+  ]
+}, '', 'ABE GTMS Engine v1.0')}
 <div style="text-align:center;margin-top:8mm;padding-top:5mm;border-top:1px solid var(--border)">
   <div class="am" style="margin:0 auto 3mm;width:28px;height:28px;font-size:9px">ABE</div>
   <p style="font-size:9px;color:var(--faint)">End of Report · ${e(co)} · ${date} · Confidential</p>
