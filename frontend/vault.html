@@ -1300,9 +1300,12 @@ async function renderHtmlToPdf(html, filename) {
         let candidateBottom = currentY + sliceH;
 
         if (candidateBottom < pageBottom) {
-          const crossedBox = boxes.find(b => b.top < candidateBottom && b.bottom > candidateBottom);
-          if (crossedBox && crossedBox.top > currentY + 40) {
-            candidateBottom = crossedBox.top - 10; // Break cleanly before the element
+          const crossingBoxes = boxes.filter(b => b.top < candidateBottom && b.bottom > candidateBottom);
+          const validBreakBoxes = crossingBoxes.filter(b => b.top > currentY + 40);
+          
+          if (validBreakBoxes.length > 0) {
+            const bestBox = validBreakBoxes[0]; // The highest valid child
+            candidateBottom = bestBox.top - 10; // Break cleanly before the element
             sliceH = candidateBottom - currentY;
           }
         }
