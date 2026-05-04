@@ -1156,7 +1156,27 @@ async function confirmPdfExport() {
       link.download = pData.filename || 'GTM_Report.pdf';
       link.click();
     } else if (pData.html && pData.mode === 'html2pdf') {
-      await renderHtmlToPdf(pData.html, pData.filename || 'GTM_Report.pdf');
+      try {
+        const pdfRes = await fetch('http://localhost:3001/render-pdf', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ html: pData.html, filename: pData.filename || 'GTM_Report.pdf' })
+        });
+        if (!pdfRes.ok) throw new Error('PDF service returned ' + pdfRes.status);
+        
+        const blob = await pdfRes.blob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = pData.filename || 'GTM_Report.pdf';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+      } catch (pdfSvcError) {
+        console.warn('Playwright PDF service failed, falling back to client-side render', pdfSvcError);
+        await renderHtmlToPdf(pData.html, pData.filename || 'GTM_Report.pdf');
+      }
     }
 
     closePdfModal();
