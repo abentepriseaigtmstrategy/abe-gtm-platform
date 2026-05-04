@@ -217,6 +217,72 @@
       .swot-grid  { grid-template-columns:1fr; }
       .grid2, .grid3 { grid-template-columns:1fr; }
     }
+
+    /* ═══════════════════════════════════════════════════════════════
+       CONTEXTUAL FILLER SYSTEM — Educational Insights for PDF Export
+       Sections shorter than 60% of A4 (~175mm) get a glossary box
+       injected at the bottom. Hidden on dashboard; visible on export.
+    ═══════════════════════════════════════════════════════════════ */
+    .report-section-wrapper {
+      position: relative;
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+
+    /* ── Hidden on screen by default ── */
+    .edu-filler { display: none; }
+
+    /* ── Visible during export (body.force-fillers) or @media print ── */
+    body.force-fillers .edu-filler.edu-filler--active { display: block !important; }
+    @media print { .edu-filler.edu-filler--active { display: block !important; } }
+
+    /* ── Filler box visual ── */
+    .edu-filler.edu-filler--active {
+      margin-top: 14px;
+      border: 1px dashed rgba(168,85,247,.28);
+      border-left: 4px solid var(--accent);
+      border-radius: 10px;
+      padding: 16px 20px;
+      background: rgba(168,85,247,.025);
+      page-break-inside: avoid;
+      break-inside: avoid;
+    }
+    .edu-filler__badge {
+      display: inline-flex; align-items: center; gap: 6px;
+      font-size: 8px; font-weight: 900; text-transform: uppercase;
+      letter-spacing: .22em; color: var(--accent);
+      background: rgba(168,85,247,.1); border: 1px solid rgba(168,85,247,.2);
+      border-radius: 4px; padding: 3px 8px; margin-bottom: 10px;
+    }
+    .edu-filler__term {
+      font-size: 13px; font-weight: 800; color: #fff;
+      margin-bottom: 6px; letter-spacing: -.3px;
+    }
+    .edu-filler__definition {
+      font-size: 11px; color: #D1D5DB; line-height: 1.75; margin-bottom: 10px;
+    }
+    .edu-filler__points {
+      list-style: none; padding: 0; margin: 0 0 10px 0;
+    }
+    .edu-filler__points li {
+      font-size: 10.5px; color: #9CA3AF; line-height: 1.6;
+      padding: 3px 0 3px 14px; position: relative;
+    }
+    .edu-filler__points li::before {
+      content: '›'; position: absolute; left: 0;
+      color: var(--accent); font-weight: 700;
+    }
+    .edu-filler__protip {
+      font-size: 10.5px; font-style: italic; color: #6B7280;
+      border-top: 1px solid rgba(168,85,247,.15); padding-top: 8px; line-height: 1.65;
+    }
+    .edu-filler__protip strong { color: var(--accent); font-style: normal; }
+
+    /* ── Page-break controls for PDF ── */
+    @media print {
+      .section { page-break-inside: avoid; break-inside: avoid; }
+      .report-section-wrapper { page-break-after: auto; break-after: auto; }
+    }
   </style>
 </head>
 <body>
@@ -340,13 +406,156 @@ function emailCard(em, label) {
     ${em.cta ? `<div class="ec">→ ${esc(em.cta)}</div>` : ''}
   </div>`;
 }
+// ── Section key → insight key map ─────────────────────────────────
+const SECTION_INSIGHT_MAP = {
+  '01': 'market',
+  '02': 'tam',
+  '03': 'icp',
+  '04': 'sourcing',
+  '05': 'keywords',
+  '06': 'messaging',
+  '07': 'decision',
+};
+
+// ── Educational Insights data ──────────────────────────────────────
+const EDUCATIONAL_INSIGHTS = {
+  market: {
+    term: 'SWOT Analysis',
+    definition: 'A structured framework evaluating four dimensions: Strengths (internal assets that create competitive advantage), Weaknesses (internal gaps that limit performance), Opportunities (external forces to exploit), and Threats (external risks to mitigate). Used at the top of every GTM cycle to anchor positioning decisions.',
+    subPoints: [
+      'Strengths → Lead messaging. Weaknesses → Pre-empt objections.',
+      'Opportunities → Frame urgency in outreach. Threats → Build risk narratives.',
+      'Revisit SWOT after each major deal win or loss for drift calibration.',
+    ],
+    proTip: "The most actionable SWOT maps each quadrant to a specific GTM motion. Don't produce a SWOT and then ignore it — run it through your messaging layer.",
+  },
+  tam: {
+    term: 'TAM · SAM · SOM',
+    definition: 'Three nested market-sizing layers every enterprise revenue team must quantify before committing pipeline spend.',
+    subPoints: [
+      'TAM (Total Addressable Market) — The global revenue opportunity if you held 100% market share.',
+      'SAM (Serviceable Addressable Market) — The slice of TAM reachable by your current product and geographic scope.',
+      'SOM (Serviceable Obtainable Market) — The realistic share of SAM you can close in the next 12–24 months based on win rate, capacity, and competition.',
+    ],
+    proTip: "Investors and CROs care about SOM, not TAM. Always anchor your pipeline forecast on SOM × CAGR, not the headline TAM number.",
+  },
+  icp: {
+    term: 'ICP — Ideal Customer Profile',
+    definition: 'A data-driven description of the company (firmographics) and buyer (psychographics + technographics) most likely to purchase, expand, and advocate for your product. Distinct from a Buyer Persona, which describes an individual; an ICP defines the entire account.',
+    subPoints: [
+      'Firmographic filters: revenue band, headcount, industry vertical, geography, tech stack.',
+      'Psychographic signals: risk tolerance, innovation appetite, regulatory burden.',
+      'Behavioural triggers: recent funding, leadership change, compliance event, merger/acquisition.',
+    ],
+    proTip: "Your ICP should disqualify as aggressively as it qualifies. A tight ICP improves SDR conversion, shortens sales cycles, and lifts net revenue retention.",
+  },
+  sourcing: {
+    term: 'Account Sourcing Methodology',
+    definition: 'The structured process of building a prospect universe from your ICP filters. Combines technographic databases (Apollo, Lusha, ZoomInfo), intent data platforms (Bombora, G2), and social signals (LinkedIn Sales Navigator) to produce a ranked, enriched target list.',
+    subPoints: [
+      'Tier 1 (Dream 100): Manually curated high-fit accounts — maximum SDR effort.',
+      'Tier 2 (Scaled Outbound): ICP-matched but lower intent — sequence-driven automation.',
+      'Tier 3 (Programmatic): Broad awareness plays — content and paid channels.',
+    ],
+    proTip: "Enrich every sourced account with at least two contact-level signals (a job-change alert and a content-engagement event) before your first outreach touch.",
+  },
+  keywords: {
+    term: 'Intent Signal Taxonomy',
+    definition: "A structured map of the language a buyer uses at each stage of their purchase journey — from problem-aware (early funnel) through solution-aware (late funnel) to vendor-selection (bottom-of-funnel). Drives SEO, paid, and ABM targeting.",
+    subPoints: [
+      "Early funnel: problem-definition language — 'how to reduce X', 'why is Y slow'.",
+      "Mid funnel: category language — 'best tools for X', 'X software comparison'.",
+      "Late funnel: vendor language — branded terms, G2 review searches, pricing pages.",
+    ],
+    proTip: "Map your outreach email subject lines to late-funnel intent keywords. Subject lines that mirror the buyer's own language achieve 2–3× higher open rates than generic approaches.",
+  },
+  messaging: {
+    term: 'Outreach Sequencing Principles',
+    definition: 'A multi-touch cadence that progresses a cold prospect from unaware to engaged through alternating channels (email, LinkedIn, phone) and escalating value-adds (insight → proof → urgency).',
+    subPoints: [
+      'Touch 1 (Day 1): Personalised insight — reference a specific trigger event.',
+      'Touch 2 (Day 3): Hard ROI metric — quantify the cost of inaction.',
+      'Touch 3 (Day 7): Social proof — a relevant case study or proof data point.',
+      'Touch 4 (Day 14): Permission-based break-up — low-friction re-engagement ask.',
+    ],
+    proTip: "The biggest sequencing mistake is making every touch a pitch. Alternate between giving value and asking for a micro-commitment — the ratio should be 3:1 in favour of value.",
+  },
+  decision: {
+    term: 'Go / Watch / No-Go Framework',
+    definition: 'A three-tier qualification gate used at the end of account intelligence to align sales and marketing on pipeline entry decisions — before SDR time is committed.',
+    subPoints: [
+      'GO (score ≥ 75): Strong signal fidelity and active buying trigger. Enter immediately.',
+      'WATCH (score 50–74): Signals present but incomplete. Monitor for a catalyst event.',
+      'NO-GO (score < 50): Insufficient fit. Park for 90-day re-evaluation or trigger-based re-entry.',
+    ],
+    proTip: "A 'No-Go' is not a rejection — it's a time-allocation decision. Build a 90-day nurture sequence for No-Go accounts so they re-enter your pipeline automatically when their situation changes.",
+  },
+};
+
+// ── Build filler HTML from an insight key ─────────────────────────
+function buildFillerHtml(insightKey) {
+  const ins = EDUCATIONAL_INSIGHTS[insightKey];
+  if (!ins) return '';
+  const pts = (ins.subPoints || []).map(p => `<li>${esc(p)}</li>`).join('');
+  return `<div class="edu-filler">
+    <div class="edu-filler__badge">📖 Glossary</div>
+    <div class="edu-filler__term">${esc(ins.term)}</div>
+    <div class="edu-filler__definition">${esc(ins.definition)}</div>
+    ${pts ? `<ul class="edu-filler__points">${pts}</ul>` : ''}
+    ${ins.proTip ? `<div class="edu-filler__protip"><strong>Pro Tip:</strong> ${esc(ins.proTip)}</div>` : ''}
+  </div>`;
+}
+
+// ── sectionWrap — now wraps in .report-section-wrapper ────────────
 function sectionWrap(num, title, contextText, body) {
   const parts = body.filter(Boolean).join(''); if (!parts) return '';
-  return `<div class="section">
-    <div class="sec-header"><div class="sec-num">${num}</div><div class="sec-title">${esc(title)}</div></div>
-    ${contextText ? `<div class="sec-context">${esc(contextText)}</div>` : ''}
-    ${parts}
+  const insightKey = SECTION_INSIGHT_MAP[num] || null;
+  const fillerHtml = insightKey ? buildFillerHtml(insightKey) : '';
+  return `<div class="report-section-wrapper" data-section="${num}">
+    <div class="section">
+      <div class="sec-header"><div class="sec-num">${num}</div><div class="sec-title">${esc(title)}</div></div>
+      ${contextText ? `<div class="sec-context">${esc(contextText)}</div>` : ''}
+      ${parts}
+    </div>${fillerHtml}
   </div>`;
+}
+
+// ── A4 height threshold constants ─────────────────────────────────
+const A4_PAGE_HEIGHT_PX = 1123; // 297mm @ 96 dpi
+const FILL_THRESHOLD    = 0.60; // 60% → ~175mm
+
+/**
+ * checkSectionNeedsInsight(sectionEl)
+ * Returns true when primaryContent height < 60% of A4 page height.
+ * @param {HTMLElement} sectionEl — the inner .section div
+ * @returns {boolean}
+ */
+function checkSectionNeedsInsight(sectionEl) {
+  if (!sectionEl) return false;
+  return sectionEl.getBoundingClientRect().height < A4_PAGE_HEIGHT_PX * FILL_THRESHOLD;
+}
+
+/**
+ * activateFillers()
+ * Evaluates every .report-section-wrapper, activates .edu-filler on
+ * short sections, and returns a cleanup function.
+ * Call before PDF capture; call the returned function after.
+ */
+function activateFillers() {
+  const wrappers = document.querySelectorAll('.report-section-wrapper');
+  const activated = [];
+  wrappers.forEach(wrapper => {
+    const section = wrapper.querySelector('.section');
+    const filler  = wrapper.querySelector('.edu-filler');
+    if (!section || !filler) return;
+    if (checkSectionNeedsInsight(section)) {
+      filler.classList.add('edu-filler--active');
+      activated.push(filler);
+    }
+  });
+  return function deactivate() {
+    activated.forEach(f => f.classList.remove('edu-filler--active'));
+  };
 }
 function callout(text, type='') {
   if (!text) return '';
@@ -897,13 +1106,44 @@ function showError(msg) {
 async function exportPDF() {
   const btn = document.getElementById('btn-export') || document.getElementById('btn-export2');
   if (btn) { btn.disabled = true; btn.textContent = 'Generating…'; }
+
+  // Activate contextual fillers before any capture
+  const deactivateFillers = activateFillers();
+  document.body.classList.add('force-fillers');
+
   try {
-    const data = await window.APP.api('/api/export-pdf', { strategy: window._strategy });
+    const data = await window.APP.api('/api/export-pdf', { strategy: window._strategy, renderMode: 'browser-pdf' });
     if (!data.html) throw new Error(data.error || 'Export failed');
-    await renderHtmlToPdf(data.html, data.filename || 'GTM_Report.pdf');
+    
+    // 1. Playwright PDF Service Export Path (New Architecture)
+    try {
+      const pdfRes = await fetch('http://localhost:3001/render-pdf', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ html: data.html, filename: data.filename || 'GTM_Report.pdf' })
+      });
+      if (!pdfRes.ok) throw new Error('PDF service returned ' + pdfRes.status);
+      
+      const blob = await pdfRes.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = data.filename || 'GTM_Report.pdf';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.URL.revokeObjectURL(url);
+    } catch (pdfSvcError) {
+      console.warn('Playwright PDF service failed, falling back to client-side render', pdfSvcError);
+      // 2. Client-side html2canvas fallback
+      await renderHtmlToPdf(data.html, data.filename || 'GTM_Report.pdf');
+    }
   } catch (e) {
     alert('PDF export failed: ' + e.message);
   } finally {
+    // Always clean up fillers — dashboard must stay unchanged
+    document.body.classList.remove('force-fillers');
+    deactivateFillers();
     if (btn) { btn.disabled = false; btn.textContent = 'Export PDF'; }
   }
 }
@@ -957,9 +1197,12 @@ async function renderHtmlToPdf(html, filename) {
         let candidateBottom = currentY + sliceH;
 
         if (candidateBottom < pageBottom) {
-          const crossedBox = boxes.find(b => b.top < candidateBottom && b.bottom > candidateBottom);
-          if (crossedBox && crossedBox.top > currentY + 40) {
-            candidateBottom = crossedBox.top - 10; // Break cleanly before the element
+          const crossingBoxes = boxes.filter(b => b.top < candidateBottom && b.bottom > candidateBottom);
+          const validBreakBoxes = crossingBoxes.filter(b => b.top > currentY + 40);
+          
+          if (validBreakBoxes.length > 0) {
+            const bestBox = validBreakBoxes[0]; // The highest valid child
+            candidateBottom = bestBox.top - 10; // Break cleanly before the element
             sliceH = candidateBottom - currentY;
           }
         }
