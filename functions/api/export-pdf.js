@@ -725,6 +725,86 @@ function renderPageInsightBlock(pageKey, strategy, isDemoMode) {
 }
 
 // ══════════════════════════════════════════════════════════════
+// CONTEXTUAL FILLER — Educational Insights for short PDF pages
+// Shown at bottom of each page via margin-top:auto (flex column).
+// Fills blank space without cluttering content-rich pages.
+// ══════════════════════════════════════════════════════════════
+
+const EDU_INSIGHTS = {
+  exec: {
+    term: 'GTM Score — How It\'s Calculated',
+    definition: 'The GTM Relevance Score (0–100) is a composite signal derived from four weighted dimensions: signal veracity (40%), market timing (25%), ICP fit (20%), and data completeness (15%). The score is hard-capped by data richness — AI cannot claim higher confidence than the evidence supports.',
+    points: ['≥ 75 = GO — strong alignment, initiate outbound now', '50–74 = WATCH — monitor for catalyst event before committing', '< 50 = NO-GO — re-evaluate in 90 days or on trigger', 'Score is directional, not a guarantee — validate with pipeline data'],
+    proTip: 'Treat the GTM Score as a prioritisation signal, not a verdict. A score of 72 earns a WATCH, not a GO — the next deal stage requires human validation of the weakest sub-score dimension.',
+  },
+  market: {
+    term: 'SWOT — How to Action Each Quadrant',
+    definition: 'A SWOT is only useful if each quadrant drives a specific GTM motion. Strengths anchor your messaging. Weaknesses pre-empt objections before the prospect raises them. Opportunities frame urgency in outreach. Threats build risk narratives that justify budget.',
+    points: ['Strengths → lead your email subject line with the proof point', 'Weaknesses → address proactively in the demo, not reactively', 'Opportunities → "your competitors are already doing this" framing', 'Threats → quantify the cost of inaction to drive urgency'],
+    proTip: 'Run your SWOT through a messaging filter: for each quadrant, write one sentence you\'d say to the prospect. If you can\'t, the SWOT entry is too abstract to be useful.',
+  },
+  tam: {
+    term: 'TAM · SAM · SOM — The Three Numbers That Matter',
+    definition: 'TAM is the total global opportunity if you had 100% share. SAM is the portion reachable by your current product and geography. SOM is the realistic slice you can close in 12–24 months given your win rate and capacity.',
+    points: ['TAM = market size; SAM = addressable scope; SOM = your pipeline ceiling', 'SOM = TAM × geo eligibility × service-line fit × win rate', 'AI estimates TAM from public market data — cross-reference reports', 'Use SOM to set outbound targets; use TAM to frame investor decks'],
+    proTip: 'CROs and investors care about SOM, not TAM. Always ground your pipeline forecast in SOM × CAGR and be ready to defend every multiplier with company-specific data.',
+  },
+  icp: {
+    term: 'ICP vs Buyer Persona — Key Distinction',
+    definition: 'An ICP (Ideal Customer Profile) defines the type of company most likely to buy, expand, and refer — firmographics, revenue band, tech stack, geography. A Buyer Persona defines the individual within that company who initiates, evaluates, or signs. You need both to run effective outbound.',
+    points: ['ICP = the account filter (company fit)', 'Persona = the contact filter (person within that account)', 'Wrong ICP = wasted SDR cycles on unwinnable accounts', 'Wrong persona = right company, wrong door — longer sales cycle'],
+    proTip: 'Your ICP should disqualify as aggressively as it qualifies. A tight ICP shrinks your universe but dramatically improves reply rates, close rates, and NRR.',
+  },
+  sourcing: {
+    term: 'Account Sourcing — Three-Tier Prioritisation',
+    definition: 'Not all accounts in your SAM deserve equal SDR effort. Tier 1 (Dream 100): manually curated, maximum effort. Tier 2 (Scaled Outbound): ICP-matched but lower intent — sequence-driven. Tier 3 (Programmatic): broad awareness plays, content and paid channels only.',
+    points: ['Tier 1: ≤ 100 accounts — personalised 1:1 outreach', 'Tier 2: 100–500 accounts — personalised sequences, lighter research', 'Tier 3: 500+ accounts — automated, minimal personalisation', 'Enrich every Tier 1 account with a recent trigger event before touching'],
+    proTip: 'Enrich each sourced account with at least two contact-level signals — a job-change alert and a content-engagement event — before your first outreach touch. Cold + no signal = noise.',
+  },
+  keywords: {
+    term: 'Intent Signal Taxonomy — Funnel Mapping',
+    definition: 'A structured map of the language buyers use at each funnel stage. Early funnel: problem-definition language ("how to reduce X"). Mid funnel: category language ("best tools for X"). Late funnel: vendor language (branded terms, pricing pages, G2 reviews).',
+    points: ['Early funnel signals → top-of-funnel content and paid', 'Mid funnel signals → competitive positioning and comparison content', 'Late funnel signals → direct outbound, trials, demo requests', 'Intent signals precede RFPs — act before competitors know they\'re looking'],
+    proTip: 'Mirror late-funnel keywords in your email subject lines. Subject lines that use the buyer\'s own language ("pipeline unpredictability" vs "improve sales") achieve 2–3× higher open rates.',
+  },
+  sdr: {
+    term: 'SDR Sequence — The 3:1 Value-to-Ask Ratio',
+    definition: 'The biggest sequencing mistake is pitching on every touch. High-performing sequences alternate between giving value (insight, data, proof) and asking for a micro-commitment (briefing, feedback, reply). The ratio should be 3:1 in favour of value.',
+    points: ['Touch 1: personalised insight referencing a specific trigger event', 'Touch 2: hard ROI metric — quantify the cost of the problem', 'Touch 3: social proof — a case study or data point from a similar account', 'Touch 4: permission-based break-up — low-friction re-engagement ask'],
+    proTip: 'A permission-based break-up ("should I close your file?") often generates more replies than the first three touches combined. People respond to closure more than to pitches.',
+  },
+  decision: {
+    term: 'Go / Watch / No-Go — What Happens Next',
+    definition: 'The Go/Watch/No-Go verdict is a resource allocation decision, not a rejection. GO accounts get immediate SDR outreach and AE involvement. WATCH accounts enter a 60-day monitoring sequence with trigger-based re-entry. NO-GO accounts get parked with a 90-day nurture.',
+    points: ['GO: assign an AE, start the 3-touch sequence within 48h', 'WATCH: set a CRM trigger for leadership change, funding, or compliance event', 'NO-GO: add to a low-frequency nurture — one touchpoint every 6 weeks', 'Re-score any account when a material trigger event occurs'],
+    proTip: 'Build a 90-day automated nurture for every NO-GO account. Most NO-GOs become GO accounts within 12 months when their situation changes — the cost of re-entry is near zero if you\'ve maintained light contact.',
+  },
+  confidence: {
+    term: 'Confidence Matrix — Reading the Sub-Scores',
+    definition: 'The weighted fidelity matrix breaks the overall confidence score into four independent dimensions. Signal Veracity (40%) measures the density and recency of explicit buying signals. Market Timing (25%) measures macro alignment. ICP Fit (20%) measures firmographic match. Data Completeness (15%) measures source quality.',
+    points: ['Signal Veracity < 50%: insufficient buying signals — monitor longer', 'Market Timing < 50%: macro conditions not aligned — revisit in 60 days', 'ICP Fit < 50%: account may be outside core persona — de-prioritise', 'Data Completeness < 50%: report based on limited data — validate manually'],
+    proTip: 'Focus research effort on the LOWEST sub-score, not the highest. Improving the weakest dimension from 40% to 60% moves the overall score more than improving a strong dimension from 80% to 90%.',
+  },
+};
+
+function buildFillerBlock(key, renderMode) {
+  if (renderMode !== 'browser-pdf') return '';
+  const ins = EDU_INSIGHTS[key];
+  if (!ins) return '';
+  const pts = (ins.points || []).map(p =>
+    `<li>${p.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</li>`
+  ).join('');
+  const safe = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return `<div class="edu-filler">
+    <div class="edu-filler__badge">📖 Glossary &amp; Pro-Tips</div>
+    <div class="edu-filler__term">${safe(ins.term)}</div>
+    <div class="edu-filler__definition">${safe(ins.definition)}</div>
+    ${pts ? `<ul class="edu-filler__points">${pts}</ul>` : ''}
+    ${ins.proTip ? `<div class="edu-filler__protip"><strong>Pro Tip:</strong> ${safe(ins.proTip)}</div>` : ''}
+  </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════
 // TIER-1 ENTERPRISE A4 REPORT — dark-theme, rendered to PDF
 // ══════════════════════════════════════════════════════════════
 export function buildReportHTML(strategy, charts = {}, isDemoMode = false, renderMode = 'html2canvas') {
@@ -1067,14 +1147,69 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-
 ${renderMode === 'browser-pdf' ? `
 @page { size: A4; margin: 12mm; }
 body { padding: 0 !important; height: auto !important; }
-.page { width: 100%; min-height: auto !important; overflow: visible !important; margin: 0 0 6mm 0 !important; padding: 0 !important; display: block !important; page-break-after: auto !important; break-after: auto !important; background: transparent !important; }
-.page:last-of-type { margin-bottom: 0 !important; }
-/* Strip excessive avoid rules globally to prevent Chromium from generating huge blank pages */
+/* Each .page div = exactly one physical A4 page.
+   min-height fills the printable area (297mm - 24mm @page margins = 273mm).
+   page-break-after:always forces a hard break after every section.
+   flex-direction:column lets margin-top:auto push the filler to the bottom. */
+.page {
+  width: 100%;
+  min-height: 273mm;
+  box-sizing: border-box;
+  display: flex !important;
+  flex-direction: column !important;
+  page-break-after: always !important;
+  break-after: page !important;
+  background: transparent !important;
+  overflow: hidden !important;
+  padding: 0 !important;
+  margin: 0 !important;
+}
+.page:last-of-type { page-break-after: auto !important; break-after: auto !important; }
+/* Prevent content inside pages from breaking across Chromium pages */
 * { break-inside: auto !important; page-break-inside: auto !important; }
-/* Apply avoid ONLY to specific requested elements */
-.card, .table-wrap, .chart-block, .callout, .insight-card, .ac, .swot-grid, .page-insight, .page-insight-expanded, tr { break-inside: avoid !important; page-break-inside: avoid !important; }
-/* Keep headers attached to content */
+.card, .table-wrap, .chart-block, .ac, .swot-grid, .page-insight, .page-insight-expanded, tr { break-inside: avoid !important; page-break-inside: avoid !important; }
 h1, h2, h3, .section-header, .ph { break-after: avoid !important; page-break-after: avoid !important; }
+/* Filler box — hidden by default, shows via margin-top:auto push */
+.edu-filler {
+  margin-top: auto;
+  padding-top: 6mm;
+  border-top: 1px dashed rgba(168,85,247,.2);
+  border-left: 3px solid rgba(168,85,247,.4);
+  border-right: 1px dashed rgba(168,85,247,.12);
+  border-bottom: 1px dashed rgba(168,85,247,.12);
+  border-radius: 0 8px 8px 0;
+  padding: 4mm 5mm 4.5mm 5mm;
+  background: linear-gradient(135deg,rgba(168,85,247,.03),rgba(124,58,237,.015));
+  margin-top: auto;
+  break-inside: avoid !important;
+  page-break-inside: avoid !important;
+}
+.edu-filler__badge {
+  font-size: 7.5px; font-weight: 900; text-transform: uppercase;
+  letter-spacing: .22em; color: #a855f7;
+  display: inline-block; margin-bottom: 2.5mm;
+}
+.edu-filler__term {
+  font-size: 12px; font-weight: 800; color: #fff;
+  margin-bottom: 1.5mm; letter-spacing: -.2px;
+}
+.edu-filler__definition {
+  font-size: 10px; color: #9CA3AF; line-height: 1.7; margin-bottom: 2mm;
+}
+.edu-filler__points {
+  list-style: none; padding: 0; margin: 0 0 2mm 0;
+  display: grid; grid-template-columns: 1fr 1fr; gap: 0.5mm 4mm;
+}
+.edu-filler__points li {
+  font-size: 9.5px; color: #6B7280; line-height: 1.55;
+  padding-left: 8px; position: relative;
+}
+.edu-filler__points li::before { content: '›'; position:absolute; left:0; color:#a855f7; font-weight:700; }
+.edu-filler__protip {
+  font-size: 9.5px; font-style: italic; color: #4B5563;
+  border-top: 1px solid rgba(168,85,247,.12); padding-top: 2mm; line-height: 1.6;
+}
+.edu-filler__protip strong { color: #a855f7; font-style: normal; }
 ` : `
 .page{width:210mm;min-height:297mm;overflow:visible;margin:0;background:var(--bg);padding:12mm 15mm 15mm;position:relative;page-break-after:always;box-sizing:border-box;display:flex;flex-direction:column}
 `}
@@ -1280,6 +1415,7 @@ ${secCtx('Establishes the macro-opportunity and win-probability. Provides the hi
 ${srcNote('TAM/CAGR: AI market estimate; Relevance: algorithmic scoring; Verdict: composite signal analysis')}
 ${callout(s1.gtm_relevance_reasoning||s1.analyst_insight||'')}
 ${renderPageInsightBlock('executive_summary', strategy, isDemoMode)}
+${buildFillerBlock('exec', renderMode)}
 ${pageFtr('Executive Summary',1)}
 </div>
 
@@ -1308,6 +1444,7 @@ ${h3('market-research', '5', 'Tech Stack Indicators')}
 <div class="keep-together" style="display:flex;flex-wrap:wrap;gap:2mm;margin-bottom:3mm">${arr(s1.tech_stack_hints).slice(0,6).map(t=>`<div style="display:inline-flex;align-items:center;gap:2mm;background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.2);border-radius:6px;padding:1.5mm 3mm"><svg width="8" height="8" viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="10" height="10" rx="2" stroke="#93c5fd" stroke-width="1.2"/><path d="M4 6h4M6 4v4" stroke="#93c5fd" stroke-width="1" stroke-linecap="round"/></svg><span style="font-size:8.5px;font-weight:600;color:#93c5fd">${e(String(t))}</span></div>`).join('')}</div>
 ${callout(s1.analyst_insight)}
 ${renderPageInsightBlock('market_research', strategy, isDemoMode)}
+${buildFillerBlock('market', renderMode)}
 ${pageFtr('Market Research',2)}
 </div>
 
@@ -1342,6 +1479,7 @@ ${segTable()}
 ${s2.priority_opportunities?`${h3('tam-mapping', '4', 'Priority Opportunities')}<div class="card keep-together"><p>${e(safe(s2.priority_opportunities))}</p></div>`:''}
 ${callout(s2.analyst_insight,'amber')}
 ${renderPageInsightBlock('tam_mapping', strategy, isDemoMode)}
+${buildFillerBlock('tam', renderMode)}
 ${pageFtr('TAM Analysis',3)}
 </div>
 
@@ -1376,6 +1514,7 @@ ${painMap()}
 ${icpRepair()}
 ${callout(s3.analyst_insight)}
 ${renderPageInsightBlock('icp_modeling', strategy, isDemoMode)}
+${buildFillerBlock('icp', renderMode)}
 ${pageFtr('ICP Modeling',4)}
 </div>
 
@@ -1423,6 +1562,7 @@ ${s4.data_enrichment_tips?`${h3('account-sourcing', '4', 'Data Enrichment')}<div
 ${acctTable()}
 ${callout(s4.analyst_insight)}
 ${renderPageInsightBlock('account_sourcing', strategy, isDemoMode)}
+${buildFillerBlock('sourcing', renderMode)}
 ${pageFtr('Account Sourcing',5)}
 </div>
 
@@ -1445,6 +1585,7 @@ ${charts.intent
 <div class="keep-together" style="margin:3mm 0"><strong style="font-size:9px;color:var(--muted)">CONTENT TOPICS</strong><br>${tags(s5.content_topics,'blue')}</div>
 ${callout(s5.analyst_insight)}
 ${renderPageInsightBlock('keywords_intent', strategy, isDemoMode)}
+${buildFillerBlock('keywords', renderMode)}
 ${pageFtr('Keywords & Intent',6)}
 </div>
 
@@ -1458,6 +1599,7 @@ ${emailBlock('email_1',0)}
 ${emailBlock('email_2',1)}
 ${emailBlock('email_3',2)}
 ${renderPageInsightBlock('sdr_sequence', strategy, isDemoMode)}
+${buildFillerBlock('sdr', renderMode)}
 ${pageFtr('Engagement Playbook — Emails',7)}
 </div>
 
@@ -1503,6 +1645,7 @@ ${s6.linkedin_follow_up?`${h3('sdr-sequence', '4', 'LinkedIn Follow-up')}<div cl
 </div>
 ${callout(s6.analyst_insight)}
 ${renderPageInsightBlock('followup_social', strategy, isDemoMode)}
+${buildFillerBlock('sdr', renderMode)}
 ${pageFtr('Engagement Playbook — Cadence',8)}
 </div>
 
@@ -1511,6 +1654,7 @@ ${pageFtr('Engagement Playbook — Cadence',8)}
 ${pageHdr()}
 ${decisionEngine()}
 ${renderPageInsightBlock('decision_engine', strategy, isDemoMode)}
+${buildFillerBlock('decision', renderMode)}
 ${pageFtr('Revenue Intelligence',9)}
 </div>
 
@@ -1539,6 +1683,7 @@ ${renderChartOrFallback('Confidence Matrix', charts.confidence,
 ${srcNote('Confidence score is algorithmic — weights fixed (40/25/20/15), capped by data richness')}
 ${renderPageInsightBlock('confidence_matrix', strategy, isDemoMode)}
 ${callout(s7.analyst_insight)}
+${buildFillerBlock('confidence', renderMode)}
 ${pageFtr('Revenue Intelligence — Confidence',10)}
 </div>
 
