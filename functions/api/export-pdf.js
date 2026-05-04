@@ -139,8 +139,9 @@ export async function onRequestPost(context) {
   }
 
   const filename = `GTM_${strategy.company_name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
-  const html = buildReportHTML(strategy, charts, isDemoMode);
-  return new Response(JSON.stringify({ html, filename, mode: 'html2pdf' }), {
+  const renderMode = body.renderMode || 'html2canvas';
+  const html = buildReportHTML(strategy, charts, isDemoMode, renderMode);
+  return new Response(JSON.stringify({ html, filename, mode: renderMode }), {
     status: 200, headers: { ...cors, 'Content-Type': 'application/json' },
   });
 }
@@ -726,7 +727,7 @@ function renderPageInsightBlock(pageKey, strategy, isDemoMode) {
 // ══════════════════════════════════════════════════════════════
 // TIER-1 ENTERPRISE A4 REPORT — dark-theme, rendered to PDF
 // ══════════════════════════════════════════════════════════════
-export function buildReportHTML(strategy, charts = {}, isDemoMode = false) {
+export function buildReportHTML(strategy, charts = {}, isDemoMode = false, renderMode = 'html2canvas') {
   const s1 = strategy.step_1_market || strategy.steps?.[1] || {};
   const s2 = strategy.step_2_tam || strategy.steps?.[2] || {};
   const s3 = strategy.step_3_icp || strategy.steps?.[3] || {};
@@ -1063,7 +1064,20 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false) {
 :root{--bg:#0B0F1A;--bg2:#0D1120;--card:#121827;--border:#1F2937;--accent:#a855f7;--accent2:#7c3aed;--green:#22c55e;--amber:#f59e0b;--red:#ef4444;--blue:#3b82f6;--text:#E5E7EB;--muted:#6B7280;--faint:#374151;--white:#fff}
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:11.5px;line-height:1.65;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+${renderMode === 'browser-pdf' ? `
+@page { size: A4; margin: 12mm; }
+body { padding: 0 !important; height: auto !important; }
+.page { width: 100%; min-height: auto !important; overflow: visible !important; margin: 0 0 6mm 0 !important; padding: 0 !important; display: block !important; page-break-after: auto !important; break-after: auto !important; background: transparent !important; }
+.page:last-of-type { margin-bottom: 0 !important; }
+/* Strip excessive avoid rules globally to prevent Chromium from generating huge blank pages */
+* { break-inside: auto !important; page-break-inside: auto !important; }
+/* Apply avoid ONLY to specific requested elements */
+.card, .table-wrap, .chart-block, .callout, .insight-card, .ac, .swot-grid, .page-insight, .page-insight-expanded, tr { break-inside: avoid !important; page-break-inside: avoid !important; }
+/* Keep headers attached to content */
+h1, h2, h3, .section-header, .ph { break-after: avoid !important; page-break-after: avoid !important; }
+` : `
 .page{width:210mm;min-height:297mm;overflow:visible;margin:0;background:var(--bg);padding:12mm 15mm 15mm;position:relative;page-break-after:always;box-sizing:border-box;display:flex;flex-direction:column}
+`}
 .ph{display:flex;align-items:center;justify-content:space-between;margin-bottom:6mm;border-bottom:1px solid var(--border);padding-bottom:3mm;break-inside:avoid;page-break-inside:avoid}
 .phb{display:flex;align-items:center;gap:10px}
 .am{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:white}
@@ -1147,7 +1161,11 @@ p{margin-bottom:1.5mm;break-inside:avoid;page-break-inside:avoid}
 .cmrow-overall .cmfill{background:linear-gradient(90deg,#5b21b6,#7c3aed,#a855f7,#c084fc)}
 .cmrow-overall .cmlbl{color:white;font-size:10px}
 .cmrow-overall .cmscore{font-size:14px;color:white}
+${renderMode === 'browser-pdf' ? `
+.pf{margin-top: 6mm; font-size:8px;color:var(--faint);display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:3mm;}
+` : `
 .pf{margin-top:auto;font-size:8px;color:var(--faint);display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:3mm;break-inside:avoid;page-break-inside:avoid}
+`}
 ul{padding-left:5mm}li{margin-bottom:1.5mm}
 /* ── PAGE INSIGHT BLOCKS ── */
 .page-insight{margin-top:6mm;padding:4mm 5mm 4.5mm;border:1px solid rgba(168,85,247,.18);border-left:3px solid var(--accent);border-radius:10px;background:linear-gradient(135deg,rgba(168,85,247,.05),rgba(124,58,237,.03));break-inside:avoid;page-break-inside:avoid}
@@ -1178,7 +1196,7 @@ ul{padding-left:5mm}li{margin-bottom:1.5mm}
 .score-badge{display:inline-flex;align-items:center;gap:2mm;background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.25);border-radius:20px;padding:2mm 4mm;font-family:'Space Mono',monospace;font-size:12px;font-weight:900;color:white}
 /* ── SECTION HEADER LINE ── */
 h3{font-size:12.5px;font-weight:700;color:var(--text);margin-top:3.5mm;margin-bottom:1.5mm;padding-bottom:1mm;border-bottom:1px solid rgba(255,255,255,.05);break-after:avoid;page-break-after:avoid}
-</style><'+'/head><body>
+</style></head><body>
 
 <!-- COVER -->
 <div class="page" style="display:flex;flex-direction:column;justify-content:flex-start;align-items:center;text-align:center;padding:0;overflow:hidden">
