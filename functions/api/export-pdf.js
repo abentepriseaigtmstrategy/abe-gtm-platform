@@ -57,9 +57,10 @@ export async function onRequestPost(context) {
 
     const tamRaw = safe_val(s2.tam_size_estimate); const tamNum = parseMoneyValue(tamRaw, isDemoMode ? 1800 : 0);
     const samRaw = safe_val(s2.sam_estimate || s2.waterfall?.sam_value);
-    const somRaw = safe_val(s2.waterfall?.som_value || '5-10% of TAM');
     const samNum = samRaw && samRaw !== '—' ? parseMoneyValue(samRaw, tamNum * 0.4) : tamNum * 0.4;
-    const somNum = parseMoneyValue(somRaw, tamNum * 0.07);
+    const somRawVal = safe_val(s2.waterfall?.som_value || '');
+    const somIsPercent = somRawVal && /\d+.*%/.test(somRawVal);
+    const somNum = (!somRawVal || somIsPercent) ? tamNum * 0.07 : parseMoneyValue(somRawVal, tamNum * 0.07);
 
     // ── Live-mode confidence sub-field extraction ──
     const liveVeracity     = safeNumber(s7.signal_veracity     || s7.confidence_breakdown?.signal_veracity,     0);
@@ -260,7 +261,12 @@ function buildTamWaterfallChartConfig(tamM, samM, somM) {
           color: '#ffffff',
           font: { size: 11, weight: '700', family: 'monospace' },
           anchor: 'end', align: 'right', offset: 4,
-          formatter: v => v > 0 ? fmt(v) : '',
+          formatter: function(v) {
+            var n = Number(v) || 0;
+            if (n >= 1000) return '$' + (n/1000).toFixed(1) + 'B';
+            if (n >= 1) return '$' + Math.round(n) + 'M';
+            return n > 0 ? '$' + n : '$0';
+          },
         },
         annotation: {
           annotations: {
@@ -343,10 +349,10 @@ function buildConfidenceMatrixChartConfig({ veracity, timing, icpFit, completene
         tooltip: { enabled: false },
         datalabels: {
           display: true,
-          color: ctx => ctx.dataIndex === 4 ? '#ffffff' : 'rgba(255,255,255,0.85)',
-          font: ctx => ({ size: ctx.dataIndex === 4 ? 12 : 10, weight: '700', family: 'monospace' }),
+          color: function(ctx) { return ctx.dataIndex === 4 ? '#ffffff' : 'rgba(255,255,255,0.85)'; },
+          font: function(ctx) { return { size: ctx.dataIndex === 4 ? 12 : 10, weight: '700', family: 'monospace' }; },
           anchor: 'end', align: 'right', offset: 4,
-          formatter: (v, ctx) => {
+          formatter: function(v, ctx) {
             if (ctx.dataIndex === 4) return v + '/100';
             return v + '%';
           },
@@ -513,7 +519,7 @@ function buildIntentSignalChartConfig(signals) {
           display: true, color: '#ffffff',
           font: { size: 9, weight: '700', family: 'monospace' },
           anchor: 'end', align: 'right', offset: 3,
-          formatter: v => v + '%',
+          formatter: function(v) { return v + '%'; },
         },
       },
       scales: {
@@ -557,7 +563,7 @@ function buildRiskSeverityChartConfig(verdict, score) {
           display: true, color: '#ffffff',
           font: { size: 9, weight: '700', family: 'monospace' },
           anchor: 'end', align: 'right', offset: 3,
-          formatter: v => v >= 70 ? 'High' : v >= 50 ? 'Med' : 'Low',
+          formatter: function(v) { return v >= 70 ? 'High' : v >= 50 ? 'Med' : 'Low'; },
         },
         annotation: {
           annotations: {
@@ -1085,69 +1091,120 @@ p{margin-bottom:2mm}
 .cmrow-overall .cmscore{font-size:14px;color:white}
 .pf{position:absolute;bottom:12mm;left:18mm;right:18mm;font-size:8px;color:var(--faint);display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:4mm}
 ul{padding-left:5mm}li{margin-bottom:1.5mm}
+/* ── PAGE INSIGHT BLOCKS ── */
+.page-insight{margin-top:6mm;padding:4mm 5mm 4.5mm;border:1px solid rgba(168,85,247,.18);border-left:3px solid var(--accent);border-radius:10px;background:linear-gradient(135deg,rgba(168,85,247,.05),rgba(124,58,237,.03));break-inside:avoid;page-break-inside:avoid}
+.page-insight-expanded{margin-top:6mm;padding:5mm 6mm;border:1px solid rgba(168,85,247,.2);border-left:3px solid var(--accent);border-radius:10px;background:linear-gradient(135deg,rgba(168,85,247,.06),rgba(124,58,237,.03));break-inside:avoid;page-break-inside:avoid}
+.page-insight-title{font-size:8px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:3mm;display:flex;align-items:center;gap:5px}
+.page-insight-title::before{content:'';display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--accent);flex-shrink:0}
+.page-insight-grid{display:grid;grid-template-columns:1fr 1fr;gap:5mm;margin-top:1.5mm}
+.page-insight-grid>div{background:rgba(255,255,255,.03);border-radius:6px;padding:3mm 3.5mm}
+.mini-label{font-size:7.5px;font-weight:800;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);margin-bottom:1.5mm;padding-bottom:1.5mm;border-bottom:1px solid rgba(255,255,255,.06)}
+.page-insight-expanded p,.page-insight-text{font-size:10.5px;line-height:1.65;color:var(--text);margin:0}
+.page-insight-demo{font-size:8.5px;color:var(--muted);margin-top:3mm;font-style:italic;opacity:.7}
+/* ── ENTERPRISE TABLE ENHANCEMENTS ── */
+.dt tr:hover td{background:rgba(168,85,247,.03)}
+.dt tbody tr:last-child td{border-bottom:none}
+.dt th:first-child,.dt td:first-child{padding-left:3mm}
+/* ── SECTION DIVIDERS ── */
+.sec-divider{height:1px;background:linear-gradient(90deg,var(--accent2),transparent);margin:5mm 0 4mm;opacity:.3}
+/* ── STAT CALLOUT ROW ── */
+.stat-row{display:flex;gap:3mm;margin:3mm 0 4mm}
+.stat-item{flex:1;background:linear-gradient(135deg,rgba(168,85,247,.05),rgba(18,24,39,.7));border:1px solid rgba(168,85,247,.12);border-radius:8px;padding:3mm 4mm;text-align:center}
+.stat-v{font-family:'Space Mono',monospace;font-size:16px;font-weight:900;color:var(--accent)}
+.stat-l{font-size:7.5px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);margin-top:1mm}
+/* ── KPI CARD ACCENT ── */
+.kpi-card::after,.kpi::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;border-radius:0 0 10px 10px;background:linear-gradient(90deg,var(--accent2),var(--accent))}
+/* ── SWOT CELL HOVER ── */
+.sc2{border:1px solid var(--border);border-radius:8px;padding:3mm 4mm;background:rgba(255,255,255,.015)}
+/* ── SCORE BADGE ── */
+.score-badge{display:inline-flex;align-items:center;gap:2mm;background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.25);border-radius:20px;padding:2mm 4mm;font-family:'Space Mono',monospace;font-size:12px;font-weight:900;color:white}
+/* ── SECTION HEADER LINE ── */
+h3{font-size:13px;font-weight:700;color:var(--text);margin-top:5mm;margin-bottom:2.5mm;padding-bottom:1.5mm;border-bottom:1px solid rgba(255,255,255,.05)}
 </style><'+'/head><body>
 
 <!-- COVER -->
-<div class="page" style="display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center">
+<div class="page" style="display:flex;flex-direction:column;justify-content:flex-start;align-items:center;text-align:center;padding:0;overflow:hidden">
 <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(168,85,247,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(168,85,247,.025) 1px,transparent 1px);background-size:28px 28px;pointer-events:none"></div>
-<div style="position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--accent2),var(--accent),#c084fc)"></div>
-<div style="position:relative;z-index:1;width:100%">
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:12mm">
+<div style="position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,var(--accent2),var(--accent),#c084fc)"></div>
+<div style="position:absolute;top:-80px;right:-80px;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,rgba(124,58,237,.1),transparent 70%);pointer-events:none"></div>
+<div style="position:absolute;bottom:40px;left:-60px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(168,85,247,.07),transparent 70%);pointer-events:none"></div>
+<div style="position:relative;z-index:1;width:100%;padding:14mm 18mm 0">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10mm">
     <div style="display:flex;align-items:center;gap:8px">
       <div class="am" style="width:38px;height:38px;font-size:13px">ABE</div>
       <div style="text-align:left"><div style="font-size:11px;font-weight:800;color:white">AI Revenue Infrastructure</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em">Enterprise GTM Platform</div></div>
     </div>
-    <div style="font-size:8px;color:var(--faint);text-align:right;padding-top:2mm">${date}<br>CONFIDENTIAL</div>
+    <div style="text-align:right">
+      <div style="font-size:9px;color:var(--muted)">${date}</div>
+      <div style="font-size:8px;font-weight:700;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-top:1mm">Confidential</div>
+    </div>
   </div>
-  <div style="margin-bottom:8mm">
-    <h1 style="font-size:42px;font-weight:900;color:white;letter-spacing:-1px;line-height:1.1">${e(co)}</h1>
-    <div style="font-size:20px;font-weight:300;color:var(--muted);margin-top:2mm;letter-spacing:2px;text-transform:uppercase">GTM Intelligence Report</div>
+  <div style="margin-bottom:5mm">
+    <h1 style="font-size:54px;font-weight:900;color:white;letter-spacing:-2px;line-height:1;margin-bottom:3mm">${e(co)}</h1>
+    <div style="font-size:13px;font-weight:300;color:var(--muted);letter-spacing:4px;text-transform:uppercase">GTM Intelligence Report</div>
     ${ind?`<div style="margin-top:3mm"><span class="tg blue" style="font-size:9px">${e(ind)}</span></div>`:''}
   </div>
-  <!-- GTM Score Gauge -->
-  <div style="display:flex;justify-content:center;margin-bottom:8mm">
-    ${renderGaugeChart(charts.gauge, score, rec, {width:320,height:200})}
+  <div style="display:flex;justify-content:center;margin-bottom:4mm">
+    ${renderGaugeChart(charts.gauge, score, rec, {width:280,height:170})}
   </div>
-  <!-- KPI Row -->
-  <div style="display:flex;gap:3mm;justify-content:center;margin-bottom:6mm">
-    <div style="background:rgba(18,24,39,.85);border:1px solid rgba(168,85,247,.2);border-bottom:3px solid var(--accent);border-radius:10px;padding:4mm 6mm;min-width:38mm;text-align:center">
-      <div style="font-family:'Space Mono',monospace;font-size:18px;font-weight:900;color:var(--accent)">${e(safe(s2.tam_size_estimate)||'—')}</div>
-      <div style="font-size:7px;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-top:1mm">TAM Size</div>
+  <div style="display:flex;gap:3mm;justify-content:center;margin-bottom:4mm">
+    <div style="background:rgba(18,24,39,.9);border:1px solid rgba(168,85,247,.25);border-bottom:3px solid var(--accent);border-radius:12px;padding:4mm 6mm;min-width:42mm;text-align:center">
+      <div style="font-family:'Space Mono',monospace;font-size:20px;font-weight:900;color:var(--accent)">${e(safe(s2.tam_size_estimate)||'—')}</div>
+      <div style="font-size:7px;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-top:1.5mm">TAM Size</div>
     </div>
-    <div style="background:rgba(18,24,39,.85);border:1px solid rgba(34,197,94,.2);border-bottom:3px solid var(--green);border-radius:10px;padding:4mm 6mm;min-width:38mm;text-align:center">
-      <div style="font-family:'Space Mono',monospace;font-size:18px;font-weight:900;color:var(--green)">${e(safe(s2.growth_rate)||'—')}</div>
-      <div style="font-size:7px;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-top:1mm">CAGR</div>
+    <div style="background:rgba(18,24,39,.9);border:1px solid rgba(34,197,94,.25);border-bottom:3px solid var(--green);border-radius:12px;padding:4mm 6mm;min-width:42mm;text-align:center">
+      <div style="font-family:'Space Mono',monospace;font-size:20px;font-weight:900;color:var(--green)">${e(safe(s2.growth_rate)||'—')}</div>
+      <div style="font-size:7px;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-top:1.5mm">CAGR</div>
     </div>
-    <div style="background:rgba(18,24,39,.85);border:1px solid rgba(245,158,11,.2);border-bottom:3px solid ${/go$/i.test(rec)&&!/no/i.test(rec)?'var(--green)':/no/i.test(rec)?'var(--red)':'var(--amber)'};border-radius:10px;padding:4mm 6mm;min-width:38mm;text-align:center">
-      <div style="font-family:'Space Mono',monospace;font-size:18px;font-weight:900;color:${recColor}">${e(recUp)}</div>
-      <div style="font-size:7px;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-top:1mm">Verdict</div>
+    <div style="background:rgba(18,24,39,.9);border:1px solid rgba(245,158,11,.25);border-bottom:3px solid ${/go$/i.test(rec)&&!/no/i.test(rec)?'var(--green)':/no/i.test(rec)?'var(--red)':'var(--amber)'};border-radius:12px;padding:4mm 6mm;min-width:42mm;text-align:center">
+      <div style="font-family:'Space Mono',monospace;font-size:20px;font-weight:900;color:${recColor}">${e(recUp)}</div>
+      <div style="font-size:7px;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-top:1.5mm">Verdict</div>
     </div>
   </div>
-  ${s1.company_overview || s7.strategic_hook ?`<div style="margin:0 auto;max-width:145mm;background:rgba(168,85,247,.05);border:1px solid rgba(168,85,247,.15);border-left:3px solid var(--accent);border-radius:8px;padding:3.5mm 5mm;text-align:left">
-    <div style="font-size:7px;font-weight:900;text-transform:uppercase;letter-spacing:.18em;color:var(--accent);margin-bottom:1.5mm">Strategic Positioning</div>
-    <div style="font-size:10.5px;color:var(--text);line-height:1.6">${e(strategicPositioning)}.</div>
+  ${(s1.company_overview || s7.strategic_hook) ?`<div style="max-width:148mm;margin:0 auto 4mm;background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.2);border-left:3px solid var(--accent);border-radius:10px;padding:4mm 5.5mm;text-align:left">
+    <div style="font-size:7px;font-weight:900;text-transform:uppercase;letter-spacing:.2em;color:var(--accent);margin-bottom:2mm">Strategic Positioning</div>
+    <div style="font-size:10.5px;color:var(--text);line-height:1.65">${e(strategicPositioning)}.</div>
   </div>`:''}
+  <div style="display:flex;gap:3mm;justify-content:center;max-width:148mm;margin:0 auto">
+    <div style="flex:1;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:3mm 4mm;text-align:center">
+      <div style="font-size:7.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:1.5mm">GTM Score</div>
+      <div style="font-family:'Space Mono',monospace;font-size:18px;font-weight:900;color:white">${score||'—'}<span style="font-size:9px;color:var(--muted)">/100</span></div>
+    </div>
+    <div style="flex:1;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:3mm 4mm;text-align:center">
+      <div style="font-size:7.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:1.5mm">Confidence</div>
+      <div style="font-family:'Space Mono',monospace;font-size:18px;font-weight:900;color:white">${confScore||'—'}<span style="font-size:9px;color:var(--muted)">/100</span></div>
+    </div>
+    <div style="flex:2;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:3mm 4mm;text-align:left">
+      <div style="font-size:7.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:1.5mm">Report Sections</div>
+      <div style="display:flex;flex-wrap:wrap;gap:1.5mm;align-items:center">
+        ${['01 Market','02 TAM','03 ICP','04 Sourcing','05 Keywords','06 SDR'].map(s=>`<span style="font-size:7.5px;color:var(--green);font-weight:700">${s}</span><span style="color:var(--faint);font-size:8px">·</span>`).join('')}
+        <span style="font-size:7.5px;color:var(--amber);font-weight:700">07 Intelligence</span>
+      </div>
+    </div>
+  </div>
 </div>
-<div style="position:absolute;bottom:12mm;left:0;right:0;font-size:8px;color:var(--faint);text-align:center;z-index:1">Classification: CONFIDENTIAL — Not for External Distribution</div>
+<div style="position:absolute;bottom:12mm;left:0;right:0;font-size:8px;color:var(--faint);text-align:center;z-index:1;letter-spacing:.05em">Classification: CONFIDENTIAL — Not for External Distribution</div>
 </div>
-
 <!-- EXECUTIVE SUMMARY -->
 <div class="page">
 ${pageHdr()}
 ${secHead('ES','Executive Summary')}
 ${secCtx('Establishes the macro-opportunity and win-probability. Provides the highest-leverage vector for outbound strategy.')}
-<div class="card"><p style="font-size:13px;line-height:1.9">${e(s7.executive_brief||s1.company_overview||'Strategic evaluation of market conditions and buyer readiness.')}</p></div>
-<div style="display:flex;gap:4mm;margin-bottom:5mm">
-  <div class="card" style="flex:1;text-align:center"><div class="mn">${e(safe(s2.tam_size_estimate)||'N/A')}</div><div class="bl">TAM</div></div>
-  <div class="card" style="flex:1;text-align:center"><div class="mn" style="color:var(--green)">${e(safe(s2.growth_rate)||'N/A')}</div><div class="bl">CAGR</div></div>
-  <div class="card" style="flex:1;text-align:center"><div class="mn" style="color:var(--amber)">${confScore}/100</div><div class="bl">Relevance</div></div>
-  <div class="card" style="flex:1;text-align:center"><div class="mn" style="color:${recColor}">${e(recUp)}</div><div class="bl">Verdict</div></div>
+<div class="card" style="border-left:3px solid var(--accent)"><p style="font-size:12px;line-height:1.85;color:var(--text)">${e(s7.executive_brief||s1.company_overview||'Strategic evaluation of market conditions and buyer readiness.')}</p></div>
+<div style="display:flex;gap:3mm;margin-bottom:4mm">
+  <div class="card" style="flex:1;text-align:center;border-top:2px solid var(--accent)"><div class="mn">${e(safe(s2.tam_size_estimate)||'N/A')}</div><div class="bl">TAM</div></div>
+  <div class="card" style="flex:1;text-align:center;border-top:2px solid var(--green)"><div class="mn" style="color:var(--green)">${e(safe(s2.growth_rate)||'N/A')}</div><div class="bl">CAGR</div></div>
+  <div class="card" style="flex:1;text-align:center;border-top:2px solid var(--amber)"><div class="mn" style="color:var(--amber)">${confScore}/100</div><div class="bl">Confidence</div></div>
+  <div class="card" style="flex:1;text-align:center;border-top:2px solid ${recColor}"><div class="mn" style="color:${recColor}">${e(recUp)}</div><div class="bl">Verdict</div></div>
 </div>
 ${srcNote('TAM/CAGR: AI market estimate; Relevance: algorithmic scoring; Verdict: composite signal analysis')}
 ${callout(s1.gtm_relevance_reasoning||s1.analyst_insight||'')}
 ${renderPageInsightBlock('executive_summary', strategy, isDemoMode)}
-<div style="display:flex;flex-wrap:wrap;gap:3mm;margin-top:5mm">
-  <span class="tg green">01 Market</span><span class="tg green">02 TAM</span><span class="tg green">03 ICP</span><span class="tg green">04 Sourcing</span><span class="tg green">05 Keywords</span><span class="tg green">06 Messaging</span><span class="tg amber">07 Revenue Intel</span>
+<div style="margin-top:5mm;padding-top:4mm;border-top:1px solid var(--border)">
+  <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-bottom:2.5mm">Report Navigation</div>
+  <div style="display:flex;flex-wrap:wrap;gap:2mm">
+    <span class="tg green">01 Market Research</span><span class="tg green">02 TAM Mapping</span><span class="tg green">03 ICP Modeling</span><span class="tg green">04 Account Sourcing</span><span class="tg green">05 Keywords & Intent</span><span class="tg green">06 SDR Sequence</span><span class="tg amber">07 Revenue Intelligence</span>
+  </div>
 </div>
 ${pageFtr('Executive Summary',1)}
 </div>
@@ -1171,7 +1228,7 @@ ${swotGrid()}
 <h3>1.4 · Strategic Growth Signals</h3>
 <div style="margin-bottom:3mm">${tags(s1.growth_signals,'green')}</div>
 <h3>1.5 · Tech Stack Indicators</h3>
-<div style="margin-bottom:3mm">${tags(s1.tech_stack_hints,'blue')}</div>
+<div style="display:flex;flex-wrap:wrap;gap:2mm;margin-bottom:3mm">${arr(s1.tech_stack_hints).slice(0,6).map(t=>`<div style="display:inline-flex;align-items:center;gap:2mm;background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.2);border-radius:6px;padding:1.5mm 3mm"><svg width="8" height="8" viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="10" height="10" rx="2" stroke="#93c5fd" stroke-width="1.2"/><path d="M4 6h4M6 4v4" stroke="#93c5fd" stroke-width="1" stroke-linecap="round"/></svg><span style="font-size:8.5px;font-weight:600;color:#93c5fd">${e(String(t))}</span></div>`).join('')}</div>
 ${callout(s1.analyst_insight)}
 ${renderPageInsightBlock('market_research', strategy, isDemoMode)}
 ${pageFtr('Market Research',2)}
@@ -1222,7 +1279,14 @@ ${fieldRow('Firmographics',s3.firmographics)}
 ${fieldRow('Deal Cycle',s3.deal_cycle)}
 </table>
 <h3>3.2 · Core Pain Points</h3>
-<div class="card"><p>${e(safe(s3.core_pain_points)||'—')}</p></div>
+${(()=>{
+  const pains = arr(s3.buying_triggers);
+  const objs  = arr(s3.objections);
+  const raw   = safe(s3.core_pain_points);
+  if (raw && raw !== '—') return `<div class="card"><p>${e(raw)}</p></div>`;
+  if (!pains.length) return `<div class="card"><p style="color:var(--muted);font-style:italic">Core pain points not specified — derived from buying triggers below.</p></div>`;
+  return `<div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2.5mm;margin-bottom:3mm">${pains.slice(0,3).map(p=>`<div style="background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.18);border-top:2px solid var(--amber);border-radius:8px;padding:3mm 3.5mm"><div style="font-size:7.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--amber);margin-bottom:1.5mm">Trigger</div><div style="font-size:10px;color:var(--text);line-height:1.5">${e(String(p))}</div></div>`).join('')}</div>`;
+})()}
 <div style="margin:3mm 0"><strong style="font-size:9px;color:var(--muted)">BUYING TRIGGERS</strong><br>${tags(s3.buying_triggers,'amber')}</div>
 <div style="margin:3mm 0"><strong style="font-size:9px;color:var(--muted)">COMMON OBJECTIONS</strong><br>${tags(s3.objections,'red')}</div>
 ${painMap()}
@@ -1316,9 +1380,41 @@ ${pageFtr('Engagement Playbook — Emails',7)}
 ${pageHdr()}
 ${secHead('06','Enterprise SDR Sequence — Follow-up & Social')}
 ${secCtx('Cadence continuation and LinkedIn direct outreach hook.')}
-${s6.follow_up_sequence?`<h3>6.2 · Follow-up Cadence</h3><div class="card"><p>${e(safe(s6.follow_up_sequence))}</p></div>`:''}
-${s6.linkedin_message?`<h3>6.3 · LinkedIn Hook</h3><div class="card"><p style="font-size:12px"><strong>Direct Message:</strong><br>"${e(safe(s6.linkedin_message))}"</p></div>`:''}
+${s6.follow_up_sequence?`<h3>6.2 · Follow-up Cadence</h3><div class="card"><p>${e(safe(s6.follow_up_sequence))}</p></div>`:`<h3>6.2 · Follow-up Cadence</h3><div class="card"><p>Send Email 1 → wait 3 days → Email 2 → reach out on LinkedIn → follow-up call attempt.</p></div>`}
+<!-- Visual cadence timeline -->
+<div style="margin:4mm 0 3mm">
+  <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-bottom:3mm">ENGAGEMENT TIMELINE</div>
+  <div style="display:flex;align-items:center;gap:0">
+    ${[['Day 1','Email 1','var(--accent)'],['Day 4','Email 2','var(--accent)'],['Day 7','LinkedIn','#3b82f6'],['Day 10','Call','var(--green)'],['Day 14','Final','var(--amber)']].map((item,i,arr)=>`<div style="display:flex;align-items:center;flex:1">
+      <div style="text-align:center;flex:1">
+        <div style="width:32px;height:32px;border-radius:50%;background:${item[2]};border:2px solid rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;color:white;margin:0 auto 2mm">${i+1}</div>
+        <div style="font-size:8px;font-weight:700;color:white">${item[1]}</div>
+        <div style="font-size:7px;color:var(--muted)">${item[0]}</div>
+      </div>
+      ${i<4?`<div style="flex:0 0 20px;height:1.5px;background:linear-gradient(90deg,${item[2]},${arr[i+1][2]});opacity:.4"></div>`:''}
+    </div>`).join('')}
+  </div>
+</div>
+${s6.linkedin_message?`<h3>6.3 · LinkedIn Hook</h3><div class="card" style="border-left:3px solid #3b82f6"><p style="font-size:11.5px"><strong>Direct Message:</strong><br><br>"${e(safe(s6.linkedin_message))}"</p></div>`:''}
 ${s6.linkedin_follow_up?`<h3>6.4 · LinkedIn Follow-up</h3><div class="card"><p>${e(safe(s6.linkedin_follow_up))}</p></div>`:''}
+<!-- Channel best-practice strip -->
+<div style="margin-top:4mm">
+  <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-bottom:2.5mm">CHANNEL PERFORMANCE BENCHMARKS</div>
+  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2.5mm">
+    <div style="background:rgba(168,85,247,.05);border:1px solid rgba(168,85,247,.15);border-radius:8px;padding:3mm 3.5mm;text-align:center">
+      <div style="font-family:'Space Mono',monospace;font-size:18px;font-weight:900;color:var(--accent)">15–25%</div>
+      <div style="font-size:7.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-top:1mm">Email Open Rate<br>Enterprise B2B</div>
+    </div>
+    <div style="background:rgba(59,130,246,.05);border:1px solid rgba(59,130,246,.15);border-radius:8px;padding:3mm 3.5mm;text-align:center">
+      <div style="font-family:'Space Mono',monospace;font-size:18px;font-weight:900;color:#93c5fd">3–5%</div>
+      <div style="font-size:7.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-top:1mm">Reply Rate<br>Cold Outbound</div>
+    </div>
+    <div style="background:rgba(34,197,94,.05);border:1px solid rgba(34,197,94,.15);border-radius:8px;padding:3mm 3.5mm;text-align:center">
+      <div style="font-family:'Space Mono',monospace;font-size:18px;font-weight:900;color:var(--green)">3–5x</div>
+      <div style="font-size:7.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-top:1mm">Multi-Touch Lift<br>vs Single Touch</div>
+    </div>
+  </div>
+</div>
 ${callout(s6.analyst_insight)}
 ${renderPageInsightBlock('followup_social', strategy, isDemoMode)}
 ${pageFtr('Engagement Playbook — Cadence',8)}
