@@ -1145,7 +1145,7 @@ async function confirmPdfExport() {
     const pRes  = await fetch('/api/export-pdf', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-      body:    JSON.stringify({ strategy: filtered }),
+      body:    JSON.stringify({ strategy: filtered, renderMode: 'browser-pdf' }),
     });
     const pData = await pRes.json();
     if (!pRes.ok) throw new Error(pData.error || 'Export failed');
@@ -1155,7 +1155,7 @@ async function confirmPdfExport() {
       link.href     = 'data:application/pdf;base64,' + pData.pdf_base64;
       link.download = pData.filename || 'GTM_Report.pdf';
       link.click();
-    } else if (pData.html && pData.mode === 'html2pdf') {
+    } else if (pData.html && (pData.mode === 'html2pdf' || pData.mode === 'browser-pdf')) {
       try {
         const pdfRes = await fetch('http://localhost:3001/render-pdf', {
           method: 'POST',
