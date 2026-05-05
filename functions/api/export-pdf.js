@@ -1182,20 +1182,21 @@ body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-
 ${renderMode === 'browser-pdf' ? `
 @page { size: A4; margin: 12mm; }
 body { padding: 0 !important; height: auto !important; }
-/* browser-pdf: each .page section starts on a new physical page.
-   Chromium handles all pagination — NO fixed min-height, NO overflow:hidden.
-   Content flows naturally; long sections grow across as many pages as needed. */
+/* browser-pdf: content flows naturally — Chromium handles pagination.
+   Only major sections (.section-break) force a new physical page.
+   Continuation sections (SDR social, confidence matrix) flow after their parent. */
 .page {
   width: 100%;
   box-sizing: border-box;
-  break-before: page !important;
-  page-break-before: always !important;
   background: transparent !important;
   padding: 0 !important;
   margin: 0 !important;
 }
-/* Cover page does not force a break-before */
-.page:first-of-type { break-before: auto !important; page-break-before: auto !important; }
+/* Only major section divs start on a new physical page */
+.page.section-break {
+  break-before: page !important;
+  page-break-before: always !important;
+}
 /* Protect semantic blocks from mid-block splits */
 .card, .table-wrap, .chart-block, .ac, .swot-grid,
 .page-insight, .page-insight-expanded, .sdr-step, tr {
@@ -1368,7 +1369,7 @@ h3{font-size:12.5px;font-weight:700;color:var(--text);margin-top:3.5mm;margin-bo
 </style></head><body>
 
 <!-- COVER -->
-<div class="page" style="display:flex;flex-direction:column;justify-content:flex-start;align-items:center;text-align:center;padding:0;overflow:hidden">
+<div class="page" style="position:relative;display:flex;flex-direction:column;justify-content:flex-start;align-items:center;text-align:center;padding:0;overflow:hidden">
 <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(168,85,247,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(168,85,247,.025) 1px,transparent 1px);background-size:28px 28px;pointer-events:none"></div>
 <div style="position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,var(--accent2),var(--accent),#c084fc)"></div>
 <div style="position:absolute;top:-80px;right:-80px;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,rgba(124,58,237,.1),transparent 70%);pointer-events:none"></div>
@@ -1435,7 +1436,7 @@ h3{font-size:12.5px;font-weight:700;color:var(--text);margin-top:3.5mm;margin-bo
 <div style="position:absolute;bottom:12mm;left:0;right:0;font-size:8px;color:var(--faint);text-align:center;z-index:1;letter-spacing:.05em">Classification: CONFIDENTIAL — Not for External Distribution</div>
 </div>
 <!-- EXECUTIVE SUMMARY -->
-<div class="page">
+<div class="page section-break" id="exec-summary">
 ${pageHdr()}
 ${secHead('ES', 'Executive Summary')}
 ${secCtx('Establishes the macro-opportunity and win-probability. Provides the highest-leverage vector for outbound strategy.')}
@@ -1454,7 +1455,7 @@ ${pageFtr('Executive Summary', 1)}
 </div>
 
 <!-- STEP 1: MARKET RESEARCH -->
-<div class="page">
+<div class="page section-break" id="market-research">
 ${pageHdr()}
 ${secHead('01', 'Market Research — The Context')}
 ${secCtx(s1.section_context || 'Deconstructs market positioning and isolates specific macro-triggers.')}
@@ -1483,7 +1484,7 @@ ${pageFtr('Market Research', 2)}
 </div>
 
 <!-- STEP 2: TAM MAPPING -->
-<div class="page">
+<div class="page section-break" id="tam-mapping">
 ${pageHdr()}
 ${secHead('02', 'TAM Mapping — The Opportunity')}
 ${secCtx(s2.section_context || 'Quantifies total market velocity and filters it to actionable scope.')}
@@ -1519,7 +1520,7 @@ ${pageFtr('TAM Analysis', 3)}
 </div>
 
 <!-- STEP 3: ICP MODELING -->
-<div class="page">
+<div class="page section-break" id="icp-modeling">
 ${pageHdr()}
 ${secHead('03', 'ICP Modeling — The Persona')}
 ${secCtx(s3.section_context || 'Identifies decision-makers and maps operational pain directly to solutions.')}
@@ -1553,7 +1554,7 @@ ${buildFillerBlock('icp', renderMode)}
 ${pageFtr('ICP Modeling', 4)}
 </div>
 
-<div class="page">
+<div class="page section-break" id="account-sourcing">
 ${pageHdr()}
 ${secHead('04', 'Account Sourcing — The Targets')}
 ${secCtx(s4.section_context || 'Translates persona into actionable technographic filters and sourcing logic.')}
@@ -1602,7 +1603,7 @@ ${pageFtr('Account Sourcing', 5)}
 </div>
 
 <!-- STEP 5: KEYWORDS & INTENT -->
-<div class="page">
+<div class="page section-break" id="keywords-intent">
 ${pageHdr()}
 ${secHead('05', 'Keywords & Intent Intelligence')}
 ${secCtx(s5.section_context || 'Maps the semantic footprint before RFP issuance and decodes intent signals.')}
@@ -1625,7 +1626,7 @@ ${pageFtr('Keywords & Intent', 6)}
 </div>
 
 <!-- STEP 6: ENTERPRISE SDR SEQUENCE — PAGE 8: EMAILS -->
-<div class="page">
+<div class="page section-break" id="sdr-emails">
 ${pageHdr()}
 ${secHead('06', 'Enterprise SDR Sequence — The Engagement')}
 ${secCtx(s6.section_context || 'Hyper-targeted sequences designed to agitate pain and validate scalability.')}
@@ -1639,7 +1640,7 @@ ${pageFtr('Engagement Playbook — Emails', 7)}
 </div>
 
 <!-- STEP 6 CONTINUED — PAGE 9: FOLLOW-UP + LINKEDIN -->
-<div class="page">
+<div class="page" id="sdr-social">
 ${pageHdr()}
 ${secHead('06', 'Enterprise SDR Sequence — Follow-up & Social')}
 ${secCtx('Cadence continuation and LinkedIn direct outreach hook.')}
@@ -1685,7 +1686,7 @@ ${pageFtr('Engagement Playbook — Cadence', 8)}
 </div>
 
 <!-- STEP 7: REVENUE INTELLIGENCE — Decision Engine -->
-<div class="page">
+<div class="page section-break" id="decision-engine">
 ${pageHdr()}
 ${decisionEngine()}
 ${renderPageInsightBlock('decision_engine', strategy, isDemoMode)}
@@ -1694,7 +1695,7 @@ ${pageFtr('Revenue Intelligence', 9)}
 </div>
 
 <!-- STEP 7 CONTINUED: CONFIDENCE MATRIX -->
-<div class="page">
+<div class="page" id="confidence-matrix">
 ${pageHdr()}
 ${secHead('07', 'Revenue Intelligence — Confidence Matrix')}
 ${secCtx('Weighted fidelity assessment of signal quality, market timing, and ICP alignment.')}
@@ -1722,10 +1723,10 @@ ${buildFillerBlock('confidence', renderMode)}
 ${pageFtr('Revenue Intelligence — Confidence', 10)}
 </div>
 
-<!-- APPENDIX PAGE 1: A.1-A.4 -->
-<div class="page">
+<!-- APPENDIX — single flowing section, renders once, always last -->
+<div class="page section-break" id="appendix">
 ${pageHdr()}
-${secHead('A', 'Appendix — Methodology & Data Quality')}
+${secHead('A', 'Appendix — Methodology, Data Quality &amp; Report Metadata')}
 ${secCtx('Transparency layer. Documents data provenance, scoring methodology, and known limitations.')}
 <div class="appendix-section">
 ${h3('appendix', '1', 'Data Sources')}
@@ -1777,32 +1778,21 @@ ${renderDarkTable({
         ['Data Completeness', '<span class="num">15%</span>', 'Depth and quality of source data used in analysis']
       ]
     }, 'The AI confidence score is hard-capped by measured data richness. The AI cannot claim higher confidence than the underlying data supports.', 'ABE GTMS Engine v1.0')}
-${pageFtr('Appendix — Methodology', 11)}
 </div>
-
-<!-- APPENDIX PAGE 2: A.5-A.7 -->
-<div class="page">
-${pageHdr()}
-${secHead('A', 'Appendix — Data Quality & Report Metadata')}
-${secCtx('Data quality audit, AI-estimated fields disclaimer, and report metadata.')}
-${s7._data_quality ? `${h3('appendix', '5', 'Data Quality Audit')}${renderDarkTable({
+${s7._data_quality ? `<div class="appendix-section">${h3('appendix', '5', 'Data Quality Audit')}${renderDarkTable({
       headers: ['Metric', 'Value'],
       rows: [
-        ['Data Richness Score', `<span class="num">${s7._data_quality.richness_score || '—'}</span>`],
-        ['Signals (Pre-filter)', `<span class="num">${s7._data_quality.signals_before_filter || '—'}</span>`],
-        ['Signals (Post-filter)', `<span class="num">${s7._data_quality.signals_after_filter || '—'}</span>`],
-        ['AI Confidence (Claimed)', `<span class="num">${s7._data_quality.confidence_ai_claimed || '—'}</span>`],
-        ['Confidence (After Cap)', `<span class="num">${s7._data_quality.confidence_after_cap || '—'}</span>`]
+        ['Data Richness Score', '<span class="num">' + (s7._data_quality.richness_score || '—') + '</span>'],
+        ['Signals (Pre-filter)', '<span class="num">' + (s7._data_quality.signals_before_filter || '—') + '</span>'],
+        ['Signals (Post-filter)', '<span class="num">' + (s7._data_quality.signals_after_filter || '—') + '</span>'],
+        ['AI Confidence (Claimed)', '<span class="num">' + (s7._data_quality.confidence_ai_claimed || '—') + '</span>'],
+        ['Confidence (After Cap)', '<span class="num">' + (s7._data_quality.confidence_after_cap || '—') + '</span>']
       ]
-    }, '', 'ABE GTMS Engine v1.0')}` : ''}
+    }, '', 'ABE GTMS Engine v1.0')}</div>` : ''}
+<div class="appendix-section">
 ${h3('appendix', '6', 'AI-Estimated Fields Disclaimer')}
 <div class="ac amber keep-together"><strong>AI-Estimated Content:</strong> The following fields in this report are generated by AI and should be independently validated before use in strategic decisions:<br>
-TAM / SAM / SOM sizing and growth rates<br>
-Market segment estimates and priorities<br>
-ICP persona derivations (when original data was placeholder)<br>
-Account target analogs and fit scores<br>
-Buying trigger identification and signal strength<br>
-Confidence score components<br><br>
+TAM / SAM / SOM sizing and growth rates · Market segment estimates and priorities · ICP persona derivations (when original data was placeholder) · Account target analogs and fit scores · Buying trigger identification and signal strength · Confidence score components.<br><br>
 All competitive intelligence reflects publicly available data only. Manual validation of exact revenue figures, headcount, and funding data is recommended prior to boardroom presentation.</div>
 ${h3('appendix', '7', 'Report Metadata')}
 ${renderDarkTable({
@@ -1813,17 +1803,16 @@ ${renderDarkTable({
         ['Generated', date],
         ['Platform', 'ABE Enterprise AI Revenue Infrastructure'],
         ['Report Mode', isDemoMode ? 'Demo — illustrative only' : 'Live / Realtime'],
-        ['Steps Completed', `${strategy.steps_completed || 6}/7`],
-        ['GTM Relevance Score', `${score}/100`],
-        ['Confidence Score', `${confScore}/100`],
+        ['Steps Completed', String(strategy.steps_completed || 6) + '/7'],
+        ['GTM Relevance Score', score + '/100'],
+        ['Confidence Score', confScore + '/100'],
         ['QuickChart Charts', [charts.gauge ? 'Gauge' : '', charts.waterfall ? 'Waterfall' : '', charts.confidence ? 'Confidence' : '', charts.intent ? 'Intent' : '', charts.risk ? 'Risk' : ''].filter(Boolean).join(', ') || 'Fallback HTML used']
       ]
     }, '', 'ABE GTMS Engine v1.0')}
 <div style="text-align:center;margin-top:8mm;padding-top:5mm;border-top:1px solid var(--border)">
   <div class="am" style="margin:0 auto 3mm;width:28px;height:28px;font-size:9px">ABE</div>
-  <p style="font-size:9px;color:var(--faint)">End of Report · ${e(co)} · ${date} · Confidential</p>
+  <p style="font-size:9px;color:var(--faint)">End of Report &middot; ${e(co)} &middot; ${date} &middot; Confidential</p>
 </div>
-${pageFtr('Appendix — Report Metadata', 12)}
 </div>
 
 ${'</body></html>'}`;
