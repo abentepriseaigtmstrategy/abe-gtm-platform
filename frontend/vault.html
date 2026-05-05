@@ -1183,6 +1183,9 @@ async function confirmPdfExport() {
     showToast('PDF downloaded ✓', 'success');
   } catch(e) {
     showToast('Export failed: ' + e.message, 'error');
+    if (e.message.includes('401') || e.message.includes('Unauthorized')) {
+      window.APP.signOut();
+    }
     btn.disabled = false;
     btn.textContent = '⬇ Generate PDF';
     prog.style.display = 'none';
