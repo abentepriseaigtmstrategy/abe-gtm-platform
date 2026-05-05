@@ -22,9 +22,9 @@ export async function onRequestPost(context) {
   // ── QuickChart env config ──
   const QC = {
     enabled: (env?.QUICKCHART_ENABLED ?? 'true') !== 'false',
-    apiKey: env?.QUICKCHART_API_KEY || '',
+    apiKey:  env?.QUICKCHART_API_KEY || '',
     timeout: parseInt(env?.QUICKCHART_TIMEOUT_MS) || 5000,
-    maxPer: parseInt(env?.QUICKCHART_MAX_PER_REPORT) || 5,
+    maxPer:  parseInt(env?.QUICKCHART_MAX_PER_REPORT) || 5,
   };
 
   // ── Detect demo vs live mode ──
@@ -32,7 +32,7 @@ export async function onRequestPost(context) {
     strategy.demo_mode || strategy.report_mode === 'demo' ||
     strategy._profile_source === 'demo_mode_simulated' ||
     strategy.step_7_intelligence?.demo_mode ||
-    (strategy.step_1_market?.analyst_insight || '').toLowerCase().includes('demo mode')
+    (strategy.step_1_market?.analyst_insight||'').toLowerCase().includes('demo mode')
   );
 
   // ── Pre-fetch QuickChart images ──
@@ -49,7 +49,7 @@ export async function onRequestPost(context) {
     ) || (isDemoMode ? 60 : 0);
     const verdict = s7.go_no_go?.recommendation ||
       s7.verdict || strategy.verdict ||
-      (gtmScore >= 75 ? 'Go' : gtmScore >= 50 ? 'Watch' : 'No-Go') ||
+      (gtmScore>=75?'Go':gtmScore>=50?'Watch':'No-Go') ||
       (isDemoMode ? 'Watch' : 'Watch');
     const confScore = parseInt(
       s7.confidence_score || s7.overall_fidelity || s7._data_quality?.confidence_after_cap
@@ -62,7 +62,7 @@ export async function onRequestPost(context) {
     const somIsPercent = somRawVal && /\d+.*%/.test(somRawVal);
     const somNum = (!somRawVal || somIsPercent) ? tamNum * 0.07 : parseMoneyValue(somRawVal, tamNum * 0.07);
 
-    const formatUSD = n => { if (n >= 1000) return `USD ${(n / 1000).toFixed(1).replace(/\.0$/, '')}B`; if (n > 0) return `USD ${Math.round(n)}M`; return 'USD 0'; };
+    const formatUSD = n => { if(n>=1000) return `USD ${(n/1000).toFixed(1).replace(/\.0$/,'')}B`; if(n>0) return `USD ${Math.round(n)}M`; return 'USD 0'; };
     s2.tam_size_estimate = formatUSD(tamNum);
     s2.sam_estimate = formatUSD(samNum);
     if (!s2.waterfall) s2.waterfall = {};
@@ -71,74 +71,76 @@ export async function onRequestPost(context) {
     s2.waterfall.som_value = formatUSD(somNum);
 
     // ── Live-mode confidence sub-field extraction ──
-    const liveVeracity = safeNumber(s7.signal_veracity || s7.confidence_breakdown?.signal_veracity, 0);
-    const liveTiming = safeNumber(s7.market_timing || s7.confidence_breakdown?.market_timing, 0);
-    const liveIcpFit = safeNumber(s7.icp_fit || s7.confidence_breakdown?.icp_fit, 0);
-    const liveCompleteness = safeNumber(s7.data_completeness || s7.confidence_breakdown?.data_completeness, 0);
+    const liveVeracity     = safeNumber(s7.signal_veracity     || s7.confidence_breakdown?.signal_veracity,     0);
+    const liveTiming       = safeNumber(s7.market_timing       || s7.confidence_breakdown?.market_timing,       0);
+    const liveIcpFit       = safeNumber(s7.icp_fit             || s7.confidence_breakdown?.icp_fit,             0);
+    const liveCompleteness = safeNumber(s7.data_completeness   || s7.confidence_breakdown?.data_completeness,   0);
     // If live sub-fields exist use them; else derive from confScore weights
     const hasLiveSubs = liveVeracity > 0 || liveTiming > 0 || liveIcpFit > 0 || liveCompleteness > 0;
-    const matrixVeracity = hasLiveSubs ? liveVeracity : Math.round(confScore * 0.4);
-    const matrixTiming = hasLiveSubs ? liveTiming : Math.round(confScore * 0.25);
-    const matrixIcpFit = hasLiveSubs ? liveIcpFit : Math.round(confScore * 0.2);
+    const matrixVeracity     = hasLiveSubs ? liveVeracity     : Math.round(confScore * 0.4);
+    const matrixTiming       = hasLiveSubs ? liveTiming       : Math.round(confScore * 0.25);
+    const matrixIcpFit       = hasLiveSubs ? liveIcpFit       : Math.round(confScore * 0.2);
     const matrixCompleteness = hasLiveSubs ? liveCompleteness : Math.round(confScore * 0.15);
 
     // ── KV Chart Caching (DEFERRED — add env.KV when available) ──
-    // When env.KV is present, wrap fetchQuickChartBase64 with:
-    //   const cacheKey = `chart:gauge:${gtmScore}:${verdict}`;        TTL demo=604800 live=86400
-    //   const cacheKey = `chart:waterfall:${tamNum}:${samNum}:${somNum}`;
-    //   const cacheKey = `chart:confidence:${matrixVeracity}:${matrixTiming}:${matrixIcpFit}:${matrixCompleteness}`;
-    //   const cached = await env.KV.get(cacheKey);
-    //   if (cached) return cached;
-    //   const b64 = await fetchQuickChartBase64(...);
-    //   await env.KV.put(cacheKey, b64, { expirationTtl: isDemoMode ? 604800 : 86400 });
-    //   return b64;
+  // When env.KV is present, wrap fetchQuickChartBase64 with:
+  //   const cacheKey = `chart:gauge:${gtmScore}:${verdict}`;        TTL demo=604800 live=86400
+  //   const cacheKey = `chart:waterfall:${tamNum}:${samNum}:${somNum}`;
+  //   const cacheKey = `chart:confidence:${matrixVeracity}:${matrixTiming}:${matrixIcpFit}:${matrixCompleteness}`;
+  //   const cached = await env.KV.get(cacheKey);
+  //   if (cached) return cached;
+  //   const b64 = await fetchQuickChartBase64(...);
+  //   await env.KV.put(cacheKey, b64, { expirationTtl: isDemoMode ? 604800 : 86400 });
+  //   return b64;
 
-    let chartCount = 0;
-    const tryFetch = async (type, config, w, h) => {
-      if (chartCount >= QC.maxPer) {
-        console.warn(`[QuickChart] max calls (${QC.maxPer}) reached — fallback for ${type}`);
-        return null;
-      }
-      chartCount++;
-      try {
-        return await fetchQuickChartBase64(config, w, h, QC, type);
-      } catch (err) {
-        console.warn(`[QuickChart] ${type} fallback triggered:`, err.message);
-        return null;
-      }
-    };
+  let chartCount = 0;
+  const tryFetch = async (type, config, w, h) => {
+    if (chartCount >= QC.maxPer) {
+      console.warn(`[QuickChart] max calls (${QC.maxPer}) reached — fallback for ${type}`);
+      return null;
+    }
+    chartCount++;
+    try {
+      return await fetchQuickChartBase64(config, w, h, QC, type);
+    } catch(err) {
+      console.warn(`[QuickChart] ${type} fallback triggered:`, err.message);
+      return null;
+    }
+  };
 
     const [g, wf, cm] = await Promise.allSettled([
-      tryFetch('gauge', buildGtmGaugeChartConfig(gtmScore, verdict), 320, 200),
-      tryFetch('waterfall', buildTamWaterfallChartConfig(tamNum, samNum, somNum), 760, 280),
+      tryFetch('gauge',      buildGtmGaugeChartConfig(gtmScore, verdict), 320, 200),
+      tryFetch('waterfall',  buildTamWaterfallChartConfig(tamNum, samNum, somNum), 760, 280),
       tryFetch('confidence', buildConfidenceMatrixChartConfig({
         veracity: matrixVeracity, timing: matrixTiming,
         icpFit: matrixIcpFit, completeness: matrixCompleteness,
         overall: confScore
       }), 760, 300),
     ]);
-    charts.gauge = g.status === 'fulfilled' ? g.value : null;
-    charts.waterfall = wf.status === 'fulfilled' ? wf.value : null;
-    charts.confidence = cm.status === 'fulfilled' ? cm.value : null;
+    charts.gauge      = g.status==='fulfilled'  ? g.value  : null;
+    charts.waterfall  = wf.status==='fulfilled' ? wf.value : null;
+    charts.confidence = cm.status==='fulfilled' ? cm.value : null;
 
     // ── Optional mini charts (max 2 additional calls) ──
     const _s5 = strategy.step_5_keywords || strategy.steps?.[5] || {};
-    const _arr = v => Array.isArray(v) ? v : (v ? [String(v)] : []);
-    const intentSignals = _arr(_s5?.intent_signals || _s5?.intent_topics || []);
-    const intentItems = intentSignals.slice(0, 4).map((s, i) => ({
-      label: typeof s === 'string' ? s : (s.signal || s.label || `Signal ${i + 1}`),
-      strength: typeof s === 'object' && s.strength ? s.strength : [72, 58, 65, 50][i] || 60
+    const _arr = v => Array.isArray(v)?v:(v?[String(v)]:[]);
+    const intentSignals = _arr(_s5?.intent_signals||_s5?.intent_topics||[]);
+    const intentItems = intentSignals.slice(0,4).map((s,i)=>({
+      label: typeof s==='string'?s:(s.signal||s.label||`Signal ${i+1}`),
+      strength: typeof s==='object'&&s.strength ? s.strength : [72,58,65,50][i]||60
     }));
     const [intent, risk] = await Promise.allSettled([
       tryFetch('intent', buildIntentSignalChartConfig(intentItems), 480, 180),
-      tryFetch('risk', buildRiskSeverityChartConfig(verdict, gtmScore), 480, 180),
+      tryFetch('risk',   buildRiskSeverityChartConfig(verdict, gtmScore), 480, 180),
     ]);
-    charts.intent = intent.status === 'fulfilled' ? intent.value : null;
-    charts.risk = risk.status === 'fulfilled' ? risk.value : null;
+    charts.intent = intent.status==='fulfilled' ? intent.value : null;
+    charts.risk   = risk.status==='fulfilled'   ? risk.value   : null;
     console.info(`[QuickChart] total calls=${chartCount}/${QC.maxPer} gauge=${!!charts.gauge} waterfall=${!!charts.waterfall} confidence=${!!charts.confidence} intent=${!!charts.intent} risk=${!!charts.risk}`);
   }
 
   const filename = `GTM_${strategy.company_name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
+  // browser-pdf is the primary Playwright/Chromium path.
+  // html2canvas remains as fallback only (triggered by explicit renderMode:'html2canvas').
   const renderMode = body.renderMode || 'browser-pdf';
   const html = buildReportHTML(strategy, charts, isDemoMode, renderMode);
   return new Response(JSON.stringify({ html, filename, mode: renderMode }), {
@@ -191,7 +193,7 @@ function safe_val(v) {
 
 function parseMoneyValue(str, fallback = 0) {
   if (!str) return fallback;
-  const s = String(str).replace(/,/g, '').toUpperCase();
+  const s = String(str).replace(/,/g,'').toUpperCase();
   const m = s.match(/([\d.]+)\s*(B|M|K)?/);
   if (!m) return fallback;
   const n = parseFloat(m[1]);
@@ -245,8 +247,8 @@ function buildTamWaterfallChartConfig(tamM, samM, somM) {
   const safeNum = v => (Number.isFinite(v) && v > 0) ? v : 0;
   const values = [safeNum(tamM), safeNum(samM), safeNum(somM)];
   const maxVal = Math.max(100, ...values) * 1.22;
-  const fmt = v => { const n = Number(v) || 0; if (n >= 1000) return 'USD ' + (n / 1000).toFixed(1).replace(/\.0$/, '') + 'B'; if (n > 0) return 'USD ' + Math.round(n) + 'M'; return 'USD 0'; };
-  const somPct = values[0] > 0 ? Math.round((values[2] / values[0]) * 100) : 0;
+  const fmt = v => { const n = Number(v)||0; if(n>=1000) return 'USD '+(n/1000).toFixed(1).replace(/\.0$/,'')+'B'; if(n>0) return 'USD '+Math.round(n)+'M'; return 'USD 0'; };
+  const somPct = values[0]>0 ? Math.round((values[2]/values[0])*100) : 0;
   return {
     type: 'bar',
     data: {
@@ -270,9 +272,9 @@ function buildTamWaterfallChartConfig(tamM, samM, somM) {
           color: '#ffffff',
           font: { size: 11, weight: '700', family: 'monospace' },
           anchor: 'end', align: 'right', offset: 4,
-          formatter: function (v) {
+          formatter: function(v) {
             var n = Number(v) || 0;
-            if (n >= 1000) return 'USD ' + (n / 1000).toFixed(1).replace(/\.0$/, '') + 'B';
+            if (n >= 1000) return 'USD ' + (n/1000).toFixed(1).replace(/\.0$/,'') + 'B';
             if (n >= 1) return 'USD ' + Math.round(n) + 'M';
             return n > 0 ? 'USD ' + n : 'USD 0';
           },
@@ -327,8 +329,8 @@ function buildTamWaterfallChartConfig(tamM, samM, somM) {
 }
 
 function buildConfidenceMatrixChartConfig({ veracity, timing, icpFit, completeness, overall }) {
-  const safe = v => { const n = Number(v); return Number.isFinite(n) ? Math.max(0, Math.min(100, Math.round(n))) : 0; };
-  const toPercent = (sc, max) => safe(Math.round((sc / max) * 100));
+  const safe = v => { const n=Number(v); return Number.isFinite(n)?Math.max(0,Math.min(100,Math.round(n))):0; };
+  const toPercent = (sc, max) => safe(Math.round((sc/max)*100));
   const values = [
     toPercent(veracity, 40),
     toPercent(timing, 25),
@@ -337,7 +339,7 @@ function buildConfidenceMatrixChartConfig({ veracity, timing, icpFit, completene
     safe(overall),
   ];
   const overallColor = values[4] >= 75 ? '#22c55e' : values[4] >= 50 ? '#f59e0b' : '#ef4444';
-  const bgColors = ['#7c3aed', '#8b5cf6', '#6366f1', '#a78bfa', overallColor];
+  const bgColors = ['#7c3aed','#8b5cf6','#6366f1','#a78bfa', overallColor];
   return {
     type: 'bar',
     data: {
@@ -358,10 +360,10 @@ function buildConfidenceMatrixChartConfig({ veracity, timing, icpFit, completene
         tooltip: { enabled: false },
         datalabels: {
           display: true,
-          color: function (ctx) { return ctx.dataIndex === 4 ? '#ffffff' : 'rgba(255,255,255,0.85)'; },
-          font: function (ctx) { return { size: ctx.dataIndex === 4 ? 12 : 10, weight: '700', family: 'monospace' }; },
+          color: function(ctx) { return ctx.dataIndex === 4 ? '#ffffff' : 'rgba(255,255,255,0.85)'; },
+          font: function(ctx) { return { size: ctx.dataIndex === 4 ? 12 : 10, weight: '700', family: 'monospace' }; },
           anchor: 'end', align: 'right', offset: 4,
-          formatter: function (v, ctx) {
+          formatter: function(v, ctx) {
             if (ctx.dataIndex === 4) return v + '/100';
             return v + '%';
           },
@@ -371,21 +373,21 @@ function buildConfidenceMatrixChartConfig({ veracity, timing, icpFit, completene
             weakLine: {
               type: 'line',
               xMin: 50, xMax: 50,
-              borderColor: 'rgba(245,158,11,0.35)', borderWidth: 1.5, borderDash: [3, 3],
+              borderColor: 'rgba(245,158,11,0.35)', borderWidth: 1.5, borderDash: [3,3],
               label: {
                 enabled: true, content: 'Validate', position: 'start',
                 backgroundColor: 'rgba(245,158,11,0.08)', color: '#f59e0b',
-                font: { size: 8, weight: '600' }, padding: { x: 4, y: 2 }, yAdjust: -14,
+                font: { size: 8, weight: '600' }, padding: { x:4, y:2 }, yAdjust: -14,
               },
             },
             strongLine: {
               type: 'line',
               xMin: 75, xMax: 75,
-              borderColor: 'rgba(34,197,94,0.30)', borderWidth: 1.5, borderDash: [3, 3],
+              borderColor: 'rgba(34,197,94,0.30)', borderWidth: 1.5, borderDash: [3,3],
               label: {
                 enabled: true, content: 'Strong', position: 'start',
                 backgroundColor: 'rgba(34,197,94,0.08)', color: '#22c55e',
-                font: { size: 8, weight: '600' }, padding: { x: 4, y: 2 }, yAdjust: -14,
+                font: { size: 8, weight: '600' }, padding: { x:4, y:2 }, yAdjust: -14,
               },
             },
           },
@@ -394,7 +396,7 @@ function buildConfidenceMatrixChartConfig({ veracity, timing, icpFit, completene
       scales: {
         x: {
           beginAtZero: true, min: 0, max: 110,
-          ticks: { color: '#9CA3AF', font: { size: 9 }, callback: v => v <= 100 ? v + '%' : '' },
+          ticks: { color: '#9CA3AF', font: { size: 9 }, callback: v => v <= 100 ? v+'%' : '' },
           grid: { color: 'rgba(255,255,255,0.06)', drawBorder: false },
         },
         y: {
@@ -424,8 +426,8 @@ async function withTimeout(promise, ms) {
 }
 
 async function fetchQuickChartBase64(config, width, height, qc, chartType = 'default') {
-  const versionMap = { gauge: ['4', '3'], waterfall: ['3', '4'], confidence: ['4', '3'], intent: ['4', '3'], risk: ['4', '3'] };
-  const versions = versionMap[chartType] || ['4', '3'];
+  const versionMap = { gauge:['4','3'], waterfall:['3','4'], confidence:['4','3'], intent:['4','3'], risk:['4','3'] };
+  const versions = versionMap[chartType] || ['4','3'];
   const configStr = JSON.stringify(config);
   const hasDatalabels = configStr.includes('datalabels');
   const hasAnnotation = configStr.includes('annotation');
@@ -447,7 +449,7 @@ async function fetchQuickChartBase64(config, width, height, qc, chartType = 'def
       );
       if (!res.ok) {
         const errBody = await res.text().catch(() => '');
-        throw new Error(`QuickChart HTTP ${res.status}: ${errBody.slice(0, 80)}`);
+        throw new Error(`QuickChart HTTP ${res.status}: ${errBody.slice(0,80)}`);
       }
       const buf = await res.arrayBuffer();
       const b64 = arrayBufferToBase64(buf);
@@ -465,8 +467,8 @@ async function fetchQuickChartBase64(config, width, height, qc, chartType = 'def
 
 // ── Fallback renderers ──
 function renderGaugeFallback(score, verdict) {
-  const color = /^go$/i.test(verdict) ? 'var(--green)' : /no/i.test(verdict) ? 'var(--red)' : 'var(--amber)';
-  const circ = 157, filled = Math.round((score / 100) * circ);
+  const color = /^go$/i.test(verdict)?'var(--green)':/no/i.test(verdict)?'var(--red)':'var(--amber)';
+  const circ = 157, filled = Math.round((score/100)*circ);
   return `<svg width="130" height="80" viewBox="0 0 130 80" xmlns="http://www.w3.org/2000/svg">
     <defs><linearGradient id="gaugeGrad2" x1="0%" y1="0%" x2="100%" y2="0%"><stop offset="0%" stop-color="#7c3aed"/><stop offset="100%" stop-color="${color}"/></linearGradient></defs>
     <path d="M 15 72 A 50 50 0 0 1 115 72" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="8" stroke-linecap="round"/>
@@ -477,7 +479,7 @@ function renderGaugeFallback(score, verdict) {
 }
 
 function renderWaterfallFallback(tamV, samV, somV) {
-  const bar = (label, val, w, cls) => `<div style="display:flex;align-items:center;margin-bottom:3mm">
+  const bar = (label,val,w,cls) => `<div style="display:flex;align-items:center;margin-bottom:3mm">
     <div style="width:100px;font-family:monospace;font-size:10px;text-align:right;padding-right:3mm;color:white;font-weight:700">${val}</div>
     <div style="flex:1;background:rgba(255,255,255,.08);border-radius:6px;height:14px;overflow:hidden">
       <div style="height:100%;border-radius:6px;width:${w}" class="${cls}"></div>
@@ -485,7 +487,7 @@ function renderWaterfallFallback(tamV, samV, somV) {
     <span style="margin-left:2mm;font-size:9px;color:#6B7280">${label}</span>
   </div>`;
   return `<div style="margin:3mm 0">
-    ${bar('TAM', tamV, '80%', 'wfb')}${bar('SAM', samV, '50%', 'wfa')}${bar('SOM', somV, '20%', 'wfm')}
+    ${bar('TAM',tamV,'80%','wfb')}${bar('SAM',samV,'50%','wfa')}${bar('SOM',somV,'20%','wfm')}
   </div>`;
 }
 
@@ -496,11 +498,11 @@ function renderConfidenceFallback(v, t, f, c, overall) {
       <span style="font-family:monospace;font-size:11px;font-weight:900;color:#a855f7">${sc}<span style="font-size:8px;font-weight:400;color:#6B7280">/${max}</span></span>
     </div>
     <div style="background:rgba(255,255,255,.07);border-radius:5px;height:9px;overflow:hidden">
-      <div style="height:100%;border-radius:5px;background:linear-gradient(90deg,#7c3aed,#a855f7);width:${Math.round((sc / max) * 100)}%;min-width:3px"></div>
+      <div style="height:100%;border-radius:5px;background:linear-gradient(90deg,#7c3aed,#a855f7);width:${Math.round((sc/max)*100)}%;min-width:3px"></div>
     </div>
   </div>`;
-  return cmBar('Signal Veracity (40%)', v, 40) + cmBar('Market Timing (25%)', t, 25) + cmBar('ICP Fit (20%)', f, 20) + cmBar('Data Completeness (15%)', c, 15) +
-    `<div style="border-top:1px solid rgba(168,85,247,.2);margin:3mm 0"></div>` +
+  return cmBar('Signal Veracity (40%)',v,40)+cmBar('Market Timing (25%)',t,25)+cmBar('ICP Fit (20%)',f,20)+cmBar('Data Completeness (15%)',c,15)+
+    `<div style="border-top:1px solid rgba(168,85,247,.2);margin:3mm 0"></div>`+
     `<div style="margin-bottom:2mm"><div style="display:flex;justify-content:space-between;margin-bottom:1.5mm"><span style="font-size:10px;font-weight:900;color:white">Overall Fidelity</span><span style="font-family:monospace;font-size:14px;font-weight:900;color:white">${overall}<span style="font-size:8px;font-weight:400;color:#6B7280">/100</span></span></div><div style="background:rgba(168,85,247,.12);border:1px solid rgba(168,85,247,.2);border-radius:6px;height:13px;overflow:hidden"><div style="height:100%;border-radius:6px;background:linear-gradient(90deg,#5b21b6,#7c3aed,#a855f7,#c084fc);width:${overall}%;min-width:3px"></div></div></div>`;
 }
 
@@ -515,7 +517,7 @@ function buildIntentSignalChartConfig(signals) {
     { label: 'Decision-maker outreach', strength: 58 },
     { label: 'Funnel velocity', strength: 65 },
   ];
-  const items = (Array.isArray(signals) && signals.length >= 2) ? signals.slice(0, 4) : defaults;
+  const items = (Array.isArray(signals) && signals.length >= 2) ? signals.slice(0,4) : defaults;
   const labels = items.map(s => typeof s === 'string' ? s : (s.label || String(s)));
   const values = items.map(s => typeof s === 'object' && s.strength ? s.strength : 65);
   return {
@@ -538,19 +540,15 @@ function buildIntentSignalChartConfig(signals) {
           display: true, color: '#ffffff',
           font: { size: 9, weight: '700', family: 'monospace' },
           anchor: 'end', align: 'right', offset: 3,
-          formatter: function (v) { return v + '%'; },
+          formatter: function(v) { return v + '%'; },
         },
       },
       scales: {
-        x: {
-          beginAtZero: true, min: 0, max: 110,
-          ticks: { color: '#6B7280', font: { size: 8 }, callback: v => v <= 100 ? v + '%' : '' },
-          grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false }
-        },
-        y: {
-          ticks: { color: '#E5E7EB', font: { size: 9, weight: '600' }, autoSkip: false, maxRotation: 0 },
-          grid: { display: false }
-        }
+        x: { beginAtZero: true, min: 0, max: 110,
+          ticks: { color: '#6B7280', font: { size: 8 }, callback: v => v<=100?v+'%':'' },
+          grid: { color: 'rgba(255,255,255,0.05)', drawBorder: false } },
+        y: { ticks: { color: '#E5E7EB', font: { size: 9, weight: '600' }, autoSkip: false, maxRotation: 0 },
+          grid: { display: false } }
       },
     }
   };
@@ -558,7 +556,7 @@ function buildIntentSignalChartConfig(signals) {
 
 function buildRiskSeverityChartConfig(verdict, score) {
   const cycle = score >= 75 ? 35 : score >= 50 ? 65 : 85;
-  const lock = score >= 75 ? 40 : score >= 50 ? 60 : 75;
+  const lock  = score >= 75 ? 40 : score >= 50 ? 60 : 75;
   const budget = score >= 75 ? 45 : score >= 50 ? 65 : 80;
   const compete = score >= 75 ? 50 : score >= 50 ? 55 : 70;
   return {
@@ -568,10 +566,10 @@ function buildRiskSeverityChartConfig(verdict, score) {
       datasets: [{
         data: [cycle, lock, budget, compete],
         backgroundColor: [
-          cycle >= 70 ? '#ef4444' : cycle >= 50 ? '#f59e0b' : '#22c55e',
-          lock >= 70 ? '#ef4444' : lock >= 50 ? '#f59e0b' : '#22c55e',
-          budget >= 70 ? '#ef4444' : budget >= 50 ? '#f59e0b' : '#22c55e',
-          compete >= 70 ? '#ef4444' : compete >= 50 ? '#f59e0b' : '#22c55e',
+          cycle>=70?'#ef4444':cycle>=50?'#f59e0b':'#22c55e',
+          lock>=70?'#ef4444':lock>=50?'#f59e0b':'#22c55e',
+          budget>=70?'#ef4444':budget>=50?'#f59e0b':'#22c55e',
+          compete>=70?'#ef4444':compete>=50?'#f59e0b':'#22c55e',
         ],
         borderRadius: 6, borderSkipped: false, barThickness: 14, maxBarThickness: 20,
       }]
@@ -586,31 +584,25 @@ function buildRiskSeverityChartConfig(verdict, score) {
           display: true, color: '#ffffff',
           font: { size: 9, weight: '700', family: 'monospace' },
           anchor: 'end', align: 'right', offset: 3,
-          formatter: function (v) { return v >= 70 ? 'High' : v >= 50 ? 'Med' : 'Low'; },
+          formatter: function(v) { return v >= 70 ? 'High' : v >= 50 ? 'Med' : 'Low'; },
         },
         annotation: {
           annotations: {
             highThreshold: {
               type: 'line', xMin: 70, xMax: 70,
-              borderColor: 'rgba(239,68,68,0.3)', borderWidth: 1, borderDash: [3, 3],
+              borderColor: 'rgba(239,68,68,0.3)', borderWidth: 1, borderDash: [3,3],
             },
           },
         },
       },
       scales: {
         x: { beginAtZero: true, min: 0, max: 110, display: false },
-        y: {
-          ticks: { color: '#E5E7EB', font: { size: 9, weight: '600' }, autoSkip: false, maxRotation: 0 },
-          grid: { display: false }
-        }
+        y: { ticks: { color: '#E5E7EB', font: { size: 9, weight: '600' }, autoSkip: false, maxRotation: 0 },
+          grid: { display: false } }
       },
     }
   };
 }
-
-// ══════════════════════════════════════════════════════════════
-// STRING / RENDER HELPERS
-// ══════════════════════════════════════════════════════════════
 
 function escapeHtml(value) {
   return String(value || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\s+/g, ' ').trim();
@@ -665,8 +657,8 @@ function getPageInsight(pageKey, strategy, isDemoMode) {
   const score = parseInt(s1.gtm_relevance_score) || 0;
   const keywords = safeText(s5.primary_keywords || s5.secondary_keywords);
   const sequence = safeText(s6.follow_up_sequence || s6.linkedin_message);
-  const primary = safeText(s3.primary_icp);
-  switch (pageKey) {
+  const primary  = safeText(s3.primary_icp);
+  switch(pageKey) {
     case 'executive_summary': return {
       title: 'Strategic Interpretation', expanded: true,
       text: score ? `A GTM score of ${score}/100 signals directional attractiveness for this market motion — prioritize, monitor, or pause based on data richness.` : `This summary sets the commercial context. Validate the score with live pipeline and buyer data before taking action.`,
@@ -740,1080 +732,1045 @@ function renderPageInsightBlock(pageKey, strategy, isDemoMode) {
 // Fills blank space without cluttering content-rich pages.
 // ══════════════════════════════════════════════════════════════
 
-const EDU_INSIGHTS = {
-  exec: {
-    term: 'GTM Score — How It\'s Calculated',
-    definition: 'The GTM Relevance Score (0–100) is a composite signal derived from four weighted dimensions: signal veracity (40%), market timing (25%), ICP fit (20%), and data completeness (15%). The score is hard-capped by data richness — AI cannot claim higher confidence than the evidence supports.',
-    points: ['≥ 75 = GO — strong alignment, initiate outbound now', '50–74 = WATCH — monitor for catalyst event before committing', '< 50 = NO-GO — re-evaluate in 90 days or on trigger', 'Score is directional, not a guarantee — validate with pipeline data'],
-    proTip: 'Treat the GTM Score as a prioritisation signal, not a verdict. A score of 72 earns a WATCH, not a GO — the next deal stage requires human validation of the weakest sub-score dimension.',
-  },
-  market: {
-    term: 'SWOT — How to Action Each Quadrant',
-    definition: 'A SWOT is only useful if each quadrant drives a specific GTM motion. Strengths anchor your messaging. Weaknesses pre-empt objections before the prospect raises them. Opportunities frame urgency in outreach. Threats build risk narratives that justify budget.',
-    points: ['Strengths → lead your email subject line with the proof point', 'Weaknesses → address proactively in the demo, not reactively', 'Opportunities → "your competitors are already doing this" framing', 'Threats → quantify the cost of inaction to drive urgency'],
-    proTip: 'Run your SWOT through a messaging filter: for each quadrant, write one sentence you\'d say to the prospect. If you can\'t, the SWOT entry is too abstract to be useful.',
-  },
-  tam: {
-    term: 'TAM · SAM · SOM — The Three Numbers That Matter',
-    definition: 'TAM is the total global opportunity if you had 100% share. SAM is the portion reachable by your current product and geography. SOM is the realistic slice you can close in 12–24 months given your win rate and capacity.',
-    points: ['TAM = market size; SAM = addressable scope; SOM = your pipeline ceiling', 'SOM = TAM × geo eligibility × service-line fit × win rate', 'AI estimates TAM from public market data — cross-reference reports', 'Use SOM to set outbound targets; use TAM to frame investor decks'],
-    proTip: 'CROs and investors care about SOM, not TAM. Always ground your pipeline forecast in SOM × CAGR and be ready to defend every multiplier with company-specific data.',
-  },
-  icp: {
-    term: 'ICP vs Buyer Persona — Key Distinction',
-    definition: 'An ICP (Ideal Customer Profile) defines the type of company most likely to buy, expand, and refer — firmographics, revenue band, tech stack, geography. A Buyer Persona defines the individual within that company who initiates, evaluates, or signs. You need both to run effective outbound.',
-    points: ['ICP = the account filter (company fit)', 'Persona = the contact filter (person within that account)', 'Wrong ICP = wasted SDR cycles on unwinnable accounts', 'Wrong persona = right company, wrong door — longer sales cycle'],
-    proTip: 'Your ICP should disqualify as aggressively as it qualifies. A tight ICP shrinks your universe but dramatically improves reply rates, close rates, and NRR.',
-  },
-  sourcing: {
-    term: 'Account Sourcing — Three-Tier Prioritisation',
-    definition: 'Not all accounts in your SAM deserve equal SDR effort. Tier 1 (Dream 100): manually curated, maximum effort. Tier 2 (Scaled Outbound): ICP-matched but lower intent — sequence-driven. Tier 3 (Programmatic): broad awareness plays, content and paid channels only.',
-    points: ['Tier 1: ≤ 100 accounts — personalised 1:1 outreach', 'Tier 2: 100–500 accounts — personalised sequences, lighter research', 'Tier 3: 500+ accounts — automated, minimal personalisation', 'Enrich every Tier 1 account with a recent trigger event before touching'],
-    proTip: 'Enrich each sourced account with at least two contact-level signals — a job-change alert and a content-engagement event — before your first outreach touch. Cold + no signal = noise.',
-  },
-  keywords: {
-    term: 'Intent Signal Taxonomy — Funnel Mapping',
-    definition: 'A structured map of the language buyers use at each funnel stage. Early funnel: problem-definition language ("how to reduce X"). Mid funnel: category language ("best tools for X"). Late funnel: vendor language (branded terms, pricing pages, G2 reviews).',
-    points: ['Early funnel signals → top-of-funnel content and paid', 'Mid funnel signals → competitive positioning and comparison content', 'Late funnel signals → direct outbound, trials, demo requests', 'Intent signals precede RFPs — act before competitors know they\'re looking'],
-    proTip: 'Mirror late-funnel keywords in your email subject lines. Subject lines that use the buyer\'s own language ("pipeline unpredictability" vs "improve sales") achieve 2–3× higher open rates.',
-  },
-  sdr: {
-    term: 'SDR Sequence — The 3:1 Value-to-Ask Ratio',
-    definition: 'The biggest sequencing mistake is pitching on every touch. High-performing sequences alternate between giving value (insight, data, proof) and asking for a micro-commitment (briefing, feedback, reply). The ratio should be 3:1 in favour of value.',
-    points: ['Touch 1: personalised insight referencing a specific trigger event', 'Touch 2: hard ROI metric — quantify the cost of the problem', 'Touch 3: social proof — a case study or data point from a similar account', 'Touch 4: permission-based break-up — low-friction re-engagement ask'],
-    proTip: 'A permission-based break-up ("should I close your file?") often generates more replies than the first three touches combined. People respond to closure more than to pitches.',
-  },
-  decision: {
-    term: 'Go / Watch / No-Go — What Happens Next',
-    definition: 'The Go/Watch/No-Go verdict is a resource allocation decision, not a rejection. GO accounts get immediate SDR outreach and AE involvement. WATCH accounts enter a 60-day monitoring sequence with trigger-based re-entry. NO-GO accounts get parked with a 90-day nurture.',
-    points: ['GO: assign an AE, start the 3-touch sequence within 48h', 'WATCH: set a CRM trigger for leadership change, funding, or compliance event', 'NO-GO: add to a low-frequency nurture — one touchpoint every 6 weeks', 'Re-score any account when a material trigger event occurs'],
-    proTip: 'Build a 90-day automated nurture for every NO-GO account. Most NO-GOs become GO accounts within 12 months when their situation changes — the cost of re-entry is near zero if you\'ve maintained light contact.',
-  },
-  confidence: {
-    term: 'Confidence Matrix — Reading the Sub-Scores',
-    definition: 'The weighted fidelity matrix breaks the overall confidence score into four independent dimensions. Signal Veracity (40%) measures the density and recency of explicit buying signals. Market Timing (25%) measures macro alignment. ICP Fit (20%) measures firmographic match. Data Completeness (15%) measures source quality.',
-    points: ['Signal Veracity < 50%: insufficient buying signals — monitor longer', 'Market Timing < 50%: macro conditions not aligned — revisit in 60 days', 'ICP Fit < 50%: account may be outside core persona — de-prioritise', 'Data Completeness < 50%: report based on limited data — validate manually'],
-    proTip: 'Focus research effort on the LOWEST sub-score, not the highest. Improving the weakest dimension from 40% to 60% moves the overall score more than improving a strong dimension from 80% to 90%.',
-  },
-};
 
-function buildFillerBlock(key, renderMode) {
-  // Edu-filler only works inside a fixed-height flex page (html2canvas mode).
-  // In browser-pdf mode sections flow naturally — no fixed container to push into.
-  if (renderMode === 'browser-pdf') return '';
-  if (renderMode !== 'html2canvas') return '';
-  const ins = EDU_INSIGHTS[key];
-  if (!ins) return '';
-  const pts = (ins.points || []).map(p =>
-    `<li>${p.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</li>`
-  ).join('');
-  const safe = s => String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  return `<div class="edu-filler">
-    <div class="edu-filler__badge">📖 Glossary &amp; Pro-Tips</div>
-    <div class="edu-filler__term">${safe(ins.term)}</div>
-    <div class="edu-filler__definition">${safe(ins.definition)}</div>
-    ${pts ? `<ul class="edu-filler__points">${pts}</ul>` : ''}
-    ${ins.proTip ? `<div class="edu-filler__protip"><strong>Pro Tip:</strong> ${safe(ins.proTip)}</div>` : ''}
-  </div>`;
-}
-
-// ══════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
 // SECTION REGISTRY
-// Defines the canonical order and metadata for every report section.
-// renderFn is resolved inside buildReportHTML where data is in scope.
-// mode: 'standard' | 'enterprise' | 'both'
-// ══════════════════════════════════════════════════════════════
-const SECTION_REGISTRY = [
-  { id: 'cover',              order:  0, required: true,  mode: 'both',       title: 'Cover' },
-  { id: 'executive_summary',  order:  1, required: true,  mode: 'both',       title: 'Executive Summary' },
-  { id: 'market_research',    order:  2, required: true,  mode: 'both',       title: 'Market Research' },
-  { id: 'tam_mapping',        order:  3, required: true,  mode: 'both',       title: 'TAM Mapping' },
-  { id: 'icp_modeling',       order:  4, required: true,  mode: 'both',       title: 'ICP Modeling' },
-  { id: 'account_sourcing',   order:  5, required: true,  mode: 'both',       title: 'Account Sourcing' },
-  { id: 'keywords_intent',    order:  6, required: true,  mode: 'both',       title: 'Keywords & Intent' },
-  { id: 'sdr_emails',         order:  7, required: true,  mode: 'both',       title: 'SDR Sequence — Emails' },
-  { id: 'sdr_social',         order:  8, required: true,  mode: 'both',       title: 'SDR Sequence — Social & Cadence' },
-  { id: 'decision_engine',    order:  9, required: true,  mode: 'both',       title: 'Revenue Intelligence — Decision Engine' },
-  { id: 'confidence_matrix',  order: 10, required: true,  mode: 'both',       title: 'Revenue Intelligence — Confidence Matrix' },
-  { id: 'appendix_methodology', order: 11, required: true, mode: 'both',      title: 'Appendix — Methodology' },
-  { id: 'appendix_metadata',  order: 12, required: true,  mode: 'both',       title: 'Appendix — Report Metadata' },
+// ──────────────────────────────────────────────────────────────────────────────
+// Declares every section's id, render order, page-break policy, and data guard.
+// The flowing template reads this registry implicitly — each section <section>
+// uses .rpt-sec (break-before:page) for MAJOR sections and .rpt-continuation
+// for sub-sections that follow their parent naturally.
+//
+// required: section is always rendered (guarded only by isDemoMode fallback)
+// optional: section is hidden if dataCheck() returns false
+// breakPolicy:
+//   'page'         → .rpt-sec  → Chromium starts a new page before this section
+//   'flow'         → .rpt-continuation → no forced break; flows after prior content
+// ══════════════════════════════════════════════════════════════════════════════
+export const SECTION_REGISTRY = [
+  { id: 'cover',          order: 0,  required: true,  breakPolicy: 'page', dataCheck: () => true,                           title: 'Cover' },
+  { id: 'exec',           order: 1,  required: true,  breakPolicy: 'page', dataCheck: (s) => true,                          title: 'Executive Summary' },
+  { id: 'market',         order: 2,  required: true,  breakPolicy: 'page', dataCheck: (s) => !!(s.step_1_market),           title: 'Market Research' },
+  { id: 'tam',            order: 3,  required: true,  breakPolicy: 'page', dataCheck: (s) => !!(s.step_2_tam),              title: 'TAM Mapping' },
+  { id: 'icp',            order: 4,  required: true,  breakPolicy: 'page', dataCheck: (s) => !!(s.step_3_icp),              title: 'ICP Modeling' },
+  { id: 'sourcing',       order: 5,  required: true,  breakPolicy: 'page', dataCheck: (s) => !!(s.step_4_sourcing),         title: 'Account Sourcing' },
+  { id: 'keywords',       order: 6,  required: true,  breakPolicy: 'page', dataCheck: (s) => !!(s.step_5_keywords),         title: 'Keywords & Intent' },
+  { id: 'sdr-emails',     order: 7,  required: true,  breakPolicy: 'page', dataCheck: (s) => !!(s.step_6_messaging),        title: 'SDR Sequence — Emails' },
+  { id: 'sdr-cadence',    order: 8,  required: true,  breakPolicy: 'flow', dataCheck: (s) => !!(s.step_6_messaging),        title: 'SDR Sequence — Cadence' },
+  { id: 'decision',       order: 9,  required: true,  breakPolicy: 'page', dataCheck: (s) => !!(s.step_7_intelligence),     title: 'Revenue Intelligence — Decision Engine' },
+  { id: 'confidence',     order: 10, required: true,  breakPolicy: 'flow', dataCheck: (s) => !!(s.step_7_intelligence),     title: 'Revenue Intelligence — Confidence Matrix' },
+  { id: 'appendix',       order: 11, required: true,  breakPolicy: 'page', dataCheck: () => true,                           title: 'Appendix' },
+  // ── Enterprise-only optional modules (Mode 2 — not yet wired into standard report) ──
+  { id: 'toc',            order: 0.5, required: false, breakPolicy: 'page', dataCheck: () => false, title: 'Table of Contents' },
+  { id: 'study-objectives',order: 1.5,required: false, breakPolicy: 'page', dataCheck: () => false, title: 'Study Objectives' },
+  { id: 'market-definition',order:1.6,required: false, breakPolicy: 'page', dataCheck: () => false, title: 'Market Definition' },
+  { id: 'study-scope',    order: 1.7, required: false, breakPolicy: 'page', dataCheck: () => false, title: 'Study Scope' },
+  { id: 'research-methodology',order:1.8,required:false,breakPolicy:'page', dataCheck: () => false, title: 'Research Methodology' },
+  { id: 'data-triangulation', order:1.9,required:false, breakPolicy: 'page', dataCheck: () => false, title: 'Data Triangulation' },
+  { id: 'competitive-landscape',order:10.5,required:false,breakPolicy:'page',dataCheck:()=>false,   title: 'Competitive Landscape' },
+  { id: 'company-profiles',order:10.6,required: false, breakPolicy: 'page', dataCheck: () => false, title: 'Company Profiles' },
 ];
 
-// ══════════════════════════════════════════════════════════════
-// TIER-1 ENTERPRISE A4 REPORT — dark-theme, rendered to PDF
-// ══════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════════════════
+// ENTERPRISE GTM REPORT — v6 Flowing Architecture
+// ──────────────────────────────────────────────────────────────────────────────
+// Architecture principle (per spec):
+//   ✓ No fixed-height .page containers
+//   ✓ Normal flowing HTML — Chromium paginates naturally
+//   ✓ break-before:page only on major section starts (SECTION_REGISTRY breakPolicy:'page')
+//   ✓ break-inside:avoid on atomic units (cards, callouts, charts, table rows)
+//   ✓ No blank continuation pages
+//   ✓ No clipped text
+//   ✓ Page count grows only as content requires
+//   ✓ html2canvas path remains as explicit fallback only
+// ══════════════════════════════════════════════════════════════════════════════
+
 export function buildReportHTML(strategy, charts = {}, isDemoMode = false, renderMode = 'browser-pdf') {
   const s1 = strategy.step_1_market || strategy.steps?.[1] || {};
-  const s2 = strategy.step_2_tam || strategy.steps?.[2] || {};
-  const s3 = strategy.step_3_icp || strategy.steps?.[3] || {};
+  const s2 = strategy.step_2_tam    || strategy.steps?.[2] || {};
+  const s3 = strategy.step_3_icp    || strategy.steps?.[3] || {};
   const s4 = strategy.step_4_sourcing || strategy.steps?.[4] || {};
   const s5 = strategy.step_5_keywords || strategy.steps?.[5] || {};
   const s6 = strategy.step_6_messaging || strategy.steps?.[6] || {};
   const s7 = strategy.step_7_intelligence || {};
-  const coRaw = strategy.company_name || 'Company';
-  const co = normalizeCompanyName(coRaw);
-  const ind = strategy.industry || '';
-  const date = new Date().toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
-  const score = parseInt(s1.gtm_relevance_score) || 0;
-  const confScore = parseInt(s7.confidence_score) || score || 0;
 
-  // ── String helpers ──
-  const e = s => { if (typeof s !== 'string') return String(s || ''); return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>'); };
-  const safe = v => { if (!v && v !== 0) return ''; if (Array.isArray(v)) return v.join(', '); if (typeof v === 'object') return Object.entries(v).map(([k, x]) => `${k}: ${Array.isArray(x) ? x.join(', ') : x}`).join('; '); return String(v); };
-  const arr = v => Array.isArray(v) ? v : (v ? [String(v)] : []);
+  const co   = normalizeCompanyName(strategy.company_name || 'Company');
+  const ind  = strategy.industry || '';
+  const date = new Date().toLocaleDateString('en-GB', { year:'numeric', month:'long', day:'numeric' });
 
-  const numbering = {
-    "executive-summary": { main: "ES", title: "Executive Summary" },
-    "market-research": { main: "1", title: "Market Research" },
-    "tam-mapping": { main: "2", title: "TAM Mapping" },
-    "icp-modeling": { main: "3", title: "ICP Modeling" },
-    "account-sourcing": { main: "4", title: "Account Sourcing" },
-    "keywords-intent": { main: "5", title: "Keywords & Intent" },
-    "sdr-sequence": { main: "6", title: "Enterprise SDR Sequence" },
-    "revenue-intelligence": { main: "7", title: "Revenue Intelligence" },
-    "appendix": { main: "A", title: "Appendix" }
-  };
-  const h3 = (slug, sub, title) => {
-    const main = numbering[slug]?.main || '';
-    return `<h3 class="keep-together">${main}.${sub} · ${title}</h3>`;
-  };
-  const renderDarkTable = (data, note, source) => {
-    const { headers, rows } = data;
-    const tableHtml = `
-      <table class="dark-table" style="width:100%; border-collapse:collapse; margin-top:1.5mm; margin-bottom:1.5mm; font-family:inherit;">
-        <thead>
-          <tr>
-            ${headers.map(h => `<th style="background:#2a2a2a; color:#f0f0f0; font-weight:bold; text-align:center; border:0.5px solid #444; padding:6px; font-size:10px;">${h}</th>`).join('')}
-          </tr>
-        </thead>
-        <tbody>
-          ${rows.map((row, i) => {
-      const bg = i % 2 === 0 ? '#1e1e1e' : '#2a2a2a';
-      return `<tr style="background:${bg};">
-              ${row.map(cell => `<td style="border:0.5px solid #444; padding:6px; font-size:10px; vertical-align:top;">${cell}</td>`).join('')}
-            </tr>`;
-    }).join('')}
-        </tbody>
-      </table>
-      ${note ? `<p class="table-note" style="font-size:8px; font-style:italic; color:#aaa; margin:1mm 0 0.5mm;">Note: ${note}</p>` : ''}
-      ${source ? `<p class="table-source" style="font-size:8px; font-style:italic; color:#aaa; margin:0 0 3mm;">Source: ${source}</p>` : ''}
-    `;
-    return `<div class="keep-together table-wrap">${tableHtml}</div>`;
-  };
-
-  // ── Strategic positioning: robust first sentence extraction ──
-  const getFirstSentence = (text) => {
-    if (!text) return '';
-    // Strip leading dots/spaces/newlines (e.g. ".cloudflare is..." → "cloudflare is...")
-    const clean = String(text).replace(/^[\s.\-–—]+/, '').trim();
-    // Find first sentence boundary after at least 20 chars
-    const idx = clean.search(/\.(?=\s|$)/);
-    if (idx > 15) return clean.slice(0, idx);
-    // Fallback: first line or first 150 chars
-    const line = clean.split(/\n/)[0];
-    return line.length > 20 ? line : clean.slice(0, 150);
-  };
-  // Strategic positioning fallback chain
-  const getStrategicPositioning = () => {
-    const candidates = [
-      s7.strategic_hook,
-      s1.company_overview,
-      s1.market_position,
-      s7.go_no_go?.reason,
-    ];
-    for (const c of candidates) {
-      const text = safe(c);
-      if (text && text.length > 20) return getFirstSentence(text);
-    }
-    return `${co} is a commercially relevant target based on inferred market fit, GTM maturity, and revenue operations alignment. Validate with live data before decisioning.`;
-  };
-  const strategicPositioning = getStrategicPositioning();
-  const rec = s7.go_no_go?.recommendation || (score >= 75 ? 'Go' : score >= 50 ? 'Watch' : 'No-Go');
-  const recUp = rec.toUpperCase();
-  const recColor = /go$/i.test(rec) && !/no/i.test(rec) ? 'var(--green)' : /no/i.test(rec) ? 'var(--red)' : 'var(--amber)';
-  const veracity = Math.round(confScore * 0.4);
-  const timing = Math.round(confScore * 0.25);
-  const icpFit = Math.round(confScore * 0.2);
+  const score     = parseInt(s1.gtm_relevance_score) || 0;
+  const confScore = parseInt(s7.confidence_score || s7.overall_fidelity) || score || 0;
+  const rec       = s7.go_no_go?.recommendation || (score>=75?'Go':score>=50?'Watch':'No-Go');
+  const recUp     = rec.toUpperCase();
+  const recColor  = /go$/i.test(rec)&&!/no/i.test(rec) ? 'var(--green)' : /no/i.test(rec) ? 'var(--red)' : 'var(--amber)';
+  const veracity     = Math.round(confScore * 0.40);
+  const timing       = Math.round(confScore * 0.25);
+  const icpFit       = Math.round(confScore * 0.20);
   const completeness = Math.round(confScore * 0.15);
 
-  const srcNote = (src) => `<div style="font-size:7.5px;color:var(--faint);margin:1.5mm 0;font-style:italic">◆ ${e(src)} — validate manually</div>`;
-  const callout = (text, cls = '') => text ? `<div class="ac ${cls}"><strong><svg width="11" height="11" viewBox="0 0 16 16" fill="none" style="display:inline;vertical-align:middle;margin-right:3px"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><path d="M8 7v4M8 5.5v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg> Analyst Insight:</strong> ${e(text)}</div>` : '';
+  // ── String helpers ────────────────────────────────────────────────────────
+  const e    = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+  const safe = v => { if(!v&&v!==0)return ''; if(Array.isArray(v))return v.join(', '); if(typeof v==='object')return Object.values(v).filter(Boolean).join(', '); return String(v); };
+  const arr  = v => Array.isArray(v)?v:(v?[String(v)]:[]);
+  const truncate = (text, words=80) => { const w=String(text||'').trim().split(/\s+/).filter(Boolean); return w.length<=words?w.join(' '):`${w.slice(0,words).join(' ')}...`; };
 
-  // ── ICP placeholder detection & repair ──
+  // ── Section label footer (appears at logical end of section) ──────────────
+  const sectionFtr = (label) => `<div class="sec-ftr">ABE · ${e(label)}</div>`;
+
+  // ── Page header (printed at start of each flowing section) ────────────────
+  const pageHdr = () => `<div class="ph">
+    <div class="phb">
+      <div class="am">ABE</div>
+      <div><div class="abn">AI Revenue Infrastructure</div><div class="abs">Enterprise GTM Platform</div></div>
+    </div>
+    <div class="cb">Confidential</div>
+  </div>`;
+
+  // ── Source note ────────────────────────────────────────────────────────────
+  const srcNote = (src) => `<div class="src-note">◆ ${e(src)} — validate manually</div>`;
+
+  // ── Callout box ────────────────────────────────────────────────────────────
+  const callout = (text, cls='') => text ? `<div class="ac ${cls}">
+    <strong><svg width="11" height="11" viewBox="0 0 16 16" fill="none" style="display:inline;vertical-align:middle;margin-right:3px"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><path d="M8 7v4M8 5.5v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg> Analyst Insight:</strong> ${e(truncate(text))}
+  </div>` : '';
+
+  // ── Section heading ────────────────────────────────────────────────────────
+  const ICONS = {
+    ES:  `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="2" rx="1" fill="white"/><rect x="2" y="7" width="8" height="2" rx="1" fill="white" opacity=".7"/><rect x="2" y="11" width="10" height="2" rx="1" fill="white" opacity=".5"/></svg>`,
+    '01':`<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5" stroke="white" stroke-width="1.5"/><path d="M8 5v3l2 2" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+    '02':`<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M2 13L6 7l3 3 2-4 3 4" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    '03':`<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="2.5" stroke="white" stroke-width="1.5"/><path d="M3 13c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+    '04':`<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="5" cy="5" r="2" stroke="white" stroke-width="1.5"/><circle cx="11" cy="8" r="2" stroke="white" stroke-width="1.5"/><circle cx="5" cy="11" r="2" stroke="white" stroke-width="1.5"/></svg>`,
+    '05':`<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="4" stroke="white" stroke-width="1.5"/><path d="M10.5 10.5L14 14" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>`,
+    '06':`<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M2 12l3-6 3 3 2-4 3 4" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+    '07':`<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2l1.5 4h4l-3.5 2.5 1.5 4L8 10l-3.5 2.5 1.5-4L2.5 6h4z" stroke="white" stroke-width="1.3" stroke-linejoin="round"/></svg>`,
+    A:   `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2L10 7H15L11 10L13 15L8 12L3 15L5 10L1 7H6Z" stroke="white" stroke-width="1.2" stroke-linejoin="round"/></svg>`,
+  };
+  const secHead = (num, title) => `<h2 class="section-header">
+    <span class="sa" style="background:linear-gradient(135deg,var(--accent2),var(--accent))">${ICONS[num]||num}</span> ${e(title)}
+  </h2>`;
+  const secCtx  = t => t ? `<div class="sc">${e(t)}</div>` : '';
+  const h3      = (_, sub, title) => `<h3>${sub} · ${e(title)}</h3>`;
+
+  // ── Tag pills ──────────────────────────────────────────────────────────────
+  const tags = (items, cls='') => arr(items).slice(0,15).map(t=>`<span class="tg ${cls}">${e(String(t))}</span>`).join('');
+
+  // ── Dark table renderer ────────────────────────────────────────────────────
+  const renderDarkTable = (data, note, source) => {
+    const { headers, rows } = data;
+    const filteredRows = rows.filter(r => r && r.some(c => c && String(c).replace(/<[^>]*>/g,'').trim()));
+    if (!filteredRows.length) return '';
+    return `<div class="table-wrap">
+      <table class="dark-table">
+        <thead><tr>${headers.map(h=>`<th>${h}</th>`).join('')}</tr></thead>
+        <tbody>${filteredRows.map((row,i)=>`<tr class="${i%2===0?'row-even':'row-odd'}">${row.map(cell=>`<td>${cell||'—'}</td>`).join('')}</tr>`).join('')}</tbody>
+      </table>
+      ${note   ? `<div class="table-note">${e(note)}</div>` : ''}
+      ${source ? `<div class="table-src">Source: ${e(source)}</div>` : ''}
+    </div>`;
+  };
+
+  // ── Strategic positioning text ─────────────────────────────────────────────
+  const getFirstSentence = (t) => {
+    const c = String(t||'').replace(/^[\s.\-–—]+/,'').trim();
+    const i = c.search(/\.(?=\s|$)/);
+    return i > 15 ? c.slice(0, i) : (c.split(/\n/)[0] || c.slice(0, 150));
+  };
+  const strategicPos = (() => {
+    for (const c of [s7.strategic_hook, s1.company_overview, s1.market_position, s7.go_no_go?.reason]) {
+      const t = safe(c); if (t && t.length > 20) return getFirstSentence(t);
+    }
+    return `${co} is a commercially relevant target based on inferred market fit and revenue operations alignment. Validate with live data before decisioning.`;
+  })();
+
+  // ── ICP derivation ────────────────────────────────────────────────────────
   const ICP_BAD = /^(persona|secondary|unknown|n\/a|—|-|\s*)$/i;
   const isPhICP = v => !v || ICP_BAD.test(String(v).trim());
   const deriveICP = (raw, role) => {
     if (!isPhICP(raw)) return safe(raw);
     const dms = arr(s3.decision_makers), trig = arr(s3.buying_triggers);
-    if (role === 'primary') {
-      if (dms.length) return `${dms[0]}${ind ? ` in ${ind}` : ''} — derived from decision-maker data`;
-      if (ind) return `Senior technology decision-maker in ${ind} — derived from industry`;
-      if (trig.length) return `Budget holder responsive to ${trig[0]} — derived from triggers`;
-      return 'Senior decision-maker with P&L authority — derived from business model';
+    if (role==='primary') {
+      if (dms.length) return `${dms[0]}${ind?` in ${ind}`:''} — derived from decision-maker data`;
+      if (ind) return `Senior technology decision-maker in ${ind}`;
+      return 'Senior decision-maker with P&L authority';
     }
-    if (dms.length > 1) return `${dms[1]}${ind ? ` in ${ind}` : ''} — derived from decision-maker data`;
-    if (ind) return `Operations/procurement leader in ${ind} — derived from industry`;
-    return 'Line-of-business owner with operational oversight — derived from business model';
+    if (dms.length>1) return `${dms[1]}${ind?` in ${ind}`:''}`;
+    return ind ? `Operations/procurement leader in ${ind}` : 'Line-of-business owner with operational oversight';
   };
-  const primaryICP = deriveICP(s3.primary_icp, 'primary');
+  const primaryICP   = deriveICP(s3.primary_icp, 'primary');
   const secondaryICP = deriveICP(s3.secondary_icp, 'secondary');
-  const icpDerived = isPhICP(s3.primary_icp) || isPhICP(s3.secondary_icp);
+  const icpDerived   = isPhICP(s3.primary_icp) || isPhICP(s3.secondary_icp);
 
-  // ── Account name sanitization ──
-  const FAKE_RE = /^(global bank|euro\s?manu|healthfirst|acme|sample|test|example|foo|bar|demo|dummy|placeholder|mega\s?corp)/i;
-  const ANALOGS = ['Top-5 UK retail bank', 'Large EU automotive OEM', 'Tier-1 APAC telco', 'Regional food delivery aggregator', 'Enterprise SaaS vendor (NA)', 'Mid-market insurance carrier (EU)', 'Large Indian quick-commerce platform', 'Fortune-500 industrial conglomerate'];
-  const cleanAcct = (name, i) => { if (!name || name === '—') return ANALOGS[i % ANALOGS.length]; const n = String(name).trim(); return FAKE_RE.test(n) ? ANALOGS[i % ANALOGS.length] : n; };
+  // ── Account name sanitisation ─────────────────────────────────────────────
+  const FAKE_RE   = /^(global bank|euro\s?manu|healthfirst|acme|sample|test|example|foo|bar|demo|dummy|placeholder)/i;
+  const ANALOGS   = ['Top-5 UK retail bank','Large EU automotive OEM','Tier-1 APAC telco','Enterprise SaaS vendor (NA)','Mid-market insurance carrier (EU)','Fortune-500 industrial conglomerate'];
+  const cleanAcct = (name, i) => { const n = String(name||'').trim(); return (!n||n==='—'||FAKE_RE.test(n)) ? ANALOGS[i%ANALOGS.length] : n; };
 
-  // ── Helper builders ──
-  const pageHdr = () => `<div class="ph"><div class="phb"><div class="am">ABE</div><div><div class="abn">AI Revenue Infrastructure</div><div class="abs">Enterprise GTM Platform</div></div></div><div class="cb">Confidential</div></div>`;
-  const pageFtr = (label, num) => `<div class="pf"><span>ABE · ${e(label)}</span><span>${num}</span></div>`;
-
-  // SVG icons for each section (inline, no external deps)
-  const ICONS = {
-    ES: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="2" y="3" width="12" height="2" rx="1" fill="white"/><rect x="2" y="7" width="8" height="2" rx="1" fill="white" opacity=".7"/><rect x="2" y="11" width="10" height="2" rx="1" fill="white" opacity=".5"/></svg>`,
-    '01': `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="5" stroke="white" stroke-width="1.5"/><path d="M8 5v3l2 2" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>`,
-    '02': `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M2 13L6 7l3 3 2-4 3 4" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
-    '03': `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="5" r="2.5" stroke="white" stroke-width="1.5"/><path d="M3 13c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>`,
-    '04': `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="5" cy="5" r="2" stroke="white" stroke-width="1.5"/><circle cx="11" cy="8" r="2" stroke="white" stroke-width="1.5"/><circle cx="5" cy="11" r="2" stroke="white" stroke-width="1.5"/><path d="M7 5h2M7 11h2M6 7l3-1" stroke="white" stroke-width="1" opacity=".6"/></svg>`,
-    '05': `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><circle cx="7" cy="7" r="4" stroke="white" stroke-width="1.5"/><path d="M10.5 10.5L14 14" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>`,
-    '06': `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 12V6l5-3 5 3v6" stroke="white" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><rect x="6" y="8" width="4" height="4" rx=".5" stroke="white" stroke-width="1.2"/></svg>`,
-    '07': `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2l1.5 4h4l-3.5 2.5 1.5 4L8 10l-3.5 2.5 1.5-4L2.5 6h4z" stroke="white" stroke-width="1.3" stroke-linejoin="round"/></svg>`,
-    A: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2L10 7H15L11 10L13 15L8 12L3 15L5 10L1 7H6Z" stroke="white" stroke-width="1.2" stroke-linejoin="round"/></svg>`,
+  // ── SWOT grid ─────────────────────────────────────────────────────────────
+  const swotCell = (label, items, color) => {
+    const a = arr(items); if (!a.length) return '';
+    return `<div class="sc2" style="border-top:3px solid ${color}">
+      <div class="sl" style="color:${color}">${label}</div>
+      <ul>${a.slice(0,4).map(i=>`<li>${e(String(i))}</li>`).join('')}</ul>
+    </div>`;
   };
-  const secHead = (num, title) => {
-    const icon = ICONS[num] || '';
-    return `<h2 class="section-header"><span class="sa" style="background:linear-gradient(135deg,var(--accent2),var(--accent))">${icon || num}</span> ${e(title)}</h2>`;
+  const swotGrid = () => {
+    const sw = s1.swot; if (!sw||typeof sw!=='object') return '';
+    const h = swotCell('STRENGTHS',sw.strengths,'var(--green)')+swotCell('WEAKNESSES',sw.weaknesses,'var(--red)')+swotCell('OPPORTUNITIES',sw.opportunities,'var(--blue)')+swotCell('THREATS',sw.threats,'var(--amber)');
+    return h ? `<div class="sg">${h}</div>` : '';
   };
-  const secCtx = text => text ? `<div class="sc">${e(text)}</div>` : '';
-  const tags = (items, cls = '') => arr(items).slice(0, 15).map(t => `<span class="tg ${cls}">${e(String(t))}</span>`).join('');
-  const fieldRow = (label, val) => { const v = safe(val); return v ? `<tr><th>${e(label)}</th><td>${e(v)}</td></tr>` : ''; };
 
-  // ── SWOT ──
-  const swotCell = (label, items, color) => { const a = arr(items); return a.length ? `<div class="sc2" style="border-top:3px solid ${color}"><div class="sl" style="color:${color}">${label}</div><ul>${a.slice(0, 4).map(i => `<li>${e(String(i))}</li>`).join('')}</ul></div>` : ''; };
-  const swotGrid = () => { const sw = s1.swot; if (!sw || typeof sw !== 'object') return ''; const h = swotCell('STRENGTHS', sw.strengths, 'var(--green)') + swotCell('WEAKNESSES', sw.weaknesses, 'var(--red)') + swotCell('OPPORTUNITIES', sw.opportunities, 'var(--blue)') + swotCell('THREATS', sw.threats, 'var(--amber)'); return h ? `<div class="sg swot-grid">${h}</div>` : ''; };
-
-  // ── TAM Waterfall with math ──
-  const wfBar = (label, value, w, cls) => value ? `<div class="wb"><div class="wv">${e(safe(value))}</div><div class="wftrack"><div class="wf ${cls}" style="width:${w}"></div></div><span style="margin-left:2mm;font-size:9px;color:var(--muted)">${label}</span></div>` : '';
+  // ── TAM waterfall bars ────────────────────────────────────────────────────
+  const wfBar = (label, value, w, cls) => value ? `<div class="wb">
+    <div class="wv">${e(safe(value))}</div>
+    <div class="wftrack"><div class="wf ${cls}" style="width:${w}"></div></div>
+    <span class="wflabel">${label}</span>
+  </div>` : '';
   const waterfall = () => {
-    const wf = s2.waterfall || {}; const tam = safe(s2.tam_size_estimate); if (!tam && !wf.tam_value) return '';
-    const tamV = wf.tam_value || tam, samV = wf.sam_value || safe(s2.sam_estimate) || '—', somV = wf.som_value || '5–10% of TAM';
-    const tamSrc = samV && samV !== '—' ? 'Market estimate' : 'AI estimate ⚠️';
-    // Dynamic factors — pull from strategy data when available, else default
-    const geoRaw = wf.geography_eligibility || s2.geography_eligibility;
-    const slRaw = wf.service_line_fit || s2.service_line_fit;
-    const wrRaw = wf.win_rate || wf.capture_rate || s2.win_rate;
-    const geoVal = geoRaw ? safe(geoRaw) : '60–70%';
-    const slVal = slRaw ? safe(slRaw) : '30–40%';
-    const wrVal = wrRaw ? safe(wrRaw) : '8–12%';
-    const geoSrc = geoRaw ? 'Company data' : 'AI estimate ⚠️ (default)';
-    const slSrc = slRaw ? 'Company data' : 'AI estimate ⚠️ (default)';
-    const wrSrc = wrRaw ? 'Company data' : 'AI estimate ⚠️ (default)';
-    return `<div class="ww keep-together">${wfBar('TAM (Total Addressable)', tamV, '80%', 'wfb')}${wfBar('SAM (Serviceable Addressable)', samV, '50%', 'wfa')}${wfBar('SOM (Serviceable Obtainable)', somV, '20%', 'wfm')}</div>
-    ${h3('tam-mapping', '2b', 'TAM Derivation Formula')}
-    ${renderDarkTable({
-      headers: ['Step', 'Factor', 'Value', 'Source'],
-      rows: [
-        ['Global TAM', 'Total market size', `<span class="num">${e(tamV)}</span>`, tamSrc],
-        ['× Geography eligibility', 'Addressable regions', `<span class="num">${e(geoVal)}</span>`, geoSrc],
-        ['× Service-line fit', 'Relevant segments', `<span class="num">${e(slVal)}</span>`, slSrc],
-        ['× Capture / win rate', 'Realistic close rate', `<span class="num">${e(wrVal)}</span>`, wrSrc],
-        ['<strong>= Obtainable opportunity</strong>', '', `<span class="num ha">${e(somV)}</span>`, 'Derived']
-      ]
-    }, 'Factors marked "AI estimate" use conservative defaults. When company-specific data is available, it is used automatically.', 'ABE GTMS Engine v1.0')}`;
+    const wf = s2.waterfall||{};
+    const tam = safe(s2.tam_size_estimate); if (!tam && !wf.tam_value) return '';
+    const tamV = wf.tam_value||tam, samV = wf.sam_value||safe(s2.sam_estimate)||'—', somV = wf.som_value||'5–10% of TAM';
+    return `<div class="ww">${wfBar('TAM (Total Addressable)',tamV,'80%','wfb')}${wfBar('SAM (Serviceable Addressable)',samV,'50%','wfa')}${wfBar('SOM (Serviceable Obtainable)',somV,'20%','wfm')}</div>`;
   };
 
-  // ── Pain-Solution Map ──
-  const painMap = () => { const m = s3.pain_solution_map; if (!Array.isArray(m) || !m.length) return ''; return `${h3('icp-modeling', '3', 'Pain → Impact → Intervention')}${renderDarkTable({ headers: ['Operational Friction', 'Business Impact', 'Intervention'], rows: m.slice(0, 5).map(p => [e(safe(p.operational_friction || '—')), `<span style="color:var(--amber)">${e(safe(p.business_impact || '—'))}</span>`, `<span style="color:var(--green)">${e(safe(p.recommended_intervention || '—'))}</span>`]) }, '', 'ABE GTMS Engine v1.0')}`; };
+  // ── Segments table ────────────────────────────────────────────────────────
+  const segTable = () => {
+    const sg = s2.market_segments; if (!Array.isArray(sg)||!sg.length) return '';
+    return `${h3('','2.3','Market Segments')}${renderDarkTable({
+      headers: ['Segment','Est. Size','Priority','Growth'],
+      rows: sg.slice(0,6).map(s=>[e(safe(s.name||s.segment_name||'—')),`<span class="num">${e(safe(s.size||s.market_size||'—'))}</span>`,e(safe(s.priority||'—')),`<span class="num">${e(safe(s.growth_rate||'—'))}</span>`])
+    },'','AI market estimate — validate with industry reports')}`;
+  };
 
-  // ── Account Targets (sanitized) ──
-  const acctTable = () => { const t = s4.account_targets; if (!Array.isArray(t) || !t.length) return ''; return `${h3('account-sourcing', '5', 'High-Fit Account Analogs')}${renderDarkTable({ headers: ['Account Profile', 'Fit', 'Trigger'], rows: t.slice(0, 5).map((a, i) => [`${e(cleanAcct(a.account_name, i))}`, `<span class="num" style="color:${(a.fit_score || 0) >= 80 ? 'var(--green)' : 'var(--amber)'}">${a.fit_score || '—'}</span>`, e(safe(a.actionable_trigger || '—'))]) }, '', 'Account names are anonymized analogs representing target archetypes — AI-generated profile matching')}`; };
+  // ── Pain-solution map ─────────────────────────────────────────────────────
+  const painMap = () => {
+    const m = s3.pain_solution_map; if (!Array.isArray(m)||!m.length) return '';
+    return `${h3('','3.3','Pain → Impact → Intervention')}${renderDarkTable({
+      headers: ['Operational Friction','Business Impact','Intervention'],
+      rows: m.slice(0,5).map(p=>[e(safe(p.operational_friction||'—')),`<span style="color:var(--amber)">${e(safe(p.business_impact||'—'))}</span>`,`<span style="color:var(--green)">${e(safe(p.recommended_intervention||'—'))}</span>`])
+    },'','ABE GTMS Engine v1.0')}`;
+  };
 
-  // ── Keyword Taxonomy ──
-  const kwTaxonomy = () => { const kt = s5.keyword_taxonomy; if (!kt || typeof kt !== 'object') return ''; const ef = arr(kt.early_funnel), lf = arr(kt.late_funnel); if (!ef.length && !lf.length) return ''; return `${h3('keywords-intent', '2', 'Funnel Taxonomy')}<div class="keep-together" style="display:grid;grid-template-columns:1fr 1fr;gap:3mm"><div><div class="bl">Early Funnel (Problem-Aware)</div>${tags(ef, 'blue')}</div><div><div class="bl">Late Funnel (Solution-Aware)</div>${tags(lf, 'green')}</div></div>`; };
+  // ── ICP persona repair ────────────────────────────────────────────────────
+  const icpRepair = () => {
+    const pm = s3.persona_map; if (!pm||typeof pm!=='object') return '';
+    const rows = [
+      pm.primary_role   ? ['Primary Contact',   e(safe(pm.primary_role.title||'—')),   e(safe(pm.primary_role.key_responsibility||'—'))]   : null,
+      pm.economic_buyer ? ['Economic Buyer',     e(safe(pm.economic_buyer.title||'—')), e(safe(pm.economic_buyer.key_responsibility||'—'))] : null,
+      pm.champion       ? ['Internal Champion',  e(safe(pm.champion.title||'—')),       e(safe(pm.champion.key_responsibility||'—'))]       : null,
+    ].filter(Boolean);
+    if (!rows.length) return '';
+    return `${h3('','3.4','ICP Persona Map')}${renderDarkTable({headers:['Role','Title','Key Responsibility'],rows},'','ABE GTMS Engine v1.0')}`;
+  };
 
-  // ── Segments Table ──
-  const segTable = () => { const sg = s2.market_segments; if (!Array.isArray(sg) || !sg.length) return ''; return `${h3('tam-mapping', '3', 'Market Segments')}${renderDarkTable({ headers: ['Segment', 'Est. Size', 'Priority', 'Growth'], rows: sg.slice(0, 6).map(s => [e(safe(s.name || s.segment_name || '—')), `<span class="num">${e(safe(s.size || s.market_size || '—'))}</span>`, e(safe(s.priority || '—')), `<span class="num">${e(safe(s.growth_rate || '—'))}</span>`]) }, '', 'AI market estimate — validate with industry reports')}`; };
+  // ── Account targets table ─────────────────────────────────────────────────
+  const acctTable = () => {
+    const t = s4.account_targets; if (!Array.isArray(t)||!t.length) return '';
+    return `${h3('','4.4','High-Fit Account Analogs')}${renderDarkTable({
+      headers: ['Account Profile','Fit','Trigger'],
+      rows: t.slice(0,5).map((a,i)=>[e(cleanAcct(a.account_name,i)),`<span class="num" style="color:${(a.fit_score||0)>=80?'var(--green)':'var(--amber)'}">${a.fit_score||'—'}</span>`,e(safe(a.actionable_trigger||'—'))])
+    },'Account names are anonymized analogs — AI-generated profile matching','')}`;
+  };
+  // ── Keyword taxonomy ──────────────────────────────────────────────────────
+  const kwTaxonomy = () => {
+    const kt = s5.keyword_taxonomy; if (!kt||typeof kt!=='object') return '';
+    const ef = arr(kt.early_funnel), lf = arr(kt.late_funnel);
+    if (!ef.length && !lf.length) return '';
+    return `${h3('','5.2','Funnel Taxonomy')}<div class="grid2-even no-break">
+      <div><div class="bl">Early Funnel (Problem-Aware)</div>${tags(ef,'blue')}</div>
+      <div><div class="bl">Late Funnel (Solution-Aware)</div>${tags(lf,'green')}</div>
+    </div>`;
+  };
 
-  // ── Emails — SDR Timeline ──
+  // ── Email block ────────────────────────────────────────────────────────────
   const emailBlock = (k, i) => {
     const em = s6[k]; if (!em) return '';
-    const icons = ['✉', '✉', '✉', '🔗', '📞'];
-    const labels = ['Email 1', 'Email 2', 'Email 3', 'LinkedIn', 'Follow-up'];
-    return `<div class="sdr-step keep-together">
-      <div class="sdr-num">${icons[i] || i + 1}</div>
+    const icons  = ['✉','✉','✉','🔗','📞'];
+    const labels = ['Email 1 — ','Email 2 — ','Email 3 — ','LinkedIn — ','Follow-up — '];
+    return `<div class="sdr-step">
+      <div class="sdr-num">${icons[i]||i+1}</div>
       <div class="sdr-body">
-        <div class="sdr-angle">${labels[i] || 'Step ' + (i + 1)} — ${e(em.angle || '')}</div>
-        <div class="sdr-subject">${e(em.subject || '—')}</div>
-        <div class="sdr-preview">${e(em.body || '—')}</div>
-        <span class="tg green" style="margin-top:2mm;display:inline-block">CTA: ${e(em.cta || '—')}</span>
+        <div class="sdr-angle">${labels[i]||'Step '+(i+1)}${e(em.angle||'')}</div>
+        <div class="sdr-subject">${e(em.subject||'—')}</div>
+        <div class="sdr-preview">${e(em.body||'—')}</div>
+        <span class="tg green" style="margin-top:2mm;display:inline-block">CTA: ${e(em.cta||'—')}</span>
       </div>
     </div>`;
   };
 
-  // ── ICP Repair Logic ──
-  const icpRepair = () => {
-    const pm = s3.persona_map; if (!pm || typeof pm !== 'object') return '';
-    const rows = [pm.primary_role ? ['Primary Contact', e(safe(pm.primary_role.title || '—')), e(safe(pm.primary_role.key_responsibility || '—'))] : null, pm.economic_buyer ? ['Economic Buyer', e(safe(pm.economic_buyer.title || '—')), e(safe(pm.economic_buyer.key_responsibility || '—'))] : null, pm.champion ? ['Internal Champion', e(safe(pm.champion.title || '—')), e(safe(pm.champion.key_responsibility || '—'))] : null].filter(Boolean);
-    if (!rows.length) return '';
-    return `${h3('icp-modeling', '4', 'ICP Persona Map (Repair Logic)')}${renderDarkTable({ headers: ['Role', 'Title', 'Key Responsibility'], rows }, '', 'ABE GTMS Engine v1.0')}`;
+  // ── Page insight block (keep as inline callout, not expanded) ─────────────
+  const pageInsightSimple = (title, text) => {
+    if (!text) return '';
+    const clean = truncate(text, 60);
+    const final = isDemoMode && !/demo mode/i.test(clean) ? `${clean} In demo mode, validate with live data.` : clean;
+    return `<div class="page-insight"><div class="pi-title">${e(title)}</div><p class="pi-text">${e(final)}</p></div>`;
+  };
+  const pageInsightExpanded = (title, what, action) => {
+    if (!title || !what || !action) return '';
+    return `<div class="page-insight pi-expanded">
+      <div class="pi-title">${e(title)}</div>
+      <div class="pi-grid">
+        <div><div class="mini-label">What This Means</div><p>${e(truncate(what,55))}</p></div>
+        <div><div class="mini-label">Recommended Action</div><p>${e(truncate(action,55))}</p></div>
+      </div>
+      ${isDemoMode ? '<div class="pi-demo">In demo mode, validate with live data.</div>' : ''}
+    </div>`;
   };
 
-  // ── Decision Engine (Step 7) ──
-  const decisionEngine = () => {
+  // ── Decision engine content ────────────────────────────────────────────────
+  const decisionContent = () => {
     if (!score && !confScore) return '';
-    const hasS7 = s7 && Object.keys(s7).length > 1;
-    const triggers = arr(s3.buying_triggers);
-    const dms = arr(s3.decision_makers);
-    const whyNow = hasS7 && s7.why_now_analysis ? s7.why_now_analysis : `Market conditions and active ${(triggers[0] || 'operational pressure').toLowerCase()} dynamics create a time-sensitive engagement window.`;
-    const hook = hasS7 && s7.strategic_hook ? s7.strategic_hook : (triggers.length >= 2 ? `${triggers[0]} paired with ${triggers[1]}` : `Lead with: ${triggers[0] || 'Operational pressure'}`);
-    const reason = s7.go_no_go?.reason || (score >= 75 ? `GTM score of ${score} indicates strong alignment. Initiate outbound immediately.` : score >= 50 ? `GTM score of ${score} reflects moderate alignment. Monitor triggers before committing.` : `GTM score of ${score} indicates limited fit. Re-evaluate in 90 days.`);
+    const hasS7      = s7 && Object.keys(s7).length > 1;
+    const dms        = arr(s3.decision_makers);
+    const triggers   = arr(s3.buying_triggers);
+    const whyNow     = hasS7 && s7.why_now_analysis ? s7.why_now_analysis : `Market conditions and ${(triggers[0]||'operational pressure').toLowerCase()} dynamics create a time-sensitive engagement window.`;
+    const hook       = hasS7 && s7.strategic_hook   ? s7.strategic_hook   : (triggers.length>=2 ? `${triggers[0]} paired with ${triggers[1]}` : `Lead with: ${triggers[0]||'Operational pressure'}`);
+    const reason     = s7.go_no_go?.reason || (score>=75?`GTM score of ${score} indicates strong alignment. Initiate outbound immediately.`:score>=50?`GTM score of ${score} reflects moderate alignment. Monitor triggers before committing.`:`GTM score of ${score} indicates limited fit. Re-evaluate in 90 days.`);
     return `
-  ${secHead('07', 'Revenue Intelligence — Decision Engine')}
-  ${secCtx('Final strategic audit. Validates execution viability and dictates immediate next steps.')}
-  ${h3('revenue-intelligence', '1', 'Go / No-Go Validation')}
-  <div class="card keep-together" style="border-left:4px solid ${recColor}">
-    <div style="display:flex;align-items:center;gap:5mm">
-      <svg width="52" height="52" viewBox="0 0 52 52" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0">
-        <circle cx="26" cy="26" r="24" fill="rgba(168,85,247,.06)" stroke="${recColor}" stroke-width="1.5"/>
-        ${/no/i.test(rec) ? `<path d="M18 18L34 34M34 18L18 34" stroke="${recColor}" stroke-width="3" stroke-linecap="round"/>` : /go$/i.test(rec) && !/no/i.test(rec) ? `<path d="M15 27L22 34L37 18" stroke="${recColor}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>` : `<path d="M26 18v10M26 32v2" stroke="${recColor}" stroke-width="3" stroke-linecap="round"/>`}
-      </svg>
-      <div>
-        <div style="font-family:'Space Mono',monospace;font-size:26px;font-weight:900;color:${recColor};line-height:1">${e(recUp)}</div>
-        <div style="font-size:10px;color:var(--muted);margin-top:1.5mm"><strong style="color:var(--text)">Verdict Rationale:</strong> ${e(reason)}</div>
+    ${h3('','7.1','Go / No-Go Validation')}
+    <div class="card no-break" style="border-left:4px solid ${recColor}">
+      <div style="display:flex;align-items:center;gap:5mm">
+        <svg width="52" height="52" viewBox="0 0 52 52" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0">
+          <circle cx="26" cy="26" r="24" fill="rgba(168,85,247,.06)" stroke="${recColor}" stroke-width="1.5"/>
+          ${/no/i.test(rec)?`<path d="M18 18L34 34M34 18L18 34" stroke="${recColor}" stroke-width="3" stroke-linecap="round"/>`:/go$/i.test(rec)&&!/no/i.test(rec)?`<path d="M15 27L22 34L37 18" stroke="${recColor}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>`:`<path d="M26 18v10M26 32v2" stroke="${recColor}" stroke-width="3" stroke-linecap="round"/>`}
+        </svg>
+        <div>
+          <div style="font-family:'Space Mono',monospace;font-size:26px;font-weight:900;color:${recColor};line-height:1">${e(recUp)}</div>
+          <div style="font-size:10px;color:var(--muted);margin-top:1.5mm"><strong style="color:var(--text)">Verdict Rationale:</strong> ${e(reason)}</div>
+        </div>
       </div>
     </div>
-  </div>
-  ${srcNote(hasS7 ? 'Source: Step 7 AI intelligence layer — algorithmic composite' : 'Source: derived from GTM relevance score (' + score + '/100) — algorithmic')}
-  ${h3('revenue-intelligence', '2', 'Why Now')}
-  <div class="card keep-together"><p style="font-size:12px">${e(whyNow)}</p></div>
-  ${srcNote(hasS7 && s7.why_now_analysis ? 'Source: Step 7 AI analysis of market signals' : 'Source: AI inference from buying triggers and market context — validate timing independently')}
-  ${h3('revenue-intelligence', '3', 'Strategic Hook')}
-  <div class="ac keep-together"><strong>"${e(hook)}"</strong></div>
-  ${srcNote(hasS7 && s7.strategic_hook ? 'Source: Step 7 AI strategic analysis' : 'Source: derived from buying triggers — AI estimate')}
-  ${h3('revenue-intelligence', '4', 'Risk &amp; Constraint Analysis')}
-  <div class="card keep-together" style="border-left:4px solid var(--red);background:rgba(239,68,68,.03)">
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3mm">
-      <div>
-        <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--red);margin-bottom:1.5mm">
-          <svg width="9" height="9" viewBox="0 0 12 12" fill="none" style="display:inline;vertical-align:middle;margin-right:2px"><circle cx="6" cy="6" r="5" stroke="currentColor" stroke-width="1.2"/><path d="M6 4v3M6 8v.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg> Decision Cycle</div>
-        <div style="font-size:9.5px;color:var(--text)">${dms.length ? `Buying committee: ${dms.slice(0, 2).join(', ')}. Extends cycle 30–60 days.` : 'Multi-stakeholder approval cycle expected.'}</div>
-      </div>
-      <div>
-        <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--amber);margin-bottom:1.5mm">
-          <svg width="9" height="9" viewBox="0 0 12 12" fill="none" style="display:inline;vertical-align:middle;margin-right:2px"><rect x="1" y="4" width="10" height="7" rx="1" stroke="currentColor" stroke-width="1.2"/><path d="M4 4V3a2 2 0 014 0v1" stroke="currentColor" stroke-width="1.2"/></svg> Vendor Lock-in</div>
-        <div style="font-size:9.5px;color:var(--text)">Incumbent relationships reduce switching probability. Lead with differentiated outcomes.</div>
-      </div>
-      <div>
-        <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--amber);margin-bottom:1.5mm">
-          <svg width="9" height="9" viewBox="0 0 12 12" fill="none" style="display:inline;vertical-align:middle;margin-right:2px"><path d="M6 2v2M6 8v2M2 6h2M8 6h2" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><circle cx="6" cy="6" r="2" stroke="currentColor" stroke-width="1.2"/></svg> Budget Friction</div>
-        <div style="font-size:9.5px;color:var(--text)">CFO-level ROI framing required. Surface quantifiable efficiency recovery.</div>
+    ${srcNote(hasS7?'Source: Step 7 AI intelligence layer — algorithmic composite':'Source: derived from GTM relevance score — algorithmic')}
+    ${h3('','7.2','Why Now')}
+    <div class="card no-break"><p style="font-size:12px">${e(whyNow)}</p></div>
+    ${h3('','7.3','Strategic Hook')}
+    <div class="ac no-break"><strong>"${e(hook)}"</strong></div>
+    ${h3('','7.4','Risk & Constraint Analysis')}
+    <div class="card no-break risk-card" style="border-left:4px solid var(--red)">
+      <div class="grid3">
+        <div>
+          <div class="risk-label" style="color:var(--red)">⊙ Decision Cycle</div>
+          <div class="risk-text">${dms.length?`Buying committee: ${e(dms.slice(0,2).join(', '))}. Extends cycle 30–60 days.`:'Multi-stakeholder approval cycle expected.'}</div>
+        </div>
+        <div>
+          <div class="risk-label" style="color:var(--amber)">⊙ Vendor Lock-in</div>
+          <div class="risk-text">Incumbent relationships reduce switching probability. Lead with differentiated outcomes.</div>
+        </div>
+        <div>
+          <div class="risk-label" style="color:var(--amber)">⊙ Budget Friction</div>
+          <div class="risk-text">CFO-level ROI framing required. Surface quantifiable efficiency recovery.</div>
+        </div>
       </div>
     </div>
-  </div>
-  ${srcNote('30–60 day cycle estimate is an industry benchmark (AI estimate) — validate with CRM data')}
-  ${charts.risk
-        ? `<div class="keep-together chart-block" style="margin:2mm 0 4mm"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:2mm">RISK SEVERITY ASSESSMENT</div>${renderChartOrFallback('Risk Severity', charts.risk, '', { width: 480, height: 180 })}<p class="figure-caption" style="font-size:10px; font-weight:bold; color:#f5f5f5; margin:1mm 0 0.5mm;">Figure 4: Risk Severity Assessment</p><p class="figure-source" style="font-size:8px; font-style:italic; color:#aaa; margin:0;">Source: ABE GTMS Engine v1.0</p></div>`
-        : ''
-      }
-  ${h3('revenue-intelligence', '5', 'Execution Priority')}
-  <div class="card keep-together">
-    <div style="display:flex;gap:5mm">
-      <div style="flex:1;border-right:1px solid var(--border);padding-right:4mm">
-        <div style="font-size:7.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:1.5mm">Target</div>
-        <div style="font-size:11px;font-weight:700;color:white">${e(dms[0] || safe(s3.primary_icp) || 'Senior decision-makers')}</div>
-      </div>
-      <div style="flex:1;border-right:1px solid var(--border);padding-right:4mm">
-        <div style="font-size:7.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:1.5mm">Lead With</div>
-        <div style="font-size:11px;font-weight:700;color:var(--amber)">${e(triggers[0] || 'Operational pressure')}</div>
-      </div>
-      <div style="flex:1">
-        <div style="font-size:7.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:1.5mm">Close With</div>
-        <div style="font-size:11px;font-weight:700;color:var(--green)">${safe(s2.growth_rate) ? `${safe(s2.growth_rate)} market — quantify cost of delay` : 'Quantified ROI recovery'}</div>
+    ${srcNote('30–60 day cycle estimate is an industry benchmark — validate with CRM data')}
+    ${charts.risk ? `<div class="chart-block">
+      <div class="bl" style="margin-bottom:2mm">RISK SEVERITY ASSESSMENT</div>
+      ${renderChartOrFallback('Risk Severity',charts.risk,'',{width:480,height:180})}
+      <div class="fig-caption">Figure 4: Risk Severity Assessment</div>
+      <div class="fig-src">Source: ABE GTMS Engine v1.0</div>
+    </div>` : ''}
+    ${h3('','7.5','Execution Priority')}
+    <div class="card no-break">
+      <div class="grid3-even">
+        <div style="border-right:1px solid var(--border);padding-right:4mm">
+          <div class="mini-label">Target</div>
+          <div style="font-size:11px;font-weight:700;color:white">${e(dms[0]||safe(s3.primary_icp)||'Senior decision-makers')}</div>
+        </div>
+        <div style="border-right:1px solid var(--border);padding-right:4mm;padding-left:4mm">
+          <div class="mini-label">Lead With</div>
+          <div style="font-size:11px;font-weight:700;color:var(--amber)">${e(triggers[0]||'Operational pressure')}</div>
+        </div>
+        <div style="padding-left:4mm">
+          <div class="mini-label">Close With</div>
+          <div style="font-size:11px;font-weight:700;color:var(--green)">${safe(s2.growth_rate)?`${e(safe(s2.growth_rate))} market — quantify cost of delay`:'Quantified ROI recovery'}</div>
+        </div>
       </div>
     </div>
-  </div>
-  ${safe(s2.growth_rate) ? srcNote('CAGR (' + safe(s2.growth_rate) + ') is an AI market estimate — cross-reference with analyst reports') : ''}`;
-
+    ${safe(s2.growth_rate)?srcNote('CAGR is an AI market estimate — cross-reference with analyst reports'):''}`;
   };
 
-  // ── Weighted Confidence Matrix ──
-  const confidenceMatrix = () => {
+  // ── Confidence matrix (inline fallback or QuickChart image) ───────────────
+  const confidenceContent = () => {
     if (!confScore) return '';
-    const cmBar = (label, sc, max, cls = '') => `<div class="cmrow ${cls}">
+    const cmBar = (label, sc, max, overall=false) => `<div class="cmrow${overall?' cmrow-overall':''}">
       <div class="cmhdr"><span class="cmlbl">${label}</span><span class="cmscore">${sc}<span style="font-size:8px;font-weight:400;color:var(--muted)">/${max}</span></span></div>
-      <div class="cmtrack"><div class="cmfill" style="width:${Math.round((sc / max) * 100)}%"></div></div>
+      <div class="cmtrack"><div class="cmfill" style="width:${Math.round((sc/max)*100)}%"></div></div>
     </div>`;
-    // SVG donut: r=28, circumference=176
-    const circ = 176;
-    const filled = Math.round((confScore / 100) * circ);
-    const gaugeColor = confScore >= 75 ? 'var(--green)' : confScore >= 50 ? 'var(--amber)' : 'var(--red)';
-    return `
-  ${h3('revenue-intelligence', '6', 'Weighted Confidence Matrix')}
-  <div class="keep-together" style="display:flex;gap:6mm;align-items:flex-start">
-    <svg width="90" height="90" viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0">
-      <circle cx="45" cy="45" r="28" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="9"/>
-      <circle cx="45" cy="45" r="28" fill="none" stroke="${gaugeColor}" stroke-width="9"
-        stroke-dasharray="${filled} ${circ}" stroke-dashoffset="${Math.round(circ * 0.25)}"
-        stroke-linecap="round" transform="rotate(-90 45 45)"/>
-      <text x="45" y="42" text-anchor="middle" font-family="'Space Mono',monospace" font-size="16" font-weight="900" fill="white">${confScore}</text>
-      <text x="45" y="54" text-anchor="middle" font-family="Inter,sans-serif" font-size="6.5" fill="#6B7280" letter-spacing="1">FIDELITY</text>
-    </svg>
-    <div style="flex:1">
-      ${cmBar('Signal Veracity (40%)', veracity, 40)}
-      ${cmBar('Market Timing (25%)', timing, 25)}
-      ${cmBar('ICP Fit (20%)', icpFit, 20)}
-      ${cmBar('Data Completeness (15%)', completeness, 15)}
-      <div style="border-top:1px solid rgba(168,85,247,.2);margin:3mm 0 2mm"></div>
-      ${cmBar('Overall Fidelity', confScore, 100, 'cmrow-overall')}
+    const circ = 176, filled = Math.round((confScore/100)*circ);
+    const gc   = confScore>=75?'var(--green)':confScore>=50?'var(--amber)':'var(--red)';
+    const fallbackHtml = `<div style="display:flex;gap:6mm;align-items:flex-start">
+      <svg width="90" height="90" viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0">
+        <circle cx="45" cy="45" r="28" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="9"/>
+        <circle cx="45" cy="45" r="28" fill="none" stroke="${gc}" stroke-width="9" stroke-dasharray="${filled} ${circ}" stroke-dashoffset="${Math.round(circ*0.25)}" stroke-linecap="round" transform="rotate(-90 45 45)"/>
+        <text x="45" y="42" text-anchor="middle" font-family="monospace" font-size="16" font-weight="900" fill="white">${confScore}</text>
+        <text x="45" y="54" text-anchor="middle" font-size="6.5" fill="#6B7280" letter-spacing="1">FIDELITY</text>
+      </svg>
+      <div style="flex:1">
+        ${cmBar('Signal Veracity (40%)',veracity,40)}${cmBar('Market Timing (25%)',timing,25)}${cmBar('ICP Fit (20%)',icpFit,20)}${cmBar('Data Completeness (15%)',completeness,15)}
+        <div style="border-top:1px solid rgba(168,85,247,.2);margin:3mm 0 2mm"></div>
+        ${cmBar('Overall Fidelity',confScore,100,true)}
+      </div>
+    </div>`;
+    return `<div class="chart-block no-break">
+      ${renderChartOrFallback('Confidence Matrix',charts.confidence,fallbackHtml,{width:480,height:200})}
+      <div class="fig-caption">Figure 5: Weighted Confidence Matrix</div>
+      <div class="fig-src">Source: ABE GTMS Engine v1.0</div>
     </div>
-  </div>
-  ${srcNote('Confidence score is algorithmic — weights fixed (40/25/20/15), capped by data richness')}`;
+    ${srcNote('Confidence score is algorithmic — weights fixed (40/25/20/15), capped by data richness')}`;
   };
 
-  // ════════════════════════════════════════════════════════════
-  // FULL HTML DOCUMENT
-  // ════════════════════════════════════════════════════════════
-  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
-<style>
-:root{--bg:#0B0F1A;--bg2:#0D1120;--card:#121827;--border:#1F2937;--accent:#a855f7;--accent2:#7c3aed;--green:#22c55e;--amber:#f59e0b;--red:#ef4444;--blue:#3b82f6;--text:#E5E7EB;--muted:#6B7280;--faint:#374151;--white:#fff}
-*{margin:0;padding:0;box-sizing:border-box}
-body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:11.5px;line-height:1.65;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-${renderMode === 'browser-pdf' ? `
-@page { size: A4; margin: 12mm; }
-body { padding: 0 !important; height: auto !important; }
-/* browser-pdf: content flows naturally — Chromium handles pagination.
-   Only major sections (.section-break) force a new physical page.
-   Continuation sections (SDR social, confidence matrix) flow after their parent. */
-.page {
-  width: 100%;
-  box-sizing: border-box;
-  background: transparent !important;
-  padding: 0 !important;
-  margin: 0 !important;
+  // ══════════════════════════════════════════════════════════════════════════
+  // CSS — Single flowing document, no fixed-height page boxes
+  // ══════════════════════════════════════════════════════════════════════════
+  const CSS = `
+:root {
+  --bg:#0B0F1A; --bg2:#0D1120; --card:#121827; --border:#1F2937;
+  --accent:#a855f7; --accent2:#7c3aed; --green:#22c55e; --amber:#f59e0b;
+  --red:#ef4444; --blue:#3b82f6; --text:#E5E7EB; --muted:#6B7280; --faint:#374151;
 }
-/* Only major section divs start on a new physical page */
-.page.section-break {
-  break-before: page !important;
-  page-break-before: always !important;
+/* ── Print page setup ── */
+@page {
+  size: A4;
+  margin: 10mm 12mm;
 }
-/* Protect semantic blocks from mid-block splits */
-.card, .table-wrap, .chart-block, .ac, .swot-grid,
-.page-insight, .page-insight-expanded, .sdr-step, tr {
-  break-inside: avoid !important;
-  page-break-inside: avoid !important;
+/* ── Base ── */
+*, *::before, *::after { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 11px;
+  line-height: 1.65;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
 }
-h1, h2, h3, .section-header, .ph { break-after: avoid !important; page-break-after: avoid !important; }
-/* Filler box — hidden by default, shows via margin-top:auto push */
-.edu-filler {
-  margin-top: auto;
-  padding-top: 6mm;
-  border-top: 1px dashed rgba(168,85,247,.2);
-  border-left: 3px solid rgba(168,85,247,.4);
-  border-right: 1px dashed rgba(168,85,247,.12);
-  border-bottom: 1px dashed rgba(168,85,247,.12);
-  border-radius: 0 8px 8px 0;
-  padding: 4mm 5mm 4.5mm 5mm;
-  background: linear-gradient(135deg,rgba(168,85,247,.03),rgba(124,58,237,.015));
-  margin-top: auto;
-  break-inside: avoid !important;
-  page-break-inside: avoid !important;
+/* ── Cover: always its own page ── */
+#rpt-cover {
+  /* min-height ensures cover fills A4 visually — this is NOT a fixed page box.
+     Chromium will not create a blank page after it because break-after:page
+     is set, not min-height forcing overflow. */
+  min-height: 270mm;
+  padding: 12mm 16mm 10mm;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden;
+  break-after: page;
 }
-.edu-filler__badge {
-  font-size: 7.5px; font-weight: 900; text-transform: uppercase;
-  letter-spacing: .22em; color: #a855f7;
-  display: inline-block; margin-bottom: 2.5mm;
+/* ── Major sections: each begins on a fresh page ──
+   Applied only to primary report sections (exec, market, tam, icp,
+   sourcing, keywords, sdr-emails, decision, appendix).
+   Continuation blocks (sdr-cadence, confidence) flow naturally. ── */
+.rpt-sec {
+  break-before: page;
+  padding: 0 0 8mm 0;
 }
-.edu-filler__term {
-  font-size: 12px; font-weight: 800; color: #fff;
-  margin-bottom: 1.5mm; letter-spacing: -.2px;
+/* ── Continuation blocks: flow after their parent section,
+   no forced page break. Chromium paginates naturally. ── */
+.rpt-continuation {
+  padding: 0 0 8mm 0;
 }
-.edu-filler__definition {
-  font-size: 10px; color: #9CA3AF; line-height: 1.7; margin-bottom: 2mm;
+/* ── Page header (shown at top of each section) ── */
+.ph {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 5mm; padding-bottom: 3mm;
+  border-bottom: 1px solid var(--border);
+  break-inside: avoid; break-after: avoid;
 }
-.edu-filler__points {
-  list-style: none; padding: 0; margin: 0 0 2mm 0;
-  display: grid; grid-template-columns: 1fr 1fr; gap: 0.5mm 4mm;
+.phb { display:flex; align-items:center; gap:10px; }
+.am {
+  width:32px; height:32px; border-radius:8px;
+  background:linear-gradient(135deg,var(--accent),var(--accent2));
+  display:flex; align-items:center; justify-content:center;
+  font-family:'Space Mono',monospace; font-size:10px; font-weight:700; color:white;
+  flex-shrink:0;
 }
-.edu-filler__points li {
-  font-size: 9.5px; color: #6B7280; line-height: 1.55;
-  padding-left: 8px; position: relative;
+.abn { font-size:11px; font-weight:800; color:white; }
+.abs { font-family:'Space Mono',monospace; font-size:7.5px; color:var(--muted); letter-spacing:.12em; text-transform:uppercase; }
+.cb { background:rgba(168,85,247,.08); border:1px solid rgba(168,85,247,.25); border-radius:20px; padding:3px 12px; font-size:8.5px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--accent); }
+/* ── Typography ── */
+h1 { font-size:52px; font-weight:900; color:white; letter-spacing:-2px; line-height:1; }
+h2 { font-size:16px; font-weight:700; color:white; margin-bottom:2.5mm; display:flex; align-items:center; gap:8px; break-after:avoid; }
+h3 { font-size:12px; font-weight:700; color:var(--text); margin:3.5mm 0 1.5mm; padding-bottom:1mm; border-bottom:1px solid rgba(255,255,255,.05); break-after:avoid; }
+p { margin-bottom:1.5mm; }
+ul { padding-left:5mm; }
+li { margin-bottom:1mm; }
+/* ── Section icon badge ── */
+.sa {
+  display:inline-flex; width:26px; height:26px; border-radius:7px;
+  align-items:center; justify-content:center; font-size:10px; font-weight:800; color:white;
+  flex-shrink:0;
 }
-.edu-filler__points li::before { content: '›'; position:absolute; left:0; color:#a855f7; font-weight:700; }
-.edu-filler__protip {
-  font-size: 9.5px; font-style: italic; color: #4B5563;
-  border-top: 1px solid rgba(168,85,247,.12); padding-top: 2mm; line-height: 1.6;
+/* ── Section context line ── */
+.sc {
+  font-size:11px; color:var(--muted); margin-bottom:3mm;
+  border-bottom:1px dashed var(--border); padding-bottom:2mm;
+  break-after:avoid;
 }
-.edu-filler__protip strong { color: #a855f7; font-style: normal; }
-` : `
-.page{width:210mm;min-height:297mm;overflow:visible;margin:0;background:var(--bg);padding:12mm 15mm 15mm;position:relative;page-break-after:always;box-sizing:border-box;display:flex;flex-direction:column}
-`}
-.ph{display:flex;align-items:center;justify-content:space-between;margin-bottom:6mm;border-bottom:1px solid var(--border);padding-bottom:3mm;break-inside:avoid;page-break-inside:avoid}
-.phb{display:flex;align-items:center;gap:10px}
-.am{width:32px;height:32px;background:linear-gradient(135deg,var(--accent),var(--accent2));border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:'Space Mono',monospace;font-size:11px;font-weight:700;color:white}
-.abn{font-size:12px;font-weight:800;color:white}
-.abs{font-family:'Space Mono',monospace;font-size:8px;color:var(--muted);letter-spacing:.12em;text-transform:uppercase}
-.cb{background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.25);border-radius:20px;padding:4px 14px;font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--accent)}
-h1{font-size:36px;font-weight:900;color:white;letter-spacing:-.5px}
-h2{font-size:16px;font-weight:700;color:white;margin-bottom:2.5mm;display:flex;align-items:center;gap:8px;break-after:avoid;page-break-after:avoid}
-p{margin-bottom:1.5mm;break-inside:avoid;page-break-inside:avoid}
-.sa{display:inline-flex;width:26px;height:26px;background:linear-gradient(135deg,var(--accent2),var(--accent));border-radius:7px;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:white}
-.sc{font-size:11.5px;color:var(--muted);margin-bottom:3mm;border-bottom:1px dashed var(--border);padding-bottom:2mm;break-inside:avoid;page-break-inside:avoid}
-.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:3.5mm 4.5mm;margin-bottom:2.5mm;break-inside:avoid;page-break-inside:avoid;box-sizing:border-box}
-.bl{font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-bottom:1.5mm}
-.dt{width:100%;border-collapse:collapse;margin-top:1.5mm;font-size:10px;margin-bottom:3mm;break-inside:avoid;page-break-inside:avoid}
-.dt th{text-align:left;color:var(--muted);font-weight:600;padding:1.5mm 2.5mm;border-bottom:1px solid var(--border)}
-.dt td{padding:1.5mm 2.5mm;border-bottom:1px solid rgba(31,41,55,.5);vertical-align:top}
-.num{font-family:'Space Mono',monospace;text-align:right}
-.ha{color:var(--accent);font-weight:700}
-.mn{font-size:22px;font-weight:900;font-family:'Space Mono',monospace;color:var(--accent)}
-.ac{background:rgba(168,85,247,.04);border:1px solid rgba(168,85,247,.2);border-left:4px solid var(--accent);border-radius:8px;padding:3mm 4mm;margin:3mm 0;font-size:10.5px;break-inside:avoid;page-break-inside:avoid}
-.insight-box{break-inside:avoid;page-break-inside:avoid}
-.kpi-row{display:flex;gap:3mm;margin-bottom:4mm;break-inside:avoid;page-break-inside:avoid}
-.kpi-card,.kpi{flex:1;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:3.5mm 4mm;text-align:center;position:relative;overflow:hidden;break-inside:avoid;page-break-inside:avoid}
-.table-wrap{break-inside:avoid;page-break-inside:avoid;overflow:visible}
-.swot-grid{display:grid;grid-template-columns:1fr 1fr;gap:2.5mm;margin:1.5mm 0 3mm;break-inside:avoid;page-break-inside:avoid}
-.risk-grid{break-inside:avoid;page-break-inside:avoid}
-.email-card{break-inside:avoid;page-break-inside:avoid}
-.chart-block{break-inside:avoid;page-break-inside:avoid;margin:3mm 0}
-.confidence-matrix{break-inside:avoid;page-break-inside:avoid}
-.appendix-section{break-inside:avoid;page-break-inside:avoid;margin-bottom:4mm}
-.section-header{break-after:avoid;page-break-after:avoid}
-.keep-together{break-inside:avoid;page-break-inside:avoid}
-.ac strong{color:var(--accent)}
-.ac.amber{border-left-color:var(--amber);background:rgba(245,158,11,.04);border-color:rgba(245,158,11,.2)}
-.ac.amber strong{color:var(--amber)}
-.ac.green{border-left-color:var(--green);background:rgba(34,197,94,.04);border-color:rgba(34,197,94,.2)}
-.ac.green strong{color:var(--green)}
-.ac.red{border-left-color:var(--red);background:rgba(239,68,68,.04);border-color:rgba(239,68,68,.2)}
-.ac.red strong{color:var(--red)}
-.tg{display:inline-block;background:rgba(168,85,247,.08);border:1px solid rgba(168,85,247,.2);border-radius:5px;padding:1mm 3mm;font-size:8.5px;font-weight:600;color:#c4b5fd;margin:1mm 1.5mm 1mm 0}
-.tg.green{background:rgba(34,197,94,.08);border-color:rgba(34,197,94,.2);color:#86efac}
-.tg.amber{background:rgba(245,158,11,.08);border-color:rgba(245,158,11,.2);color:#fcd34d}
-.tg.blue{background:rgba(59,130,246,.08);border-color:rgba(59,130,246,.2);color:#93c5fd}
-.tg.red{background:rgba(239,68,68,.08);border-color:rgba(239,68,68,.2);color:#fca5a5}
-.sg{display:grid;grid-template-columns:1fr 1fr;gap:2.5mm;margin:1.5mm 0 3mm;break-inside:avoid;page-break-inside:avoid}
-.sc2{border:1px solid var(--border);border-radius:7px;padding:2.5mm 3.5mm}
-.sc2 ul{padding-left:4mm;font-size:9px;line-height:1.55}
-.sc2 li{margin-bottom:1mm}
-.sl{font-size:8.5px;font-weight:900;text-transform:uppercase;letter-spacing:.15em;margin-bottom:1.5mm}
-/* ── ICON UTILITIES (inline SVG helpers) ── */
-.icon-badge{display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:6px;margin-right:2mm;flex-shrink:0}
-.kpi-row{display:flex;gap:3mm;margin-bottom:4mm}
-.kpi{flex:1;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:3.5mm 4mm;text-align:center;position:relative;overflow:hidden}
-.kpi::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2.5px;border-radius:0 0 10px 10px}
-.kpi-v{font-size:20px;font-weight:900;font-family:'Space Mono',monospace}
-.kpi-l{font-size:7px;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-top:1mm}
-/* ── SDR TIMELINE ── */
-.sdr-step{display:flex;gap:4mm;margin-bottom:3.5mm;align-items:flex-start}
-.sdr-num{width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,var(--accent2),var(--accent));display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:900;color:white;flex-shrink:0;margin-top:1mm}
-.sdr-body{flex:1;background:var(--card);border:1px solid var(--border);border-radius:9px;padding:3.5mm 4.5mm}
-.sdr-angle{font-size:7.5px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:1.5mm}
-.sdr-subject{font-size:11px;font-weight:700;color:white;margin-bottom:1.5mm}
-.sdr-preview{font-size:10px;color:var(--text);line-height:1.55;white-space:pre-line;word-break:break-word}
-.ww{margin:3mm 0}
-.wb{display:flex;align-items:center;margin-bottom:3mm}
-.wv{width:110px;font-family:'Space Mono',monospace;font-size:10px;text-align:right;padding-right:3mm;color:white;font-weight:700}
-.wftrack{flex:1;background:rgba(255,255,255,.08);border-radius:6px;height:14px;overflow:hidden;border:1px solid rgba(255,255,255,.06)}
-.wf{height:100%;border-radius:6px;min-width:4px}
-.wfb{background:linear-gradient(90deg,#1d4ed8,#3b82f6,#60a5fa)}
-.wfa{background:linear-gradient(90deg,#5b21b6,#7c3aed,#a855f7)}
-.wfm{background:linear-gradient(90deg,#b45309,#d97706,#f59e0b)}
-.confbar{background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.06);border-radius:5px;height:12px;overflow:hidden;margin:3mm 0}
-.conffill{height:100%;border-radius:5px;background:linear-gradient(90deg,#5b21b6,#7c3aed,#a855f7,#c084fc)}
-.cmrow{margin-bottom:4mm}
-.cmhdr{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:1.5mm}
-.cmlbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted)}
-.cmscore{font-family:'Space Mono',monospace;font-size:11px;font-weight:900;color:var(--accent)}
-.cmtrack{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.05);border-radius:5px;height:9px;overflow:hidden}
-.cmfill{height:100%;border-radius:5px;background:linear-gradient(90deg,var(--accent2),var(--accent));min-width:3px}
-.cmrow-overall .cmtrack{height:13px;border-radius:6px;background:rgba(168,85,247,.12);border-color:rgba(168,85,247,.2)}
-.cmrow-overall .cmfill{background:linear-gradient(90deg,#5b21b6,#7c3aed,#a855f7,#c084fc)}
-.cmrow-overall .cmlbl{color:white;font-size:10px}
-.cmrow-overall .cmscore{font-size:14px;color:white}
-${renderMode === 'browser-pdf' ? `
-.pf{margin-top: 6mm; font-size:8px;color:var(--faint);display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:3mm;}
-` : `
-.pf{margin-top:auto;font-size:8px;color:var(--faint);display:flex;justify-content:space-between;border-top:1px solid var(--border);padding-top:3mm;break-inside:avoid;page-break-inside:avoid}
-`}
-ul{padding-left:5mm}li{margin-bottom:1.5mm}
-/* ── PAGE INSIGHT BLOCKS ── */
-.page-insight{margin-top:6mm;padding:4mm 5mm 4.5mm;border:1px solid rgba(168,85,247,.18);border-left:3px solid var(--accent);border-radius:10px;background:linear-gradient(135deg,rgba(168,85,247,.05),rgba(124,58,237,.03));break-inside:avoid;page-break-inside:avoid}
-.page-insight-expanded{margin-top:6mm;padding:5mm 6mm;border:1px solid rgba(168,85,247,.2);border-left:3px solid var(--accent);border-radius:10px;background:linear-gradient(135deg,rgba(168,85,247,.06),rgba(124,58,237,.03));break-inside:avoid;page-break-inside:avoid}
-.page-insight-title{font-size:8px;font-weight:900;letter-spacing:.18em;text-transform:uppercase;color:var(--accent);margin-bottom:3mm;display:flex;align-items:center;gap:5px}
-.page-insight-title::before{content:'';display:inline-block;width:5px;height:5px;border-radius:50%;background:var(--accent);flex-shrink:0}
-.page-insight-grid{display:grid;grid-template-columns:1fr 1fr;gap:5mm;margin-top:1.5mm}
-.page-insight-grid>div{background:rgba(255,255,255,.03);border-radius:6px;padding:3mm 3.5mm}
-.mini-label{font-size:7.5px;font-weight:800;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);margin-bottom:1.5mm;padding-bottom:1.5mm;border-bottom:1px solid rgba(255,255,255,.06)}
-.page-insight-expanded p,.page-insight-text{font-size:10.5px;line-height:1.65;color:var(--text);margin:0}
-.page-insight-demo{font-size:8.5px;color:var(--muted);margin-top:3mm;font-style:italic;opacity:.7}
-/* ── ENTERPRISE TABLE ENHANCEMENTS ── */
-.dt tr:hover td{background:rgba(168,85,247,.03)}
-.dt tbody tr:last-child td{border-bottom:none}
-.dt th:first-child,.dt td:first-child{padding-left:3mm}
-/* ── SECTION DIVIDERS ── */
-.sec-divider{height:1px;background:linear-gradient(90deg,var(--accent2),transparent);margin:5mm 0 4mm;opacity:.3}
-/* ── STAT CALLOUT ROW ── */
-.stat-row{display:flex;gap:3mm;margin:3mm 0 4mm}
-.stat-item{flex:1;background:linear-gradient(135deg,rgba(168,85,247,.05),rgba(18,24,39,.7));border:1px solid rgba(168,85,247,.12);border-radius:8px;padding:3mm 4mm;text-align:center}
-.stat-v{font-family:'Space Mono',monospace;font-size:16px;font-weight:900;color:var(--accent)}
-.stat-l{font-size:7.5px;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);margin-top:1mm}
-/* ── KPI CARD ACCENT ── */
-.kpi-card::after,.kpi::after{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;border-radius:0 0 10px 10px;background:linear-gradient(90deg,var(--accent2),var(--accent))}
-/* ── SWOT CELL HOVER ── */
-.sc2{border:1px solid var(--border);border-radius:8px;padding:3mm 4mm;background:rgba(255,255,255,.015)}
-/* ── SCORE BADGE ── */
-.score-badge{display:inline-flex;align-items:center;gap:2mm;background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.25);border-radius:20px;padding:2mm 4mm;font-family:'Space Mono',monospace;font-size:12px;font-weight:900;color:white}
-/* ── SECTION HEADER LINE ── */
-h3{font-size:12.5px;font-weight:700;color:var(--text);margin-top:3.5mm;margin-bottom:1.5mm;padding-bottom:1mm;border-bottom:1px solid rgba(255,255,255,.05);break-after:avoid;page-break-after:avoid}
-</style></head><body>
+/* ── Cards ── */
+.card {
+  background:var(--card); border:1px solid var(--border); border-radius:10px;
+  padding:3.5mm 4.5mm; margin-bottom:2.5mm;
+  break-inside:avoid;
+}
+/* ── No-break utility ── */
+.no-break { break-inside:avoid; }
+/* ── Tables ── */
+.table-wrap { break-inside:avoid; margin-bottom:3mm; overflow:visible; }
+.dark-table {
+  width:100%; border-collapse:collapse;
+  margin-bottom:1.5mm; font-size:10px;
+}
+.dark-table th {
+  background:#242a38; color:#f0f0f0; font-weight:700; font-size:9.5px;
+  text-align:left; padding:5px 7px; border:0.5px solid #2d3748;
+}
+.dark-table td { padding:5px 7px; border:0.5px solid #2d3748; vertical-align:top; word-break:break-word; }
+.dark-table .row-even td { background:#161c2a; }
+.dark-table .row-odd  td { background:#1a2035; }
+/* Prevent mid-row breaks but allow table to break between rows */
+.dark-table tr { break-inside:avoid; }
+.table-note { font-size:8px; font-style:italic; color:var(--muted); margin:1mm 0 0.5mm; }
+.table-src  { font-size:8px; font-style:italic; color:var(--muted); margin:0 0 3mm; }
+/* ── Charts ── */
+.chart-block { break-inside:avoid; margin:3mm 0 5mm; }
+.fig-caption { font-size:10px; font-weight:700; color:#f5f5f5; margin:1.5mm 0 0.5mm; }
+.fig-src     { font-size:8px; font-style:italic; color:var(--muted); margin:0 0 2mm; }
+/* ── Callout / Analyst Insight ── */
+.ac {
+  background:rgba(168,85,247,.04); border:1px solid rgba(168,85,247,.2);
+  border-left:4px solid var(--accent); border-radius:8px;
+  padding:3mm 4mm; margin:3mm 0; font-size:10.5px;
+  break-inside:avoid;
+}
+.ac strong { color:var(--accent); }
+.ac.amber { border-left-color:var(--amber); background:rgba(245,158,11,.04); border-color:rgba(245,158,11,.2); }
+.ac.amber strong { color:var(--amber); }
+/* ── Tag pills ── */
+.tg {
+  display:inline-block; background:rgba(168,85,247,.08); border:1px solid rgba(168,85,247,.2);
+  border-radius:5px; padding:1mm 3mm; font-size:8.5px; font-weight:600; color:#c4b5fd;
+  margin:1mm 1.5mm 1mm 0;
+}
+.tg.green { background:rgba(34,197,94,.08); border-color:rgba(34,197,94,.2); color:#86efac; }
+.tg.amber { background:rgba(245,158,11,.08); border-color:rgba(245,158,11,.2); color:#fcd34d; }
+.tg.blue  { background:rgba(59,130,246,.08); border-color:rgba(59,130,246,.2); color:#93c5fd; }
+.tg.red   { background:rgba(239,68,68,.08);  border-color:rgba(239,68,68,.2);  color:#fca5a5; }
+/* ── SWOT grid ── */
+.sg { display:grid; grid-template-columns:1fr 1fr; gap:2.5mm; margin:1.5mm 0 3mm; break-inside:avoid; }
+.sc2 { border:1px solid var(--border); border-radius:8px; padding:3mm 4mm; background:rgba(255,255,255,.015); break-inside:avoid; }
+.sc2 ul { padding-left:4mm; font-size:9px; line-height:1.5; }
+.sl  { font-size:8.5px; font-weight:900; text-transform:uppercase; letter-spacing:.15em; margin-bottom:1.5mm; }
+/* ── Grids ── */
+.grid2      { display:grid; grid-template-columns:1fr 1fr;     gap:2.5mm; }
+.grid2-even { display:grid; grid-template-columns:1fr 1fr;     gap:3mm;   break-inside:avoid; }
+.grid3      { display:grid; grid-template-columns:1fr 1fr 1fr; gap:3mm;   break-inside:avoid; }
+.grid3-even { display:grid; grid-template-columns:1fr 1fr 1fr; gap:3mm;   break-inside:avoid; }
+/* ── KPI strip ── */
+.kpi-row { display:flex; gap:3mm; margin-bottom:4mm; break-inside:avoid; }
+.kpi {
+  flex:1; background:var(--card); border:1px solid var(--border); border-radius:10px;
+  padding:3.5mm 4mm; text-align:center; position:relative; overflow:hidden;
+  break-inside:avoid;
+}
+.kpi::after { content:''; position:absolute; bottom:0; left:0; right:0; height:2px; border-radius:0 0 10px 10px; background:linear-gradient(90deg,var(--accent2),var(--accent)); }
+.kpi-v { font-size:20px; font-weight:900; font-family:'Space Mono',monospace; }
+.kpi-l { font-size:7px; text-transform:uppercase; letter-spacing:.15em; color:var(--muted); margin-top:1mm; }
+/* ── Monospace numeric value ── */
+.mn  { font-size:22px; font-weight:900; font-family:'Space Mono',monospace; color:var(--accent); }
+.num { font-family:'Space Mono',monospace; }
+.bl  { font-size:8px; font-weight:700; text-transform:uppercase; letter-spacing:.15em; color:var(--muted); margin-bottom:1.5mm; }
+/* ── Source note ── */
+.src-note { font-size:7.5px; color:var(--faint); margin:1.5mm 0; font-style:italic; break-inside:avoid; }
+/* ── TAM waterfall bars ── */
+.ww     { margin:3mm 0 4mm; }
+.wb     { display:flex; align-items:center; margin-bottom:3mm; break-inside:avoid; }
+.wv     { width:110px; font-family:'Space Mono',monospace; font-size:10px; text-align:right; padding-right:3mm; color:white; font-weight:700; }
+.wftrack{ flex:1; background:rgba(255,255,255,.08); border-radius:6px; height:14px; overflow:hidden; }
+.wf     { height:100%; border-radius:6px; min-width:4px; }
+.wfb    { background:linear-gradient(90deg,#1d4ed8,#3b82f6,#60a5fa); }
+.wfa    { background:linear-gradient(90deg,#5b21b6,#7c3aed,#a855f7); }
+.wfm    { background:linear-gradient(90deg,#b45309,#d97706,#f59e0b); }
+.wflabel{ margin-left:2mm; font-size:9px; color:var(--muted); }
+/* ── SDR steps ── */
+.sdr-step   { display:flex; gap:4mm; margin-bottom:3.5mm; align-items:flex-start; break-inside:avoid; }
+.sdr-num    { width:24px; height:24px; border-radius:50%; background:linear-gradient(135deg,var(--accent2),var(--accent)); display:flex; align-items:center; justify-content:center; font-size:9px; font-weight:900; color:white; flex-shrink:0; margin-top:1mm; }
+.sdr-body   { flex:1; background:var(--card); border:1px solid var(--border); border-radius:9px; padding:3.5mm 4.5mm; }
+.sdr-angle  { font-size:7.5px; font-weight:700; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); margin-bottom:1.5mm; }
+.sdr-subject{ font-size:11px; font-weight:700; color:white; margin-bottom:1.5mm; }
+.sdr-preview{ font-size:10px; color:var(--text); line-height:1.55; white-space:pre-line; word-break:break-word; }
+/* ── Confidence matrix ── */
+.cmrow        { margin-bottom:3.5mm; break-inside:avoid; }
+.cmhdr        { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:1.5mm; }
+.cmlbl        { font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); }
+.cmscore      { font-family:'Space Mono',monospace; font-size:11px; font-weight:900; color:var(--accent); }
+.cmtrack      { background:rgba(255,255,255,.07); border:1px solid rgba(255,255,255,.05); border-radius:5px; height:9px; overflow:hidden; }
+.cmfill       { height:100%; border-radius:5px; background:linear-gradient(90deg,var(--accent2),var(--accent)); min-width:3px; }
+.cmrow-overall .cmtrack { height:13px; background:rgba(168,85,247,.12); border-color:rgba(168,85,247,.2); }
+.cmrow-overall .cmfill  { background:linear-gradient(90deg,#5b21b6,#7c3aed,#a855f7,#c084fc); }
+.cmrow-overall .cmlbl   { color:white; font-size:10px; }
+.cmrow-overall .cmscore { font-size:14px; color:white; }
+/* ── Page insight block ── */
+.page-insight {
+  margin-top:5mm; padding:4mm 5mm; border:1px solid rgba(168,85,247,.18);
+  border-left:3px solid var(--accent); border-radius:10px;
+  background:linear-gradient(135deg,rgba(168,85,247,.05),rgba(124,58,237,.03));
+  break-inside:avoid;
+}
+.pi-expanded { padding:5mm 6mm; }
+.pi-title    { font-size:8px; font-weight:900; letter-spacing:.18em; text-transform:uppercase; color:var(--accent); margin-bottom:2.5mm; display:flex; align-items:center; gap:5px; }
+.pi-title::before { content:''; display:inline-block; width:5px; height:5px; border-radius:50%; background:var(--accent); flex-shrink:0; }
+.pi-text     { font-size:10.5px; line-height:1.65; color:var(--text); }
+.pi-grid     { display:grid; grid-template-columns:1fr 1fr; gap:5mm; margin-top:2mm; }
+.pi-grid > div { background:rgba(255,255,255,.03); border-radius:6px; padding:3mm 3.5mm; }
+.mini-label  { font-size:7.5px; font-weight:800; text-transform:uppercase; letter-spacing:.14em; color:var(--muted); margin-bottom:1.5mm; padding-bottom:1.5mm; border-bottom:1px solid rgba(255,255,255,.06); }
+.pi-demo     { font-size:8.5px; color:var(--muted); margin-top:2mm; font-style:italic; opacity:.7; }
+/* ── Risk card ── */
+.risk-card .risk-label { font-size:8px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; margin-bottom:1.5mm; }
+.risk-card .risk-text  { font-size:9.5px; color:var(--text); }
+/* ── Section footer label ── */
+.sec-ftr { font-size:7.5px; color:var(--faint); margin-top:5mm; padding-top:2.5mm; border-top:1px solid var(--border); break-inside:avoid; }
+/* ── Appendix ── */
+.appendix-block { break-inside:avoid; margin-bottom:5mm; }
+`;
 
-<!-- COVER -->
-<div class="page" style="position:relative;display:flex;flex-direction:column;justify-content:flex-start;align-items:center;text-align:center;padding:0;overflow:hidden">
-<div style="position:absolute;inset:0;background-image:linear-gradient(rgba(168,85,247,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(168,85,247,.025) 1px,transparent 1px);background-size:28px 28px;pointer-events:none"></div>
-<div style="position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,var(--accent2),var(--accent),#c084fc)"></div>
-<div style="position:absolute;top:-80px;right:-80px;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,rgba(124,58,237,.1),transparent 70%);pointer-events:none"></div>
-<div style="position:absolute;bottom:40px;left:-60px;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(168,85,247,.07),transparent 70%);pointer-events:none"></div>
-<div style="position:relative;z-index:1;width:100%;padding:14mm 18mm 0">
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10mm">
-    <div style="display:flex;align-items:center;gap:8px">
-      <div class="am" style="width:38px;height:38px;font-size:13px">ABE</div>
-      <div style="text-align:left"><div style="font-size:11px;font-weight:800;color:white">AI Revenue Infrastructure</div><div style="font-size:8px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em">Enterprise GTM Platform</div></div>
+  // ══════════════════════════════════════════════════════════════════════════
+  // HTML DOCUMENT
+  // ══════════════════════════════════════════════════════════════════════════
+  return `<!DOCTYPE html><html lang="en"><head>
+<meta charset="UTF-8">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>${CSS}</style>
+</head><body>
+
+<!-- ═══════════════════════════════ COVER ═════════════════════════════════ -->
+<div id="rpt-cover">
+  <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(168,85,247,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(168,85,247,.02) 1px,transparent 1px);background-size:28px 28px;pointer-events:none"></div>
+  <div style="position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,var(--accent2),var(--accent),#c084fc)"></div>
+  <div style="position:relative;z-index:1">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8mm">
+      <div style="display:flex;align-items:center;gap:8px">
+        <div class="am" style="width:38px;height:38px;font-size:13px">ABE</div>
+        <div><div style="font-size:11px;font-weight:800;color:white">AI Revenue Infrastructure</div><div style="font-size:7.5px;color:var(--muted);text-transform:uppercase;letter-spacing:.1em">Enterprise GTM Platform</div></div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:9px;color:var(--muted)">${date}</div>
+        <div style="font-size:8px;font-weight:700;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-top:1mm">Confidential</div>
+      </div>
     </div>
-    <div style="text-align:right">
-      <div style="font-size:9px;color:var(--muted)">${date}</div>
-      <div style="font-size:8px;font-weight:700;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-top:1mm">Confidential</div>
+    <div style="text-align:center;margin-bottom:6mm">
+      <h1 style="margin-bottom:2.5mm">${e(co)}</h1>
+      <div style="font-size:13px;font-weight:300;color:var(--muted);letter-spacing:4px;text-transform:uppercase">GTM Intelligence Report</div>
+      ${ind ? `<div style="margin-top:3mm"><span class="tg blue" style="font-size:9px">${e(ind)}</span></div>` : ''}
     </div>
-  </div>
-  <div style="margin-bottom:5mm">
-    <h1 style="font-size:54px;font-weight:900;color:white;letter-spacing:-2px;line-height:1;margin-bottom:3mm">${e(co)}</h1>
-    <div style="font-size:13px;font-weight:300;color:var(--muted);letter-spacing:4px;text-transform:uppercase">GTM Intelligence Report</div>
-    ${ind ? `<div style="margin-top:3mm"><span class="tg blue" style="font-size:9px">${e(ind)}</span></div>` : ''}
-  </div>
-  <div class="keep-together chart-block" style="text-align:center; margin-bottom:4mm">
-    <div style="display:flex;justify-content:center;">
-      ${renderGaugeChart(charts.gauge, score, rec, { width: 280, height: 170 })}
+    <div style="text-align:center;margin-bottom:5mm">
+      ${renderGaugeChart(charts.gauge, score, rec, {width:260,height:160})}
+      <div class="fig-caption" style="text-align:center">Figure 1: GTM Score Gauge</div>
+      <div class="fig-src" style="text-align:center">Source: ABE GTMS Engine v1.0</div>
     </div>
-    <p class="figure-caption" style="font-size:10px; font-weight:bold; color:#f5f5f5; margin:1mm 0 0.5mm;">Figure 1: GTM Score Gauge</p>
-    <p class="figure-source" style="font-size:8px; font-style:italic; color:#aaa; margin:0;">Source: ABE GTMS Engine v1.0</p>
-  </div>
-  <div class="keep-together" style="display:flex;gap:3mm;justify-content:center;margin-bottom:4mm">
-    <div style="background:rgba(18,24,39,.9);border:1px solid rgba(168,85,247,.25);border-bottom:3px solid var(--accent);border-radius:12px;padding:4mm 6mm;min-width:42mm;text-align:center">
-      <div style="font-family:'Space Mono',monospace;font-size:20px;font-weight:900;color:var(--accent)">${e(safe(s2.tam_size_estimate) || '—')}</div>
-      <div style="font-size:7px;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-top:1.5mm">TAM Size</div>
+    <div class="kpi-row" style="justify-content:center;max-width:148mm;margin:0 auto 5mm">
+      <div class="kpi" style="border-bottom:3px solid var(--accent)"><div class="kpi-v" style="color:var(--accent)">${e(safe(s2.tam_size_estimate)||'—')}</div><div class="kpi-l">TAM Size</div></div>
+      <div class="kpi" style="border-bottom:3px solid var(--green)"><div class="kpi-v" style="color:var(--green)">${e(safe(s2.growth_rate)||'—')}</div><div class="kpi-l">CAGR</div></div>
+      <div class="kpi" style="border-bottom:3px solid ${recColor}"><div class="kpi-v" style="color:${recColor}">${e(recUp)}</div><div class="kpi-l">Verdict</div></div>
     </div>
-    <div style="background:rgba(18,24,39,.9);border:1px solid rgba(34,197,94,.25);border-bottom:3px solid var(--green);border-radius:12px;padding:4mm 6mm;min-width:42mm;text-align:center">
-      <div style="font-family:'Space Mono',monospace;font-size:20px;font-weight:900;color:var(--green)">${e(safe(s2.growth_rate) || '—')}</div>
-      <div style="font-size:7px;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-top:1.5mm">CAGR</div>
-    </div>
-    <div style="background:rgba(18,24,39,.9);border:1px solid rgba(245,158,11,.25);border-bottom:3px solid ${/go$/i.test(rec) && !/no/i.test(rec) ? 'var(--green)' : /no/i.test(rec) ? 'var(--red)' : 'var(--amber)'};border-radius:12px;padding:4mm 6mm;min-width:42mm;text-align:center">
-      <div style="font-family:'Space Mono',monospace;font-size:20px;font-weight:900;color:${recColor}">${e(recUp)}</div>
-      <div style="font-size:7px;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-top:1.5mm">Verdict</div>
-    </div>
-  </div>
-  ${(s1.company_overview || s7.strategic_hook) ? `<div class="keep-together" style="max-width:148mm;margin:0 auto 4mm;background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.2);border-left:3px solid var(--accent);border-radius:10px;padding:4mm 5.5mm;text-align:left">
-    <div style="font-size:7px;font-weight:900;text-transform:uppercase;letter-spacing:.2em;color:var(--accent);margin-bottom:2mm">Strategic Positioning</div>
-    <div style="font-size:10.5px;color:var(--text);line-height:1.65">${e(strategicPositioning)}.</div>
-  </div>`: ''}
-  <div class="keep-together" style="display:flex;gap:3mm;justify-content:center;max-width:148mm;margin:0 auto">
-    <div style="flex:1;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:3mm 4mm;text-align:center">
-      <div style="font-size:7.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:1.5mm">GTM Score</div>
-      <div style="font-family:'Space Mono',monospace;font-size:18px;font-weight:900;color:white">${score || '—'}<span style="font-size:9px;color:var(--muted)">/100</span></div>
-    </div>
-    <div style="flex:1;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:3mm 4mm;text-align:center">
-      <div style="font-size:7.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:1.5mm">Confidence</div>
-      <div style="font-family:'Space Mono',monospace;font-size:18px;font-weight:900;color:white">${confScore || '—'}<span style="font-size:9px;color:var(--muted)">/100</span></div>
-    </div>
-    <div style="flex:2;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:3mm 4mm;text-align:left">
-      <div style="font-size:7.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:1.5mm">Report Sections</div>
-      <div style="display:flex;flex-wrap:wrap;gap:1.5mm;align-items:center">
-        ${['01 Market', '02 TAM', '03 ICP', '04 Sourcing', '05 Keywords', '06 SDR'].map(s => `<span style="font-size:7.5px;color:var(--green);font-weight:700">${s}</span><span style="color:var(--faint);font-size:8px">·</span>`).join('')}
-        <span style="font-size:7.5px;color:var(--amber);font-weight:700">07 Intelligence</span>
+    ${(s1.company_overview||s7.strategic_hook) ? `<div style="max-width:148mm;margin:0 auto 5mm;background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.2);border-left:3px solid var(--accent);border-radius:10px;padding:4mm 5.5mm">
+      <div style="font-size:7px;font-weight:900;text-transform:uppercase;letter-spacing:.2em;color:var(--accent);margin-bottom:2mm">Strategic Positioning</div>
+      <div style="font-size:10.5px;color:var(--text);line-height:1.65">${e(strategicPos)}.</div>
+    </div>` : ''}
+    <div style="display:flex;gap:3mm;justify-content:center;max-width:148mm;margin:0 auto">
+      <div style="flex:1;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:3mm 4mm;text-align:center">
+        <div class="bl">GTM Score</div><div style="font-family:'Space Mono',monospace;font-size:18px;font-weight:900;color:white">${score||'—'}<span style="font-size:9px;color:var(--muted)">/100</span></div>
+      </div>
+      <div style="flex:1;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:3mm 4mm;text-align:center">
+        <div class="bl">Confidence</div><div style="font-family:'Space Mono',monospace;font-size:18px;font-weight:900;color:white">${confScore||'—'}<span style="font-size:9px;color:var(--muted)">/100</span></div>
+      </div>
+      <div style="flex:2;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:3mm 4mm;text-align:left">
+        <div class="bl" style="margin-bottom:1.5mm">Report Sections</div>
+        <div style="display:flex;flex-wrap:wrap;gap:2mm">
+          ${['01 Market','02 TAM','03 ICP','04 Sourcing','05 Keywords','06 SDR','07 Intelligence'].map((s,i)=>`<span style="font-size:7.5px;color:${i<6?'var(--green)':'var(--amber)'};font-weight:700">${s}</span>`).join('<span style="color:var(--faint);font-size:7px">·</span>')}
+        </div>
       </div>
     </div>
   </div>
+  <div style="text-align:center;margin-top:auto;padding-top:6mm;font-size:8px;color:var(--faint);letter-spacing:.05em">Classification: CONFIDENTIAL — Not for External Distribution</div>
 </div>
-<div style="position:absolute;bottom:12mm;left:0;right:0;font-size:8px;color:var(--faint);text-align:center;z-index:1;letter-spacing:.05em">Classification: CONFIDENTIAL — Not for External Distribution</div>
-</div>
-<!-- EXECUTIVE SUMMARY -->
-<div class="page section-break" id="exec-summary">
+
+<!-- ═══════════════════════════ EXECUTIVE SUMMARY ═════════════════════════ -->
+<section class="rpt-sec" id="sec-exec">
 ${pageHdr()}
-${secHead('ES', 'Executive Summary')}
+${secHead('ES','Executive Summary')}
 ${secCtx('Establishes the macro-opportunity and win-probability. Provides the highest-leverage vector for outbound strategy.')}
-<div class="card" style="border-left:3px solid var(--accent)"><p style="font-size:12px;line-height:1.85;color:var(--text)">${e(s7.executive_brief || s1.company_overview || 'Strategic evaluation of market conditions and buyer readiness.')}</p></div>
-<div style="display:flex;gap:3mm;margin-bottom:4mm">
-  <div class="card" style="flex:1;text-align:center;border-top:2px solid var(--accent)"><div class="mn">${e(safe(s2.tam_size_estimate) || 'N/A')}</div><div class="bl">TAM</div></div>
-  <div class="card" style="flex:1;text-align:center;border-top:2px solid var(--green)"><div class="mn" style="color:var(--green)">${e(safe(s2.growth_rate) || 'N/A')}</div><div class="bl">CAGR</div></div>
-  <div class="card" style="flex:1;text-align:center;border-top:2px solid var(--amber)"><div class="mn" style="color:var(--amber)">${confScore}/100</div><div class="bl">Confidence</div></div>
-  <div class="card" style="flex:1;text-align:center;border-top:2px solid ${recColor}"><div class="mn" style="color:${recColor}">${e(recUp)}</div><div class="bl">Verdict</div></div>
+<div class="card" style="border-left:3px solid var(--accent)">
+  <p style="font-size:12px;line-height:1.85">${e(truncate(s7.executive_brief||s1.company_overview||'Strategic evaluation of market conditions and buyer readiness.',120))}</p>
 </div>
-${srcNote('TAM/CAGR: AI market estimate; Relevance: algorithmic scoring; Verdict: composite signal analysis')}
-${callout(s1.gtm_relevance_reasoning || s1.analyst_insight || '')}
-${renderPageInsightBlock('executive_summary', strategy, isDemoMode)}
-${buildFillerBlock('exec', renderMode)}
-${pageFtr('Executive Summary', 1)}
+${isDemoMode ? `<div class="card" style="border-left:3px solid var(--faint)"><p style="font-size:10.5px;color:var(--muted)">Demo mode revenue intelligence — validate with live data before taking action. [DEMO MODE – illustrative only]</p></div>` : ''}
+<div class="kpi-row">
+  <div class="kpi" style="border-top:2px solid var(--accent)"><div class="mn">${e(safe(s2.tam_size_estimate)||'N/A')}</div><div class="bl">TAM</div></div>
+  <div class="kpi" style="border-top:2px solid var(--green)"><div class="mn" style="color:var(--green)">${e(safe(s2.growth_rate)||'N/A')}</div><div class="bl">CAGR</div></div>
+  <div class="kpi" style="border-top:2px solid var(--amber)"><div class="mn" style="color:var(--amber)">${confScore}/100</div><div class="bl">Confidence</div></div>
+  <div class="kpi" style="border-top:2px solid ${recColor}"><div class="mn" style="color:${recColor}">${e(recUp)}</div><div class="bl">Verdict</div></div>
 </div>
+${srcNote('TAM/CAGR: AI market estimate; Relevance: algorithmic scoring; Verdict: composite signal analysis — validate manually')}
+${callout(s1.gtm_relevance_reasoning||s1.analyst_insight||'')}
+${pageInsightExpanded('Strategic Interpretation',
+  score>=75 ? 'Strong alignment across TAM, ICP, and timing signals. This motion is ready for active engagement.' : score>=50 ? 'Moderate alignment. Validate the weakest evidence areas before committing outbound resources.' : 'Limited fit signals detected. Consider re-evaluating in 60–90 days with richer data.',
+  score>=75 ? 'Initiate outbound with the top-tier ICP accounts and validate conversion signals within 30 days.' : score>=50 ? 'Run a small test batch with high-fit accounts before scaling. Strengthen weak signal areas first.' : 'Pause full-scale execution. Identify the root cause of low fit and re-qualify the TAM before proceeding.'
+)}
+${sectionFtr('Executive Summary')}
+</section>
 
-<!-- STEP 1: MARKET RESEARCH -->
-<div class="page section-break" id="market-research">
+<!-- ═══════════════════════════ MARKET RESEARCH ════════════════════════════ -->
+<section class="rpt-sec" id="sec-market">
 ${pageHdr()}
-${secHead('01', 'Market Research — The Context')}
-${secCtx(s1.section_context || 'Deconstructs market positioning and isolates specific macro-triggers.')}
-${h3('market-research', '1', 'Company Overview')}
-<div class="card keep-together"><p>${e(safe(s1.company_overview) || '—')}</p></div>
-${h3('market-research', '2', 'Market Position & Stage')}
+${secHead('01','Market Research — The Context')}
+${secCtx(s1.section_context||'Deconstructs market positioning and isolates specific macro-triggers.')}
+${h3('','1.1','Company Overview')}
+<div class="card no-break"><p>${e(safe(s1.company_overview)||'—')}</p></div>
+${h3('','1.2','Market Position & Stage')}
 ${renderDarkTable({
-    headers: ['Attribute', 'Value'],
-    rows: [
-      ['Market Position', safe(s1.market_position)],
-      ['Revenue Stage', safe(s1.revenue_stage)],
-      ['Employee Count', safe(s1.employee_count)],
-      ['Products/Services', safe(s1.products_services)]
-    ].filter(r => r[1])
-  }, '', 'ABE GTMS Engine v1.0')}
-${h3('market-research', '3', 'SWOT Analysis')}
+  headers: ['Attribute','Value'],
+  rows: [
+    ['Market Position', safe(s1.market_position)],
+    ['Revenue Stage',   safe(s1.revenue_stage)],
+    ['Employee Count',  safe(s1.employee_count)],
+    ['Products/Services', safe(s1.products_services)]
+  ].filter(r=>r[1])
+},'','ABE GTMS Engine v1.0')}
+${h3('','1.3','SWOT Analysis')}
 ${swotGrid()}
-${h3('market-research', '4', 'Strategic Growth Signals')}
-<div class="keep-together" style="margin-bottom:3mm">${tags(s1.growth_signals, 'green')}</div>
-${h3('market-research', '5', 'Tech Stack Indicators')}
-<div class="keep-together" style="display:flex;flex-wrap:wrap;gap:2mm;margin-bottom:3mm">${arr(s1.tech_stack_hints).slice(0, 6).map(t => `<div style="display:inline-flex;align-items:center;gap:2mm;background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.2);border-radius:6px;padding:1.5mm 3mm"><svg width="8" height="8" viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="10" height="10" rx="2" stroke="#93c5fd" stroke-width="1.2"/><path d="M4 6h4M6 4v4" stroke="#93c5fd" stroke-width="1" stroke-linecap="round"/></svg><span style="font-size:8.5px;font-weight:600;color:#93c5fd">${e(String(t))}</span></div>`).join('')}</div>
+${h3('','1.4','Strategic Growth Signals')}
+<div class="no-break" style="margin-bottom:3mm">${tags(s1.growth_signals,'green')}</div>
+${arr(s1.tech_stack_hints).length ? `${h3('','1.5','Tech Stack Indicators')}
+<div class="no-break" style="display:flex;flex-wrap:wrap;gap:2mm;margin-bottom:3mm">
+  ${arr(s1.tech_stack_hints).slice(0,6).map(t=>`<div style="display:inline-flex;align-items:center;gap:2mm;background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.2);border-radius:6px;padding:1.5mm 3mm"><span style="font-size:8.5px;font-weight:600;color:#93c5fd">${e(String(t))}</span></div>`).join('')}
+</div>` : ''}
 ${callout(s1.analyst_insight)}
-${renderPageInsightBlock('market_research', strategy, isDemoMode)}
-${buildFillerBlock('market', renderMode)}
-${pageFtr('Market Research', 2)}
-</div>
+${pageInsightSimple('Market Implication','Positioning, SWOT signals, and growth indicators show whether the current strategy is ready for active engagement or needs refinement. Use this page to align timing and messaging to realistic market conditions.'+(isDemoMode?' In demo mode, validate with live data.':''))}
+${sectionFtr('Market Research')}
+</section>
 
-<!-- STEP 2: TAM MAPPING -->
-<div class="page section-break" id="tam-mapping">
+<!-- ═════════════════════════════ TAM MAPPING ══════════════════════════════ -->
+<section class="rpt-sec" id="sec-tam">
 ${pageHdr()}
-${secHead('02', 'TAM Mapping — The Opportunity')}
-${secCtx(s2.section_context || 'Quantifies total market velocity and filters it to actionable scope.')}
-${h3('tam-mapping', '1', 'Market Sizing')}
-<div class="keep-together" style="display:flex;gap:4mm;margin-bottom:5mm">
-  <div class="card" style="flex:1;text-align:center"><div class="mn">${e(safe(s2.tam_size_estimate) || '—')}</div><div class="bl">TAM</div></div>
-  <div class="card" style="flex:1;text-align:center"><div class="mn" style="color:var(--green)">${e(safe(s2.growth_rate) || '—')}</div><div class="bl">CAGR</div></div>
-  <div class="card" style="flex:1;text-align:center">
-    ${(() => {
-      const mv = safe(s2.market_maturity) || '—'; const isLong = mv.length > 12;
-      if (isLong) {
-        const parts = mv.split(/\s+with\s+|\s+—\s+|\s*,\s*/i);
-        return `<div style="font-size:14px;font-weight:900;font-family:'Space Mono',monospace;color:var(--amber);line-height:1.2">${e(parts[0] || mv)}</div>${parts[1] ? `<div style="font-size:9px;color:var(--muted);margin-top:1.5mm;line-height:1.3">${e(parts[1])}</div>` : ''}`;
-      }
-      return `<div class="mn" style="color:var(--amber)">${e(mv)}</div>`;
-    })()}
-    <div class="bl">Maturity</div>
-  </div>
+${secHead('02','TAM Mapping — The Opportunity')}
+${secCtx(s2.section_context||'Quantifies total market velocity and filters it to actionable scope.')}
+${h3('','2.1','Market Sizing')}
+<div class="kpi-row" style="margin-bottom:3mm">
+  <div class="kpi"><div class="mn">${e(safe(s2.tam_size_estimate)||'—')}</div><div class="bl">TAM</div></div>
+  <div class="kpi"><div class="mn" style="color:var(--green)">${e(safe(s2.growth_rate)||'—')}</div><div class="bl">CAGR</div></div>
+  <div class="kpi">${(()=>{ const mv=safe(s2.market_maturity)||'Emerging'; const long=mv.length>12; const p=mv.split(/\s+with\s+|\s+—\s+|\s*,\s*/i); return `<div style="font-size:${long?'14':'20'}px;font-weight:900;font-family:'Space Mono',monospace;color:var(--amber)">${e(p[0]||mv)}</div>${p[1]?`<div style="font-size:9px;color:var(--muted);margin-top:1mm">${e(p[1])}</div>`:''}`; })()}<div class="bl">Maturity</div></div>
 </div>
 ${srcNote('TAM/CAGR: AI market estimate; Maturity: AI assessment — cross-reference with industry analyst reports')}
-${h3('tam-mapping', '2', 'Waterfall Logic: TAM → SAM → SOM')}
-<div class="keep-together chart-block">
-  ${renderChartOrFallback('TAM Waterfall', charts.waterfall, waterfall(), { width: 480, height: 180 })}
-  <p class="figure-caption" style="font-size:10px; font-weight:bold; color:#f5f5f5; margin:1mm 0 0.5mm;">Figure 2: TAM → SAM → SOM Waterfall</p>
-  <p class="figure-source" style="font-size:8px; font-style:italic; color:#aaa; margin:0;">Source: ABE GTMS Engine v1.0</p>
+${h3('','2.2','Waterfall Logic: TAM → SAM → SOM')}
+<div class="chart-block">
+  ${renderChartOrFallback('TAM Waterfall',charts.waterfall,waterfall(),{width:480,height:180})}
+  <div class="fig-caption">Figure 2: TAM → SAM → SOM Waterfall</div>
+  <div class="fig-src">Source: ABE GTMS Engine v1.0</div>
 </div>
 ${segTable()}
-${s2.priority_opportunities ? `${h3('tam-mapping', '4', 'Priority Opportunities')}<div class="card keep-together"><p>${e(safe(s2.priority_opportunities))}</p></div>` : ''}
-${callout(s2.analyst_insight, 'amber')}
-${renderPageInsightBlock('tam_mapping', strategy, isDemoMode)}
-${buildFillerBlock('tam', renderMode)}
-${pageFtr('TAM Analysis', 3)}
-</div>
+${s2.priority_opportunities ? `${h3('','2.4','Priority Opportunities')}<div class="card no-break"><p>${e(safe(s2.priority_opportunities))}</p></div>` : ''}
+${callout(s2.analyst_insight,'amber')}
+${pageInsightExpanded('Commercial Impact',
+  'The narrowing from TAM to SOM represents realistic go-to-market scope — not just market size. Over-targeting the full TAM is a common execution failure.',
+  'Focus immediate sourcing on the SOM tier. Expand only after win rate and deal cycle data from early accounts are validated.'
+)}
+${sectionFtr('TAM Analysis')}
+</section>
 
-<!-- STEP 3: ICP MODELING -->
-<div class="page section-break" id="icp-modeling">
+<!-- ═══════════════════════════ ICP MODELING ══════════════════════════════ -->
+<section class="rpt-sec" id="sec-icp">
 ${pageHdr()}
-${secHead('03', 'ICP Modeling — The Persona')}
-${secCtx(s3.section_context || 'Identifies decision-makers and maps operational pain directly to solutions.')}
-${h3('icp-modeling', '1', 'Primary Persona & Firmographics')}
+${secHead('03','ICP Modeling — The Persona')}
+${secCtx(s3.section_context||'Identifies decision-makers and maps operational pain directly to solutions.')}
+${h3('','3.1','Primary Persona & Firmographics')}
 ${renderDarkTable({
-      headers: ['Criteria', 'Details'],
-      rows: [
-        ['Primary ICP', primaryICP],
-        ['Secondary ICP', secondaryICP],
-        ['Decision Makers', safe(s3.decision_makers)],
-        ['Firmographics', safe(s3.firmographics)],
-        ['Deal Cycle', safe(s3.deal_cycle)]
-      ].filter(r => r[1])
-    }, icpDerived ? '⚠️ One or more ICP values were derived from decision-maker / industry / trigger data.' : '', 'ABE GTMS Engine v1.0')}
-${h3('icp-modeling', '2', 'Core Pain Points')}
-${(() => {
-      const pains = arr(s3.buying_triggers);
-      const objs = arr(s3.objections);
-      const raw = safe(s3.core_pain_points);
-      if (raw && raw !== '—') return `<div class="card keep-together"><p>${e(raw)}</p></div>`;
-      if (!pains.length) return `<div class="card keep-together"><p style="color:var(--muted);font-style:italic">Core pain points not specified — derived from buying triggers below.</p></div>`;
-      return `<div class="keep-together" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2.5mm;margin-bottom:3mm">${pains.slice(0, 3).map(p => `<div style="background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.18);border-top:2px solid var(--amber);border-radius:8px;padding:3mm 3.5mm"><div style="font-size:7.5px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--amber);margin-bottom:1.5mm">Trigger</div><div style="font-size:10px;color:var(--text);line-height:1.5">${e(String(p))}</div></div>`).join('')}</div>`;
-    })()}
-<div class="keep-together" style="margin:3mm 0"><strong style="font-size:9px;color:var(--muted)">BUYING TRIGGERS</strong><br>${tags(s3.buying_triggers, 'amber')}</div>
-<div class="keep-together" style="margin:3mm 0"><strong style="font-size:9px;color:var(--muted)">COMMON OBJECTIONS</strong><br>${tags(s3.objections, 'red')}</div>
+  headers: ['Criteria','Details'],
+  rows: [
+    ['Primary ICP',     primaryICP],
+    ['Secondary ICP',   secondaryICP],
+    ['Decision Makers', safe(s3.decision_makers)],
+    ['Firmographics',   safe(s3.firmographics)],
+    ['Deal Cycle',      safe(s3.deal_cycle)]
+  ].filter(r=>r[1])
+}, icpDerived ? '⚠ One or more ICP values were derived from decision-maker / industry / trigger data.' : '', 'ABE GTMS Engine v1.0')}
+${h3('','3.2','Core Pain Points')}
+${(()=>{
+  const pains = arr(s3.buying_triggers);
+  const raw   = safe(s3.core_pain_points);
+  if (raw && raw !== '—') return `<div class="card no-break"><p>${e(raw)}</p></div>`;
+  if (!pains.length) return `<div class="card no-break"><p style="color:var(--muted);font-style:italic">Core pain points not specified — derived from buying triggers below.</p></div>`;
+  return `<div class="grid3 no-break" style="margin-bottom:3mm">${pains.slice(0,3).map(p=>`<div style="background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.18);border-top:2px solid var(--amber);border-radius:8px;padding:3mm"><div class="risk-label" style="color:var(--amber)">Trigger</div><div style="font-size:10px;line-height:1.5">${e(String(p))}</div></div>`).join('')}</div>`;
+})()}
+<div class="no-break" style="margin:3mm 0"><div class="bl">BUYING TRIGGERS</div>${tags(s3.buying_triggers,'amber')}</div>
+<div class="no-break" style="margin:3mm 0"><div class="bl">COMMON OBJECTIONS</div>${tags(s3.objections,'red')}</div>
 ${painMap()}
 ${icpRepair()}
 ${callout(s3.analyst_insight)}
-${renderPageInsightBlock('icp_modeling', strategy, isDemoMode)}
-${buildFillerBlock('icp', renderMode)}
-${pageFtr('ICP Modeling', 4)}
-</div>
+${pageInsightSimple('ICP Interpretation', arr(s3.decision_makers).length ? `The primary ICP and pain points identified here are the targeting foundation. Align outreach to buyer roles and objections to reduce wasted effort and improve response rates.${isDemoMode?' In demo mode, validate with live data.':''}` : 'Define the highest-fit buyer profile before initiating outbound. Weak ICP clarity is the most common reason for low reply rates.')}
+${sectionFtr('ICP Modeling')}
+</section>
 
-<div class="page section-break" id="account-sourcing">
+<!-- ══════════════════════════ ACCOUNT SOURCING ════════════════════════════ -->
+<section class="rpt-sec" id="sec-sourcing">
 ${pageHdr()}
-${secHead('04', 'Account Sourcing — The Targets')}
-${secCtx(s4.section_context || 'Translates persona into actionable technographic filters and sourcing logic.')}
-${h3('account-sourcing', '1', 'Sourcing Infrastructure')}
+${secHead('04','Account Sourcing — The Targets')}
+${secCtx(s4.section_context||'Translates persona into actionable technographic filters and sourcing logic.')}
+${h3('','4.1','Sourcing Infrastructure')}
 ${renderDarkTable({
-      headers: ['Category', 'Details'],
-      rows: [
-        ['Recommended Databases', safe(s4.recommended_databases)],
-        ['Estimated Universe', safe(s4.estimated_universe)]
-      ].filter(r => r[1])
-    }, '', 'ABE GTMS Engine v1.0')}
-${h3('account-sourcing', '2', 'Filter Criteria')}
-<div class="keep-together" style="display:grid;grid-template-columns:1fr 1fr;gap:2.5mm;margin-bottom:3mm">
-  <div style="background:var(--card);border:1px solid var(--border);border-radius:7px;padding:2.5mm 3.5mm">
-    <div style="font-size:7.5px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:1.5mm">Include</div>
-    <div style="font-size:10px;color:var(--text)">${e(safe(s4.filter_criteria) || 'Company size 200–800 employees, B2B revenue operations focus, modern digitization capacity')}</div>
-  </div>
-  <div class="keep-together" style="background:var(--card);border:1px solid rgba(239,68,68,.2);border-radius:7px;padding:2.5mm 3.5mm">
-    <div style="font-size:7.5px;font-weight:700;text-transform:uppercase;letter-spacing:.12em;color:var(--red);margin-bottom:1.5mm">Exclude</div>
-    <div style="font-size:10px;color:var(--text)">${e(safe(s4.exclusion_criteria) || 'Pre-revenue, non-B2B, outside target geography, weak digital presence')}</div>
-  </div>
+  headers: ['Category','Details'],
+  rows: [
+    ['Recommended Databases', safe(s4.recommended_databases)],
+    ['Estimated Universe',    safe(s4.estimated_universe)]
+  ].filter(r=>r[1])
+},'','ABE GTMS Engine v1.0')}
+${h3('','4.2','Filter Criteria')}
+<div class="grid2 no-break" style="margin-bottom:3mm">
+  <div class="card" style="margin-bottom:0"><div class="bl">Include</div><p style="font-size:10px">${e(safe(s4.filter_criteria)||'Company size 200–800 employees, B2B revenue operations focus, modern digitization capacity.')}</p></div>
+  <div class="card" style="margin-bottom:0;border-color:rgba(239,68,68,.2)"><div class="bl" style="color:var(--red)">Exclude</div><p style="font-size:10px">${e(safe(s4.exclusion_criteria)||'Pre-revenue, non-B2B, outside target geography, weak digital presence.')}</p></div>
 </div>
-${h3('account-sourcing', '3', '3-Step Sourcing Motion')}
-<div class="keep-together" style="display:flex;gap:2.5mm;margin-bottom:3mm">
-  ${['Identify', 'Validate', 'Prioritize'].map((step, i) => {
-      const descs = [
-        safe(s4.sourcing_playbook) || 'Build list from Crunchbase, LinkedIn Sales Navigator, ZoomInfo using firmographic filters.',
-        'Cross-reference with intent data. Confirm buyer title, tech stack signal, and growth stage.',
-        'Score accounts by ICP fit, signal recency, and deal-cycle alignment. Lead with high-fit.'
-      ];
-      return `<div style="flex:1;background:var(--card);border:1px solid var(--border);border-radius:8px;padding:3mm 3.5mm;border-top:2.5px solid var(--accent)">
+${h3('','4.3','3-Step Sourcing Motion')}
+<div class="grid3 no-break" style="margin-bottom:3mm">
+  ${['Identify','Validate','Prioritize'].map((step,i)=>{
+    const descs = [
+      safe(s4.sourcing_playbook)||'Build list from Crunchbase, LinkedIn Sales Navigator, ZoomInfo using firmographic filters.',
+      'Cross-reference with intent data. Confirm buyer title, tech stack signal, and growth stage.',
+      'Score accounts by ICP fit, signal recency, and deal-cycle alignment. Lead with high-fit.'
+    ];
+    return `<div class="card" style="margin-bottom:0;border-top:2.5px solid var(--accent)">
       <div style="display:flex;align-items:center;gap:2mm;margin-bottom:1.5mm">
-        <div style="width:16px;height:16px;border-radius:50%;background:linear-gradient(135deg,var(--accent2),var(--accent));display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;color:white;flex-shrink:0">${i + 1}</div>
+        <div style="width:16px;height:16px;border-radius:50%;background:linear-gradient(135deg,var(--accent2),var(--accent));display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;color:white;flex-shrink:0">${i+1}</div>
         <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.1em;color:white">${step}</div>
       </div>
-      <div style="font-size:9.5px;color:var(--text);line-height:1.5">${descs[i]}</div>
+      <p style="font-size:9.5px;line-height:1.5">${descs[i]}</p>
     </div>`;
-    }).join('')}
+  }).join('')}
 </div>
-${s4.data_enrichment_tips ? `${h3('account-sourcing', '4', 'Data Enrichment')}<div class="card keep-together"><p>${e(safe(s4.data_enrichment_tips))}</p></div>` : ''}
+${s4.data_enrichment_tips ? `${h3('','4.4','Data Enrichment')}<div class="card no-break"><p>${e(safe(s4.data_enrichment_tips))}</p></div>` : ''}
 ${acctTable()}
 ${callout(s4.analyst_insight)}
-${renderPageInsightBlock('account_sourcing', strategy, isDemoMode)}
-${buildFillerBlock('sourcing', renderMode)}
-${pageFtr('Account Sourcing', 5)}
-</div>
+${pageInsightExpanded('Sourcing Implication',
+  'The sourcing criteria narrow the target universe to higher-fit accounts, reducing wasted outreach cycles against borderline names.',
+  'Use these filters to prioritize accounts with strong fit and exclude low-fit names from active sequencing immediately.'
+)}
+${sectionFtr('Account Sourcing')}
+</section>
 
-<!-- STEP 5: KEYWORDS & INTENT -->
-<div class="page section-break" id="keywords-intent">
+<!-- ══════════════════════════ KEYWORDS & INTENT ═══════════════════════════ -->
+<section class="rpt-sec" id="sec-keywords">
 ${pageHdr()}
-${secHead('05', 'Keywords & Intent Intelligence')}
-${secCtx(s5.section_context || 'Maps the semantic footprint before RFP issuance and decodes intent signals.')}
-${h3('keywords-intent', '1', 'Keyword Arsenal')}
-<div class="keep-together" style="margin-bottom:3mm"><strong style="font-size:9px;color:var(--muted)">PRIMARY KEYWORDS</strong><br>${tags(s5.primary_keywords, 'green')}</div>
-<div class="keep-together" style="margin-bottom:3mm"><strong style="font-size:9px;color:var(--muted)">SECONDARY KEYWORDS</strong><br>${tags(s5.secondary_keywords, 'blue')}</div>
+${secHead('05','Keywords & Intent Intelligence')}
+${secCtx(s5.section_context||'Maps the semantic footprint before RFP issuance and decodes intent signals.')}
+${h3('','5.1','Keyword Arsenal')}
+<div class="no-break" style="margin-bottom:3mm"><div class="bl">PRIMARY KEYWORDS</div>${tags(s5.primary_keywords,'green')}</div>
+<div class="no-break" style="margin-bottom:3mm"><div class="bl">SECONDARY KEYWORDS</div>${tags(s5.secondary_keywords,'blue')}</div>
 ${kwTaxonomy()}
-${s5.boolean_query ? `${h3('keywords-intent', '3', 'Boolean Query String')}<div class="card keep-together"><code style="font-family:'Space Mono',monospace;font-size:10px;color:#c4b5fd;word-break:break-all">${e(safe(s5.boolean_query))}</code></div>` : ''}
-${s5.linkedin_search_strings ? `${h3('keywords-intent', '4', 'LinkedIn Search String')}<div class="card keep-together"><code style="font-family:'Space Mono',monospace;font-size:10px;color:#93c5fd;word-break:break-all">${e(safe(s5.linkedin_search_strings))}</code></div>` : ''}
-<div class="keep-together" style="margin:3mm 0"><strong style="font-size:9px;color:var(--muted)">INTENT SIGNALS</strong><br>${tags(s5.intent_signals, 'amber')}</div>
-${charts.intent
-      ? `<div class="keep-together chart-block" style="margin:3mm 0 5mm"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:2mm">INTENT SIGNAL STRENGTH</div>${renderChartOrFallback('Intent Signal', charts.intent, '', { width: 480, height: 180 })}<p class="figure-caption" style="font-size:10px; font-weight:bold; color:#f5f5f5; margin:1mm 0 0.5mm;">Figure 3: Intent Signal Strength</p><p class="figure-source" style="font-size:8px; font-style:italic; color:#aaa; margin:0;">Source: ABE GTMS Engine v1.0</p></div>`
-      : ''
-    }
-<div class="keep-together" style="margin:3mm 0"><strong style="font-size:9px;color:var(--muted)">CONTENT TOPICS</strong><br>${tags(s5.content_topics, 'blue')}</div>
+${s5.boolean_query ? `${h3('','5.3','Boolean Query String')}<div class="card no-break"><code style="font-family:'Space Mono',monospace;font-size:10px;color:#c4b5fd;word-break:break-all">${e(safe(s5.boolean_query))}</code></div>` : ''}
+<div class="no-break" style="margin:3mm 0"><div class="bl">INTENT SIGNALS</div>${tags(s5.intent_signals,'amber')}</div>
+${charts.intent ? `<div class="chart-block">
+  <div class="bl" style="margin-bottom:2mm">INTENT SIGNAL STRENGTH</div>
+  ${renderChartOrFallback('Intent Signal',charts.intent,'',{width:480,height:180})}
+  <div class="fig-caption">Figure 3: Intent Signal Strength</div>
+  <div class="fig-src">Source: ABE GTMS Engine v1.0</div>
+</div>` : ''}
+<div class="no-break" style="margin:3mm 0"><div class="bl">CONTENT TOPICS</div>${tags(s5.content_topics,'blue')}</div>
 ${callout(s5.analyst_insight)}
-${renderPageInsightBlock('keywords_intent', strategy, isDemoMode)}
-${buildFillerBlock('keywords', renderMode)}
-${pageFtr('Keywords & Intent', 6)}
-</div>
+${pageInsightExpanded('Intent Interpretation',
+  'The signal clusters show where buyer intent is strongest and which themes should be prioritized in outreach personalization.',
+  'Build messaging around the highest-priority intent themes. Keep outreach concise and directly aligned to buyer needs.'
+)}
+${sectionFtr('Keywords & Intent')}
+</section>
 
-<!-- STEP 6: ENTERPRISE SDR SEQUENCE — PAGE 8: EMAILS -->
-<div class="page section-break" id="sdr-emails">
+<!-- ═════════════════════════ SDR SEQUENCE — EMAILS ════════════════════════ -->
+<section class="rpt-sec" id="sec-sdr">
 ${pageHdr()}
-${secHead('06', 'Enterprise SDR Sequence — The Engagement')}
-${secCtx(s6.section_context || 'Hyper-targeted sequences designed to agitate pain and validate scalability.')}
-${h3('sdr-sequence', '1', '3-Touch Triggered Sequence')}
-${emailBlock('email_1', 0)}
-${emailBlock('email_2', 1)}
-${emailBlock('email_3', 2)}
-${renderPageInsightBlock('sdr_sequence', strategy, isDemoMode)}
-${buildFillerBlock('sdr', renderMode)}
-${pageFtr('Engagement Playbook — Emails', 7)}
-</div>
+${secHead('06','Enterprise SDR Sequence — The Engagement')}
+${secCtx(s6.section_context||'Hyper-targeted sequences designed to agitate pain and validate scalability.')}
+${h3('','6.1','3-Touch Triggered Sequence')}
+${emailBlock('email_1',0)}
+${emailBlock('email_2',1)}
+${emailBlock('email_3',2)}
+${pageInsightSimple('Engagement Logic','A three-touch SDR sequence moves buyers from problem awareness to interest and urgency without overloading them early. This structure builds credibility while surfacing high-fit responses.'+(isDemoMode?' In demo mode, validate with live data.':''))}
+${sectionFtr('Engagement Playbook — Emails')}
+</section>
 
-<!-- STEP 6 CONTINUED — PAGE 9: FOLLOW-UP + LINKEDIN -->
-<div class="page" id="sdr-social">
+<!-- ═══════════════════════ SDR SEQUENCE — CADENCE ════════════════════════ -->
+<section class="rpt-continuation" id="sec-sdr-cadence">
 ${pageHdr()}
-${secHead('06', 'Enterprise SDR Sequence — Follow-up & Social')}
+${secHead('06','Enterprise SDR Sequence — Follow-up & Social')}
 ${secCtx('Cadence continuation and LinkedIn direct outreach hook.')}
-${s6.follow_up_sequence ? `${h3('sdr-sequence', '2', 'Follow-up Cadence')}<div class="card keep-together"><p>${e(safe(s6.follow_up_sequence))}</p></div>` : `${h3('sdr-sequence', '2', 'Follow-up Cadence')}<div class="card keep-together"><p>Send Email 1 → wait 3 days → Email 2 → reach out on LinkedIn → follow-up call attempt.</p></div>`}
-<!-- Visual cadence timeline -->
-<div class="keep-together" style="margin:4mm 0 3mm">
-  <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-bottom:3mm">ENGAGEMENT TIMELINE</div>
-  <div style="display:flex;align-items:center;gap:0">
-    ${[['Day 1', 'Email 1', 'var(--accent)'], ['Day 4', 'Email 2', 'var(--accent)'], ['Day 7', 'LinkedIn', '#3b82f6'], ['Day 10', 'Call', 'var(--green)'], ['Day 14', 'Final', 'var(--amber)']].map((item, i, arr) => `<div style="display:flex;align-items:center;flex:1">
+${h3('','6.2','Follow-up Cadence')}
+<div class="card no-break"><p>${e(safe(s6.follow_up_sequence)||'Send Email 1 → wait 3 days → Email 2 → reach out on LinkedIn → follow-up call attempt.')}</p></div>
+<div class="no-break" style="margin:4mm 0">
+  <div class="bl" style="margin-bottom:3mm">ENGAGEMENT TIMELINE</div>
+  <div style="display:flex;align-items:center">
+    ${[['Day 1','Email 1','var(--accent)'],['Day 4','Email 2','var(--accent)'],['Day 7','LinkedIn','#3b82f6'],['Day 10','Call','var(--green)'],['Day 14','Final','var(--amber)']].map((item,i,ar)=>`<div style="display:flex;align-items:center;flex:1">
       <div style="text-align:center;flex:1">
-        <div style="width:32px;height:32px;border-radius:50%;background:${item[2]};border:2px solid rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;color:white;margin:0 auto 2mm">${i + 1}</div>
+        <div style="width:30px;height:30px;border-radius:50%;background:${item[2]};display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;color:white;margin:0 auto 2mm">${i+1}</div>
         <div style="font-size:8px;font-weight:700;color:white">${item[1]}</div>
         <div style="font-size:7px;color:var(--muted)">${item[0]}</div>
       </div>
-      ${i < 4 ? `<div style="flex:0 0 20px;height:1.5px;background:linear-gradient(90deg,${item[2]},${arr[i + 1][2]});opacity:.4"></div>` : ''}
+      ${i<4?`<div style="flex:0 0 20px;height:1.5px;background:linear-gradient(90deg,${item[2]},${ar[i+1][2]});opacity:.4"></div>`:''}
     </div>`).join('')}
   </div>
 </div>
-${s6.linkedin_message ? `${h3('sdr-sequence', '3', 'LinkedIn Hook')}<div class="card keep-together" style="border-left:3px solid #3b82f6"><p style="font-size:11.5px"><strong>Direct Message:</strong><br><br>"${e(safe(s6.linkedin_message))}"</p></div>` : ''}
-${s6.linkedin_follow_up ? `${h3('sdr-sequence', '4', 'LinkedIn Follow-up')}<div class="card keep-together"><p>${e(safe(s6.linkedin_follow_up))}</p></div>` : ''}
-<!-- Channel best-practice strip -->
-<div class="keep-together" style="margin-top:4mm">
-  <div style="font-size:8px;font-weight:700;text-transform:uppercase;letter-spacing:.15em;color:var(--muted);margin-bottom:2.5mm">CHANNEL PERFORMANCE BENCHMARKS</div>
-  <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2.5mm">
-    <div style="background:rgba(168,85,247,.05);border:1px solid rgba(168,85,247,.15);border-radius:8px;padding:3mm 3.5mm;text-align:center">
-      <div style="font-family:'Space Mono',monospace;font-size:18px;font-weight:900;color:var(--accent)">15–25%</div>
-      <div style="font-size:7.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-top:1mm">Email Open Rate<br>Enterprise B2B</div>
-    </div>
-    <div style="background:rgba(59,130,246,.05);border:1px solid rgba(59,130,246,.15);border-radius:8px;padding:3mm 3.5mm;text-align:center">
-      <div style="font-family:'Space Mono',monospace;font-size:18px;font-weight:900;color:#93c5fd">3–5%</div>
-      <div style="font-size:7.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-top:1mm">Reply Rate<br>Cold Outbound</div>
-    </div>
-    <div style="background:rgba(34,197,94,.05);border:1px solid rgba(34,197,94,.15);border-radius:8px;padding:3mm 3.5mm;text-align:center">
-      <div style="font-family:'Space Mono',monospace;font-size:18px;font-weight:900;color:var(--green)">3–5x</div>
-      <div style="font-size:7.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-top:1mm">Multi-Touch Lift<br>vs Single Touch</div>
-    </div>
+${s6.linkedin_message ? `${h3('','6.3','LinkedIn Hook')}<div class="card no-break" style="border-left:3px solid #3b82f6"><p><strong>Direct Message:</strong><br><br>"${e(safe(s6.linkedin_message))}"</p></div>` : ''}
+<div class="no-break" style="margin-top:4mm">
+  <div class="bl" style="margin-bottom:2.5mm">CHANNEL PERFORMANCE BENCHMARKS</div>
+  <div class="grid3">
+    <div class="card" style="margin-bottom:0;text-align:center"><div style="font-family:'Space Mono',monospace;font-size:18px;font-weight:900;color:var(--accent)">15–25%</div><div class="bl" style="margin-top:1mm">Email Open Rate<br>Enterprise B2B</div></div>
+    <div class="card" style="margin-bottom:0;text-align:center"><div style="font-family:'Space Mono',monospace;font-size:18px;font-weight:900;color:#93c5fd">3–5%</div><div class="bl" style="margin-top:1mm">Reply Rate<br>Cold Outbound</div></div>
+    <div class="card" style="margin-bottom:0;text-align:center"><div style="font-family:'Space Mono',monospace;font-size:18px;font-weight:900;color:var(--green)">3–5×</div><div class="bl" style="margin-top:1mm">Multi-Touch Lift<br>vs Single Touch</div></div>
   </div>
 </div>
 ${callout(s6.analyst_insight)}
-${renderPageInsightBlock('followup_social', strategy, isDemoMode)}
-${buildFillerBlock('sdr', renderMode)}
-${pageFtr('Engagement Playbook — Cadence', 8)}
-</div>
+${pageInsightExpanded('Channel Strategy',
+  'Follow-up and social outreach broaden the core engagement sequence without adding friction to the buyer journey.',
+  'Activate follow-up within 3–5 days of the first touch. Use LinkedIn to reinforce credibility before the second email touch.'
+)}
+${sectionFtr('Engagement Playbook — Cadence')}
+</section>
 
-<!-- STEP 7: REVENUE INTELLIGENCE — Decision Engine -->
-<div class="page section-break" id="decision-engine">
+<!-- ══════════════════════ REVENUE INTELLIGENCE — DECISION ENGINE ══════════ -->
+<section class="rpt-sec" id="sec-decision">
 ${pageHdr()}
-${decisionEngine()}
-${renderPageInsightBlock('decision_engine', strategy, isDemoMode)}
-${buildFillerBlock('decision', renderMode)}
-${pageFtr('Revenue Intelligence', 9)}
-</div>
+${secHead('07','Revenue Intelligence — Decision Engine')}
+${secCtx('Final strategic audit. Validates execution viability and dictates immediate next steps.')}
+${decisionContent()}
+${pageInsightExpanded('Decision Interpretation',
+  'The decision score is a prioritization signal for execution readiness — not a substitute for stakeholder review and live validation.',
+  'Review the recommendation, validate weak assumptions, and only advance the motion if evidence support aligns with your go-to-market timing window.'
+)}
+${sectionFtr('Revenue Intelligence')}
+</section>
 
-<!-- STEP 7 CONTINUED: CONFIDENCE MATRIX -->
-<div class="page" id="confidence-matrix">
+<!-- ══════════════════════ REVENUE INTELLIGENCE — CONFIDENCE ══════════════ -->
+<section class="rpt-continuation" id="sec-confidence">
 ${pageHdr()}
-${secHead('07', 'Revenue Intelligence — Confidence Matrix')}
+${secHead('07','Revenue Intelligence — Confidence Matrix')}
 ${secCtx('Weighted fidelity assessment of signal quality, market timing, and ICP alignment.')}
-<div class="confidence-matrix keep-together chart-block">
-${renderChartOrFallback('Confidence Matrix', charts.confidence,
-      `<div style="display:flex;gap:6mm;align-items:flex-start">${(() => {
-        const circ = 176, filled = Math.round((confScore / 100) * circ);
-        const gc = confScore >= 75 ? 'var(--green)' : confScore >= 50 ? 'var(--amber)' : 'var(--red)';
-        return `<svg width="90" height="90" viewBox="0 0 90 90" xmlns="http://www.w3.org/2000/svg" style="flex-shrink:0">
-      <circle cx="45" cy="45" r="28" fill="none" stroke="rgba(255,255,255,.07)" stroke-width="9"/>
-      <circle cx="45" cy="45" r="28" fill="none" stroke="${gc}" stroke-width="9" stroke-dasharray="${filled} ${circ}" stroke-dashoffset="${Math.round(circ * 0.25)}" stroke-linecap="round" transform="rotate(-90 45 45)"/>
-      <text x="45" y="42" text-anchor="middle" font-family="monospace" font-size="16" font-weight="900" fill="white">${confScore}</text>
-      <text x="45" y="54" text-anchor="middle" font-size="6.5" fill="#6B7280" letter-spacing="1">FIDELITY</text>
-    </svg><div style="flex:1">${renderConfidenceFallback(veracity, timing, icpFit, completeness, confScore)}</div>`;
-      })()}</div>`,
-      { width: 480, height: 200 }
-    )}
-<p class="figure-caption" style="font-size:10px; font-weight:bold; color:#f5f5f5; margin:1mm 0 0.5mm;">Figure 5: Weighted Confidence Matrix</p>
-<p class="figure-source" style="font-size:8px; font-style:italic; color:#aaa; margin:0;">Source: ABE GTMS Engine v1.0</p>
-</div>
-${srcNote('Confidence score is algorithmic — weights fixed (40/25/20/15), capped by data richness')}
-${renderPageInsightBlock('confidence_matrix', strategy, isDemoMode)}
+${confidenceContent()}
+${pageInsightExpanded('Confidence Interpretation',
+  'The confidence matrix lets you see which evidence pillars are strong and which need more validation before scaling execution.',
+  'Focus follow-up research on the lowest-confidence dimensions and update the recommendation before committing outbound resources.'
+)}
 ${callout(s7.analyst_insight)}
-${buildFillerBlock('confidence', renderMode)}
-${pageFtr('Revenue Intelligence — Confidence', 10)}
-</div>
+${sectionFtr('Revenue Intelligence — Confidence')}
+</section>
 
-<!-- APPENDIX — single flowing section, renders once, always last -->
-<div class="page section-break" id="appendix">
+<!-- ═══════════════════════════════ APPENDIX ══════════════════════════════ -->
+<section class="rpt-sec" id="sec-appendix">
 ${pageHdr()}
-${secHead('A', 'Appendix — Methodology, Data Quality &amp; Report Metadata')}
+${secHead('A','Appendix — Methodology & Data Quality')}
 ${secCtx('Transparency layer. Documents data provenance, scoring methodology, and known limitations.')}
-<div class="appendix-section">
-${h3('appendix', '1', 'Data Sources')}
+
+<div class="appendix-block">
+${h3('','A.1','Data Sources')}
 ${renderDarkTable({
-      headers: ['Data Point', 'Source Type', 'Reliability'],
-      rows: [
-        ['Company overview, position', 'Company website / public data', 'High — verify currency'],
-        ['TAM / SAM / SOM', 'AI market estimate', 'Medium — cross-ref industry reports'],
-        ['CAGR / growth rate', 'AI market estimate', 'Medium — validate with analyst data'],
-        ['ICP / decision makers', 'AI inference from company profile', 'Medium — confirm with sales intel'],
-        ['Buying triggers', 'AI inference from market signals', 'Medium'],
-        ['Account targets', 'AI-generated analogs (anonymized)', 'Low — replace with real pipeline'],
-        ['Keywords / intent signals', 'AI inference from ICP + industry', 'Medium'],
-        ['Email sequences', 'AI-generated, personalized', 'High — review before sending'],
-        ['Confidence score', 'Algorithmic (capped by data richness)', 'High']
-      ]
-    }, '', 'ABE GTMS Engine v1.0')}
+  headers: ['Data Point','Source Type','Reliability'],
+  rows: [
+    ['Company overview, position','Company website / public data','High — verify currency'],
+    ['TAM / SAM / SOM','AI market estimate','Medium — cross-ref industry reports'],
+    ['CAGR / growth rate','AI market estimate','Medium — validate with analyst data'],
+    ['ICP / decision makers','AI inference from company profile','Medium — confirm with sales intel'],
+    ['Buying triggers','AI inference from market signals','Medium'],
+    ['Account targets','AI-generated analogs (anonymized)','Low — replace with real pipeline'],
+    ['Keywords / intent signals','AI inference from ICP + industry','Medium'],
+    ['Email sequences','AI-generated, personalized','High — review before sending'],
+    ['Confidence score','Algorithmic (capped by data richness)','High']
+  ]
+},'','ABE GTMS Engine v1.0')}
 </div>
-<div class="appendix-section">
-${h3('appendix', '2', 'TAM Calculation Methodology')}
+
+<div class="appendix-block">
+${h3('','A.2','TAM Calculation Methodology')}
 ${renderDarkTable({
-      headers: ['Step', 'Method'],
-      rows: [
-        ['1. Global TAM', 'AI estimate from industry classification, public market reports, and comparable company analysis'],
-        ['2. Geography filter', 'Uses company-provided geography_eligibility when available; defaults to conservative 60-70%'],
-        ['3. Service-line fit', 'Uses company-provided service_line_fit when available; defaults to conservative 30-40%'],
-        ['4. Win rate', 'Uses company-provided win_rate when available; defaults to 8-12% (enterprise benchmark)'],
-        ['5. SOM derivation', 'Product of steps 1-4; dynamic values override defaults when strategy data provides them']
-      ]
-    }, '', 'ABE GTMS Engine v1.0')}
-${h3('appendix', '3', 'Key Assumptions')}
-${renderDarkTable({
-      headers: ['Assumption', 'Default Value', 'Override Guidance'],
-      rows: [
-        ['Geography eligibility', 'Dynamic when available; else 60-70%', 'Auto-populated from strategy.waterfall.geography_eligibility'],
-        ['Service-line fit', 'Dynamic when available; else 30-40%', 'Auto-populated from strategy.waterfall.service_line_fit'],
-        ['Win/capture rate', 'Dynamic when available; else 8-12%', 'Auto-populated from strategy.waterfall.win_rate'],
-        ['ICP derivation', 'Inferred from decision-makers + industry', 'Replace with validated buyer persona research'],
-        ['Account analogs', 'AI-generated archetypes', 'Replace with actual target account list from sales']
-      ]
-    }, '', 'ABE GTMS Engine v1.0')}
-${h3('appendix', '4', 'Confidence Scoring Explanation')}
-${renderDarkTable({
-      headers: ['Dimension', 'Weight', 'Description'],
-      rows: [
-        ['Signal Veracity', '<span class="num">40%</span>', 'Density and recency of explicit buying signals observed'],
-        ['Market Timing', '<span class="num">25%</span>', 'Alignment with macro tailwinds, budget cycles, and trigger events'],
-        ['ICP Fit', '<span class="num">20%</span>', 'Firmographic and technographic match against ideal profile'],
-        ['Data Completeness', '<span class="num">15%</span>', 'Depth and quality of source data used in analysis']
-      ]
-    }, 'The AI confidence score is hard-capped by measured data richness. The AI cannot claim higher confidence than the underlying data supports.', 'ABE GTMS Engine v1.0')}
+  headers: ['Step','Method'],
+  rows: [
+    ['1. Global TAM','AI estimate from industry classification, public market reports, and comparable company analysis'],
+    ['2. Geography filter','Uses company-provided geography_eligibility when available; defaults to conservative 60–70%'],
+    ['3. Service-line fit','Uses company-provided service_line_fit when available; defaults to conservative 30–40%'],
+    ['4. Win rate','Uses company-provided win_rate when available; defaults to 8–12% (enterprise benchmark)'],
+    ['5. SOM derivation','Product of steps 1–4; dynamic values override defaults when strategy data provides them']
+  ]
+},'','ABE GTMS Engine v1.0')}
 </div>
-${s7._data_quality ? `<div class="appendix-section">${h3('appendix', '5', 'Data Quality Audit')}${renderDarkTable({
-      headers: ['Metric', 'Value'],
-      rows: [
-        ['Data Richness Score', '<span class="num">' + (s7._data_quality.richness_score || '—') + '</span>'],
-        ['Signals (Pre-filter)', '<span class="num">' + (s7._data_quality.signals_before_filter || '—') + '</span>'],
-        ['Signals (Post-filter)', '<span class="num">' + (s7._data_quality.signals_after_filter || '—') + '</span>'],
-        ['AI Confidence (Claimed)', '<span class="num">' + (s7._data_quality.confidence_ai_claimed || '—') + '</span>'],
-        ['Confidence (After Cap)', '<span class="num">' + (s7._data_quality.confidence_after_cap || '—') + '</span>']
-      ]
-    }, '', 'ABE GTMS Engine v1.0')}</div>` : ''}
-<div class="appendix-section">
-${h3('appendix', '6', 'AI-Estimated Fields Disclaimer')}
-<div class="ac amber keep-together"><strong>AI-Estimated Content:</strong> The following fields in this report are generated by AI and should be independently validated before use in strategic decisions:<br>
-TAM / SAM / SOM sizing and growth rates · Market segment estimates and priorities · ICP persona derivations (when original data was placeholder) · Account target analogs and fit scores · Buying trigger identification and signal strength · Confidence score components.<br><br>
-All competitive intelligence reflects publicly available data only. Manual validation of exact revenue figures, headcount, and funding data is recommended prior to boardroom presentation.</div>
-${h3('appendix', '7', 'Report Metadata')}
+
+<div class="appendix-block">
+${h3('','A.3','Key Assumptions')}
 ${renderDarkTable({
-      headers: ['Field', 'Value'],
-      rows: [
-        ['Subject Company', e(co)],
-        ...(ind ? [['Industry', e(ind)]] : []),
-        ['Generated', date],
-        ['Platform', 'ABE Enterprise AI Revenue Infrastructure'],
-        ['Report Mode', isDemoMode ? 'Demo — illustrative only' : 'Live / Realtime'],
-        ['Steps Completed', String(strategy.steps_completed || 6) + '/7'],
-        ['GTM Relevance Score', score + '/100'],
-        ['Confidence Score', confScore + '/100'],
-        ['QuickChart Charts', [charts.gauge ? 'Gauge' : '', charts.waterfall ? 'Waterfall' : '', charts.confidence ? 'Confidence' : '', charts.intent ? 'Intent' : '', charts.risk ? 'Risk' : ''].filter(Boolean).join(', ') || 'Fallback HTML used']
-      ]
-    }, '', 'ABE GTMS Engine v1.0')}
-<div style="text-align:center;margin-top:8mm;padding-top:5mm;border-top:1px solid var(--border)">
-  <div class="am" style="margin:0 auto 3mm;width:28px;height:28px;font-size:9px">ABE</div>
-  <p style="font-size:9px;color:var(--faint)">End of Report &middot; ${e(co)} &middot; ${date} &middot; Confidential</p>
+  headers: ['Assumption','Default Value','Override Guidance'],
+  rows: [
+    ['Geography eligibility','Dynamic when available; else 60–70%','Auto-populated from strategy.waterfall.geography_eligibility'],
+    ['Service-line fit','Dynamic when available; else 30–40%','Auto-populated from strategy.waterfall.service_line_fit'],
+    ['Win/capture rate','Dynamic when available; else 8–12%','Auto-populated from strategy.waterfall.win_rate'],
+    ['ICP derivation','Inferred from decision-makers + industry','Replace with validated buyer persona research'],
+    ['Account analogs','AI-generated archetypes','Replace with actual target account list from sales']
+  ]
+},'','ABE GTMS Engine v1.0')}
+</div>
+
+<div class="appendix-block">
+${h3('','A.4','Confidence Scoring Explanation')}
+${renderDarkTable({
+  headers: ['Dimension','Weight','Description'],
+  rows: [
+    ['Signal Veracity','<span class="num">40%</span>','Density and recency of explicit buying signals observed'],
+    ['Market Timing','<span class="num">25%</span>','Alignment with macro tailwinds, budget cycles, and trigger events'],
+    ['ICP Fit','<span class="num">20%</span>','Firmographic and technographic match against ideal profile'],
+    ['Data Completeness','<span class="num">15%</span>','Depth and quality of source data used in analysis']
+  ]
+},'The AI confidence score is hard-capped by measured data richness. The AI cannot claim higher confidence than the underlying data supports.','ABE GTMS Engine v1.0')}
+</div>
+
+${s7._data_quality ? `<div class="appendix-block">
+${h3('','A.5','Data Quality Audit')}
+${renderDarkTable({
+  headers: ['Metric','Value'],
+  rows: [
+    ['Data Richness Score',       `<span class="num">${s7._data_quality.richness_score||'—'}</span>`],
+    ['Signals (Pre-filter)',      `<span class="num">${s7._data_quality.signals_before_filter||'—'}</span>`],
+    ['Signals (Post-filter)',     `<span class="num">${s7._data_quality.signals_after_filter||'—'}</span>`],
+    ['AI Confidence (Claimed)',   `<span class="num">${s7._data_quality.confidence_ai_claimed||'—'}</span>`],
+    ['Confidence (After Cap)',    `<span class="num">${s7._data_quality.confidence_after_cap||'—'}</span>`]
+  ]
+},'','ABE GTMS Engine v1.0')}
+</div>` : ''}
+
+<div class="appendix-block">
+${h3('','A.6','AI-Estimated Fields Disclaimer')}
+<div class="ac amber">
+  <strong>AI-Estimated Content:</strong> The following fields are AI-generated and should be independently validated before use in strategic decisions:<br>
+  TAM / SAM / SOM sizing and growth rates · Market segment estimates · ICP persona derivations · Account target analogs and fit scores · Buying trigger identification · Confidence score components.<br><br>
+  All competitive intelligence reflects publicly available data only. Manual validation of revenue figures, headcount, and funding data is recommended prior to boardroom presentation.
 </div>
 </div>
 
-${'</body></html>'}`;
+<div class="appendix-block">
+${h3('','A.7','Report Metadata')}
+${renderDarkTable({
+  headers: ['Field','Value'],
+  rows: [
+    ['Subject Company',    e(co)],
+    ...(ind ? [['Industry', e(ind)]] : []),
+    ['Generated',          date],
+    ['Platform',           'ABE Enterprise AI Revenue Infrastructure'],
+    ['Report Mode',        isDemoMode ? 'Demo — illustrative only' : 'Live / Realtime'],
+    ['Steps Completed',    `${strategy.steps_completed||6}/7`],
+    ['GTM Relevance Score',`${score}/100`],
+    ['Confidence Score',   `${confScore}/100`],
+    ['Charts',             [charts.gauge?'Gauge':'',charts.waterfall?'Waterfall':'',charts.confidence?'Confidence':'',charts.intent?'Intent':'',charts.risk?'Risk':''].filter(Boolean).join(', ')||'Fallback HTML used']
+  ]
+},'','ABE GTMS Engine v1.0')}
+</div>
+
+<div style="text-align:center;margin-top:10mm;padding-top:5mm;border-top:1px solid var(--border)">
+  <div class="am" style="margin:0 auto 3mm;width:28px;height:28px;font-size:9px">ABE</div>
+  <p style="font-size:9px;color:var(--faint)">End of Report · ${e(co)} · ${date} · Confidential</p>
+  <p style="font-size:7.5px;color:var(--faint);margin-top:1mm;letter-spacing:.05em">Classification: CONFIDENTIAL — Not for External Distribution</p>
+</div>
+${sectionFtr('Appendix — Methodology & Data Quality')}
+</section>
+
+</body></html>`;
 }
