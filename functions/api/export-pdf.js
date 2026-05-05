@@ -817,8 +817,10 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false, rende
   // ── Section label footer (appears at logical end of section) ──────────────
   const sectionFtr = (label) => `<div class="sec-ftr">ABE · ${e(label)}</div>`;
 
-  // ── Page header (printed at start of each flowing section) ────────────────
-  const pageHdr = () => `<div class="ph">
+  // browser-pdf: pageHdr suppressed — Chromium @page margins are sufficient.
+  //   Repeating the header on every section wastes ~15mm per page and causes
+  //   the final blank orphan. html2canvas path retains it unchanged.
+  const pageHdr = () => renderMode === 'browser-pdf' ? '' : `<div class="ph">
     <div class="phb">
       <div class="am">ABE</div>
       <div><div class="abn">AI Revenue Infrastructure</div><div class="abs">Enterprise GTM Platform</div></div>
@@ -1764,7 +1766,7 @@ ${renderDarkTable({
 },'','ABE GTMS Engine v1.0')}
 </div>
 
-<div style="text-align:center;margin-top:10mm;padding-top:5mm;border-top:1px solid var(--border)">
+<div style="text-align:center;margin-top:8mm;padding-top:5mm;border-top:1px solid var(--border);break-before:avoid;break-inside:avoid">
   <div class="am" style="margin:0 auto 3mm;width:28px;height:28px;font-size:9px">ABE</div>
   <p style="font-size:9px;color:var(--faint)">End of Report · ${e(co)} · ${date} · Confidential</p>
   <p style="font-size:7.5px;color:var(--faint);margin-top:1mm;letter-spacing:.05em">Classification: CONFIDENTIAL — Not for External Distribution</p>
