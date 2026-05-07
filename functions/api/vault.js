@@ -7,6 +7,7 @@
  * POST /api/vault           → delegates to gtm.js get_vault action (pagination, filters)
  */
 import { verifyAuth, corsHeaders, sanitise, errRes, okRes } from './_middleware.js';
+import { buildIntegrationContext } from './integration-readiness.js';
 
 export async function onRequestGet(context) {
   const { request, env } = context;
@@ -30,7 +31,10 @@ export async function onRequestGet(context) {
     });
     const data = await res.json();
     if (!res.ok) return errRes(data.error || 'Not found', res.status, cors);
-    return okRes({ report: data.strategy }, cors);
+    
+    // Pass through integration_context from gtm response if present
+    const integrationContext = data.integration_context;
+    return okRes({ report: data.strategy, integration_context: integrationContext }, cors);
   }
 
   // List all

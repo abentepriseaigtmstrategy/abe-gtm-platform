@@ -12,6 +12,7 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="auth-guard.js"></script>
+  <script src="ga4-tag.js"></script>
   <style>
     :root {
       --bg: #0B0F1A;
@@ -1694,10 +1695,10 @@
       const s7 = r.step_7_intelligence || (r.full_report && r.full_report.step_7_intelligence) || r.step7_decision_engine;
 
       if (s7 && typeof s7 === 'object' && Object.keys(s7).length > 0) {
-        const verdict = s7.go_no_go?.recommendation || 'Watch';
-        const verdictClass = verdict === 'Go' ? 'decision-go' : verdict === 'No-Go' ? 'decision-nogo' : 'decision-watch';
-        const reason = s7.go_no_go?.reason || '';
-        const confidence = s7.confidence_score || s1.gtm_relevance_score || 0;
+        const verdict = s7.verdict || s7.go_no_go?.recommendation || r.verdict || 'Watch';
+        const verdictClass = verdict.toLowerCase().includes('go') && !verdict.toLowerCase().includes('no') ? 'decision-go' : verdict.toLowerCase().includes('no') ? 'decision-nogo' : 'decision-watch';
+        const reason = s7.go_no_go?.reason || s7.verdict_reasoning || '';
+        const confidence = s7.confidence_score || r.gtm_score || s1.gtm_relevance_score || 0;
 
         let signalsHtml = '';
         if (s7.signal_summary && s7.signal_summary.length > 0) {
@@ -1776,18 +1777,15 @@
       const score = s1.gtm_relevance_score;
       if (!score) return ''; // Hide gracefully if no data
 
-      // Derive decision from score
-      let verdict, verdictClass, reason, confidence;
-      if (score >= 75) {
-        verdict = 'GO'; verdictClass = 'decision-go'; confidence = Math.min(score + 7, 97);
-        reason = `Signal fidelity and market timing show a high-priority engagement window. GTM score of ${score} indicates strong product-market alignment. Initiate outbound immediately before RFP cycles lock in incumbents.`;
-      } else if (score >= 50) {
-        verdict = 'WATCH'; verdictClass = 'decision-watch'; confidence = score - 5;
-        reason = `Market signals are present but incomplete. GTM score of ${score} reflects moderate alignment. Monitor for leadership changes, compliance events, or funding rounds before committing full SDR resources.`;
-      } else {
-        verdict = 'NO-GO'; verdictClass = 'decision-nogo'; confidence = Math.max(score - 10, 15);
-        reason = `GTM score of ${score} indicates limited product-market fit. Prospect profile does not meet minimum buying-intent threshold. Re-evaluate in 90 days or upon material trigger event.`;
-      }
+      // Derive decision from backend-owned intelligence layer
+      let verdict = r.verdict || (score >= 75 ? 'GO' : score >= 50 ? 'WATCH' : 'NO-GO');
+      let verdictClass = verdict.toLowerCase().includes('go') && !verdict.toLowerCase().includes('no') ? 'decision-go' : verdict.toLowerCase().includes('no') ? 'decision-nogo' : 'decision-watch';
+      let confidence = r.step_7_intelligence?.confidence_score || r.gtm_score || score || 0;
+      let reason = r.step_7_intelligence?.verdict_reasoning || (
+        verdict === 'GO' ? `Signal fidelity and market timing show a high-priority engagement window. GTM score of ${score} indicates strong product-market alignment.` :
+        verdict === 'WATCH' ? `Market signals are present but incomplete. GTM score of ${score} reflects moderate alignment.` :
+        `GTM score of ${score} indicates limited product-market fit. Re-evaluate in 90 days.`
+      );
 
       const triggers = Array.isArray(s3.buying_triggers) ? s3.buying_triggers : [];
       const primaryTrigger = triggers[0] || 'Operational pressure and modernisation mandate';
@@ -1865,9 +1863,10 @@
 
       // KPI strip
       const score = s1.gtm_relevance_score;
+      const bi = r.backend_intelligence || {};
       const s7 = r.step_7_intelligence || (r.full_report && r.full_report.step_7_intelligence) || r.step7_decision_engine || {};
-      const confScore = parseInt(s7.confidence_score) || score || 0;
-      const rec = s7.go_no_go?.recommendation || (score >= 75 ? 'Go' : score >= 50 ? 'Watch' : 'No-Go');
+      const confScore = parseInt(bi.confScore || s7.confidence_score) || score || 0;
+      const rec = bi.verdict || s7.go_no_go?.recommendation || (score >= 75 ? 'Go' : score >= 50 ? 'Watch' : 'No-Go');
       const scoreEl = document.getElementById('r-score');
       scoreEl.textContent = score ? String(score) : '';
       if (score >= 80) scoreEl.className = 'sv green';
@@ -1885,6 +1884,18 @@
 
       const container = document.getElementById('sections-container');
       container.innerHTML = [
+
+        // Truth Validation Audit
+        bi.truthMetadata?.validationWarnings?.length ? `
+        <div class="section" style="border-color:rgba(245,158,11,0.3)">
+          <div class="sec-header"><div class="sec-num" style="background:var(--amber)">⚠️</div><div class="sec-title">Truth Validation Audit</div></div>
+          <div class="sec-context">The following claims require manual verification to ensure market data integrity.</div>
+          <div class="card" style="border-left:3px solid var(--amber)">
+            <ul style="margin:0; padding:0 0 0 20px; color:var(--text); font-size:12px;">
+              ${bi.truthMetadata.validationWarnings.map(w => `<li>${esc(w)}</li>`).join('')}
+            </ul>
+          </div>
+        </div>` : '',
 
         // Executive Summary
         renderExecSummary(r, s1, s2) ? `<div class="section" style="border-color:rgba(168,85,247,.25)">
@@ -2008,7 +2019,15 @@
         // Appendix
         `<div class="section">
       <div class="sec-header"><div class="sec-num" style="background:var(--faint)">A</div><div class="sec-title">Appendix — Methodology & Data Quality</div></div>
-      <div class="sec-context">Transparency layer. Documents data provenance, scoring methodology, and known limitations.</div>
+      <div class="sec-context">${bi.methodology || 'Transparency layer. Documents data provenance, scoring methodology, and known limitations.'}</div>
+      <div class="fl">Data Quality Audit</div>
+      <div style="background:rgba(245,158,11,0.05);border-radius:6px;padding:12px;margin-bottom:14px;border:1px solid rgba(245,158,11,0.2)">
+        <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+          <span style="font-size:11px;font-weight:700;color:var(--amber)">Fidelity: ${bi.dataQuality?.status || 'Unknown'}</span>
+          <span style="font-size:11px;font-weight:700;color:var(--amber)">Richness: ${bi.dataQuality?.richness_score || 0}/100</span>
+        </div>
+        <div class="confidence-bar-wrap" style="height:4px;background:rgba(255,255,255,0.1)"><div class="confidence-bar" style="width:${bi.dataQuality?.richness_score || 0}%;background:var(--amber)"></div></div>
+      </div>
       <div class="fl">Data Sources</div>
       <table class="appendix-table">
         <thead><tr><th>Data Point</th><th>Source Type</th><th>Reliability</th></tr></thead>
@@ -2017,18 +2036,18 @@
           <tr><td>TAM / SAM / SOM</td><td>AI market estimate</td><td>Medium — cross-ref reports</td></tr>
           <tr><td>ICP / decision makers</td><td>AI inference</td><td>Medium — confirm with sales</td></tr>
           <tr><td>Account targets</td><td>AI-generated analogs</td><td>Low — replace with pipeline</td></tr>
-          <tr><td>Email sequences</td><td>AI-generated</td><td>High — review before sending</td></tr>
-          <tr><td>Confidence score</td><td>Algorithmic (capped)</td><td>High</td></tr>
         </tbody>
       </table>
-      <div class="fl">Key Assumptions</div>
+      <div class="fl" style="margin-top:14px">Key Assumptions</div>
       <table class="appendix-table">
         <thead><tr><th>Assumption</th><th>Default</th><th>Override</th></tr></thead>
         <tbody>
+          ${bi.assumptions ? bi.assumptions.map(a => `<tr><td>${esc(a)}</td><td>Applied</td><td>—</td></tr>`).join('') : `
           <tr><td>Geography eligibility</td><td>Dynamic or 60–70%</td><td>Replace with actual territory data</td></tr>
           <tr><td>Service-line fit</td><td>Dynamic or 30–40%</td><td>Replace with segment match</td></tr>
           <tr><td>Win/capture rate</td><td>Dynamic or 8–12%</td><td>Replace with CRM close rate</td></tr>
           <tr><td>Account analogs</td><td>AI archetypes</td><td>Replace with real target list</td></tr>
+          `}
         </tbody>
       </table>
       <div class="analyst-callout amber"><strong>⚠️ AI-Estimated Content:</strong> TAM/SAM/SOM, CAGR, ICP derivations, account analogs, and buying triggers are AI-generated and should be independently validated before strategic decisions.</div>
@@ -2060,11 +2079,43 @@
       const params = new URLSearchParams(location.search);
       const id = params.get('id');
       if (!id) { showError('No report ID specified. Please open from the Vault.'); return; }
+      
       try {
         const data = await window.APP.api('/api/vault?id=' + encodeURIComponent(id), null, 'GET');
         const report = data.report;
         if (!report) { showError('Report not found.'); return; }
-        renderReport(report);
+        
+        // ── Strategy Normalization (v5 — Production) ──
+        const strategy = report.full_report || report.strategy || report.report_data || report;
+
+        // ── Phase 3: Production Canonical Viewer ──
+        try {
+          const forceFallback = params.get('force_fallback') === 'true';
+          if (forceFallback) throw new Error('Forced failure (dev-mode)');
+
+          console.log('[Phase 3] Initiating API-driven viewer render...');
+          const viewerData = await window.APP.api('/api/export-pdf?mode=viewer', { strategy: strategy }, 'POST');
+
+          if (viewerData && viewerData.html) {
+            console.log('%c[Viewer] Source: API-Canonical', 'color: #22c55e; font-weight: bold');
+            
+            const container = document.getElementById('report-content');
+            container.innerHTML = viewerData.html;
+            
+            // UI State Sync
+            document.getElementById('loading-state').style.display = 'none';
+            container.style.display = 'block';
+            document.getElementById('btn-export').disabled = false;
+            document.getElementById('btn-export2').disabled = false;
+            
+            window._strategy = strategy;
+            return;
+          }
+          throw new Error('API render returned empty payload');
+        } catch (viewerErr) {
+          console.warn('%c[Viewer] Source: Legacy-Fallback', 'color: #f59e0b; font-weight: bold', viewerErr.message);
+          renderReport(report); // Fallback to client-side JS engine
+        }
       } catch (e) {
         showError('Failed to load report: ' + e.message);
       }

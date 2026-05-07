@@ -6,6 +6,8 @@
   <title>GTM Strategy Builder V2 · ABE AI Revenue Infrastructure</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
 
+  <script src="ga4-tag.js"></script>
+
   <style>
     :root {
       --bg:       #0B0F1A;
@@ -3337,6 +3339,7 @@ async function generateProfessionalPDF() {
   const p5 = state.steps[5]?.data || {};
   const p6 = state.steps[6]?.data || {};
   const s7 = state.step7 || {};
+  const bi = state.backend_intelligence || s7.backend_intelligence || {};
 
   const esc  = s => (s||'').toString()
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
@@ -3352,8 +3355,8 @@ async function generateProfessionalPDF() {
   const icp      = p2.icp_fit_score?.score          ?? 0;
   const data_c   = p2.data_completeness_score?.score ?? 0;
   const total    = p2.total_score ?? (demand + timing + icp + data_c);
-  const verdict  = ((p3.verdict || p6.verdict || 'PENDING')).toUpperCase();
-  const confScore = p5.confidence_score ?? Math.round(total * 0.85);
+  const verdict  = (bi.verdict || s7.verdict || p3.verdict || p6.verdict || 'PENDING').toUpperCase();
+  const confScore = bi.confScore ?? s7.confidence_score ?? p5.confidence_score ?? Math.round(total * 0.85);
   const vc = verdict === 'GO'
     ? { color:'#22c55e', bg:'rgba(34,197,94,0.15)', border:'#22c55e', label:'GO' }
     : verdict === 'NO GO'
@@ -3736,7 +3739,7 @@ async function generateProfessionalPDF() {
   <div style="border:2px solid ${vc.border};background:${vc.bg};border-radius:12px;padding:20px 22px;margin-bottom:14px;">
     <div class="mono" style="font-size:32px;font-weight:900;color:${vc.color};margin-bottom:6px;">${vc.label}</div>
     <div style="font-size:10px;font-weight:700;color:${vc.color};letter-spacing:.1em;margin-bottom:4px;">TOTAL SCORE: ${total}/100</div>
-    <div style="font-size:12px;color:#d1d5db;margin-bottom:14px;">${esc(safe(p3.verdict_reasoning,'Verdict based on signal scoring across all four dimensions.'))}</div>
+    <div style="font-size:12px;color:#d1d5db;margin-bottom:14px;">${esc(safe(bi.reasoning || p3.verdict_reasoning,'Verdict based on signal scoring across all four dimensions.'))}</div>
     <div>
       <div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:14px;">
         <div style="font-size:9px;font-weight:700;color:#9ca3af;margin-bottom:6px;">DEMAND ASSESSMENT</div>

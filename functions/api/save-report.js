@@ -9,6 +9,7 @@
  *     Old payloads without these fields still save — all new fields default to null.
  */
 import { verifyAuth, corsHeaders, validate, sanitise, errRes, okRes } from './_middleware.js';
+import { buildIntegrationContext } from './integration-readiness.js';
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -56,6 +57,7 @@ export async function onRequestPost(context) {
     full_report:           strategy.full_report         || null,
     step_7_intelligence:   strategy.step_7_intelligence   || null,
     step7_decision_engine: strategy.step7_decision_engine || null,
+    backend_intelligence:  strategy.backend_intelligence  || null,
   };
 
   try {
@@ -68,9 +70,11 @@ export async function onRequestPost(context) {
     const data = await res.json();
     if (!res.ok) return errRes(data.error || 'Save failed', res.status, cors);
 
+    const integrationContext = await buildIntegrationContext({}, env);
     return okRes({
       success:   true,
       report_id: data.strategy_id,
+      integration_context: integrationContext,
     }, cors);
 
   } catch (e) {

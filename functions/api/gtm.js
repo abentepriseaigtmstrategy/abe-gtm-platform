@@ -8,6 +8,8 @@
  */
 
 import { verifyAuth, corsHeaders, validate, rateLimit, sanitise, errRes, okRes, kv } from './_middleware.js';
+import { normalizeStrategy } from './gtm-intelligence.js';
+import { getIntegrationStatus, buildIntegrationContext } from './integration-readiness.js';
 
 const COST_PER_TOKEN   = 0.0000002;
 const HOURLY_TOKEN_LIMIT = 200_000;
@@ -49,17 +51,18 @@ export async function onRequestPost(context) {
   switch (body.action) {
     case 'run_step':        return handleRunStep(body, userId, openaiKey, supabaseUrl, supabaseKey, env, cors);
     case 'run_demo_step':   return handleRunDemoStep(body, userId, supabaseUrl, supabaseKey, env, cors);
-    case 'save_strategy':   return handleSaveStrategy(body, userId, supabaseUrl, supabaseKey, env, cors);
-    case 'get_vault':       return handleGetVault(body, userId, supabaseUrl, supabaseKey, cors);
-    case 'get_strategy':    return handleGetStrategy(body, userId, supabaseUrl, supabaseKey, env, cors);
-    case 'delete_strategy': return handleDeleteStrategy(body, userId, supabaseUrl, supabaseKey, env, cors);
-    case 'archive_strategy':return handleArchiveStrategy(body, userId, supabaseUrl, supabaseKey, env, cors);
-    case 'resume_strategy': return handleResumeStrategy(body, userId, supabaseUrl, supabaseKey, cors);
-    case 'check_cache':     return handleCheckCache(body, userId, supabaseUrl, supabaseKey, env, cors);
-    case 'score_leads':     return handleScoreLeads(body, userId, openaiKey, cors);
-    case 'run_step7':       return handleRunStep7(body, userId, openaiKey, supabaseUrl, supabaseKey, env, cors);
-    case 'save_step7':      return handleSaveStep7(body, userId, supabaseUrl, supabaseKey, env, cors);
-    default:                return errRes(`Unknown action: ${body.action}`, 400, cors);
+    case 'save_strategy':        return handleSaveStrategy(body, userId, supabaseUrl, supabaseKey, env, cors);
+    case 'get_vault':            return handleGetVault(body, userId, supabaseUrl, supabaseKey, cors);
+    case 'get_strategy':         return handleGetStrategy(body, userId, supabaseUrl, supabaseKey, env, cors);
+    case 'delete_strategy':      return handleDeleteStrategy(body, userId, supabaseUrl, supabaseKey, env, cors);
+    case 'archive_strategy':     return handleArchiveStrategy(body, userId, supabaseUrl, supabaseKey, env, cors);
+    case 'resume_strategy':      return handleResumeStrategy(body, userId, supabaseUrl, supabaseKey, cors);
+    case 'check_cache':          return handleCheckCache(body, userId, supabaseUrl, supabaseKey, env, cors);
+    case 'score_leads':          return handleScoreLeads(body, userId, openaiKey, cors);
+    case 'run_step7':            return handleRunStep7(body, userId, openaiKey, supabaseUrl, supabaseKey, env, cors);
+    case 'save_step7':           return handleSaveStep7(body, userId, supabaseUrl, supabaseKey, env, cors);
+    case 'get_integration_status': return handleGetIntegrationStatus(env, cors);
+    default:                     return errRes(`Unknown action: ${body.action}`, 400, cors);
   }
 }
 
@@ -72,6 +75,9 @@ async function handleRunStep(body, userId, openaiKey, supabaseUrl, supabaseKey, 
     company: 'string|required',
   }, body);
   if (errors.length) return errRes(errors[0], 400, cors);
+  const integration = getIntegrationStatus(env);
+  if (body.use_rag && !integration.features.rag.enabled) return errRes('RAG integration not configured', 503, cors);
+  if (body.use_agents && !integration.features.agents.enabled) return errRes('Agents integration not configured', 503, cors);
   if (!openaiKey) return errRes('OpenAI not configured', 503, cors);
 
   const { step, company, industry, prior_steps, company_profile } = body;
@@ -945,6 +951,15 @@ async function handleSaveStrategy(body, userId, supabaseUrl, supabaseKey, env, c
     cache_key:        cacheKey,
     updated_at:       new Date().toISOString(),
     full_report:      sanitizedFullReport || null,
+    backend_intelligence: body.backend_intelligence || normalizeStrategy({
+      step_1_market:    steps?.[1] || null,
+      step_2_tam:       steps?.[2] || null,
+      step_3_icp:       steps?.[3] || null,
+      step_4_sourcing:  steps?.[4] || null,
+      step_5_keywords:  steps?.[5] || null,
+      step_6_messaging: steps?.[6] || null,
+      step_7_intelligence: step_7_intelligence || null
+    }, isDemo)
   };
 
   // FIX: Must pass resolution=merge-duplicates so subsequent step saves UPDATE the row
@@ -973,7 +988,14 @@ async function handleSaveStrategy(body, userId, supabaseUrl, supabaseKey, env, c
     if (steps?.[6]) saveMessaging(strategyId, userId, company_name, steps[6], supabaseUrl, supabaseKey);
   }
 
-  return okRes({ strategy_id: strategyId, cache_key: cacheKey, status, steps_completed: stepsCompleted }, cors);
+  // Add integration context as additive metadata (no persistence required)
+  const integrationContext = await buildIntegrationContext({}, env);
+
+  return okRes({ strategy_id: strategyId, cache_key: cacheKey, status, steps_completed: stepsCompleted, integration_context: integrationContext }, cors);
+}
+
+async function handleGetIntegrationStatus(env, cors) {
+  return okRes({ integration: getIntegrationStatus(env) }, cors);
 }
 
 async function resolveCompanyProfile(company, providedProfile, userId, supabaseUrl, supabaseKey) {
@@ -1046,7 +1068,7 @@ async function handleGetVault(body, userId, supabaseUrl, supabaseKey, cors) {
     if (ids.length > 0) {
       const idList = ids.map(id => encodeURIComponent(id)).join(',');
       const detailsRes = await sbFetch(supabaseUrl, supabaseKey, 'strategies', 'GET', null,
-        `?user_id=eq.${userId}&id=in.(${idList})&select=id,scraped_profile,full_report,step_1_market,step_2_tam,step_3_icp,step_4_sourcing,step_5_keywords,step_6_messaging,step_7_intelligence`);
+        `?user_id=eq.${userId}&id=in.(${idList})&select=id,scraped_profile,full_report,step_1_market,step_2_tam,step_3_icp,step_4_sourcing,step_5_keywords,step_6_messaging,step_7_intelligence,backend_intelligence`);
       if (detailsRes.ok) {
         const details = await detailsRes.json();
         const detailsById = (Array.isArray(details) ? details : []).reduce((acc, item) => {
@@ -1056,9 +1078,17 @@ async function handleGetVault(body, userId, supabaseUrl, supabaseKey, cors) {
         data.forEach(strategy => {
           const detail = detailsById[strategy.id];
           if (!detail) return;
+          
+          // Decouple formula logic: Use persisted intelligence or recalculate if missing
           const flags = deriveDemoModeState(detail);
+          const intelligence = detail.backend_intelligence || normalizeStrategy(detail, flags.demo_mode);
+
           if (typeof strategy.demo_mode !== 'boolean') strategy.demo_mode = flags.demo_mode;
           if (!strategy.report_mode) strategy.report_mode = flags.report_mode;
+          
+          strategy.gtm_score = intelligence.gtmScore;
+          strategy.verdict = intelligence.verdict;
+          strategy.backend_intelligence = intelligence;
         });
       }
     }
@@ -1095,12 +1125,31 @@ async function handleGetStrategy(body, userId, supabaseUrl, supabaseKey, env, co
   const data = await res.json();
   if (!data.length) return errRes('Strategy not found', 404, cors);
 
+  const strategy = data[0];
+  
+  // Decouple formula logic: Use persisted intelligence or recalculate if missing (legacy compatibility)
+  const flags = deriveDemoModeState(strategy);
+  const intelligence = strategy.backend_intelligence || normalizeStrategy(strategy, flags.demo_mode);
+  
+  strategy.gtm_score = intelligence.gtmScore;
+  strategy.verdict = intelligence.verdict;
+  strategy.backend_intelligence = intelligence;
+  
+  if (strategy.step_7_intelligence) {
+    strategy.step_7_intelligence.confidence_score = intelligence.confScore;
+    strategy.step_7_intelligence.confidence_breakdown = intelligence.confidenceMatrix;
+    strategy.step_7_intelligence.backend_intelligence = intelligence;
+  }
+
   // Update last_viewed_at (non-blocking)
   sbFetch(supabaseUrl, supabaseKey, 'strategies', 'PATCH',
     JSON.stringify({ last_viewed_at: new Date().toISOString() }),
     `?id=eq.${body.strategy_id}&user_id=eq.${userId}`);
 
-  return okRes({ strategy: data[0] }, cors);
+  // Add integration context as additive metadata (no persistence required)
+  const integrationContext = await buildIntegrationContext(strategy, env);
+
+  return okRes({ strategy, integration_context: integrationContext }, cors);
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -1244,6 +1293,9 @@ async function handleRunStep7(body, userId, openaiKey, supabaseUrl, supabaseKey,
     steps:   'object|required',
   }, body);
   if (errors.length) return errRes(errors[0], 400, cors);
+  const integration = getIntegrationStatus(env);
+  if (body.use_rag && !integration.features.rag.enabled) return errRes('RAG integration not configured', 503, cors);
+  if (body.use_agents && !integration.features.agents.enabled) return errRes('Agents integration not configured', 503, cors);
   if (!openaiKey) return errRes('OpenAI not configured', 503, cors);
 
   const { company, industry, steps } = body;
@@ -1323,6 +1375,14 @@ async function handleRunStep7(body, userId, openaiKey, supabaseUrl, supabaseKey,
   // Enforce every enum, clamp every number, strip any field that violates the schema.
   // This runs AFTER the AI response — nothing untrusted reaches the frontend.
   parsed = sanitiseStep7Output(parsed, richness);
+  
+  // Decouple formula logic: Inject backend-owned intelligence directly into the AI response payload
+  const intelligence = normalizeStrategy({ step_1_market: steps[1], step_2_tam: steps[2], step_7_intelligence: parsed }, false);
+  parsed.gtm_score = intelligence.gtmScore;
+  parsed.confidence_score = intelligence.confScore;
+  parsed.verdict = intelligence.verdict;
+  parsed.confidence_breakdown = intelligence.confidenceMatrix;
+  parsed.backend_intelligence = intelligence;
 
   const duration = Date.now() - t0;
 
@@ -1727,10 +1787,25 @@ async function handleSaveStep7(body, userId, supabaseUrl, supabaseKey, env, cors
   if (errors.length) return errRes(errors[0], 400, cors);
 
   const { strategy_id, step_7_intelligence } = body;
+  const sid = sanitise(strategy_id, 36);
+
+  // Fix 2: Fetch existing strategy context to ensure normalizeStrategy has full data (Steps 1-6)
+  const getRes = await sbFetch(supabaseUrl, supabaseKey, 'strategies', 'GET', null,
+    `?id=eq.${sid}&user_id=eq.${userId}&limit=1`);
+  const existingData = getRes.ok ? await getRes.json() : [];
+  const existing = existingData[0] || {};
+  
+  const fullStrategy = { ...existing, step_7_intelligence };
+  const flags = deriveDemoModeState(fullStrategy);
+  const backend_intelligence = normalizeStrategy(fullStrategy, flags.demo_mode);
 
   const res = await sbFetch(supabaseUrl, supabaseKey, 'strategies', 'PATCH',
-    JSON.stringify({ step_7_intelligence, updated_at: new Date().toISOString() }),
-    `?id=eq.${sanitise(strategy_id, 36)}&user_id=eq.${userId}`);
+    JSON.stringify({ 
+      step_7_intelligence, 
+      backend_intelligence,
+      updated_at: new Date().toISOString() 
+    }),
+    `?id=eq.${sid}&user_id=eq.${userId}`);
 
   if (!res.ok) {
     const e = await res.text();
