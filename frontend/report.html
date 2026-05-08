@@ -41,7 +41,9 @@
     body {
       font-family: 'Inter', sans-serif;
       background: var(--bg);
+      background-color: #0c0d11;
       color: var(--text);
+      font-size: 12.5pt;
       min-height: 100vh;
     }
 
@@ -375,6 +377,8 @@
       border-radius: 16px;
       padding: 28px 32px;
       margin-bottom: 20px;
+      max-height: none;
+      overflow: visible;
     }
 
     .sec-header {
@@ -1129,6 +1133,12 @@
       position: relative;
       page-break-inside: avoid;
       break-inside: avoid;
+      min-height: 100vh;
+      max-height: none;
+      overflow: visible;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
     }
 
     /* ── Hidden on screen by default ── */
@@ -1142,8 +1152,47 @@
     }
 
     @media print {
+      html,
+      body {
+        font-size: 12.5pt !important;
+        background-color: #0c0d11 !important;
+      }
+
+      table td,
+      table th,
+      .pain-table td,
+      .pain-table th,
+      .cm-table td,
+      .cm-table th,
+      .appendix-table td,
+      .appendix-table th {
+        font-size: 11.5pt !important;
+      }
+
+      table th,
+      .pain-table th,
+      .cm-table th,
+      .appendix-table th {
+        font-size: 12pt !important;
+      }
+
       .edu-filler.edu-filler--active {
         display: block !important;
+      }
+
+      img,
+      .chart-block,
+      .chart-block>div,
+      [class*="chart"] {
+        background: transparent !important;
+        border: none !important;
+        box-shadow: none !important;
+        mix-blend-mode: multiply !important;
+      }
+
+      img {
+        max-height: none !important;
+        overflow: visible !important;
       }
     }
 
@@ -1234,8 +1283,15 @@
       }
 
       .report-section-wrapper {
-        page-break-after: auto;
-        break-after: auto;
+        page-break-after: always;
+        break-after: page;
+        min-height: 100vh;
+        min-height: 297mm;
+        max-height: none;
+        overflow: visible;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
       }
     }
   </style>
