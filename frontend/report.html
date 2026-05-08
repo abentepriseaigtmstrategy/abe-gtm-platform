@@ -43,8 +43,9 @@
       background: var(--bg);
       background-color: #0c0d11;
       color: var(--text);
-      font-size: 12.5pt;
-      min-height: 100vh;
+      font-size: 11.5pt;
+      height: 100%;
+      overflow: hidden;
     }
 
     body::before {
@@ -1133,12 +1134,17 @@
       position: relative;
       page-break-inside: avoid;
       break-inside: avoid;
-      min-height: 100vh;
+      height: 100%;
       max-height: none;
-      overflow: visible;
+      overflow: hidden;
       display: flex;
       flex-direction: column;
       justify-content: space-between;
+    }
+
+    /* ── Vertical centering for internal containers ── */
+    .report-section-wrapper .section {
+      margin: auto 0 !important;
     }
 
     /* ── Hidden on screen by default ── */
@@ -1154,7 +1160,7 @@
     @media print {
       html,
       body {
-        font-size: 12.5pt !important;
+        font-size: 11.5pt !important;
         background-color: #0c0d11 !important;
       }
 
@@ -1285,10 +1291,9 @@
       .report-section-wrapper {
         page-break-after: always;
         break-after: page;
-        min-height: 100vh;
-        min-height: 297mm;
+        height: 100%;
         max-height: none;
-        overflow: visible;
+        overflow: hidden;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
