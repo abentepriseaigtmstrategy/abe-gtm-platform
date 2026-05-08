@@ -2143,14 +2143,11 @@
 
       try {
         // Use raw fetch so we can inspect Content-Type before parsing.
-        // window.APP.token() is async — must await to get the string, not a Promise.
-        // Mirrors auth-guard.js apiFetch() exactly: sessionStorage key 'abe_token',
-        // header: Authorization: Bearer <token>
-        const token = window.APP
-          ? (await window.APP.token())
-          : (sessionStorage.getItem('abe_token') || '');
+        // IMPORTANT: window.APP.token() is async; await it or Authorization becomes "Bearer [object Promise]" and causes 401.
+        const token = window.APP && typeof window.APP.token === 'function' ? await window.APP.token() : null;
         const exportRes = await fetch('/api/export-pdf', {
           method: 'POST',
+          credentials: 'same-origin',
           headers: {
             'Content-Type': 'application/json',
             ...(token ? { 'Authorization': 'Bearer ' + token } : {}),
@@ -2159,19 +2156,8 @@
         });
 
         if (!exportRes.ok) {
-          const resContentType = exportRes.headers.get('Content-Type') || '';
           let errMsg = 'Export failed: HTTP ' + exportRes.status;
-          try {
-            const errBody = resContentType.includes('application/json')
-              ? await exportRes.json()
-              : await exportRes.text();
-            errMsg = (errBody && (errBody.error || errBody.message)) || String(errBody) || errMsg;
-          } catch (_) {}
-          // Surface a clear, user-friendly message for auth failures.
-          // Do NOT force signOut() here — a transient 401 should not redirect the user.
-          if (exportRes.status === 401 || exportRes.status === 403) {
-            errMsg = 'Session expired. Please sign in again and retry export.';
-          }
+          try { const errData = await exportRes.json(); errMsg = errData.error || errMsg; } catch (_) {}
           throw new Error(errMsg);
         }
 
@@ -2228,11 +2214,11 @@
           await renderHtmlToPdf(data.html, data.filename || 'GTM_Report.pdf');
         }
       } catch (e) {
-        // Show a clear error. Do NOT force signOut() on export failures —
-        // the broken token bug was causing redirect loops. If the session is
-        // genuinely expired the user will see the friendly message set above
-        // and can manually sign in; the auth guard handles expiry globally.
-        alert('PDF export failed: ' + e.message);
+        const isAuthExportError = e.message.includes('401') || e.message.includes('Unauthorized') || /token invalid|expired/i.test(e.message);
+        alert(isAuthExportError
+          ? 'PDF export failed: Session expired or export token missing. Please sign in again, then retry export.'
+          : 'PDF export failed: ' + e.message);
+        // Do not force sign-out from the export button; the global auth guard will handle genuine session expiry.
       } finally {
         // Always clean up fillers — dashboard must stay unchanged
         document.body.classList.remove('force-fillers');
