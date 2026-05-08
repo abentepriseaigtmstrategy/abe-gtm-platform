@@ -43,7 +43,7 @@
       background: var(--bg);
       background-color: #0c0d11;
       color: var(--text);
-      font-size: 11.5pt;
+      font-size: 10.5pt;
       height: 100%;
       overflow: hidden;
     }
@@ -1160,7 +1160,7 @@
     @media print {
       html,
       body {
-        font-size: 11.5pt !important;
+        font-size: 10.5pt !important;
         background-color: #0c0d11 !important;
       }
 
@@ -1172,14 +1172,14 @@
       .cm-table th,
       .appendix-table td,
       .appendix-table th {
-        font-size: 11.5pt !important;
+        font-size: 9.5pt !important;
       }
 
       table th,
       .pain-table th,
       .cm-table th,
       .appendix-table th {
-        font-size: 12pt !important;
+        font-size: 9.5pt !important;
       }
 
       .edu-filler.edu-filler--active {
@@ -1193,7 +1193,7 @@
         background: transparent !important;
         border: none !important;
         box-shadow: none !important;
-        mix-blend-mode: multiply !important;
+        mix-blend-mode: screen !important;
       }
 
       img {
@@ -1291,12 +1291,15 @@
       .report-section-wrapper {
         page-break-after: always;
         break-after: page;
-        height: 100%;
-        max-height: none;
-        overflow: hidden;
+        width: 210mm !important;
+        height: 297mm !important;
+        max-height: 297mm !important;
+        overflow: hidden !important;
+        position: relative !important;
+        background-color: #0c0d11 !important;
         display: flex;
         flex-direction: column;
-        justify-content: space-between;
+        justify-content: flex-start;
       }
     }
   </style>
