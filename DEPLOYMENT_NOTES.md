@@ -76,6 +76,21 @@ Set all variables in: **Cloudflare Dashboard → Pages → Settings → Environm
 | `GOOGLE_ANALYTICS_PRIVATE_KEY` | `-----BEGIN RSA PRIVATE KEY-----\n...` | PEM format — escape newlines as `\n` |
 | `GA4_ACCESS_CONFIRMED` | **`false`** | **Must remain false until GA4 UI grants property access to service account** |
 
+### Phase 21C — Gotenberg Server-Side PDF (New)
+| Variable | Value | Notes |
+|---|---|---|
+| `PDF_RENDER_ENGINE` | `gotenberg` | Set to `gotenberg` to enable Gotenberg path. Omit or set any other value to keep JSON/browser fallback. |
+| `GOTENBERG_URL` | `https://your-gotenberg-service-url` | Base URL of your deployed Gotenberg instance (no trailing slash). Required when `PDF_RENDER_ENGINE=gotenberg`. |
+
+**Gotenberg activation:**
+1. Deploy a Gotenberg instance (Docker: `gotenberg/gotenberg:8`)
+2. Set `PDF_RENDER_ENGINE=gotenberg` and `GOTENBERG_URL=https://<your-gotenberg-url>` in Cloudflare Pages env vars
+3. Redeploy — `/api/export-pdf` will now return `application/pdf` directly
+4. The frontend `exportPDF()` auto-detects the PDF binary and downloads it without html2canvas
+5. If Gotenberg fails for any reason, the JSON/HTML fallback activates automatically — no broken export
+
+**Fallback guarantee:** If `PDF_RENDER_ENGINE` is not `gotenberg` OR `GOTENBERG_URL` is missing OR Gotenberg returns an error, the existing JSON/HTML fallback path is returned. The export never breaks.
+
 ### Integration Feature Flags (All Inactive at Launch)
 | Variable | Value | Notes |
 |---|---|---|
