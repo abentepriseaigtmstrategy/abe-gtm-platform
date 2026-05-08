@@ -161,57 +161,55 @@ No code changes required for any of the above — env vars alone activate each i
 
 *Plan with clarity. Build with intent. Grow through trust.*
 
+---
 
-## Phase 21D PDF Stabilization Patch
+## Phase 21C — PDF Quality Overhaul (May 2026)
 
-This package includes a controlled PDF export stabilization pass:
+### Files Changed
+| File | Change |
+|------|--------|
+| `functions/api/export-pdf.js` | Gotenberg CSS expanded; font floors raised; footer fixed; cover page fixed; table padding raised; base body font 12px; waitDelay 2s; timeout 55s |
+| `frontend/report.html` | Export button messaging improved; console diagnostics added for active path detection |
+| `wrangler.toml` | PDF engine env vars documented |
 
-- Viewer mode is protected: `/api/export-pdf?mode=viewer` always returns JSON/HTML even when Gotenberg is enabled.
-- Export mode diagnostics are exposed through response headers:
-  - `X-ABE-PDF-Engine`
-  - `X-ABE-Export-Path`
-- Frontend `report.html` raw PDF fetch now awaits `window.APP.token()` before setting the Authorization header. This prevents `Bearer [object Promise]` and the 401 export regression.
-- Export 401 no longer force-signs the user out from the PDF button; the global auth guard remains responsible for genuine session expiry.
-- Gotenberg failures rebuild a browser-safe fallback HTML instead of returning Gotenberg-specific HTML to the client fallback renderer.
-- PDF readability CSS was strengthened: body/table fonts, footer contrast, table header groups, status pills, anti-orphan rules, and chart/table block handling.
+### Active Export Path Identification
+- Check browser DevTools Network tab on `/api/export-pdf` response
+- `Content-Type: application/pdf` → Gotenberg is active ✅
+- `Content-Type: application/json` → JSON fallback (Gotenberg disabled or failed)
+- Server logs: `[Gotenberg] PDF rendered successfully — XXXXX bytes`
 
-Manual validation after deploy:
+### Required Env Vars for Gotenberg
+```
+PDF_RENDER_ENGINE = gotenberg
+GOTENBERG_URL     = https://your-gotenberg-url
+```
+Set via Cloudflare Dashboard → Workers & Pages → abe-gtm-platform → Settings → Environment Variables
 
-1. Confirm `/api/export-pdf?mode=viewer` still loads the report viewer.
-2. With `PDF_RENDER_ENGINE=gotenberg` and `GOTENBERG_URL` set, export should return `Content-Type: application/pdf`.
-3. Confirm the request contains `Authorization: Bearer <token>` and not `Bearer [object Promise]`.
-4. If Gotenberg fails, confirm JSON fallback still exports without redirecting to login.
-5. Inspect the generated PDF for readable table fonts, visible footer tagline, reduced orphan headings, and no raw floats/placeholders.
-
-## Phase 21E — Multi-provider PDF rendering + fallback gap fix
-
-This build does not rely on a single PDF provider. The server export pipeline can now try multiple external PDF engines before falling back to browser rendering.
-
-Recommended Production env:
-
-```text
-PDF_RENDER_ENGINE=auto
-PDF_RENDER_PROVIDER_ORDER=gotenberg,browserless,pdfshift
-GOTENBERG_URL=https://your-gotenberg-service-url
-BROWSERLESS_URL=https://your-browserless-service-url
-BROWSERLESS_TOKEN=optional-browserless-token
-PDFSHIFT_API_KEY=optional-pdfshift-key
-PDF_RENDER_TIMEOUT_MS=28000
+### node --check
+```bash
+node --check functions/api/export-pdf.js   # must exit 0
 ```
 
-Optional cover visual:
+### Visual QA Checklist (per export)
+- [ ] Cover: company name large, gauge chart visible, metric strip readable
+- [ ] Executive Summary: body text ≥11px, footer visible and not ghosted
+- [ ] Market Definition: table cells readable (≥10px), no orphan heading
+- [ ] TAM page: waterfall chart renders, figures visible
+- [ ] ICP page: table readable, no blank page before/after
+- [ ] SDR page: email body text ≥11px, follow-up cadence flows
+- [ ] Competitive Landscape: table columns not compressed
+- [ ] Decision Engine: confidence bars render, score readable
+- [ ] Appendix: methodology table readable
+- [ ] Footer: tagline visible (#9CA3AF), left/center/right layout correct
+- [ ] No: `undefined`, `null`, `NaN`, `[object Object]`, raw floats
+- [ ] No mostly-blank internal pages
 
-```text
-UNSPLASH_ENABLED=true
-UNSPLASH_ACCESS_KEY=your-unsplash-access-key
-```
+### Fallback Test
+Unset `PDF_RENDER_ENGINE` → export must return JSON, frontend renders via Playwright or html2canvas, no 401 redirect.
 
-Expected successful server-render response headers:
+### Known Remaining Considerations
+- Gotenberg requires a live instance at `GOTENBERG_URL` — self-host via Docker or use a managed service
+- Google Fonts load inside Gotenberg's headless Chromium; if offline, Inter falls back to system sans-serif
+- QuickChart images fetched server-side before PDF build — no client-side chart rendering needed
+- `waitDelay:2s` added to ensure fonts and chart images are painted before Chromium captures
 
-```text
-Content-Type: application/pdf
-X-ABE-PDF-Engine: gotenberg | browserless | pdfshift
-X-ABE-Export-Path: external-application-pdf:<provider>
-```
-
-If all external renderers fail, the frontend uses a readable HTML fallback and no longer slices each `.page` wrapper separately; it slices the continuous rendered canvas to reduce half-blank pages.
