@@ -247,7 +247,7 @@ function buildGtmGaugeChartConfig(score, verdict) {
 }
 
 function buildTamWaterfallChartConfig(tamM, samM, somM) {
-  const safeNum = v => (Number.isFinite(v) && v > 0) ? v : 0;
+  const safeNum = v => { const n = Number(v); return (Number.isFinite(n) && n > 0) ? Math.round(n) : 0; };
   const values = [safeNum(tamM), safeNum(samM), safeNum(somM)];
   const maxVal = Math.max(100, ...values) * 1.22;
   const fmt = v => { const n = Number(v) || 0; if (n >= 1000) return 'USD ' + (n / 1000).toFixed(1).replace(/\.0$/, '') + 'B'; if (n > 0) return 'USD ' + Math.round(n) + 'M'; return 'USD 0'; };
@@ -863,11 +863,13 @@ function safeText(value, fallback = '') {
  * @param {{ color?, sub?, flex? }} opts
  * Returns a single KPI tile <div>.
  */
-function renderKpiCard(label, value, { color = 'var(--accent)', sub = '', flex = '1' } = {}) {
+function renderKpiCard(label, value, { color = 'var(--accent)', sub = '', flex = '1', icon = '' } = {}) {
   const safeVal = safeBusinessText(value, '—');
   const safeLabel = escapeHtml(label, 'Metric');
   const safeSub = sub ? `<div class="kpi-sub">${escapeHtml(sub)}</div>` : '';
-  return `<div class="kpi-card" style="flex:${flex};border-bottom:3px solid ${color}">
+  const iconHtml = icon ? `<div style="position:absolute;top:3mm;right:4mm;color:${color};opacity:0.4">${icon}</div>` : '';
+  return `<div class="kpi-card" style="flex:${flex};border-bottom:3px solid ${color};position:relative">
+    ${iconHtml}
     <div class="kpi-value" style="color:${color}">${safeVal}</div>
     <div class="kpi-label">${safeLabel}</div>
     ${safeSub}
@@ -897,7 +899,8 @@ function renderInsightBox(title, body, { accent = 'var(--accent)', cls = '' } = 
   if (!body) return '';
   const safeTitle = escapeHtml(title, 'Insight');
   const safeBody = safeBusinessText(body, '');
-  return `<div class="insight-box ${cls}" style="border-left:3px solid ${accent}">
+  return `<div class="insight-box ${cls}" style="border-left:3px solid ${accent};background:linear-gradient(90deg, rgba(168,85,247,.08), transparent);position:relative">
+    <div style="position:absolute;top:8px;right:8px;color:${accent};opacity:0.15"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg></div>
     <div class="insight-box__title" style="color:${accent}">${safeTitle}</div>
     <div class="insight-box__body">${safeBody}</div>
   </div>`;
@@ -1580,15 +1583,16 @@ function renderPorterForcesGrid(forces) {
     const border  = RATING_BORDER[rating] || RATING_BORDER.Medium;
     const valStatus = safeBusinessText(f.validation_status, 'Validation pending');
     const valColor  = /validated/i.test(valStatus) ? 'var(--green)' : /partial/i.test(valStatus) ? 'var(--amber)' : 'var(--muted)';
-    return `<div style="background:${bg};border:1px solid ${border};border-radius:8px;padding:5px 7px;break-inside:avoid">
-      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2mm">
+    return `<div style="background:${bg};border:1px solid ${border};border-left:3px solid ${color};border-radius:8px;padding:5px 7px;break-inside:avoid;position:relative">
+      <div style="position:absolute;top:4px;right:4px;color:${color};opacity:0.2"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+      <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:2mm;padding-right:18px">
         <div style="font-size:9.5px;font-weight:800;color:var(--text)">${escapeHtml(f.force, 'Force')}</div>
         <span style="font-size:8px;font-weight:700;padding:1px 5px;border-radius:3px;background:${color}22;color:${color};white-space:nowrap">${escapeHtml(rating)}</span>
       </div>
       <div style="font-size:8.5px;color:var(--text);margin-bottom:1.5mm"><strong>Analysis:</strong> ${safeBusinessText(f.explanation, 'Requires source validation')}</div>
       <div style="font-size:8.5px;color:var(--accent);margin-bottom:1.5mm"><strong>GTM Implication:</strong> ${safeBusinessText(f.gtm_implication, 'Validation pending')}</div>
       <div style="font-size:8.5px;color:var(--green);margin-bottom:1.5mm"><strong>Recommended Action:</strong> ${safeBusinessText(f.recommended_action, 'Validation pending')}</div>
-      <div style="font-size:7.5px;color:${valColor};font-style:italic">Validation: ${escapeHtml(valStatus)}</div>
+      <div style="font-size:7.5px;color:${valColor};font-style:italic;display:inline-block;border:1px solid ${valColor}40;padding:1px 4px;border-radius:2px;background:rgba(0,0,0,0.2)">Validation: ${escapeHtml(valStatus)}</div>
     </div>`;
   });
 
@@ -1626,13 +1630,13 @@ function renderBuyingCriteriaTable(criteria) {
     const valStatus = safeBusinessText(c.validation_status, 'Validation pending');
     const valColor  = /validated/i.test(valStatus) ? 'var(--green)' : /partial/i.test(valStatus) ? 'var(--amber)' : 'var(--muted)';
     return `<tr style="background:${bg}">
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9.5px;vertical-align:top;font-weight:700;color:var(--accent)">${escapeHtml(c.criteria, 'Criteria')}</td>
+      <td style="border:.5px solid #444;border-left:2px solid ${impColor};padding:5px 6px;font-size:9.5px;vertical-align:top;font-weight:700;color:var(--accent)">${escapeHtml(c.criteria, 'Criteria')}</td>
       <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top">${safeBusinessText(c.buyer_concern, 'Requires source validation')}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;font-weight:700;color:${impColor};text-align:center">${escapeHtml(imp)}</td>
+      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;font-weight:700;color:${impColor};text-align:center"><span style="background:${impColor}22;padding:1px 4px;border-radius:3px">${escapeHtml(imp)}</span></td>
       <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--amber)">${safeBusinessText(c.proof_required, 'Validation pending')}</td>
       <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--green)">${safeBusinessText(c.gtm_message, 'Validation pending')}</td>
       <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top">${safeBusinessText(c.recommended_action, 'Validation pending')}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:8.5px;vertical-align:top;color:${valColor};font-style:italic">${escapeHtml(valStatus)}</td>
+      <td style="border:.5px solid #444;padding:5px 6px;font-size:8.5px;vertical-align:top;color:${valColor};font-style:italic"><span style="border:1px solid ${valColor}40;padding:1px 3px;border-radius:2px;display:inline-block">${escapeHtml(valStatus)}</span></td>
     </tr>`;
   }).join('');
 
@@ -1847,10 +1851,11 @@ function renderRiskScoreCards(risks) {
   const cards = list.map(r => {
     const s = String(r.score || 'Medium').trim();
     const color = /^high/i.test(s) ? 'var(--red)' : /^low/i.test(s) ? 'var(--green)' : 'var(--amber)';
-    return `<div style="background:rgba(255,255,255,.02);border:1px solid var(--border);border-left:3px solid ${color};border-radius:6px;padding:3mm 4mm;margin-bottom:2mm;break-inside:avoid">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1mm">
+    return `<div style="background:linear-gradient(90deg, rgba(255,255,255,.03), rgba(255,255,255,.01));border:1px solid var(--border);border-left:3px solid ${color};border-radius:6px;padding:3mm 4mm;margin-bottom:2mm;break-inside:avoid;position:relative">
+      <div style="position:absolute;top:4px;right:4px;color:${color};opacity:0.2"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1mm;padding-right:20px">
         <strong style="font-size:9.5px;color:var(--text)">${escapeHtml(r.name)}</strong>
-        <span style="font-size:8px;font-weight:700;color:${color};text-transform:uppercase">${escapeHtml(s)} RISK</span>
+        <span style="font-size:8px;font-weight:700;background:${color}22;color:${color};padding:1px 5px;border-radius:3px;text-transform:uppercase">${escapeHtml(s)} RISK</span>
       </div>
       <div style="font-size:8.5px;color:var(--muted);line-height:1.4">${safeBusinessText(r.detail, 'Requires source validation')}</div>
     </div>`;
@@ -2226,7 +2231,15 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false, rende
 
   // ── Helper builders ──
   const pageHdr = () => `<div class="ph"><div class="phb"><div class="am">ABE</div><div><div class="abn">AI Revenue Infrastructure</div><div class="abs">Enterprise GTM Platform</div></div></div><div class="cb">Confidential</div></div>`;
-  const pageFtr = (label, num) => `<div class="pf"><span class="pf-tagline">Plan with clarity. Build with intent. Grow through trust.</span><span>ABE · ${e(label)}</span><span>${num}</span></div>`;
+  const pageFtr = (label, num) => `
+<div class="pf-wrap" style="margin-top:auto;padding-top:2.5mm;break-before:avoid;page-break-before:avoid">
+  <div class="pf-tagline" style="text-align:center;margin-bottom:2mm;font-style:italic;color:var(--faint);font-size:7.5px;letter-spacing:.03em">Plan with clarity. Build with intent. Grow through trust.</div>
+  <div class="pf" style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--border);padding-top:2mm;font-size:8px;color:var(--muted)">
+    <span style="flex:1;text-align:left;font-weight:900;color:var(--accent)">ABE</span>
+    <span style="flex:2;text-align:center;text-transform:uppercase;letter-spacing:.1em">${e(label)}</span>
+    <span style="flex:1;text-align:right">Page ${num}</span>
+  </div>
+</div>`;
 
   // SVG icons for each section (inline, no external deps)
   const ICONS = {
@@ -2241,8 +2254,9 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false, rende
     A: `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M8 2L10 7H15L11 10L13 15L8 12L3 15L5 10L1 7H6Z" stroke="white" stroke-width="1.2" stroke-linejoin="round"/></svg>`,
   };
   const secHead = (num, title) => {
-    const icon = ICONS[num] || '';
-    return `<h2 class="section-header"><span class="sa" style="background:linear-gradient(135deg,var(--accent2),var(--accent))">${icon || num}</span> ${e(title)}</h2>`;
+    const defaultIcon = `<svg width="13" height="13" viewBox="0 0 16 16" fill="none"><rect x="3" y="3" width="10" height="10" rx="2" stroke="white" stroke-width="1.5"/><path d="M6 8h4M6 11h2" stroke="white" stroke-width="1.5" stroke-linecap="round"/></svg>`;
+    const icon = ICONS[num] || defaultIcon;
+    return `<h2 class="section-header"><span class="sa" style="background:linear-gradient(135deg,var(--accent2),var(--accent))">${icon}</span> ${e(title)}</h2>`;
   };
   const secCtx = text => text ? `<div class="sc">${e(text)}</div>` : '';
   const tags = (items, cls = '') => arr(items).slice(0, 15).map(t => `<span class="tg ${cls}">${e(String(t))}</span>`).join('');
@@ -2481,7 +2495,7 @@ ${p}.page{width:210mm;min-height:297mm;overflow:visible;margin:0;background:var(
 :root{--bg:#0B0F1A;--bg2:#0D1120;--card:#121827;--border:#1F2937;--accent:#a855f7;--accent2:#7c3aed;--green:#22c55e;--amber:#f59e0b;--red:#ef4444;--blue:#3b82f6;--text:#E5E7EB;--muted:#6B7280;--faint:#374151;--white:#fff}
 ${isViewer ? '.abe-viewer-wrapper, .abe-viewer-wrapper * { box-sizing:border-box }' : '*{box-sizing:border-box}'}
 ${isViewer ? '.abe-viewer-wrapper * { margin:0; padding:0 }' : '*{margin:0;padding:0}'}
-${isViewer ? '.abe-viewer-wrapper' : 'body'}{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:11.5px;line-height:1.65;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+${isViewer ? '.abe-viewer-wrapper' : 'body'}{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:11.5px;line-height:1.65;-webkit-print-color-adjust:exact;print-color-adjust:exact;orphans:3;widows:3}
 ${paginationCss}
 /* ── ENTERPRISE TABLE ENHANCEMENTS ── */
 ${p}.dt tr:hover td{background:rgba(168,85,247,.03)}
