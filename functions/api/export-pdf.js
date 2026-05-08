@@ -906,6 +906,86 @@ function renderInsightBox(title, body, { accent = 'var(--accent)', cls = '' } = 
   </div>`;
 }
 
+const renderPageFooter = (label, num) => `
+<div class="pf-wrap" style="margin-top:auto;padding-top:2.5mm;break-before:avoid;page-break-before:avoid">
+  <div class="pf-tagline" style="text-align:center;margin-bottom:2mm;font-style:italic;color:var(--text);font-size:8px;letter-spacing:.05em;opacity:0.85">Plan with clarity. Build with intent. Grow through trust.</div>
+  <div class="pf" style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(255,255,255,0.15);padding-top:2mm;font-size:8.5px;color:var(--text);font-weight:600">
+    <span style="flex:1;text-align:left;font-weight:900;color:var(--accent)">ABE</span>
+    <span style="flex:2;text-align:center;text-transform:uppercase;letter-spacing:.1em">${escapeHtml(label)}</span>
+    <span style="flex:1;text-align:right">Page ${num}</span>
+  </div>
+</div>`;
+
+const SVG_MAP = {
+  'gauge': '<circle cx="12" cy="12" r="10"/><path d="m12 14 4-4"/><path d="M12 14v6"/><path d="M7.34 7.34 5.93 5.93"/><path d="M16.66 7.34l1.41-1.41"/>',
+  'target': '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
+  'calendar': '<rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/>',
+  'users': '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
+  'grid': '<rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/>',
+  'clipboard-check': '<rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/>',
+  'triangle': '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>',
+  'sparkles': '<path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>',
+  'compass': '<circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>',
+  'route': '<circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/>',
+  'bar-chart': '<line x1="12" x2="12" y1="20" y2="10"/><line x1="18" x2="18" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="16"/>',
+  'user-check': '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/>',
+  'filter': '<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>',
+  'search': '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
+  'mail': '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>',
+  'trophy': '<path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>',
+  'shield': '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2-1 4-2 7-2 2.5 0 4.5 1 6 2a1 1 0 0 1 1 1z"/>',
+  'checklist': '<path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z"/><path d="m9 15 2 2 4-4"/>',
+  'cpu': '<rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9" rx="1"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/>',
+  'alert-triangle': '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
+  'brain': '<path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"/><path d="M17.599 6.5a3 3 0 0 0 .399-1.375"/><path d="M6.003 5.125A3 3 0 0 0 6.401 6.5"/><path d="M3.477 10.896a4 4 0 0 1 .585-.396"/><path d="M19.938 10.5a4 4 0 0 1 .585.396"/><path d="M6 18a4 4 0 0 1-1.967-.516"/><path d="M19.967 17.484A4 4 0 0 1 18 18"/>',
+  'file-text': '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>'
+};
+
+const renderSvgIcon = (name, size = 16, color = 'currentColor') => {
+  const paths = SVG_MAP[name] || SVG_MAP['grid'];
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle">${paths}</svg>`;
+};
+
+const SECTION_ICONS = {
+  ES: 'gauge', RS: 'compass', MD: 'grid', FW: 'calendar',
+  BC: 'users', SF: 'filter', RM: 'clipboard-check', DT: 'triangle',
+  PI: 'sparkles', MO: 'route', ME: 'calendar', KF: 'search',
+  '01': 'search', '02': 'bar-chart', '03': 'user-check', '04': 'target',
+  '05': 'search', '06': 'mail', CL: 'trophy', RW: 'trophy',
+  P5: 'shield', CA: 'cpu', RR: 'alert-triangle', '07': 'brain',
+  A: 'file-text'
+};
+
+const renderPageHeader = (sectionCode, title, subtitle, iconName) => {
+  const icon = renderSvgIcon(iconName, 18, 'white');
+  return `
+    <div class="keep-together" style="margin-bottom:5mm;padding-bottom:3mm;border-bottom:1px solid rgba(255,255,255,.05);display:flex;align-items:center;gap:4mm">
+      <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--accent2),var(--accent));display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(168,85,247,.2);flex-shrink:0">
+        ${icon}
+      </div>
+      <div>
+        <div style="font-size:9px;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;font-weight:800;margin-bottom:0.5mm">Section ${escapeHtml(sectionCode)}</div>
+        <h2 style="font-size:18px;font-weight:800;color:white;margin:0;line-height:1.2;border:none;padding:0">${escapeHtml(title)}</h2>
+        ${subtitle ? `<div style="font-size:9.5px;color:var(--muted);margin-top:1mm">${escapeHtml(subtitle)}</div>` : ''}
+      </div>
+    </div>
+  `;
+};
+
+const renderVisualCallout = (type, title, body, iconName) => {
+  const accent = type === 'amber' ? 'var(--amber)' : type === 'red' ? 'var(--red)' : 'var(--accent)';
+  return renderInsightBox(title, body, { accent, icon: renderSvgIcon(iconName || 'sparkles', 24, accent) });
+};
+
+const renderExecutiveTakeaway = (title, body, iconName) => {
+  return renderInsightBox(title, body, { accent: 'var(--blue)', cls: 'exec-takeaway', icon: renderSvgIcon(iconName || 'target', 24, 'var(--blue)') });
+};
+
+const renderIconMetric = (label, value, iconName, status) => {
+  const color = status === 'High' || status === 'Critical' ? 'var(--red)' : status === 'Low' || status === 'Validated' ? 'var(--green)' : 'var(--amber)';
+  return renderKpiCard(label, value, { color, icon: renderSvgIcon(iconName || 'bar-chart', 16, color) });
+};
+
 /**
  * renderSectionHeader(num, title, icon)
  * Thin wrapper so Phase 20C callers can use the canonical name.
@@ -2235,87 +2315,7 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false, rende
 
   // ── Helper builders ──
   const pageHdr = () => `<div class="ph"><div class="phb"><div class="am">ABE</div><div><div class="abn">AI Revenue Infrastructure</div><div class="abs">Enterprise GTM Platform</div></div></div><div class="cb">Confidential</div></div>`;
-  const renderPageFooter = (label, num) => `
-<div class="pf-wrap" style="margin-top:auto;padding-top:2.5mm;break-before:avoid;page-break-before:avoid">
-  <div class="pf-tagline" style="text-align:center;margin-bottom:2mm;font-style:italic;color:var(--text);font-size:8px;letter-spacing:.05em;opacity:0.85">Plan with clarity. Build with intent. Grow through trust.</div>
-  <div class="pf" style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(255,255,255,0.15);padding-top:2mm;font-size:8.5px;color:var(--text);font-weight:600">
-    <span style="flex:1;text-align:left;font-weight:900;color:var(--accent)">ABE</span>
-    <span style="flex:2;text-align:center;text-transform:uppercase;letter-spacing:.1em">${e(label)}</span>
-    <span style="flex:1;text-align:right">Page ${num}</span>
-  </div>
-</div>`;
   const pageFtr = renderPageFooter;
-
-  const renderVisualCallout = (type, title, body, iconName) => {
-    const accent = type === 'amber' ? 'var(--amber)' : type === 'red' ? 'var(--red)' : 'var(--accent)';
-    return renderInsightBox(title, body, { accent, icon: renderSvgIcon(iconName || 'sparkles', 24, accent) });
-  };
-  
-  const renderExecutiveTakeaway = (title, body, iconName) => {
-    return renderInsightBox(title, body, { accent: 'var(--blue)', cls: 'exec-takeaway', icon: renderSvgIcon(iconName || 'target', 24, 'var(--blue)') });
-  };
-
-  const renderIconMetric = (label, value, iconName, status) => {
-    const color = status === 'High' || status === 'Critical' ? 'var(--red)' : status === 'Low' || status === 'Validated' ? 'var(--green)' : 'var(--amber)';
-    return renderKpiCard(label, value, { color, icon: renderSvgIcon(iconName || 'bar-chart', 16, color) });
-  };
-
-  // SVG icons for each section (inline, no external deps)
-  const SVG_MAP = {
-    'gauge': '<circle cx="12" cy="12" r="10"/><path d="m12 14 4-4"/><path d="M12 14v6"/><path d="M7.34 7.34 5.93 5.93"/><path d="M16.66 7.34l1.41-1.41"/>',
-    'target': '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/>',
-    'calendar': '<rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/>',
-    'users': '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
-    'grid': '<rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/>',
-    'clipboard-check': '<rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/>',
-    'triangle': '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/>',
-    'sparkles': '<path d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z"/>',
-    'compass': '<circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/>',
-    'route': '<circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/>',
-    'bar-chart': '<line x1="12" x2="12" y1="20" y2="10"/><line x1="18" x2="18" y1="20" y2="4"/><line x1="6" x2="6" y1="20" y2="16"/>',
-    'user-check': '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/>',
-    'filter': '<polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>',
-    'search': '<circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>',
-    'mail': '<rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/>',
-    'trophy': '<path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6"/><path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18"/><path d="M4 22h16"/><path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22"/><path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22"/><path d="M18 2H6v7a6 6 0 0 0 12 0V2Z"/>',
-    'shield': '<path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2-1 4-2 7-2 2.5 0 4.5 1 6 2a1 1 0 0 1 1 1z"/>',
-    'checklist': '<path d="M14 3v4a1 1 0 0 0 1 1h4"/><path d="M17 21H7a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h7l5 5v11a2 2 0 0 1-2 2Z"/><path d="m9 15 2 2 4-4"/>',
-    'cpu': '<rect width="16" height="16" x="4" y="4" rx="2"/><rect width="6" height="6" x="9" y="9" rx="1"/><path d="M15 2v2"/><path d="M15 20v2"/><path d="M2 15h2"/><path d="M2 9h2"/><path d="M20 15h2"/><path d="M20 9h2"/><path d="M9 2v2"/><path d="M9 20v2"/>',
-    'alert-triangle': '<path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z"/><path d="M12 9v4"/><path d="M12 17h.01"/>',
-    'brain': '<path d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"/><path d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"/><path d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"/><path d="M17.599 6.5a3 3 0 0 0 .399-1.375"/><path d="M6.003 5.125A3 3 0 0 0 6.401 6.5"/><path d="M3.477 10.896a4 4 0 0 1 .585-.396"/><path d="M19.938 10.5a4 4 0 0 1 .585.396"/><path d="M6 18a4 4 0 0 1-1.967-.516"/><path d="M19.967 17.484A4 4 0 0 1 18 18"/>',
-    'file-text': '<path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M10 9H8"/><path d="M16 13H8"/><path d="M16 17H8"/>'
-  };
-
-  const renderSvgIcon = (name, size = 16, color = 'currentColor') => {
-    const paths = SVG_MAP[name] || SVG_MAP['grid'];
-    return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle">${paths}</svg>`;
-  };
-
-  const SECTION_ICONS = {
-    ES: 'gauge', RS: 'compass', MD: 'grid', FW: 'calendar',
-    BC: 'users', SF: 'filter', RM: 'clipboard-check', DT: 'triangle',
-    PI: 'sparkles', MO: 'route', ME: 'calendar', KF: 'search',
-    '01': 'search', '02': 'bar-chart', '03': 'user-check', '04': 'target',
-    '05': 'search', '06': 'mail', CL: 'trophy', RW: 'trophy',
-    P5: 'shield', CA: 'cpu', RR: 'alert-triangle', '07': 'brain',
-    A: 'file-text'
-  };
-
-  const renderPageHeader = (sectionCode, title, subtitle, iconName) => {
-    const icon = renderSvgIcon(iconName, 18, 'white');
-    return `
-      <div class="keep-together" style="margin-bottom:5mm;padding-bottom:3mm;border-bottom:1px solid rgba(255,255,255,.05);display:flex;align-items:center;gap:4mm">
-        <div style="width:36px;height:36px;border-radius:10px;background:linear-gradient(135deg,var(--accent2),var(--accent));display:flex;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(168,85,247,.2);flex-shrink:0">
-          ${icon}
-        </div>
-        <div>
-          <div style="font-size:9px;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;font-weight:800;margin-bottom:0.5mm">Section ${escapeHtml(sectionCode)}</div>
-          <h2 style="font-size:18px;font-weight:800;color:white;margin:0;line-height:1.2;border:none;padding:0">${escapeHtml(title)}</h2>
-          ${subtitle ? `<div style="font-size:9.5px;color:var(--muted);margin-top:1mm">${escapeHtml(subtitle)}</div>` : ''}
-        </div>
-      </div>
-    `;
-  };
 
   const secHead = (num, title) => renderPageHeader(num, title, '', SECTION_ICONS[num] || 'grid');
   const secCtx = text => text ? `<div class="sc">${e(text)}</div>` : '';
