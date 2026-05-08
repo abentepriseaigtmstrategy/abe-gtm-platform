@@ -625,12 +625,12 @@ async function fetchQuickChartBase64(config, width, height, qc, chartType = 'def
   for (const version of versions) {
     const payload = JSON.stringify({
       chart: config, width: chartWidth, height: chartHeight, devicePixelRatio: 2,
-      backgroundColor: '#0B0F1A', format: 'png', version,
+      backgroundColor: 'transparent', format: 'png', version,
       ...(qc.apiKey ? { key: qc.apiKey } : {})
     });
     try {
       const res = await withTimeout(
-        fetch('https://quickchart.io/chart', {
+        fetch('https://quickchart.io/chart?transparent=true', {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: payload,
         }),
         qc.timeout
@@ -2708,6 +2708,7 @@ html, body {
   line-height: 1.5;
   margin: 0;
   padding: 0;
+  color: rgba(255, 255, 255, 0.9) !important;
 }
 /* Sections flow naturally — Gotenberg Chromium handles pagination */
 ${p}.page {
@@ -2721,17 +2722,15 @@ ${p}.page {
   margin: 0 !important;
   display: flex !important;
   flex-direction: column !important;
-  justify-content: flex-start !important;
+  justify-content: space-between !important;
   break-after: page !important;
   page-break-after: always !important;
 }
-/* ── Vertical centering for internal containers ── */
-${p}.section, ${p}.exec-card, ${p}.scope-grid, ${p}.waterfall, ${p}.icp-grid, ${p}.tier-cards, ${p}.sourcing-funnel, ${p}.findings-grid, ${p}.triangulation-grid {
-  margin: auto 0 !important;
-}
+/* ── Vertical centering for internal containers removed for "Stretch" rule ── */
+
 /* ── Vertical breathing map (final pass) ── */
 ${p}#page-17-icp-modeling {
-  justify-content: center !important;
+  justify-content: space-between !important;
 }
 ${p}#page-4-market-definition,
 ${p}#page-15-market-context-overflow-tam-visual,
@@ -2742,7 +2741,7 @@ ${p}#page-27-buying-criteria,
 ${p}#page-29-regulatory,
 ${p}#page-34-tam-methodology,
 ${p}#page-35-data-quality-audit {
-  justify-content: flex-start !important;
+  justify-content: space-between !important;
 }
 ${p}#page-1-cover {
   justify-content: space-between !important;
@@ -2766,8 +2765,63 @@ ${p}h1, ${p}h2, ${p}h3, ${p}.section-header, ${p}.ph {
   break-after: avoid !important;
   page-break-after: avoid !important;
 }
+/* Heading Font Increase (+3pt) */
+${p}h1 { font-size: 57px !important; }
+${p}h2, ${p}.section-header { font-size: 21px !important; }
+${p}h3 { font-size: 15.5px !important; }
+
+/* Page-Specific Filling (Flexible Stretching) */
+/* Page 2 & 10: Insights/Summary Card expansion — switch from px to flex-grow */
+${p}#page-2-exec-summary .card, 
+${p}#page-10-premium-insights .scope-cell { 
+  flex-grow: 1 !important;
+  min-height: 100px !important; 
+  margin-bottom: 20px !important; 
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+}
+
+/* Page 4, 7, 27: Table padding and line-height expansion */
+${p}#page-4-market-definition .dt td, 
+${p}#page-7-segmentation-framework .dt td, 
+${p}#page-27-buying-criteria .dt td { 
+  padding: 5% !important; /* Flexible padding */
+  line-height: 2.0 !important; 
+}
+
+/* Page 15: TAM Waterfall Visual & SWOT expansion — switch from px to flexible units */
+${p}#page-15-market-context-overflow-tam-visual .chart-block {
+  flex-grow: 2 !important; /* Give more space to the chart */
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+}
+${p}#page-15-market-context-overflow-tam-visual .chart-block img { 
+  max-height: 150mm !important; /* Limit by A4 height, not px */
+  height: auto !important;
+  object-fit: contain !important; 
+}
+${p}#page-15-market-context-overflow-tam-visual .sc2 { 
+  flex-grow: 1 !important;
+  min-height: 150px !important; 
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+}
+
+/* Page 17: ICP Modeling spacing expansion */
+${p}#page-17-icp-modeling .icp-grid { 
+  gap: 12mm !important; 
+  margin: 10mm 0 !important; 
+}
+${p}#page-17-icp-modeling .icp-card {
+  padding: 8mm !important;
+}
+
 /* Kill White Boxes on Charts */
 ${p}img, ${p}.chart-block img, ${p}canvas {
+  background: transparent !important;
   mix-blend-mode: screen !important;
 }
 /* Keep content blocks together */
@@ -2924,7 +2978,7 @@ ${p}.stat-l{font-size:7.5px;text-transform:uppercase;letter-spacing:.14em;color:
 ${p}.sc2{border:1px solid var(--border);border-radius:8px;padding:3mm 4mm;background:rgba(255,255,255,.015)}
 ${p}.score-badge{display:inline-flex;align-items:center;gap:2mm;background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.25);border-radius:20px;padding:2mm 4mm;font-family:'Space Mono',monospace;font-size:12px;font-weight:900;color:white}
 /* ── SECTION HEADER LINE ── */
-${p}h3{font-size:12.5px;font-weight:700;color:var(--text);margin-top:3.5mm;margin-bottom:1.5mm;padding-bottom:1mm;border-bottom:1px solid rgba(255,255,255,.05);break-after:avoid;page-break-after:avoid}
+${p}h3{font-size:15.5px;font-weight:700;color:rgba(255,255,255,0.9);margin-top:3.5mm;margin-bottom:1.5mm;padding-bottom:1mm;border-bottom:1px solid rgba(255,255,255,.05);break-after:avoid;page-break-after:avoid}
 /* ── PAGE HEADER ── */
 ${p}.ph{display:flex;justify-content:space-between;align-items:center;padding:0 0 3mm;border-bottom:1px solid var(--border);margin-bottom:4mm;break-after:avoid;page-break-after:avoid}
 ${p}.phb{display:flex;align-items:center;gap:8px}
@@ -2938,18 +2992,18 @@ ${p}.pf{display:flex;justify-content:space-between;align-items:flex-end;margin-t
 ${p}.pf-tagline{font-style:italic;color:#9CA3AF;font-size:8.5px;letter-spacing:.03em;opacity:1}
 /* ── CARDS ── */
 ${p}.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:4mm 5mm;margin-bottom:3mm}
-${p}.card p{font-size:11px;line-height:1.7;color:var(--text);margin:0}
+${p}.card p{font-size:11px;line-height:1.7;color:rgba(255,255,255,0.9);margin:0}
 /* ── METRIC NUMBER ── */
 ${p}.mn{font-family:'Space Mono',monospace;font-size:18px;font-weight:900;color:white;line-height:1.1;margin-bottom:1mm}
 /* ── BLOCK LABEL ── */
 ${p}.bl{font-size:8px;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);font-weight:600}
 /* ── ANALYST CALLOUT ── */
-${p}.ac{background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.18);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;padding:3mm 4mm;margin:3mm 0;font-size:10.5px;color:var(--text);line-height:1.6}
+${p}.ac{background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.18);border-left:3px solid var(--accent);border-radius:0 8px 8px 0;padding:3mm 4mm;margin:3mm 0;font-size:10.5px;color:rgba(255,255,255,0.9);line-height:1.6}
 ${p}.ac.amber{background:rgba(245,158,11,.05);border-color:rgba(245,158,11,.25);border-left-color:var(--amber)}
 /* ── SECTION CONTEXT ── */
 ${p}.sc{font-size:10.5px;color:var(--muted);font-style:italic;margin-bottom:4mm;line-height:1.6;border-left:2px solid rgba(168,85,247,.3);padding-left:3mm}
 /* ── SECTION HEADER ── */
-${p}.section-header{display:flex;align-items:center;gap:3mm;font-size:16px;font-weight:900;color:white;margin:0 0 2mm;letter-spacing:-.3px;break-after:avoid;page-break-after:avoid}
+${p}.section-header{display:flex;align-items:center;gap:3mm;font-size:21px;font-weight:900;color:white;margin:0 0 2mm;letter-spacing:-.3px;break-after:avoid;page-break-after:avoid}
 ${p}.sa{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
 /* ── TAG PILLS ── */
 ${p}.tg{display:inline-block;background:rgba(168,85,247,.1);border:1px solid rgba(168,85,247,.25);border-radius:20px;padding:1.5mm 3mm;font-size:8.5px;font-weight:600;color:#c4b5fd;margin:1.5mm 1.5mm 0 0;white-space:nowrap}
@@ -3101,11 +3155,11 @@ ${p}.section-continuation{width:100%;box-sizing:border-box;padding:0;margin:0;ba
     padding: 0 !important;
     display: flex !important;
     flex-direction: column !important;
-    justify-content: flex-start !important;
+    justify-content: space-between !important;
     break-after: page !important;
     page-break-after: always !important;
   }
-  ${p}#page-17-icp-modeling { justify-content: center !important; }
+  ${p}#page-17-icp-modeling { justify-content: space-between !important; }
   ${p}#page-4-market-definition,
   ${p}#page-15-market-context-overflow-tam-visual,
   ${p}#page-18-account-sourcing-41-42,
@@ -3114,8 +3168,22 @@ ${p}.section-continuation{width:100%;box-sizing:border-box;padding:0;margin:0;ba
   ${p}#page-27-buying-criteria,
   ${p}#page-29-regulatory,
   ${p}#page-34-tam-methodology,
-  ${p}#page-35-data-quality-audit { justify-content: flex-start !important; }
+  ${p}#page-35-data-quality-audit { justify-content: space-between !important; }
   ${p}#page-1-cover { justify-content: space-between !important; }
+  
+  /* Heading Font Increase (+3pt) */
+  ${p}h1 { font-size: 57px !important; }
+  ${p}h2, ${p}.section-header { font-size: 21px !important; }
+  ${p}h3 { font-size: 15.5px !important; }
+
+  /* Page-Specific Filling */
+  ${p}#page-2-exec-summary .card, ${p}#page-10-premium-insights .scope-cell { min-height: 200px !important; margin-bottom: 30px !important; display: flex !important; flex-direction: column !important; justify-content: center !important; }
+  ${p}#page-4-market-definition .dt td, ${p}#page-7-segmentation-framework .dt td, ${p}#page-27-buying-criteria .dt td { padding: 20px !important; line-height: 2.0 !important; }
+  ${p}#page-15-market-context-overflow-tam-visual .chart-block img { height: 500px !important; object-fit: contain !important; }
+  ${p}#page-15-market-context-overflow-tam-visual .sc2 { min-height: 250px !important; display: flex !important; flex-direction: column !important; justify-content: center !important; }
+  ${p}#page-17-icp-modeling .icp-grid { gap: 12mm !important; margin: 10mm 0 !important; }
+  ${p}#page-17-icp-modeling .icp-card { padding: 8mm !important; }
+
   ${p}.card, ${p}.table-wrap, ${p}.chart-block, ${p}.sdr-step, ${p}.keep-together,
   ${p}.page-insight, ${p}.page-insight-expanded, ${p}.swot-grid, ${p}.ww {
     break-inside: avoid !important; page-break-inside: avoid !important;
@@ -3168,18 +3236,19 @@ ${p}.section-continuation{width:100%;box-sizing:border-box;padding:0;margin:0;ba
       <div style="font-size:8px;font-weight:700;color:var(--accent);letter-spacing:.12em;text-transform:uppercase;margin-top:1mm">Confidential</div>
     </div>
   </div>
-  <div style="margin-bottom:5mm">
-    <h1 style="font-size:54px;font-weight:900;color:white;letter-spacing:-2px;line-height:1;margin-bottom:3mm">${e(co)}</h1>
-    <div style="font-size:13px;font-weight:300;color:var(--muted);letter-spacing:4px;text-transform:uppercase">GTM Intelligence Report</div>
-    ${ind ? `<div style="margin-top:3mm"><span class="tg blue" style="font-size:9px">${e(ind)}</span></div>` : ''}
+  <div style="margin-bottom:10mm">
+    <h1 style="font-size:57px;font-weight:900;color:white;letter-spacing:-2px;line-height:1;margin-bottom:6mm">${e(co)}</h1>
+    <div style="font-size:16px;font-weight:300;color:var(--muted);letter-spacing:4px;text-transform:uppercase">GTM Intelligence Report</div>
+    ${ind ? `<div style="margin-top:5mm"><span class="tg blue" style="font-size:11px">${e(ind)}</span></div>` : ''}
   </div>
-  <div class="keep-together chart-block" style="text-align:center; margin-bottom:4mm">
+  <div class="keep-together chart-block" style="text-align:center; margin-bottom:12mm">
     <div style="display:flex;justify-content:center;">
-      ${renderGaugeChart(charts.gauge, score, rec, { width: 280, height: 170 })}
+      ${renderGaugeChart(charts.gauge, score, rec, { width: 364, height: 221 })}
     </div>
-    <p class="figure-caption" style="font-size:10px; font-weight:bold; color:#f5f5f5; margin:1mm 0 0.5mm;">Figure 1: GTM Score Gauge</p>
-    <p class="figure-source" style="font-size:8px; font-style:italic; color:#aaa; margin:0;">Source: ABE GTMS Engine v1.0</p>
+    <p class="figure-caption" style="font-size:12px; font-weight:bold; color:#f5f5f5; margin:3mm 0 1mm;">Figure 1: GTM Score Gauge</p>
+    <p class="figure-source" style="font-size:10px; font-style:italic; color:#aaa; margin:0;">Source: ABE GTMS Engine v1.0</p>
   </div>
+  <div style="margin-bottom:10mm">
   ${renderMetricStrip([
     { label: 'TAM Size',   value: safe(s2.tam_size_estimate) || '—', opts: { color: 'var(--accent)' } },
     { label: 'CAGR',      value: safe(s2.growth_rate) || '—',        opts: { color: 'var(--green)' } },
@@ -3187,13 +3256,14 @@ ${p}.section-continuation{width:100%;box-sizing:border-box;padding:0;margin:0;ba
     { label: 'GTM Score', value: (score || '—') + '/100',             opts: { color: 'white' } },
     { label: 'Confidence',value: (confScore || '—') + '/100',         opts: { color: 'var(--amber)' } },
   ], 'cover-kpi')}
-  ${(s1.company_overview || s7.strategic_hook) ? `<div class="keep-together" style="max-width:148mm;margin:0 auto 4mm;background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.2);border-left:3px solid var(--accent);border-radius:10px;padding:4mm 5.5mm;text-align:left">
-    <div style="font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.2em;color:var(--accent);margin-bottom:2mm">Strategic Positioning</div>
-    <div style="font-size:10.5px;color:var(--text);line-height:1.65">${e(strategicPositioning)}.</div>
+  </div>
+  ${(s1.company_overview || s7.strategic_hook) ? `<div class="keep-together" style="max-width:148mm;margin:0 auto 10mm;background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.2);border-left:3px solid var(--accent);border-radius:10px;padding:6mm 7.5mm;text-align:left">
+    <div style="font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.2em;color:var(--accent);margin-bottom:3mm">Strategic Positioning</div>
+    <div style="font-size:12.5px;color:rgba(255,255,255,0.9);line-height:1.75">${e(strategicPositioning)}.</div>
   </div>`: ''}
-  <div class="keep-together" style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:3mm 4mm;max-width:148mm;margin:0 auto;text-align:left">
-    <div style="font-size:8.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:1.5mm">Report Sections</div>
-    <div style="display:flex;flex-wrap:wrap;gap:1.5mm;align-items:center">
+  <div class="keep-together" style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:5mm 6mm;max-width:148mm;margin:0 auto;text-align:left">
+    <div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:2.5mm">Report Sections</div>
+    <div style="display:flex;flex-wrap:wrap;gap:2.5mm;align-items:center">
       ${['01 Market', '02 TAM', '03 ICP', '04 Sourcing', '05 Keywords', '06 SDR'].map(s => `<span style="font-size:8.5px;color:var(--green);font-weight:700">${s}</span><span style="color:var(--faint);font-size:8px">·</span>`).join('')}
       <span style="font-size:8.5px;color:var(--amber);font-weight:700">07 Intelligence</span>
     </div>
