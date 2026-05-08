@@ -65,8 +65,9 @@ async function renderPdfWithGotenberg(html, filename, env) {
     encodeSimpleField('marginLeft', '0'),
     encodeSimpleField('marginRight', '0'),
     encodeSimpleField('printBackground', 'true'),      // preserve dark backgrounds
+    encodeSimpleField('omitBackground', 'true'),       // allow transparency from source HTML
     encodeSimpleField('preferCssPageSize', 'true'),    // honour @page CSS
-    encodeSimpleField('emulatedMediaType', 'print'),   // use @media print rules
+    encodeSimpleField('emulatedMediaType', 'screen'),  // mirror screen dark theme in PDF
     encodeSimpleField('waitDelay', '2s'),              // allow fonts/charts to load
     closingBytes,
   ];
@@ -352,7 +353,7 @@ function renderChartOrFallback(type, base64, fallbackHtml, dimensions = { width:
     return `<div style="margin:3mm 0;line-height:0">
       <img src="data:image/png;base64,${base64}"
         width="${dimensions.width}" height="${dimensions.height}"
-        style="width:100%;max-height:${dimensions.height}px;object-fit:contain;border-radius:8px"
+        style="width:100%;height:auto;object-fit:contain;border-radius:8px;background:transparent;mix-blend-mode:multiply"
         alt="${type} chart"/>
     </div>`;
   }
@@ -2703,7 +2704,8 @@ html, body {
   -webkit-print-color-adjust: exact !important;
   print-color-adjust: exact !important;
   background: #0B0F1A !important;
-  font-size: 11pt;
+  background-color: #0c0d11 !important;
+  font-size: 12.5pt;
   line-height: 1.65;
   orphans: 3;
   widows: 3;
@@ -2712,10 +2714,12 @@ html, body {
 ${p}.page {
   width: 100%;
   box-sizing: border-box;
-  background: transparent !important;
+  background: #0c0d11 !important;
+  background-color: #0c0d11 !important;
   padding: 0 !important;
   margin: 0 !important;
-  min-height: unset !important;
+  min-height: 100vh !important;
+  min-height: 297mm !important;
   height: auto !important;
   display: flex !important;
   flex-direction: column !important;
@@ -2725,7 +2729,7 @@ ${p}.page {
 }
 /* ── Vertical breathing map (final pass) ── */
 ${p}#page-17-icp-modeling {
-  justify-content: space-around !important;
+  justify-content: center !important;
 }
 ${p}#page-4-market-definition,
 ${p}#page-15-market-context-overflow-tam-visual,
@@ -2771,9 +2775,9 @@ ${p}.pf, ${p}.pf-wrap, ${p}.page-insight, ${p}.figure-caption, ${p}.figure-sourc
 }
 /* ── Phase 21C+: Readability — minimum font sizes (use !important to beat inline styles) ── */
 /* Tables */
-${p}.dt th, ${p}table th, ${p}th { font-size: 10px !important; padding: 6px 7px !important; }
-${p}.dt td, ${p}table td, ${p}td { font-size: 10px !important; padding: 6px 7px !important; }
-${p}table td *, ${p}.dt td *, ${p}.table-wrap td * { font-size: 10px !important; }
+${p}.dt th, ${p}table th, ${p}th { font-size: 12pt !important; padding: 6px 7px !important; }
+${p}.dt td, ${p}table td, ${p}td { font-size: 11.5pt !important; padding: 6px 7px !important; }
+${p}table td *, ${p}.dt td *, ${p}.table-wrap td * { font-size: 11.5pt !important; }
 /* Card body text */
 ${p}.card p, ${p}.card div { font-size: 11.5px !important; line-height: 1.7 !important; }
 /* SWOT / lists */
@@ -2824,10 +2828,18 @@ ${p}.stat-row, ${p}.kpi-strip, ${p}.ww { break-inside: avoid !important; page-br
 ${p}.pf *, ${p}.pf-tagline { opacity: 1 !important; }
 /* ── Gotenberg rendering artifacts: remove ghost boxes on charts/images ── */
 ${p}img, ${p}.chart-block, ${p}.chart-block > div, ${p}.keep-together.chart-block {
-  background: none !important;
+  background: transparent !important;
   border: none !important;
   box-shadow: none !important;
+  mix-blend-mode: multiply !important;
 }
+${p}img { max-height: none !important; overflow: visible !important; object-fit: contain !important; }
+${p}div, ${p}.card, ${p}.chart-block, ${p}.keep-together, ${p}.table-wrap { max-height: none !important; }
+${p}#page-19-account-sourcing-43-targets, ${p}#page-19-account-sourcing-43-targets * { max-height: none !important; overflow: visible !important; }
+${p}#page-2-exec-summary .card { padding-top: 6mm !important; padding-bottom: 6mm !important; margin-bottom: 6mm !important; }
+${p}#page-2-exec-summary .kpi-strip, ${p}#page-2-exec-summary .stat-row { gap: 5mm !important; margin: 5mm 0 6mm !important; }
+${p}#page-4-market-definition table td, ${p}#page-4-market-definition table th { line-height: 1.6 !important; }
+${p}#page-15-market-context-overflow-tam-visual .chart-block { min-height: 60vh !important; min-height: 165mm !important; display:flex !important; flex-direction:column; justify-content:center !important; }
 `;
 
   const paginationCss = renderMode === 'gotenberg' ? gotenbergPrintCss : renderMode === 'browser-pdf' ? `
@@ -2836,9 +2848,15 @@ ${!isViewer ? '@page { size: A4; margin: 12mm; } body { padding: 0 !important; h
 ${p}.page {
   width: 100%;
   box-sizing: border-box;
-  background: transparent !important;
+  background: #0c0d11 !important;
+  background-color: #0c0d11 !important;
   padding: 0 !important;
   margin: 0 !important;
+  min-height: 100vh !important;
+  min-height: 297mm !important;
+  display:flex !important;
+  flex-direction:column !important;
+  justify-content:space-between !important;
 }
 ${p}.page.section-break {
   break-before: page !important;
@@ -2870,9 +2888,9 @@ ${p}.edu-filler {
   break-inside: avoid;
   page-break-inside: avoid;
 }
-${p}.page{min-height:auto;display:block}
+${p}.page{min-height:100vh;min-height:297mm;display:flex;flex-direction:column;justify-content:space-between;background:#0c0d11;background-color:#0c0d11}
 ` : `
-${p}.page{width:210mm;min-height:297mm;overflow:visible;margin:0;background:var(--bg);padding:12mm 15mm 15mm;position:relative;page-break-after:always;box-sizing:border-box;display:flex;flex-direction:column}
+${p}.page{width:210mm;min-height:100vh;min-height:297mm;overflow:visible;margin:0;background:#0c0d11;background-color:#0c0d11;padding:12mm 15mm 15mm;position:relative;page-break-after:always;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between}
 `;
   const styles = `
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -2880,7 +2898,7 @@ ${p}.page{width:210mm;min-height:297mm;overflow:visible;margin:0;background:var(
 :root{--bg:#0B0F1A;--bg2:#0D1120;--card:#121827;--border:#1F2937;--accent:#a855f7;--accent2:#7c3aed;--green:#22c55e;--amber:#f59e0b;--red:#ef4444;--blue:#3b82f6;--text:#E5E7EB;--muted:#6B7280;--faint:#374151;--white:#fff}
 ${isViewer ? '.abe-viewer-wrapper, .abe-viewer-wrapper * { box-sizing:border-box }' : '*{box-sizing:border-box}'}
 ${isViewer ? '.abe-viewer-wrapper * { margin:0; padding:0 }' : '*{margin:0;padding:0}'}
-${isViewer ? '.abe-viewer-wrapper' : 'body'}{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:12px;line-height:1.65;-webkit-print-color-adjust:exact;print-color-adjust:exact;orphans:3;widows:3}
+${isViewer ? '.abe-viewer-wrapper' : 'body'}{font-family:'Inter',sans-serif;background:var(--bg);background-color:#0c0d11;color:var(--text);font-size:12.5pt;line-height:1.65;-webkit-print-color-adjust:exact;print-color-adjust:exact;orphans:3;widows:3}
 ${paginationCss}
 /* ── ENTERPRISE TABLE ENHANCEMENTS ── */
 ${p}.dt tr:hover td{background:rgba(168,85,247,.03)}
@@ -3061,8 +3079,8 @@ ${p}.section-continuation{width:100%;box-sizing:border-box;padding:0;margin:0;ba
 /* ── A4 PRINT DISCIPLINE ── */
 @media print {
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-  html, body { font-size: 11pt !important; }
-  ${p}.page { background: #0B0F1A !important; }
+  html, body { font-size: 12.5pt !important; background-color:#0c0d11 !important; }
+  ${p}.page { background: #0c0d11 !important; background-color:#0c0d11 !important; min-height:100vh !important; min-height:297mm !important; }
   ${p}.page, ${p}.section-continuation {
     break-after: page !important;
     page-break-after: always !important;
@@ -3070,7 +3088,7 @@ ${p}.section-continuation{width:100%;box-sizing:border-box;padding:0;margin:0;ba
     flex-direction: column !important;
     justify-content: space-between !important;
   }
-  ${p}#page-17-icp-modeling { justify-content: space-around !important; }
+  ${p}#page-17-icp-modeling { justify-content: center !important; }
   ${p}#page-4-market-definition,
   ${p}#page-15-market-context-overflow-tam-visual,
   ${p}#page-18-account-sourcing-41-42,
@@ -3089,14 +3107,19 @@ ${p}.section-continuation{width:100%;box-sizing:border-box;padding:0;margin:0;ba
   ${p}h1, ${p}h2, ${p}h3, ${p}.section-header { break-after: avoid !important; page-break-after: avoid !important; }
   ${p}.pf, ${p}.figure-caption, ${p}.figure-source { break-before: avoid !important; page-break-before: avoid !important; }
   ${p}tr { break-inside: avoid !important; page-break-inside: avoid !important; }
-  ${p}.dt th, ${p}.dt td, ${p}table th, ${p}table td, ${p}td, ${p}th { font-size: 10px !important; }
+  ${p}.dt th, ${p}table th, ${p}th { font-size: 12pt !important; }
+  ${p}.dt td, ${p}table td, ${p}td { font-size: 11.5pt !important; }
+  ${p}#page-4-market-definition table td, ${p}#page-4-market-definition table th { line-height: 1.6 !important; }
+  ${p}#page-15-market-context-overflow-tam-visual .chart-block { min-height: 60vh !important; min-height: 165mm !important; display:flex !important; flex-direction:column; justify-content:center !important; }
   ${p}.pf { margin-top: auto !important; padding-bottom: 1mm !important; }
   ${p}.pf-tagline { opacity: 1 !important; color: #9CA3AF !important; }
   ${p}img, ${p}.chart-block, ${p}.chart-block > div, ${p}.keep-together.chart-block {
-    background: none !important;
+    background: transparent !important;
     border: none !important;
     box-shadow: none !important;
+    mix-blend-mode: multiply !important;
   }
+  ${p}img { max-height: none !important; overflow: visible !important; object-fit: contain !important; }
 }
 </style>`;
 
@@ -3511,7 +3534,7 @@ ${renderMetricStrip([
 ])}
 ${h3('tam-mapping', '2.3', 'Visual Waterfall')}
 <div class="keep-together chart-block">
-  ${renderChartOrFallback('TAM Waterfall', charts.waterfall, waterfall(), { width: 480, height: 180 })}
+  ${renderChartOrFallback('TAM Waterfall', charts.waterfall, waterfall(), { width: 1200, height: 700 })}
   <p class="figure-caption" style="font-size:10px; font-weight:bold; color:#f5f5f5; margin:1mm 0 0.5mm;">Figure 2: TAM → SAM → SOM Waterfall</p>
   <p class="figure-source" style="font-size:8px; font-style:italic; color:#aaa; margin:0;">Source: ABE GTMS Engine v1.0</p>
 </div>
