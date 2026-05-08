@@ -1,12 +1,110 @@
 /**
- * /api/export-pdf  (v5 — Tier-1 Enterprise A4 Report)
+ * /api/export-pdf  (v6 — Phase 21C: Gotenberg Server-Side PDF + Print Flow Cleanup)
  * Cloudflare Pages Function
  * INPUT:  POST { strategy: { company_name, industry, step_1_market, ... } }
- * OUTPUT: JSON { html, filename, mode: 'html2pdf' }
+ * OUTPUT: application/pdf (Gotenberg) or JSON { html, filename, mode } (fallback)
+ *
+ * Env vars:
+ *   PDF_RENDER_ENGINE=gotenberg   → enables Gotenberg path
+ *   GOTENBERG_URL=https://...     → Gotenberg service base URL
  */
 import { verifyAuth, corsHeaders, validate, errRes } from './_middleware.js';
 import { normalizeStrategy } from './gtm-intelligence.js';
 import { getIntegrationStatus } from './integration-readiness.js';
+
+// ══════════════════════════════════════════════════════════════
+// PHASE 21C — GOTENBERG SERVER-SIDE PDF HELPER
+// ══════════════════════════════════════════════════════════════
+
+/**
+ * renderPdfWithGotenberg(html, filename, env)
+ *
+ * Sends final report HTML to a Gotenberg Headless Chromium instance.
+ * Returns an ArrayBuffer (PDF binary) on success.
+ * Throws a clear Error if Gotenberg fails so the caller can fallback.
+ *
+ * Gotenberg docs: https://gotenberg.dev/docs/routes#html-file-into-pdf
+ */
+async function renderPdfWithGotenberg(html, filename, env) {
+  const gotenbergUrl = env.GOTENBERG_URL.replace(/\/$/, '');
+  const endpoint = `${gotenbergUrl}/forms/chromium/convert/html`;
+
+  // Build multipart/form-data body
+  const boundary = `----GotenbergBoundary${Math.random().toString(36).slice(2)}`;
+  const encoder = new TextEncoder();
+
+  // Encode one multipart field (file or string)
+  const encodeField = (fieldName, content, mimeType = 'text/html') => {
+    const header = `--${boundary}\r\nContent-Disposition: form-data; name="${fieldName}"; filename="${fieldName === 'files' ? 'index.html' : fieldName}"\r\nContent-Type: ${mimeType}\r\n\r\n`;
+    const footer = '\r\n';
+    const headerBytes = encoder.encode(header);
+    const contentBytes = typeof content === 'string' ? encoder.encode(content) : content;
+    const footerBytes = encoder.encode(footer);
+    const combined = new Uint8Array(headerBytes.length + contentBytes.length + footerBytes.length);
+    combined.set(headerBytes, 0);
+    combined.set(contentBytes, headerBytes.length);
+    combined.set(footerBytes, headerBytes.length + contentBytes.length);
+    return combined;
+  };
+
+  const encodeSimpleField = (name, value) => {
+    const str = `--${boundary}\r\nContent-Disposition: form-data; name="${name}"\r\n\r\n${value}\r\n`;
+    return encoder.encode(str);
+  };
+
+  const closingBytes = encoder.encode(`--${boundary}--\r\n`);
+
+  // Gotenberg Chromium route parameters
+  // paperWidth/paperHeight in inches (A4 = 8.27 × 11.69)
+  const fields = [
+    encodeField('files', html, 'text/html'),         // main HTML as index.html
+    encodeSimpleField('paperWidth', '8.27'),
+    encodeSimpleField('paperHeight', '11.69'),
+    encodeSimpleField('marginTop', '0'),
+    encodeSimpleField('marginBottom', '0'),
+    encodeSimpleField('marginLeft', '0'),
+    encodeSimpleField('marginRight', '0'),
+    encodeSimpleField('printBackground', 'true'),      // preserve dark backgrounds
+    encodeSimpleField('preferCssPageSize', 'true'),    // honour @page CSS
+    encodeSimpleField('emulatedMediaType', 'print'),   // use @media print rules
+    encodeSimpleField('waitDelay', '1s'),              // allow fonts/charts to load
+    closingBytes,
+  ];
+
+  // Concatenate all field byte arrays into a single body
+  const totalLength = fields.reduce((sum, f) => sum + f.length, 0);
+  const body = new Uint8Array(totalLength);
+  let offset = 0;
+  for (const f of fields) { body.set(f, offset); offset += f.length; }
+
+  // Send to Gotenberg with a generous but bounded timeout (28s)
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 28000);
+  let res;
+  try {
+    res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': `multipart/form-data; boundary=${boundary}` },
+      body: body.buffer,
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => '');
+    throw new Error(`Gotenberg HTTP ${res.status}: ${errBody.slice(0, 200)}`);
+  }
+
+  const pdfBuffer = await res.arrayBuffer();
+  if (!pdfBuffer || pdfBuffer.byteLength < 1000) {
+    throw new Error('Gotenberg returned an empty or invalid PDF binary');
+  }
+
+  console.info(`[Gotenberg] PDF rendered successfully — ${pdfBuffer.byteLength} bytes for "${filename}"`);
+  return pdfBuffer;
+}
 
 export async function onRequestPost(context) {
   const { request, env } = context;
@@ -20,6 +118,9 @@ export async function onRequestPost(context) {
   if (errors.length) return errRes(errors[0], 400, cors);
   const { strategy } = body;
   if (!strategy.company_name) return errRes('Missing strategy.company_name', 400, cors);
+
+  // ── Phase 21C: Gotenberg render mode detection ──
+  const useGotenberg = env?.PDF_RENDER_ENGINE === 'gotenberg' && !!env?.GOTENBERG_URL;
 
   // ── QuickChart env config ──
   const QC = {
@@ -143,9 +244,41 @@ export async function onRequestPost(context) {
   const url = new URL(request.url);
   const isViewer = url.searchParams.get('mode') === 'viewer';
   const filename = `GTM_${strategy.company_name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
-  const renderMode = body.renderMode || 'browser-pdf';
+  // When Gotenberg is active, always generate with 'gotenberg' renderMode so print CSS applies correctly
+  const renderMode = useGotenberg ? 'gotenberg' : (body.renderMode || 'browser-pdf');
   const integration = getIntegrationStatus(env);
   const html = buildReportHTML(strategy, charts, isDemoMode, renderMode, isViewer);
+
+  // ── Phase 21C: Gotenberg path ──────────────────────────────────────────
+  if (useGotenberg) {
+    try {
+      const pdfBuffer = await renderPdfWithGotenberg(html, filename, env);
+      return new Response(pdfBuffer, {
+        status: 200,
+        headers: {
+          ...cors,
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `attachment; filename="${filename}"`,
+          'Cache-Control': 'no-store',
+        },
+      });
+    } catch (gotenbergErr) {
+      console.warn('[Gotenberg] Failed — returning JSON fallback:', gotenbergErr.message);
+      return new Response(
+        JSON.stringify({
+          html,
+          filename,
+          mode: 'browser-pdf',
+          integration_status: integration,
+          pdf_fallback: 'gotenberg_failed',
+          pdf_fallback_reason: gotenbergErr.message,
+        }),
+        { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } }
+      );
+    }
+  }
+
+  // ── Default JSON/html fallback (Gotenberg disabled) ────────────────────
   return new Response(JSON.stringify({ html, filename, mode: renderMode, integration_status: integration }), {
     status: 200, headers: { ...cors, 'Content-Type': 'application/json' },
   });
@@ -1471,7 +1604,10 @@ const EDU_INSIGHTS = {
 function buildFillerBlock(key, renderMode) {
   // Edu-filler only works inside a fixed-height flex page (html2canvas mode).
   // In browser-pdf mode sections flow naturally — no fixed container to push into.
+  // In gotenberg mode the CSS already hides .edu-filler via display:none, but
+  // skip generation entirely to avoid DOM clutter and save render time.
   if (renderMode === 'browser-pdf') return '';
+  if (renderMode === 'gotenberg') return '';
   if (renderMode !== 'html2canvas') return '';
   const ins = EDU_INSIGHTS[key];
   if (!ins) return '';
@@ -2505,7 +2641,81 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false, rende
   // FULL HTML DOCUMENT
   // ════════════════════════════════════════════════════════════
 
-  const paginationCss = renderMode === 'browser-pdf' ? `
+  // ── Phase 21C: Gotenberg-specific print profile ────────────────────────
+  // When Gotenberg renders, we use headless Chromium with print media.
+  // Rules: NO transform:scale(), NO fixed-height containers, allow report to flow freely.
+  // Minimum readable font sizes enforced. Section headings kept with content.
+  const gotenbergPrintCss = `
+@page { size: A4; margin: 12mm 14mm; }
+html, body {
+  -webkit-print-color-adjust: exact !important;
+  print-color-adjust: exact !important;
+  background: #0B0F1A !important;
+  font-size: 12px;
+  line-height: 1.65;
+  orphans: 3;
+  widows: 3;
+}
+/* Sections flow naturally — Gotenberg Chromium handles pagination */
+${p}.page {
+  width: 100%;
+  box-sizing: border-box;
+  background: transparent !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  min-height: unset !important;
+  height: auto !important;
+  display: block !important;
+}
+${p}.page.section-break {
+  break-before: page !important;
+  page-break-before: always !important;
+  padding-top: 4mm !important;
+}
+/* Headings always stay with at least first content block */
+${p}h1, ${p}h2, ${p}h3, ${p}.section-header, ${p}.ph {
+  break-after: avoid !important;
+  page-break-after: avoid !important;
+  orphans: 4;
+  widows: 4;
+}
+/* Keep content blocks together */
+${p}.card, ${p}.table-wrap, ${p}.chart-block, ${p}.ac,
+${p}.swot-grid, ${p}.page-insight, ${p}.page-insight-expanded,
+${p}.sdr-step, ${p}tr, ${p}.keep-together,
+${p}.kpi-strip, ${p}.icp-grid, ${p}.droc-grid,
+${p}.evolution-stage, ${p}.scope-grid, ${p}.tier-cards,
+${p}.sourcing-funnel, ${p}.findings-grid, ${p}.triangulation-grid {
+  break-inside: avoid !important;
+  page-break-inside: avoid !important;
+  orphans: 3;
+  widows: 3;
+}
+${p}.pf, ${p}.pf-wrap, ${p}.page-insight, ${p}.figure-caption, ${p}.figure-source {
+  break-before: avoid !important;
+  page-break-before: avoid !important;
+}
+/* Phase 21C: Readability — minimum font sizes */
+${p}.dt th { font-size: 10px !important; }
+${p}.dt td { font-size: 10px !important; }
+${p}table th { font-size: 10px !important; }
+${p}table td { font-size: 10px !important; }
+${p}.sc2 li { font-size: 10px !important; }
+${p}.card p { font-size: 11.5px !important; }
+${p}.tg { font-size: 9px !important; }
+${p}.pf { font-size: 8.5px !important; }
+${p}.pf-tagline { font-size: 8px !important; opacity: 1 !important; color: #9CA3AF !important; }
+${p}.figure-caption { font-size: 10px !important; color: #f5f5f5 !important; }
+${p}.figure-source { font-size: 8.5px !important; color: #aaa !important; }
+/* Phase 21C: Remove height-induced blank gaps */
+${p}.page { overflow: visible !important; }
+/* Phase 21C: Edu-filler hidden for Gotenberg (content flows, no fixed-height pages) */
+${p}.edu-filler { display: none !important; }
+/* Remove excessive spacer breaks */
+${p}.section-continuation { display: block !important; padding: 0 !important; margin: 0 !important; }
+`;
+
+  const paginationCss = renderMode === 'gotenberg' ? gotenbergPrintCss : renderMode === 'browser-pdf' ? `
 ${!isViewer ? '@page { size: A4; margin: 12mm; } body { padding: 0 !important; height: auto !important; }' : ''}
 /* browser-pdf: content flows naturally — Chromium handles pagination. */
 ${p}.page {
