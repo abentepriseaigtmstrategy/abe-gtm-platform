@@ -2821,7 +2821,6 @@ ${secCtx('Maps the decision-making unit, messaging angles, and proof requirement
 ${(() => {
   const dms   = arr(s3.decision_makers);
   const trigs = arr(s3.buying_triggers);
-  const objs  = arr(s3.objections);
   const roles = [
     { role: 'Economic Buyer',     value: dms[0] || 'Requires source validation',          msg: 'ROI recovery, cost of delay, CFO-level framing',     proof: 'Business case with quantified efficiency gain' },
     { role: 'Technical Buyer',    value: dms[1] || 'Requires source validation',          msg: 'Integration depth, security posture, architecture fit', proof: 'Technical spec sheet, security certification' },
@@ -2837,7 +2836,7 @@ ${(() => {
     <div class="stakeholder-cell" style="grid-column:span 2"><div class="stakeholder-role">Proof Required</div><div class="stakeholder-val">${escapeHtml(r.proof)}</div></div>
   </div>`).join('');
 })()}
-${objs.length ? `${h3('icp-modeling', '2', 'Common Objections by Role')}${renderDarkTable({ headers: ['Objection', 'Typical Stakeholder', 'Counter'], rows: objs.slice(0, 4).map(o => [e(String(o)), 'Economic or Technical Buyer', 'Quantify the cost of inaction and lead with peer proof']) }, '', 'ABE GTMS Engine v1.0')}` : ''}
+${arr(s3.objections).length ? `${h3('icp-modeling', '2', 'Common Objections by Role')}${renderDarkTable({ headers: ['Objection', 'Typical Stakeholder', 'Counter'], rows: arr(s3.objections).slice(0, 4).map(o => [e(String(o)), 'Economic or Technical Buyer', 'Quantify the cost of inaction and lead with peer proof']) }, '', 'ABE GTMS Engine v1.0')}` : ''}
 ${renderValidationNote('Buying committee roles are inferred from ICP and decision-maker inputs. Validate role map with discovery calls.', 'info')}
 ${pageFtr('Stakeholder Map', 5)}
 </div>
