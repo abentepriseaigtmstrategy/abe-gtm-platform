@@ -182,3 +182,36 @@ Manual validation after deploy:
 3. Confirm the request contains `Authorization: Bearer <token>` and not `Bearer [object Promise]`.
 4. If Gotenberg fails, confirm JSON fallback still exports without redirecting to login.
 5. Inspect the generated PDF for readable table fonts, visible footer tagline, reduced orphan headings, and no raw floats/placeholders.
+
+## Phase 21E — Multi-provider PDF rendering + fallback gap fix
+
+This build does not rely on a single PDF provider. The server export pipeline can now try multiple external PDF engines before falling back to browser rendering.
+
+Recommended Production env:
+
+```text
+PDF_RENDER_ENGINE=auto
+PDF_RENDER_PROVIDER_ORDER=gotenberg,browserless,pdfshift
+GOTENBERG_URL=https://your-gotenberg-service-url
+BROWSERLESS_URL=https://your-browserless-service-url
+BROWSERLESS_TOKEN=optional-browserless-token
+PDFSHIFT_API_KEY=optional-pdfshift-key
+PDF_RENDER_TIMEOUT_MS=28000
+```
+
+Optional cover visual:
+
+```text
+UNSPLASH_ENABLED=true
+UNSPLASH_ACCESS_KEY=your-unsplash-access-key
+```
+
+Expected successful server-render response headers:
+
+```text
+Content-Type: application/pdf
+X-ABE-PDF-Engine: gotenberg | browserless | pdfshift
+X-ABE-Export-Path: external-application-pdf:<provider>
+```
+
+If all external renderers fail, the frontend uses a readable HTML fallback and no longer slices each `.page` wrapper separately; it slices the continuous rendered canvas to reduce half-blank pages.
