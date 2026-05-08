@@ -619,9 +619,11 @@ async function fetchQuickChartBase64(config, width, height, qc, chartType = 'def
   const hasDoughnutlabel = configStr.includes('doughnutlabel');
   console.info(`[QuickChart] type=${chartType} w=${width} h=${height} datalabels=${hasDatalabels} annotation=${hasAnnotation} doughnutlabel=${hasDoughnutlabel}`);
   let lastError = null;
+  const chartWidth = Math.max(1200, Math.round(Number(width || 0) * 2) || 1200);
+  const chartHeight = Math.max(600, Math.round(Number(height || 0) * 2) || 600);
   for (const version of versions) {
     const payload = JSON.stringify({
-      chart: config, width, height,
+      chart: config, width: chartWidth, height: chartHeight, devicePixelRatio: 2,
       backgroundColor: '#0B0F1A', format: 'png', version,
       ...(qc.apiKey ? { key: qc.apiKey } : {})
     });
@@ -2701,7 +2703,7 @@ html, body {
   -webkit-print-color-adjust: exact !important;
   print-color-adjust: exact !important;
   background: #0B0F1A !important;
-  font-size: 12px;
+  font-size: 11pt;
   line-height: 1.65;
   orphans: 3;
   widows: 3;
@@ -2715,7 +2717,29 @@ ${p}.page {
   margin: 0 !important;
   min-height: unset !important;
   height: auto !important;
-  display: block !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: space-between !important;
+  break-after: page !important;
+  page-break-after: always !important;
+}
+/* ── Vertical breathing map (final pass) ── */
+${p}#page-17-icp-modeling {
+  justify-content: space-around !important;
+}
+${p}#page-4-market-definition,
+${p}#page-15-market-context-overflow-tam-visual,
+${p}#page-18-account-sourcing-41-42,
+${p}#page-23-sdr-followup-part-2,
+${p}#page-24-competitive-landscape,
+${p}#page-27-buying-criteria,
+${p}#page-29-regulatory,
+${p}#page-34-tam-methodology,
+${p}#page-35-data-quality-audit {
+  justify-content: flex-start !important;
+}
+${p}#page-1-cover {
+  justify-content: space-between !important;
 }
 ${p}.page.section-break {
   break-before: page !important;
@@ -2749,6 +2773,7 @@ ${p}.pf, ${p}.pf-wrap, ${p}.page-insight, ${p}.figure-caption, ${p}.figure-sourc
 /* Tables */
 ${p}.dt th, ${p}table th, ${p}th { font-size: 10px !important; padding: 6px 7px !important; }
 ${p}.dt td, ${p}table td, ${p}td { font-size: 10px !important; padding: 6px 7px !important; }
+${p}table td *, ${p}.dt td *, ${p}.table-wrap td * { font-size: 10px !important; }
 /* Card body text */
 ${p}.card p, ${p}.card div { font-size: 11.5px !important; line-height: 1.7 !important; }
 /* SWOT / lists */
@@ -2797,6 +2822,12 @@ ${p}.sec-header, ${p}.section-header, ${p}.ph {
 ${p}.stat-row, ${p}.kpi-strip, ${p}.ww { break-inside: avoid !important; page-break-inside: avoid !important; }
 /* ── Ensure no inline opacity hides footer elements ── */
 ${p}.pf *, ${p}.pf-tagline { opacity: 1 !important; }
+/* ── Gotenberg rendering artifacts: remove ghost boxes on charts/images ── */
+${p}img, ${p}.chart-block, ${p}.chart-block > div, ${p}.keep-together.chart-block {
+  background: none !important;
+  border: none !important;
+  box-shadow: none !important;
+}
 `;
 
   const paginationCss = renderMode === 'gotenberg' ? gotenbergPrintCss : renderMode === 'browser-pdf' ? `
@@ -2874,7 +2905,7 @@ ${p}.cb{font-size:8px;font-weight:700;color:var(--accent);letter-spacing:.12em;t
 /* ── ABE MONOGRAM ── */
 ${p}.am{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--accent2),var(--accent));display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;color:white;letter-spacing:-.5px;flex-shrink:0}
 /* ── PAGE FOOTER — tagline on every page ── */
-${p}.pf{display:flex;justify-content:space-between;align-items:flex-end;margin-top:auto;padding-top:3mm;border-top:1px solid rgba(255,255,255,0.2);font-size:9px;color:#D1D5DB;font-weight:600;break-before:avoid;page-break-before:avoid}
+${p}.pf{display:flex;justify-content:space-between;align-items:flex-end;margin-top:auto;padding-top:3mm;border-top:1px solid rgba(255,255,255,0.2);font-size:9px;color:#D1D5DB;font-weight:600;break-before:avoid;page-break-before:avoid;break-after:avoid;page-break-after:avoid;flex-shrink:0;position:relative;z-index:2}
 ${p}.pf-tagline{font-style:italic;color:#9CA3AF;font-size:8.5px;letter-spacing:.03em;opacity:1}
 /* ── CARDS ── */
 ${p}.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:4mm 5mm;margin-bottom:3mm}
@@ -3030,7 +3061,26 @@ ${p}.section-continuation{width:100%;box-sizing:border-box;padding:0;margin:0;ba
 /* ── A4 PRINT DISCIPLINE ── */
 @media print {
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  html, body { font-size: 11pt !important; }
   ${p}.page { background: #0B0F1A !important; }
+  ${p}.page, ${p}.section-continuation {
+    break-after: page !important;
+    page-break-after: always !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: space-between !important;
+  }
+  ${p}#page-17-icp-modeling { justify-content: space-around !important; }
+  ${p}#page-4-market-definition,
+  ${p}#page-15-market-context-overflow-tam-visual,
+  ${p}#page-18-account-sourcing-41-42,
+  ${p}#page-23-sdr-followup-part-2,
+  ${p}#page-24-competitive-landscape,
+  ${p}#page-27-buying-criteria,
+  ${p}#page-29-regulatory,
+  ${p}#page-34-tam-methodology,
+  ${p}#page-35-data-quality-audit { justify-content: flex-start !important; }
+  ${p}#page-1-cover { justify-content: space-between !important; }
   ${p}.card, ${p}.table-wrap, ${p}.chart-block, ${p}.sdr-step, ${p}.keep-together,
   ${p}.page-insight, ${p}.page-insight-expanded, ${p}.swot-grid, ${p}.ww {
     break-inside: avoid !important; page-break-inside: avoid !important;
@@ -3039,13 +3089,22 @@ ${p}.section-continuation{width:100%;box-sizing:border-box;padding:0;margin:0;ba
   ${p}h1, ${p}h2, ${p}h3, ${p}.section-header { break-after: avoid !important; page-break-after: avoid !important; }
   ${p}.pf, ${p}.figure-caption, ${p}.figure-source { break-before: avoid !important; page-break-before: avoid !important; }
   ${p}tr { break-inside: avoid !important; page-break-inside: avoid !important; }
+  ${p}.dt th, ${p}.dt td, ${p}table th, ${p}table td, ${p}td, ${p}th { font-size: 10px !important; }
+  ${p}.pf { margin-top: auto !important; padding-bottom: 1mm !important; }
+  ${p}.pf-tagline { opacity: 1 !important; color: #9CA3AF !important; }
+  ${p}img, ${p}.chart-block, ${p}.chart-block > div, ${p}.keep-together.chart-block {
+    background: none !important;
+    border: none !important;
+    box-shadow: none !important;
+  }
 }
 </style>`;
 
   const bodyContent = `
 <div class="${isViewer ? 'abe-viewer-wrapper' : ''}">
+<!-- Page 1 -->
 <!-- COVER -->
-<div class="page cover-page" style="position:relative;display:flex;flex-direction:column;justify-content:flex-start;align-items:center;text-align:center;padding:0;overflow:visible">
+<div class="page cover-page" id="page-1-cover" style="position:relative;display:flex;flex-direction:column;justify-content:flex-start;align-items:center;text-align:center;padding:0;overflow:visible">
 <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(168,85,247,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(168,85,247,.025) 1px,transparent 1px);background-size:28px 28px;pointer-events:none"></div>
 <div style="position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,var(--accent2),var(--accent),#c084fc)"></div>
 <div style="position:absolute;top:-80px;right:-80px;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,rgba(124,58,237,.1),transparent 70%);pointer-events:none"></div>
@@ -3092,10 +3151,15 @@ ${p}.section-continuation{width:100%;box-sizing:border-box;padding:0;margin:0;ba
     </div>
   </div>
 </div>
-<div style="width:100%;padding:6mm 0 8mm;font-size:8px;color:var(--muted);text-align:center;letter-spacing:.05em;margin-top:auto">Classification: CONFIDENTIAL — Not for External Distribution</div>
+<div class="pf" style="margin:6mm 18mm 6mm 18mm;padding-top:3mm">
+  <span>Cover Page · ${e(co)}</span>
+  <span class="pf-tagline">Plan with clarity. Build with intent. Grow through trust.</span>
 </div>
+<div style="width:100%;padding:0 0 2mm;font-size:8px;color:var(--muted);text-align:center;letter-spacing:.05em">Classification: CONFIDENTIAL — Not for External Distribution</div>
+</div>
+<!-- Page 2 -->
 <!-- EXECUTIVE SUMMARY -->
-<div class="page section-break" id="exec-summary">
+<div class="page section-break" id="page-2-exec-summary">
 ${pageHdr()}
 ${secHead('ES', 'Executive Summary')}
 ${secCtx('Establishes the macro-opportunity and win-probability. Provides the highest-leverage vector for outbound strategy.')}
@@ -3111,11 +3175,12 @@ ${srcNote('TAM/CAGR: AI market estimate; Relevance: algorithmic scoring; Verdict
 ${callout(s1.gtm_relevance_reasoning || s1.analyst_insight || '')}
 ${renderPageInsightBlock('executive_summary', strategy, isDemoMode)}
 ${buildFillerBlock('exec', renderMode)}
-${pageFtr('Executive Summary', 1)}
+${pageFtr('Executive Summary', 2)}
 </div>
 
 <!-- PHASE 20D: STUDY OBJECTIVE & REPORT SCOPE -->
-<div class="page section-break" id="study-objective">
+<!-- Page 3 -->
+<div class="page section-break" id="page-3-study-objective">
 ${pageHdr()}
 ${secHead('RS', 'Study Objective & Report Scope')}
 ${secCtx('Defines the analytical boundaries, evidence claims, and validation limitations of this GTM Intelligence Report.')}
@@ -3131,11 +3196,12 @@ ${renderInsightBox('Validation Limitations',
   'This report does not guarantee market share, close rates, or revenue outcomes. TAM/SAM/SOM are AI estimates unless company data overrides defaults. Buying committee map is inferred from ICP inputs. All figures require independent validation before boardroom use.',
   { accent: 'var(--amber)' })}
 ${renderValidationNote('All AI-estimated fields are marked. Validate with primary analyst data before decisioning.', 'warn')}
-${pageFtr('Study Objective \u2014 Report Scope', 2)}
+${pageFtr('Study Objective \u2014 Report Scope', 3)}
 </div>
 
+<!-- Page 4 -->
 <!-- PHASE 20D: MARKET DEFINITION -->
-<div class="page section-break" id="market-definition">
+<div class="page section-break" id="page-4-market-definition">
 ${pageHdr()}
 ${secHead('MD', 'Market Definition')}
 ${secCtx('Establishes the precise market category, adjacent spaces, and the analytical lens applied to this GTM assessment.')}
@@ -3161,11 +3227,12 @@ ${renderDarkTable({
   ]
 }, 'Select the motion matching this report\'s market definition.', 'ABE GTMS Engine v1.0')}
 ${renderValidationNote('Market definition is AI-inferred from strategy inputs. Validate with primary market research.', 'info')}
-${pageFtr('Market Definition', 3)}
+${pageFtr('Market Definition', 4)}
 </div>
 
+<!-- Page 5 -->
 <!-- PHASE 20D: YEARS CONSIDERED / FORECAST WINDOW -->
-<div class="page section-break" id="forecast-window">
+<div class="page section-break" id="page-5-forecast-window">
 ${pageHdr()}
 ${secHead('FW', 'Years Considered / Forecast Window')}
 ${secCtx('Establishes the temporal boundaries of market signals, baseline assumptions, and the GTM execution horizon.')}
@@ -3189,11 +3256,12 @@ ${renderMetricStrip([
   { label: 'Confidence',  value: (confScore || '—') + '/100',              opts: { color: 'var(--muted)' } },
 ])}
 ${renderValidationNote('All forecast windows are AI-estimated. Validate with CRM, analyst, and market data before committing execution resources.', 'warn')}
-${pageFtr('Forecast Window', 4)}
+${pageFtr('Forecast Window', 5)}
 </div>
 
+<!-- Page 6 -->
 <!-- PHASE 20D: STAKEHOLDER & BUYING COMMITTEE MAP -->
-<div class="page section-break" id="stakeholder-map">
+<div class="page section-break" id="page-6-stakeholder-map">
 ${pageHdr()}
 ${secHead('BC', 'Stakeholder & Buying Committee Map')}
 ${secCtx('Maps the decision-making unit, messaging angles, and proof requirements for each stakeholder role.')}
@@ -3217,11 +3285,12 @@ ${(() => {
 })()}
 ${arr(s3.objections).length ? `${h3('icp-modeling', '2', 'Common Objections by Role')}${renderDarkTable({ headers: ['Objection', 'Typical Stakeholder', 'Counter'], rows: arr(s3.objections).slice(0, 4).map(o => [e(String(o)), 'Economic or Technical Buyer', 'Quantify the cost of inaction and lead with peer proof']) }, '', 'ABE GTMS Engine v1.0')}` : ''}
 ${renderValidationNote('Buying committee roles are inferred from ICP and decision-maker inputs. Validate role map with discovery calls.', 'info')}
-${pageFtr('Stakeholder Map', 5)}
+${pageFtr('Stakeholder Map', 6)}
 </div>
 
+<!-- Page 7 -->
 <!-- PHASE 20E: MARKET SEGMENTATION FRAMEWORK -->
-<div class="page section-break" id="segmentation-framework">
+<div class="page section-break" id="page-7-segmentation-framework">
 ${pageHdr()}
 ${secHead('SF', 'Market Segmentation Framework')}
 ${secCtx('Defines the multi-dimensional segmentation view for prioritised GTM targeting and resource allocation.')}
@@ -3242,11 +3311,12 @@ ${(() => {
   ]);
 })()}
 ${renderValidationNote('Segmentation framework is AI-derived from available strategy inputs. Each dimension should be cross-referenced with primary research before resource allocation.', 'warn')}
-${pageFtr('Segmentation Framework', 6)}
+${pageFtr('Segmentation Framework', 7)}
 </div>
 
+<!-- Page 8 -->
 <!-- PHASE 20F: RESEARCH METHODOLOGY -->
-<div class="page section-break" id="research-methodology">
+<div class="page section-break" id="page-8-research-methodology">
 ${pageHdr()}
 ${secHead('RM', 'Research Methodology & Evidence Ledger')}
 ${secCtx('Documents the provenance of assertions, data constraints, and validation boundaries applied to the report.')}
@@ -3263,11 +3333,12 @@ ${renderInsightBox('Confidence Architecture',
   'All conclusions operate within a determinist scoring cap. AI inferences cannot supersede missing baseline data. Confidence is inherently limited until CRM pipeline integration validates target engagement.',
   { accent: 'var(--amber)' })}
 ${renderValidationNote('This is an indicative intelligence document. Boardroom-level reliance requires corroborating the unvalidated items listed above.', 'warn')}
-${pageFtr('Research Methodology', 7)}
+${pageFtr('Research Methodology', 8)}
 </div>
 
+<!-- Page 9 -->
 <!-- PHASE 20F: DATA TRIANGULATION -->
-<div class="page section-break" id="data-triangulation">
+<div class="page section-break" id="page-9-data-triangulation">
 ${pageHdr()}
 ${secHead('DT', 'Data Triangulation & Confidence')}
 ${secCtx('Assesses the cross-validation strength of the primary data pillars and overall systemic risk.')}
@@ -3286,11 +3357,12 @@ ${renderTruthLedgerSummary({
   priority: !safe(s3.primary_icp) ? 'Immediate: Define primary buyer persona' : !safe(s4.estimated_universe) ? 'Immediate: Map actual universe size' : 'Pipeline conversion validation'
 })}
 ${renderValidationNote('Systemic risk is elevated where cross-validation between pillars cannot occur due to missing source data.', 'warn')}
-${pageFtr('Data Triangulation', 8)}
+${pageFtr('Data Triangulation', 9)}
 </div>
 
+<!-- Page 10 -->
 <!-- PHASE 20G: PREMIUM GTM INSIGHTS -->
-<div class="page section-break" id="premium-insights">
+<div class="page section-break" id="page-10-premium-insights">
 ${pageHdr()}
 ${secHead('PI', 'Premium GTM Insights')}
 ${secCtx('Distilled, high-leverage strategic vectors derived from the cross-pillar triangulation.')}
@@ -3316,11 +3388,12 @@ ${renderMetricStrip([
   { label: 'Risk Profile', value: confScore >= 75 ? 'Low' : confScore >= 50 ? 'Medium' : 'High', opts: { color: confScore >= 75 ? 'var(--green)' : confScore >= 50 ? 'var(--amber)' : 'var(--red)' } }
 ])}
 ${renderValidationNote('Premium insights synthesize the core findings of the report. They represent the highest-probability path based strictly on the provided evidence.', 'info')}
-${pageFtr('Premium GTM Insights', 9)}
+${pageFtr('Premium GTM Insights', 10)}
 </div>
 
+<!-- Page 11 -->
 <!-- PHASE 20H: MARKET OVERVIEW & DYNAMICS -->
-<div class="page section-break" id="market-overview">
+<div class="page section-break" id="page-11-market-overview">
 ${pageHdr()}
 ${secHead('MO', 'Market Overview & Dynamics')}
 ${secCtx('Assesses fundamental market forces, demand/supply imbalances, and macroeconomic pressure points.')}
@@ -3345,11 +3418,12 @@ ${renderDrocGrid({
   challenges: [{ title: 'Macro Challenge', explanation: safe(s1.market_position) ? 'Establishing share in ' + safe(s1.market_position) : 'Requires validation', implication: 'Requires strong differentiation' }]
 })}
 ${renderValidationNote('DROC dynamics are synthesised from provided strategy inputs. Validate via primary analyst research.', 'info')}
-${pageFtr('Market Overview', 10)}
+${pageFtr('Market Overview', 11)}
 </div>
 
+<!-- Page 12 -->
 <!-- PHASE 20H: MARKET EVOLUTION -->
-<div class="page section-break" id="market-evolution">
+<div class="page section-break" id="page-12-market-evolution">
 ${pageHdr()}
 ${secHead('ME', 'Market Evolution Timeline')}
 ${secCtx('Traces the structural shifts in the market to determine the current maturity phase and required GTM approach.')}
@@ -3366,11 +3440,12 @@ ${renderInsightBox('Maturity Assessment',
   'The target market is currently transitioning between Data-Driven Outbound and AI-Assisted GTM. Outbound strategies must move beyond simple intent filtering to multi-signal triangulation to achieve breakout conversion rates.',
   { accent: 'var(--accent)' })}
 ${renderValidationNote('Evolutionary timeline represents standard B2B SaaS progression. Industry-specific nuances require validation.', 'info')}
-${pageFtr('Market Evolution', 11)}
+${pageFtr('Market Evolution', 12)}
 </div>
 
+<!-- Page 13 -->
 <!-- PHASE 20H: KEY FINDINGS -->
-<div class="page section-break" id="key-findings">
+<div class="page section-break" id="page-13-key-findings">
 ${pageHdr()}
 ${secHead('KF', 'Key Findings & Directives')}
 ${secCtx('Consolidated strategic directives and immediate execution priorities derived from the full intelligence assessment.')}
@@ -3393,14 +3468,14 @@ ${h3('appendix', '2', 'Go / No-Go Decision')}
   <div style="font-size:10px;color:var(--text);margin-top:2.5mm;line-height:1.5">${e(safe(s1.gtm_relevance_reasoning) || 'Validation required prior to execution.')}</div>
 </div>
 ${renderValidationNote('Findings reflect the algorithmic assessment of provided data. A final human-in-the-loop review is mandatory before committing execution resources.', 'warn')}
-${pageFtr('Key Findings', 12)}
+${pageFtr('Key Findings', 13)}
 </div>
 
-<!-- STEP 1: MARKET RESEARCH -->
-<div class="page section-break" id="market-research">
+<!-- Page 14 -->
+<div class="page section-break" id="page-14-market-context">
 ${pageHdr()}
-${secHead('01', 'Market Research — The Context')}
-${secCtx(s1.section_context || 'Deconstructs market positioning and isolates specific macro-triggers.')}
+${secHead('MC', 'Market Context — Company Overview & Market Position')}
+${secCtx('Page 14 split: company overview and market position only.')}
 ${h3('market-research', '1', 'Company Overview')}
 <div class="card keep-together"><p>${e(safe(s1.company_overview) || '—')}</p></div>
 ${h3('market-research', '2', 'Market Position & Stage')}
@@ -3413,59 +3488,41 @@ ${renderDarkTable({
       ['Products/Services', safe(s1.products_services)]
     ].filter(r => r[1])
   }, '', 'ABE GTMS Engine v1.0')}
+${pageFtr('Market Context', 14)}
+</div>
+
+<!-- Page 15 -->
+<div class="page section-break" id="page-15-market-context-overflow-tam-visual">
+${pageHdr()}
+${secHead('MC/TAM', 'Market Context Overflow + TAM 2.1 & 2.3')}
+${secCtx('Page 15 split: overflow from market context plus TAM visual waterfall segment.')}
 ${h3('market-research', '3', 'SWOT Analysis')}
 ${swotGrid()}
 ${h3('market-research', '4', 'Strategic Growth Signals')}
 <div class="keep-together" style="margin-bottom:3mm">${tags(s1.growth_signals, 'green')}</div>
 ${h3('market-research', '5', 'Tech Stack Indicators')}
 <div class="keep-together" style="display:flex;flex-wrap:wrap;gap:2mm;margin-bottom:3mm">${arr(s1.tech_stack_hints).slice(0, 6).map(t => `<div style="display:inline-flex;align-items:center;gap:2mm;background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.2);border-radius:6px;padding:1.5mm 3mm"><svg width="8" height="8" viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="10" height="10" rx="2" stroke="#93c5fd" stroke-width="1.2"/><path d="M4 6h4M6 4v4" stroke="#93c5fd" stroke-width="1" stroke-linecap="round"/></svg><span style="font-size:8.5px;font-weight:600;color:#93c5fd">${e(String(t))}</span></div>`).join('')}</div>
-${callout(s1.analyst_insight)}
-${renderPageInsightBlock('market_research', strategy, isDemoMode)}
-${buildFillerBlock('market', renderMode)}
-${pageFtr('Market Research', 13)}
-</div>
-
-<!-- STEP 2: TAM MAPPING -->
-<div class="page section-break" id="tam-mapping">
-${pageHdr()}
-${secHead('02', 'TAM Mapping — The Opportunity')}
-${secCtx(s2.section_context || 'Quantifies total market velocity and filters it to actionable scope.')}
-${h3('tam-mapping', '1', 'Market Sizing')}
+${h3('tam-mapping', '2.1', 'Market Sizing')}
 ${renderMetricStrip([
   { label: 'TAM',      value: formatCurrency(s2.tam_size_estimate, 'Requires market validation'), opts: { color: 'var(--accent)', sub: 'Total Addressable' } },
   { label: 'SAM',      value: formatCurrency(s2.sam_estimate, 'Requires market validation'),       opts: { color: '#8b5cf6',      sub: 'Serviceable' } },
   { label: 'SOM',      value: formatCurrency((s2.waterfall || {}).som_value, 'Requires market validation'), opts: { color: 'var(--amber)', sub: 'Obtainable' } },
   { label: 'CAGR',     value: formatPercent(s2.growth_rate, 'Requires market validation'),        opts: { color: 'var(--green)',  sub: 'Growth Rate' } },
-  { label: 'Maturity', value: (() => { const mv = safe(s2.market_maturity) || 'Requires market validation'; return mv.length > 14 ? mv.split(/[,—]/)[0].trim() : mv; })(), opts: { color: 'var(--amber)', sub: 'Market Stage' } },
 ])}
-${renderValidationNote('Market sizing is directional and requires source validation before commercial use.', 'warn')}
-${h3('tam-mapping', '2', 'Market Sizing Formula & Assumptions')}
-<div class="keep-together" style="display:grid;grid-template-columns:1fr 1fr;gap:4mm;margin-bottom:3mm">
-  <div class="card" style="border-top:3px solid var(--accent)">
-    <div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--accent);margin-bottom:2mm">Waterfall Logic</div>
-    <ul style="margin:0;padding-left:4mm;font-size:9px;color:var(--text);line-height:1.6">
-      <li><strong>TAM:</strong> Total market universe for this category.</li>
-      <li><strong>SAM:</strong> Reachable market based on offering/geography fit.</li>
-      <li><strong>SOM:</strong> Realistic capture zone based on fit, capacity, and execution window.</li>
-    </ul>
-  </div>
-  <div class="card" style="border-top:3px solid var(--amber)">
-    <div style="font-size:8px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--amber);margin-bottom:2mm">Baseline Assumptions</div>
-    <ul style="margin:0;padding-left:4mm;font-size:9px;color:var(--text);line-height:1.6">
-      <li><strong>Market Sizing:</strong> Algorithmic industry estimate.</li>
-      <li><strong>Geographic:</strong> Defaults to global unless specified.</li>
-      <li><strong>Service/Product Fit:</strong> 30-40% conservative.</li>
-      <li><strong>Capture Rate:</strong> 8-12% enterprise benchmark.</li>
-      <li><strong>Limitations:</strong> Highly reliant on CRM validation.</li>
-    </ul>
-  </div>
-</div>
-${h3('tam-mapping', '3', 'Visual Waterfall')}
+${h3('tam-mapping', '2.3', 'Visual Waterfall')}
 <div class="keep-together chart-block">
   ${renderChartOrFallback('TAM Waterfall', charts.waterfall, waterfall(), { width: 480, height: 180 })}
   <p class="figure-caption" style="font-size:10px; font-weight:bold; color:#f5f5f5; margin:1mm 0 0.5mm;">Figure 2: TAM → SAM → SOM Waterfall</p>
   <p class="figure-source" style="font-size:8px; font-style:italic; color:#aaa; margin:0;">Source: ABE GTMS Engine v1.0</p>
 </div>
+${pageFtr('Market Context Overflow + TAM Visual', 15)}
+</div>
+
+<!-- Page 16 -->
+<div class="page section-break" id="page-16-tam-prioritisation">
+${pageHdr()}
+${secHead('TAM', 'TAM Mapping — Prioritisation')}
+${secCtx('Page 16 split: TAM 2.4 prioritisation only.')}
 ${h3('tam-mapping', '4', 'Segment Opportunity Prioritisation')}
 ${renderSegmentOpportunityTable([
   { segment: _cleanICP(safe(s2.priority_opportunities) || 'Primary Focus'), size: 'Requires market validation', growth: 'Validation pending', urgency: 'Moderate pending live validation', fit: 'Moderate confidence pending source validation', priority: 'Watch', status: 'Validation pending' }
@@ -3473,11 +3530,12 @@ ${renderSegmentOpportunityTable([
 ${callout(s2.analyst_insight, 'amber')}
 ${renderPageInsightBlock('tam_mapping', strategy, isDemoMode)}
 ${buildFillerBlock('tam', renderMode)}
-${pageFtr('TAM Analysis', 14)}
+${pageFtr('TAM Prioritisation', 16)}
 </div>
 
 <!-- STEP 3: ICP MODELING -->
-<div class="page section-break" id="icp-modeling">
+<!-- Page 17 -->
+<div class="page section-break" id="page-17-icp-modeling">
 ${pageHdr()}
 ${secHead('03', 'ICP Modeling — The Persona')}
 ${secCtx(s3.section_context || 'Identifies decision-makers and maps operational pain directly to solutions.')}
@@ -3513,10 +3571,11 @@ ${h3('icp-modeling', '3', 'Core Pain Points & Objections')}
 ${callout(s3.analyst_insight)}
 ${renderPageInsightBlock('icp_modeling', strategy, isDemoMode)}
 ${buildFillerBlock('icp', renderMode)}
-${pageFtr('ICP Modeling', 15)}
+${pageFtr('ICP Modeling', 17)}
 </div>
 
-<div class="page section-break" id="account-sourcing">
+<!-- Page 18 -->
+<div class="page section-break" id="page-18-account-sourcing-41-42">
 ${pageHdr()}
 ${secHead('04', 'Account Sourcing — The Targets')}
 ${secCtx(s4.section_context || 'Translates persona into actionable technographic filters and sourcing logic.')}
@@ -3531,22 +3590,30 @@ ${renderDarkTable({
     ['Account Scoring Logic', 'Fit score + engagement recency', 'Validation pending']
   ]
 }, '', 'ABE GTMS Engine v1.0')}
-${h3('account-sourcing', '2', 'Account Tiering Funnel')}
+${h3('account-sourcing', '4.2', 'Account Tiering Funnel')}
 ${renderAccountSourcingFunnel({
   tier1: 'Enterprise target, matching firmographics, active intent signals, recognized tech stack.',
   tier2: 'Mid-market, matching firmographics, latent need, no active intent.',
   watchlist: 'Growth stage, incomplete tech stack, monitoring for trigger event.'
 })}
-${h3('account-sourcing', '3', 'Priority Sourcing Targets')}
+${pageFtr('Account Sourcing 4.1 / 4.2', 18)}
+</div>
+
+<!-- Page 19 -->
+<div class="page section-break" id="page-19-account-sourcing-43-targets">
+${pageHdr()}
+${secHead('04', 'Account Sourcing — 4.3 Sourcing Targets')}
+${secCtx('Page 19 split: sourcing targets only.')}
+${h3('account-sourcing', '4.3', 'Priority Sourcing Targets')}
 ${renderAccountTierCards(arr(s4.target_accounts))}
 ${callout(s4.analyst_insight)}
 ${renderPageInsightBlock('account_sourcing', strategy, isDemoMode)}
 ${buildFillerBlock('sourcing', renderMode)}
-${pageFtr('Account Sourcing', 16)}
+${pageFtr('Account Sourcing Targets', 19)}
 </div>
 
-<!-- STEP 5: KEYWORDS & INTENT -->
-<div class="page section-break" id="keywords-intent">
+<!-- Page 20 -->
+<div class="page section-break" id="page-20-keywords-intent">
 ${pageHdr()}
 ${secHead('05', 'Keywords & Intent Intelligence')}
 ${secCtx(s5.section_context || 'Maps the semantic footprint before RFP issuance and decodes intent signals.')}
@@ -3565,11 +3632,11 @@ ${charts.intent
 ${callout(s5.analyst_insight)}
 ${renderPageInsightBlock('keywords_intent', strategy, isDemoMode)}
 ${buildFillerBlock('keywords', renderMode)}
-${pageFtr('Keywords & Intent', 17)}
+${pageFtr('Keywords & Intent', 20)}
 </div>
 
-<!-- STEP 6: ENTERPRISE SDR SEQUENCE — PAGE 8: EMAILS -->
-<div class="page section-break" id="sdr-emails">
+<!-- Page 21 -->
+<div class="page section-break" id="page-21-sdr-sequence">
 ${pageHdr()}
 ${secHead('06', 'Enterprise SDR Sequence — The Engagement')}
 ${secCtx(s6.section_context || 'Hyper-targeted sequences designed to agitate pain and validate scalability.')}
@@ -3579,14 +3646,14 @@ ${emailBlock('email_2', 1)}
 ${emailBlock('email_3', 2)}
 ${renderPageInsightBlock('sdr_sequence', strategy, isDemoMode)}
 ${buildFillerBlock('sdr', renderMode)}
-${pageFtr('Engagement Playbook — Emails', 18)}
+${pageFtr('SDR Sequence', 21)}
 </div>
 
-<!-- STEP 6 CONTINUED — SDR FOLLOW-UP + SOCIAL -->
-<div class="${renderMode === 'browser-pdf' ? 'section-continuation' : 'page'}" id="sdr-social">
-${renderMode !== 'browser-pdf' ? pageHdr() : ''}
-${renderMode !== 'browser-pdf' ? secHead('06', 'Enterprise SDR Sequence — Follow-up & Social') : h3('sdr-sequence', '2', 'Follow-up Cadence & Social')}
-${renderMode !== 'browser-pdf' ? secCtx('Cadence continuation and LinkedIn direct outreach hook.') : ''}
+<!-- Page 22 -->
+<div class="page section-break" id="page-22-sdr-followup-part-1">
+${pageHdr()}
+${secHead('06', 'SDR Follow-up — Part 1')}
+${secCtx('Page 22 split: follow-up cadence and timeline.')}
 ${s6.follow_up_sequence ? `${h3('sdr-sequence', '2', 'Follow-up Cadence')}<div class="card keep-together"><p>${e(safe(s6.follow_up_sequence))}</p></div>` : `${h3('sdr-sequence', '2', 'Follow-up Cadence')}<div class="card keep-together"><p>Send Email 1 → wait 3 days → Email 2 → reach out on LinkedIn → follow-up call attempt.</p></div>`}
 <!-- Visual cadence timeline -->
 <div class="keep-together" style="margin:4mm 0 3mm">
@@ -3604,6 +3671,14 @@ ${s6.follow_up_sequence ? `${h3('sdr-sequence', '2', 'Follow-up Cadence')}<div c
 </div>
 ${s6.linkedin_message ? `${h3('sdr-sequence', '3', 'LinkedIn Hook')}<div class="card keep-together" style="border-left:3px solid #3b82f6"><p style="font-size:11.5px"><strong>Direct Message:</strong><br><br>"${e(safe(s6.linkedin_message))}"</p></div>` : ''}
 ${s6.linkedin_follow_up ? `${h3('sdr-sequence', '4', 'LinkedIn Follow-up')}<div class="card keep-together"><p>${e(safe(s6.linkedin_follow_up))}</p></div>` : ''}
+${pageFtr('SDR Follow-up — Part 1', 22)}
+</div>
+
+<!-- Page 23 -->
+<div class="page section-break" id="page-23-sdr-followup-part-2">
+${pageHdr()}
+${secHead('06', 'SDR Follow-up — Part 2')}
+${secCtx('Page 23 split: objection handling, CTA, and benchmarks.')}
 ${h3('sdr-sequence', '5', 'Objection Handling')}
 ${renderObjectionHandlingTable(s6.objection_handling)}
 ${h3('sdr-sequence', '6', 'Call to Action Strategy')}
@@ -3629,11 +3704,11 @@ ${renderCtaTable(s6.cta_strategy)}
 ${callout(s6.analyst_insight)}
 ${renderPageInsightBlock('followup_social', strategy, isDemoMode)}
 ${buildFillerBlock('sdr', renderMode)}
-${pageFtr('Engagement Playbook \u2014 Cadence', 19)}
+${pageFtr('SDR Follow-up — Part 2', 23)}
 </div>
 
-<!-- PHASE 20K: COMPETITIVE LANDSCAPE -->
-<div class="page section-break" id="competitive-landscape">
+<!-- Page 24 -->
+<div class="page section-break" id="page-24-competitive-landscape">
 ${pageHdr()}
 ${secHead('CL', 'Competitive Landscape')}
 ${secCtx((strategy.competitive_landscape?.section_context) || 'Mapping the competitive field: categories, relative strengths, and threat level by player.')}
@@ -3665,11 +3740,11 @@ ${renderInsightBox(
   { accent: 'var(--accent)' }
 )}
 ${callout(strategy.competitive_landscape?.analyst_insight || s1.analyst_insight)}
-${pageFtr('Competitive Landscape', 20)}
+${pageFtr('Competitive Landscape', 24)}
 </div>
 
-<!-- PHASE 20K: RIGHT-TO-WIN ANALYSIS -->
-<div class="page section-break" id="right-to-win">
+<!-- Page 25 -->
+<div class="page section-break" id="page-25-right-to-win">
 ${pageHdr()}
 ${secHead('RW', 'Right-to-Win Analysis')}
 ${secCtx((strategy.competitive_landscape?.rtw_context) || 'Evaluating our advantage on each win dimension versus identified competitors. Used to prioritise competitive response and messaging.')}
@@ -3696,11 +3771,11 @@ ${renderInsightBox(
   { accent: 'var(--blue)' }
 )}
 ${callout(strategy.competitive_landscape?.rtw_analyst_insight)}
-${pageFtr('Right-to-Win Analysis', 21)}
+${pageFtr('Right-to-Win Analysis', 25)}
 </div>
 
-<!-- PHASE 20L: PORTER'S FIVE FORCES: GTM LENS -->
-<div class="page section-break" id="porter-five-forces">
+<!-- Page 26 -->
+<div class="page section-break" id="page-26-porter-five-forces">
 ${pageHdr()}
 ${secHead('P5', "Porter's Five Forces: GTM Lens")}
 ${secCtx((strategy.strategy_context?.porter_context) || "Porter's Five Forces mapped to the GTM lens: how each structural force shapes buyer behaviour, competitive positioning, and outbound strategy.")}
@@ -3756,11 +3831,11 @@ ${renderInsightBox(
   'These five forces determine the structural attractiveness of the market and directly shape outbound strategy. High buyer power and high competitive rivalry are the two forces most likely to compress deal cycles and require proof-led selling. Validate all force ratings with primary research before boardroom presentation.',
   { accent: 'var(--accent)' }
 )}
-${pageFtr("Porter's Five Forces", 22)}
+${pageFtr("Porter's Five Forces", 26)}
 </div>
 
-<!-- PHASE 20L: BUYING CRITERIA MATRIX -->
-<div class="page section-break" id="buying-criteria">
+<!-- Page 27 -->
+<div class="page section-break" id="page-27-buying-criteria">
 ${pageHdr()}
 ${secHead('BC', 'Buying Criteria Matrix')}
 ${secCtx((strategy.strategy_context?.buying_criteria_context) || 'Enterprise buying decisions are evaluated across multiple criteria. This matrix maps each criterion to the buyer concern, proof required, and recommended GTM response.')}
@@ -3785,11 +3860,11 @@ ${renderInsightBox(
   'Use this matrix to align outreach, demo structure, and proposal content to the highest-importance buying criteria for the primary ICP. Critical criteria (ROI, Security, Time to Value) must be addressed in the first outbound touch. All proof claims should be validated before use in boardroom or procurement contexts.',
   { accent: 'var(--blue)' }
 )}
-${pageFtr('Buying Criteria Matrix', 23)}
+${pageFtr('Buying Criteria Matrix', 27)}
 </div>
 
-<!-- PHASE 20M: TECHNOLOGY / CAPABILITY ANALYSIS -->
-<div class="page section-break" id="capability-analysis">
+<!-- Page 28 -->
+<div class="page section-break" id="page-28-tech-analysis">
 ${pageHdr()}
 ${secHead('CA', 'Technology / Capability Analysis')}
 ${secCtx((strategy.strategy_context?.capability_context) || 'Mapping capabilities across core, complementary, and adjacent dimensions to identify where the offering creates buyer value and where evidence is still required.')}
@@ -3812,11 +3887,11 @@ ${renderInsightBox(
   'Core capabilities are the primary proof points for the first outbound touch. Complementary capabilities support the business case in evaluation. Adjacent capabilities reduce long-term risk and increase platform stickiness. All capability claims must be validated with product and customer success teams before use in enterprise proposals.',
   { accent: 'var(--green)' }
 )}
-${pageFtr('Technology / Capability Analysis', 24)}
+${pageFtr('Technology / Capability Analysis', 28)}
 </div>
 
-<!-- PHASE 20M: REGULATORY & RISK LANDSCAPE -->
-<div class="page section-break" id="regulatory-risk">
+<!-- Page 29 -->
+<div class="page section-break" id="page-29-regulatory">
 ${pageHdr()}
 ${secHead('RR', 'Regulatory & Risk Landscape')}
 ${secCtx((strategy.strategy_context?.regulatory_context) || 'Mapping buyer-perceived regulatory and procurement risks. All items reflect inferred buyer concerns — not verified legal claims. Validate with legal counsel before boardroom use.')}
@@ -3833,18 +3908,18 @@ ${renderRegulatoryRiskTable(
     { risk_area: 'Budget Approval',    buyer_concern: 'What approval authority and finance sign-off is required for this purchase?',                     gtm_impact: 'Budget approval cycles extend deal timelines — especially above CFO thresholds', mitigation_message: 'Build a CFO-ready business case deck with ROI, payback, and risk-reduction narrative',  required_proof: 'Budget threshold data for the ICP segment — validate with sales team before use',          validation_status: 'Validation pending' },
   ]
 )}
+${pageFtr('Regulatory Landscape', 29)}
+</div>
+
+<!-- Page 30 -->
+<div class="page section-break" id="page-30-decision-engine">
+${pageHdr()}
 ${renderInsightBox(
-  'Risk — GTM Activation',
+  'RISK — GTM ACTIVATION',
   strategy.strategy_context?.regulatory_summary ||
   'Address the highest-impact risks (Data Privacy, Security Review, Compliance) in discovery — not in legal review. Proactive risk mitigation can reduce friction in enterprise deal cycles when supported by validated proof. All claims in this section require independent validation before boardroom presentation.',
   { accent: 'var(--amber)' }
 )}
-${pageFtr('Regulatory & Risk Landscape', 25)}
-</div>
-
-<!-- STEP 7: REVENUE INTELLIGENCE — Decision Engine -->
-<div class="page section-break" id="decision-engine">
-${pageHdr()}
 ${renderMetricStrip([
   { label: 'GTM Score',  value: (score || '—') + '/100',    opts: { color: recColor } },
   { label: 'Verdict',   value: recUp,                       opts: { color: recColor } },
@@ -3855,25 +3930,25 @@ ${renderMetricStrip([
 ${decisionEngineSummary()}
 ${renderPageInsightBlock('decision_engine', strategy, isDemoMode)}
 ${buildFillerBlock('decision', renderMode)}
-${pageFtr('Revenue Intelligence', 26)}
+${pageFtr('Decision Engine', 30)}
 </div>
 
-<!-- STEP 7: REVENUE INTELLIGENCE — Risk & Execution -->
-<div class="page section-break" id="decision-engine-risk">
+<!-- Page 31 -->
+<div class="page section-break" id="page-31-risk-execution">
 ${pageHdr()}
 ${secHead('07', 'Revenue Intelligence — Risk & Execution')}
 ${secCtx('Assesses implementation risks and dictates the immediate strategic execution path.')}
 ${decisionEngineRisk()}
 ${renderPageInsightBlock('decision_engine_risk', strategy, isDemoMode)}
 ${buildFillerBlock('decision_risk', renderMode)}
-${pageFtr('Risk & Execution', 27)}
+${pageFtr('Risk & Execution', 31)}
 </div>
 
-<!-- STEP 7 CONTINUED: CONFIDENCE MATRIX -->
-<div class="${renderMode === 'browser-pdf' ? 'section-continuation' : 'page'}" id="confidence-matrix">
-${renderMode !== 'browser-pdf' ? pageHdr() : ''}
-${renderMode !== 'browser-pdf' ? secHead('07', 'Revenue Intelligence — Confidence Matrix') : h3('revenue-intelligence', '6', 'Weighted Confidence Matrix')}
-${renderMode !== 'browser-pdf' ? secCtx('Weighted fidelity assessment of signal quality, market timing, and ICP alignment.') : ''}
+<!-- Page 32 -->
+<div class="page section-break" id="page-32-execution-priority-confidence">
+${pageHdr()}
+${secHead('07', 'Execution Priority — Confidence Matrix')}
+${secCtx('Page 32: 7.5 execution priority and confidence matrix.')}
 <div class="confidence-matrix keep-together chart-block">
 ${renderChartOrFallback('Confidence Matrix', charts.confidence,
       `<div style="display:flex;gap:6mm;align-items:flex-start">${(() => {
@@ -3895,14 +3970,14 @@ ${srcNote('Confidence score is algorithmic — weights fixed (40/25/20/15), capp
 ${renderPageInsightBlock('confidence_matrix', strategy, isDemoMode)}
 ${callout(s7.analyst_insight)}
 ${buildFillerBlock('confidence', renderMode)}
-${pageFtr('Revenue Intelligence \u2014 Confidence', 28)}
+${pageFtr('Execution Priority & Confidence', 32)}
 </div>
 
-<!-- APPENDIX — single flowing section, renders once, always last -->
-<div class="page section-break" id="appendix">
+<!-- Page 33 -->
+<div class="page section-break" id="page-33-appendix">
 ${pageHdr()}
-${secHead('A', 'Appendix — Methodology, Data Quality &amp; Truth Ledger')}
-${secCtx('Transparency layer. Documents data provenance, scoring methodology, and known limitations.')}
+${secHead('A', 'Appendix')}
+${secCtx('Appendix overview and provenance.')}
 
 ${tm.validationWarnings?.length ? `
 <div class="card" style="border-left:3px solid var(--amber); margin-bottom:5mm">
@@ -3913,19 +3988,25 @@ ${tm.validationWarnings?.length ? `
 </div>` : ''}
 
 <div class="appendix-section">
-${h3('appendix', '1', 'Data Quality & Truth Audit')}
-<div style="background:rgba(245,158,11,0.05);border-radius:6px;padding:12px;margin-bottom:14px;border:1px solid rgba(245,158,11,0.2)">
-  <div style="display:flex;justify-content:space-between;margin-bottom:8px">
-    <span style="font-size:11px;font-weight:700;color:var(--amber)">Truth Confidence: ${tm.truthConfidence || 0}/100</span>
-    <span style="font-size:11px;font-weight:700;color:var(--amber)">Status: ${tm.truthConfidence >= 80 ? 'Validated' : 'Estimate'}</span>
-  </div>
+${h3('appendix', '1', 'Data Sources & Provenance')}
+${renderProvenanceTable()}
+${h3('appendix', '2', 'AI-Estimated Fields Disclaimer')}
+<div class="ac amber keep-together"><strong>AI-Estimated Content:</strong> The following fields in this report are generated by AI and should be independently validated before use in strategic decisions:<br>
+TAM / SAM / SOM sizing and growth rates · Market segment estimates and priorities · ICP persona derivations (when original data was placeholder) · Account target analogs and fit scores · Buying trigger identification and signal strength · Confidence score components.<br>
+All competitive intelligence reflects publicly available data only. Manual validation of exact revenue figures, headcount, and funding data is recommended prior to boardroom presentation.</div>
+${h3('appendix', '3', 'Report Metadata')}
+${renderReportMetadata()}
+${pageFtr('Appendix', 33)}
+</div>
 </div>
 
-${h3('appendix', '2', 'Data Sources & Provenance')}
-${renderProvenanceTable()}
-</div>
+<!-- Page 34 -->
+<div class="page section-break" id="page-34-tam-methodology">
+${pageHdr()}
+${secHead('A', 'TAM Methodology')}
+${secCtx('Page 34: explicit TAM methodology and assumptions.')}
 <div class="appendix-section">
-${h3('appendix', '3', 'TAM Calculation Methodology')}
+${h3('appendix', '1', 'TAM Calculation Methodology')}
 ${renderDarkTable({
       headers: ['Step', 'Method'],
       rows: [
@@ -3936,9 +4017,27 @@ ${renderDarkTable({
         ['5. SOM derivation', 'Product of steps 1-4; dynamic values override defaults when strategy data provides them']
       ]
     }, '', 'ABE GTMS Engine v1.0')}
-${h3('appendix', '4', 'Assumption Ledger')}
+${h3('appendix', '2', 'Assumption Ledger')}
 ${renderAssumptionLedger()}
-${h3('appendix', '5', 'Confidence Scoring Explanation')}
+${pageFtr('TAM Methodology', 34)}
+</div>
+</div>
+
+<!-- Page 35 -->
+<div class="page section-break" id="page-35-data-quality-audit">
+${pageHdr()}
+${secHead('A', 'Data Quality Audit')}
+${secCtx('Page 35: confidence scoring and quality audit closure.')}
+<div class="appendix-section">
+${h3('appendix', '1', 'Data Quality & Truth Audit')}
+<div style="background:rgba(245,158,11,0.05);border-radius:6px;padding:12px;margin-bottom:14px;border:1px solid rgba(245,158,11,0.2)">
+  <div style="display:flex;justify-content:space-between;margin-bottom:8px">
+    <span style="font-size:11px;font-weight:700;color:var(--amber)">Truth Confidence: ${tm.truthConfidence || 0}/100</span>
+    <span style="font-size:11px;font-weight:700;color:var(--amber)">Status: ${tm.truthConfidence >= 80 ? 'Validated' : 'Estimate'}</span>
+  </div>
+</div>
+
+${h3('appendix', '2', 'Confidence Scoring Explanation')}
 ${renderDarkTable({
       headers: ['Dimension', 'Weight', 'Description'],
       rows: [
@@ -3949,7 +4048,7 @@ ${renderDarkTable({
       ]
     }, 'Deterministic model: overall confidence is calculated from fixed weights — signal veracity 40%, market timing 25%, ICP fit 20%, and data completeness 15%. Confidence is capped by source quality and measured data richness; AI-generated assertions cannot exceed the evidence available.', 'ABE GTMS Engine v1.0')}
 </div>
-${s7._data_quality ? `<div class="appendix-section">${h3('appendix', '6', 'Data Quality Audit')}${renderDarkTable({
+${s7._data_quality ? `<div class="appendix-section">${h3('appendix', '3', 'Data Quality Audit')}${renderDarkTable({
       headers: ['Metric', 'Value'],
       rows: [
         ['Data Richness Score', '<span class="num">' + (s7._data_quality.richness_score || '—') + '</span>'],
@@ -3960,17 +4059,12 @@ ${s7._data_quality ? `<div class="appendix-section">${h3('appendix', '6', 'Data 
       ]
     }, '', 'ABE GTMS Engine v1.0')}</div>` : ''}
 <div class="appendix-section">
-${h3('appendix', '7', 'AI-Estimated Fields Disclaimer')}
-<div class="ac amber keep-together"><strong>AI-Estimated Content:</strong> The following fields in this report are generated by AI and should be independently validated before use in strategic decisions:<br>
-TAM / SAM / SOM sizing and growth rates · Market segment estimates and priorities · ICP persona derivations (when original data was placeholder) · Account target analogs and fit scores · Buying trigger identification and signal strength · Confidence score components.<br>
-All competitive intelligence reflects publicly available data only. Manual validation of exact revenue figures, headcount, and funding data is recommended prior to boardroom presentation.</div>
-${h3('appendix', '8', 'Report Metadata')}
-${renderReportMetadata()}
 <div style="text-align:center;margin-top:4mm;padding-top:3mm;border-top:1px solid var(--border)">
   <div class="am" style="margin:0 auto 3mm;width:28px;height:28px;font-size:9px">ABE</div>
   <p style="font-size:9px;color:var(--faint)">End of Report &middot; ${e(co)} &middot; ${date} &middot; Confidential</p>
   <p style="font-size:8.5px;color:var(--muted);margin-top:1.5mm;letter-spacing:.04em">Plan with clarity. Build with intent. Grow through trust.</p>
 </div>
+${pageFtr('Data Quality Audit', 35)}
 </div>
 </div>
 `;
