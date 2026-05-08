@@ -1161,18 +1161,27 @@
     @media print {
       html,
       body {
-        font-size: 11.5pt !important;
+        font-size: 13pt !important;
         background-color: #0c0d11 !important;
-        color: rgba(255, 255, 255, 0.9) !important;
-        line-height: 1.65 !important;
+        color: rgba(255, 255, 255, 0.95) !important;
+        line-height: 1.8 !important;
       }
 
-      h1 { font-size: 57px !important; }
-      h2, .section-header { font-size: 21px !important; }
-      h3 { font-size: 15.5px !important; }
+      h1 { font-size: 64px !important; margin-bottom: 12mm !important; }
+      h2, .section-header { font-size: 28px !important; margin-bottom: 8mm !important; }
+      h3 { font-size: 20px !important; margin-bottom: 6mm !important; }
+
+      .content-body {
+        flex-grow: 1 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: center !important;
+        gap: 10mm !important;
+        margin: 5mm 0 !important;
+      }
 
       /* Page-Specific Filling (Flexible Stretching) */
-      /* Page 2 & 10: Insights/Summary Card expansion — switch from px to flex-grow */
+      /* Page 2 & 10: Insights/Summary Card expansion */
       #page-2-exec-summary .card, 
       #page-10-premium-insights .scope-cell { 
         flex-grow: 1 !important;
