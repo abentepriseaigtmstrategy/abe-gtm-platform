@@ -3404,7 +3404,7 @@ async function generateProfessionalPDF() {
       }
     }
   }));
-  const barChartUrl = `https://quickchart.io/chart?backgroundColor=%230d1120&width=600&height=220&c=${scoreBarChart}`;
+  const barChartUrl = `https://quickchart.io/chart?backgroundColor=transparent&transparent=true&width=600&height=220&c=${scoreBarChart}`;
 
   /* ── Confidence gauge via QuickChart ────────────────────────── */
   const gaugeChart = encodeURIComponent(JSON.stringify({
@@ -3415,7 +3415,7 @@ async function generateProfessionalPDF() {
       centerArea:{displayText:true,text:`${confScore}%`,fontColor:'#e5e7eb',fontSize:28,fontStyle:'bold'}
     }
   }));
-  const gaugeUrl = `https://quickchart.io/chart?backgroundColor=%230d1120&width=220&height=220&c=${gaugeChart}`;
+  const gaugeUrl = `https://quickchart.io/chart?backgroundColor=transparent&transparent=true&width=220&height=220&c=${gaugeChart}`;
 
   /* ── SWOT data ────────────────────────────────────────────────── */
   const demandSignals = arr(p1.demand_signals);
@@ -3495,9 +3495,9 @@ async function generateProfessionalPDF() {
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
 <style>
   * { box-sizing:border-box; margin:0; padding:0; }
-  html, body { width:794px; min-height:1123px; background:#0d1120; overflow-x:hidden; }
+  html, body { width:210mm; min-height:100%; background:#0d1120; overflow-x:hidden; }
   body { color:#e5e7eb; font-family:'Inter',sans-serif; font-size:12px; line-height:1.55; }
-  .page { width:794px; height:1123px; min-height:1123px; padding:58px 68px 76px; background:#0d1120; position:relative; page-break-after:always; overflow:hidden; }
+  .page { width:210mm; height:297mm; min-height:297mm; padding:58px 68px 76px; background:#0d1120; position:relative; page-break-after:always; overflow:hidden; display: flex; flex-direction: column; justify-content: space-between; }
   .page:last-child { page-break-after:auto; }
   .doc-header { width:100%; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:10px; margin-bottom:18px; }
   .doc-brand { font-family:'Space Mono',monospace; font-size:9px; font-weight:900; color:#a855f7; letter-spacing:.18em; text-transform:uppercase; }
