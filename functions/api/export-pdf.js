@@ -1221,21 +1221,21 @@ function renderSegmentationGrid(segments) {
     const stColor = /validated/i.test(rawSt) ? 'var(--green)' : /partial/i.test(rawSt) ? 'var(--amber)' : 'var(--muted)';
     const st     = escapeHtml(rawSt);
     return `<tr>
-      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;font-weight:700;color:var(--accent)">${dim}</td>
-      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top">${items}</td>
-      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--green)">${pFit}</td>
-      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:#8b5cf6">${sFit}</td>
-      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:${stColor};font-style:italic">${st}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10pt;vertical-align:top;font-weight:700;color:var(--accent)">${dim}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10pt;vertical-align:top">${items}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10pt;vertical-align:top;color:var(--green)">${pFit}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10pt;vertical-align:top;color:#8b5cf6">${sFit}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10pt;vertical-align:top;color:${stColor};font-style:italic">${st}</td>
     </tr>`;
   }).join('');
   return `<div class="keep-together table-wrap" style="margin:3mm 0">
     <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-family:inherit">
       <thead><tr>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:22%">Dimension</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:28%">Segments / Items</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:18%">Primary Fit</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:18%">Secondary Fit</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:14%">Validation Status</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10pt;width:22%">Dimension</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10pt;width:28%">Segments / Items</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10pt;width:18%">Primary Fit</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10pt;width:18%">Secondary Fit</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10pt;width:14%">Validation Status</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
@@ -1276,17 +1276,17 @@ function renderMethodologyLedger(rows) {
   const trs = rows.map((r, i) => {
     const bg = i % 2 === 0 ? '#1e1e1e' : '#2a2a2a';
     return `<tr style="background:${bg}">
-    <td style="border:.5px solid #444;border-left:2px solid var(--accent);padding:6px 7px;font-size:10px;vertical-align:top;font-weight:700;color:var(--accent)">${renderSvgIcon('search', 10, 'var(--accent)')} &nbsp; ${escapeHtml(r.category)}</td>
-    <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--text)">${safeBusinessText(r.dataUsed, 'Validation pending')}</td>
-    <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--amber);font-style:italic">${safeBusinessText(r.notValidated, 'Validation pending')}</td>
+    <td style="border:.5px solid #444;border-left:2px solid var(--accent);padding:6px 7px;font-size:10pt;vertical-align:top;font-weight:700;color:var(--accent)">${renderSvgIcon('search', 10, 'var(--accent)')} &nbsp; ${escapeHtml(r.category)}</td>
+    <td style="border:.5px solid #444;padding:6px 7px;font-size:10pt;vertical-align:top;color:var(--text)">${safeBusinessText(r.dataUsed, 'Validation pending')}</td>
+    <td style="border:.5px solid #444;padding:6px 7px;font-size:10pt;vertical-align:top;color:var(--amber);font-style:italic">${safeBusinessText(r.notValidated, 'Validation pending')}</td>
   </tr>`;
   }).join('');
   return `<div class="keep-together table-wrap" style="margin:3mm 0">
     <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-family:inherit">
       <thead><tr>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:25%">Evidence Pillar</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:40%">Data Used (Verified)</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:35%">Unvalidated / Excluded</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10pt;width:25%">Evidence Pillar</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10pt;width:40%">Data Used (Verified)</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10pt;width:35%">Unvalidated / Excluded</th>
       </tr></thead>
       <tbody>${trs}</tbody>
     </table>
@@ -1314,24 +1314,24 @@ function renderTruthLedgerSummary(m) {
 function renderSegmentOpportunityTable(segments) {
   if (!Array.isArray(segments) || !segments.length) return '';
   const rows = segments.map(s => `<tr>
-    <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;font-weight:700;color:var(--accent)">${escapeHtml(s.segment)}</td>
-    <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top">${escapeHtml(s.size)}</td>
-    <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--green)">${escapeHtml(s.growth)}</td>
-    <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top">${escapeHtml(s.urgency)}</td>
-    <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top">${escapeHtml(s.fit)}</td>
-    <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--amber);font-weight:700">${escapeHtml(s.priority)}</td>
-    <td style="border:.5px solid #444;padding:6px 7px;font-size:9px;vertical-align:top;color:var(--muted);font-style:italic">${escapeHtml(s.status)}</td>
+    <td style="border:.5px solid #444;padding:6px 7px;font-size:10pt;vertical-align:top;font-weight:700;color:var(--accent)">${escapeHtml(s.segment)}</td>
+    <td style="border:.5px solid #444;padding:6px 7px;font-size:10pt;vertical-align:top">${escapeHtml(s.size)}</td>
+    <td style="border:.5px solid #444;padding:6px 7px;font-size:10pt;vertical-align:top;color:var(--green)">${escapeHtml(s.growth)}</td>
+    <td style="border:.5px solid #444;padding:6px 7px;font-size:10pt;vertical-align:top">${escapeHtml(s.urgency)}</td>
+    <td style="border:.5px solid #444;padding:6px 7px;font-size:10pt;vertical-align:top">${escapeHtml(s.fit)}</td>
+    <td style="border:.5px solid #444;padding:6px 7px;font-size:10pt;vertical-align:top;color:var(--amber);font-weight:700">${escapeHtml(s.priority)}</td>
+    <td style="border:.5px solid #444;padding:6px 7px;font-size:10pt;vertical-align:top;color:var(--muted);font-style:italic">${escapeHtml(s.status)}</td>
   </tr>`).join('');
   return `<div class="keep-together table-wrap" style="margin:3mm 0">
     <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-family:inherit">
       <thead><tr>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:18%">Segment</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:14%">Est. Size</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:14%">Growth Signal</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:14%">Buyer Urgency</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:14%">Fit Score</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:12%">Priority</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:14%">Validation</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10pt;width:18%">Segment</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10pt;width:14%">Est. Size</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10pt;width:14%">Growth Signal</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10pt;width:14%">Buyer Urgency</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10pt;width:14%">Fit Score</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10pt;width:12%">Priority</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10pt;width:14%">Validation</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
@@ -1963,12 +1963,12 @@ function renderCapabilityLandscape(capabilities) {
     const valStatus = safeBusinessText(c.validation_status, 'Validation pending');
     const valColor  = /validated/i.test(valStatus) ? 'var(--green)' : /partial/i.test(valStatus) ? 'var(--amber)' : 'var(--muted)';
     return `<tr style="background:${bg}">
-      <td style="border:.5px solid #444;border-left:2px solid ${color};padding:6px 7px;font-size:10px;vertical-align:top;font-weight:700;color:${color}">${renderSvgIcon('cpu', 10, color)} &nbsp; ${escapeHtml(group)}</td>
-      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;font-weight:700;color:var(--text)">${escapeHtml(c.capability, 'Capability')}</td>
-      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--green)">${safeBusinessText(c.buyer_value, 'Requires source validation')}</td>
-      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--amber)">${safeBusinessText(c.maturity_signal, 'Validation pending')}</td>
-      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--accent)">${safeBusinessText(c.gtm_implication, 'Validation pending')}</td>
-      <td style="border:.5px solid #444;padding:6px 7px;font-size:9px;vertical-align:top;color:${valColor};font-style:italic"><span style="border:1px solid ${valColor}40;padding:1px 3px;border-radius:2px;display:inline-block">${escapeHtml(valStatus)}</span></td>
+      <td style="border:.5px solid #444;border-left:2px solid ${color};padding:6px 7px;font-size:10pt;vertical-align:top;font-weight:700;color:${color}">${renderSvgIcon('cpu', 10, color)} &nbsp; ${escapeHtml(group)}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10pt;vertical-align:top;font-weight:700;color:var(--text)">${escapeHtml(c.capability, 'Capability')}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10pt;vertical-align:top;color:var(--green)">${safeBusinessText(c.buyer_value, 'Requires source validation')}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10pt;vertical-align:top;color:var(--amber)">${safeBusinessText(c.maturity_signal, 'Validation pending')}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10pt;vertical-align:top;color:var(--accent)">${safeBusinessText(c.gtm_implication, 'Validation pending')}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10pt;vertical-align:top;color:${valColor};font-style:italic"><span style="border:1px solid ${valColor}40;padding:1px 3px;border-radius:2px;display:inline-block">${escapeHtml(valStatus)}</span></td>
     </tr>`;
   }).join('');
 
@@ -1981,7 +1981,7 @@ function renderCapabilityLandscape(capabilities) {
     const border = GROUP_BORDER[g];
     return `<div style="background:${bg};border:1px solid ${border};border-radius:6px;padding:3mm 4mm;text-align:center;flex:1">
       <div style="font-family:'Space Mono',monospace;font-size:18px;font-weight:900;color:${color}">${n}</div>
-      <div style="font-size:8px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-top:1mm">${g}</div>
+      <div style="font-size:10pt;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-top:1mm">${g}</div>
     </div>`;
   }).join('');
 
@@ -1989,12 +1989,12 @@ function renderCapabilityLandscape(capabilities) {
   <div class="keep-together table-wrap" style="margin:3mm 0">
     <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-family:inherit">
       <thead><tr>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8px;width:14%">Group</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8px;width:18%">Capability</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8px;width:20%">Buyer Value</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8px;width:16%">Maturity Signal</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8px;width:20%">GTM Implication</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8px;width:12%">Validation</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:10pt;width:14%">Group</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:10pt;width:18%">Capability</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:10pt;width:20%">Buyer Value</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:10pt;width:16%">Maturity Signal</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:10pt;width:20%">GTM Implication</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:10pt;width:12%">Validation</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
@@ -2708,34 +2708,47 @@ html, body {
   print-color-adjust: exact !important;
   background: #0B0F1A !important;
   background-color: #0c0d11 !important;
-  font-size: 13pt !important; /* BOARDROOM GRADE VISIBILITY */
+  font-size: 11.5pt !important;
+  font-weight: 400 !important;
   line-height: 1.8 !important;
   margin: 0;
   padding: 0;
   color: rgba(255, 255, 255, 0.95) !important;
 }
-/* Sections flow naturally — Gotenberg Chromium handles pagination */
+/* Dynamic expansion: pages can grow, no clipping */
 ${p}.page {
   width: 210mm !important;
-  height: 297mm !important;
-  overflow: hidden !important;
+  min-height: 297mm !important;
+  height: auto !important;
+  overflow: visible !important;
   position: relative !important;
   background-color: #0c0d11 !important;
   box-sizing: border-box;
-  padding: 15mm 18mm 18mm !important; /* BREATHING SPACE */
+  padding: 15mm 18mm 18mm !important;
   margin: 0 !important;
   display: flex !important;
   flex-direction: column !important;
-  justify-content: space-between !important; /* FORCE HEADER TOP, FOOTER BOTTOM */
+  justify-content: center !important;
   break-after: page !important;
   page-break-after: always !important;
+}
+/* Quality Permission: Allow dense pages to expand beyond 297mm */
+${p}.page-expandable {
+  height: auto !important;
+  min-height: 297mm !important;
+  overflow: visible !important;
+  justify-content: flex-start !important;
+}
+${p}.page-expandable .content-body {
+  justify-content: flex-start !important;
+  gap: 25px !important;
 }
 /* ── Content Body wrapper for centering ── */
 ${p}.content-body {
   flex-grow: 1 !important;
   display: flex !important;
   flex-direction: column !important;
-  justify-content: center !important; /* VERTICALLY CENTER MIDDLE CONTENT */
+  justify-content: center !important;
   gap: 10mm !important;
   margin: 5mm 0 !important;
 }
@@ -2746,18 +2759,32 @@ ${p}h1, ${p}h2, ${p}h3, ${p}.section-header, ${p}.ph {
 }
 /* Heading Font Increase */
 ${p}h1 { font-size: 64px !important; margin-bottom: 12mm !important; }
-${p}h2, ${p}.section-header { font-size: 28px !important; margin-bottom: 8mm !important; }
+${p}h2, ${p}.section-header { font-size: 32pt !important; font-weight: 700 !important; margin-bottom: 8mm !important; }
 ${p}h3 { font-size: 20px !important; margin-bottom: 6mm !important; border-bottom: 1px solid rgba(255,255,255,0.1) !important; padding-bottom: 2mm !important; }
 
 /* Readability — minimum font sizes */
-${p}.dt th, ${p}table th, ${p}th { font-size: 11.5pt !important; padding: 12px 15px !important; background: rgba(255,255,255,0.05) !important; color: var(--accent) !important; }
-${p}.dt td, ${p}table td, ${p}td { font-size: 11.5pt !important; padding: 12px 15px !important; line-height: 1.8 !important; }
-${p}.card p, ${p}.card div { font-size: 12.5pt !important; line-height: 1.8 !important; }
-${p}.sc2 li { font-size: 11.5pt !important; line-height: 1.7 !important; margin-bottom: 4mm !important; }
-${p}.sc { font-size: 13pt !important; font-style: italic !important; opacity: 0.8 !important; margin-bottom: 10mm !important; border-left: 4px solid var(--accent) !important; }
-${p}.ac { font-size: 12.5pt !important; padding: 8mm 10mm !important; }
+${p}.dt th, ${p}table th, ${p}th { font-size: 10.5pt !important; padding: 12px 15px !important; background: rgba(255,255,255,0.05) !important; color: var(--accent) !important; }
+${p}.dt td, ${p}table td, ${p}td { font-size: 10.5pt !important; padding: 12px 15px !important; line-height: 1.8 !important; }
+${p}.card p, ${p}.card div { font-size: 11.5pt !important; line-height: 1.8 !important; }
+${p}.sc2 li { font-size: 10pt !important; line-height: 1.7 !important; margin-bottom: 4mm !important; }
+${p}.sc { font-size: 11.5pt !important; font-style: italic !important; opacity: 0.8 !important; margin-bottom: 10mm !important; border-left: 4px solid var(--accent) !important; }
+${p}.ac { font-size: 11pt !important; padding: 8mm 10mm !important; }
 ${p}.pf-tagline { font-size: 11px !important; font-weight: 500 !important; }
 ${p}.pf { font-size: 11px !important; }
+
+/* Chart Enhancement */
+${p}.chart-block {
+  min-height: 480px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  justify-content: center !important;
+  align-items: center !important;
+}
+${p}.chart-block img {
+  width: 100% !important;
+  height: auto !important;
+  object-fit: contain !important;
+}
 
 /* Page-Specific Filling (Flexible Stretching) */
 /* Page 2 & 10: Insights/Summary Card expansion — switch from px to flex-grow */
@@ -2833,13 +2860,13 @@ ${p}.pf, ${p}.pf-wrap, ${p}.page-insight, ${p}.figure-caption, ${p}.figure-sourc
   ${p}.dt td, ${p}table td, ${p}td { font-size: 10.5pt !important; padding: 6px 8px !important; }
   ${p}table td *, ${p}.dt td *, ${p}.table-wrap td * { font-size: 10.5pt !important; }
 /* Card body text */
-${p}.card p, ${p}.card div { font-size: 11pt !important; line-height: 1.7 !important; }
+${p}.card p, ${p}.card div { font-size: 11.5pt !important; line-height: 1.8 !important; }
 /* SWOT / lists */
 ${p}.sc2 li { font-size: 10pt !important; line-height: 1.6 !important; }
 /* SDR body text */
-${p}.sdr-preview { font-size: 10.5pt !important; line-height: 1.7 !important; }
+${p}.sdr-preview { font-size: 10pt !important; line-height: 1.7 !important; }
 /* Analyst callout */
-${p}.ac { font-size: 10.5pt !important; line-height: 1.6 !important; }
+${p}.ac { font-size: 11pt !important; line-height: 1.6 !important; }
 /* Page insight */
 ${p}.page-insight-text { font-size: 10.5px !important; }
 /* Scope / ICP / sourcing cells */
@@ -2848,9 +2875,24 @@ ${p}.scope-cell__value, ${p}.icp-value, ${p}.funnel-value, ${p}.tier-body { font
 ${p}.sc { font-size: 11pt !important; }
 /* Tag pills — keep compact but legible */
 ${p}.tg { font-size: 9.5px !important; }
-/* ── Footer — make it readable, not ghosted ── */
-${p}.pf { font-size: 10px !important; color: #D1D5DB !important; opacity: 1 !important; }
-${p}.pf-tagline { font-size: 9.5px !important; opacity: 1 !important; color: #9CA3AF !important; font-style: italic !important; }
+/* ── Footer — absolute anchor at bottom 8mm ── */
+${p}.pf {
+  position: absolute !important;
+  bottom: 8mm !important;
+  left: 18mm !important;
+  right: 18mm !important;
+  border-top: 1px solid rgba(255,255,255,0.2);
+  padding-top: 3mm;
+  font-size: 10px !important;
+  color: #D1D5DB !important;
+  opacity: 1 !important;
+}
+${p}.pf-tagline {
+  font-size: 9.5px !important;
+  opacity: 1 !important;
+  color: #9CA3AF !important;
+  font-style: italic !important;
+}
 /* ── Figure captions ── */
 ${p}.figure-caption { font-size: 11px !important; color: #f5f5f5 !important; font-weight: 700 !important; }
 ${p}.figure-source { font-size: 9.5px !important; color: #aaa !important; }
@@ -2859,7 +2901,7 @@ ${p}.validation-note { font-size: 10px !important; }
 /* ── Table notes / sources ── */
 ${p}.table-note, ${p}.table-source { font-size: 9.5px !important; color: #aaa !important; }
 /* ── Phase 21C: Remove height-induced blank gaps ── */
-${p}.page { overflow: hidden !important; }
+${p}.page { overflow: visible !important; }
 /* ── Cover: reset its large inline padding so it doesn't create a half-blank page ── */
 ${p}.page[style*="padding:0"] { padding: 0 !important; }
 /* ── Edu-filler hidden for Gotenberg (content flows, no fixed-height pages) ── */
@@ -2893,7 +2935,7 @@ ${p}#page-19-account-sourcing-43-targets, ${p}#page-19-account-sourcing-43-targe
 ${p}#page-2-exec-summary .card { padding-top: 6mm !important; padding-bottom: 6mm !important; margin-bottom: 6mm !important; }
 ${p}#page-2-exec-summary .kpi-strip, ${p}#page-2-exec-summary .stat-row { gap: 5mm !important; margin: 5mm 0 6mm !important; }
 ${p}#page-4-market-definition table td, ${p}#page-4-market-definition table th { line-height: 1.6 !important; }
-${p}#page-15-market-context-overflow-tam-visual .chart-block { min-height: 165mm !important; display:flex !important; flex-direction:column; justify-content:center !important; }
+${p}#page-15-market-context-overflow-tam-visual .chart-block { min-height: 480px !important; display:flex !important; flex-direction:column; justify-content:center !important; }
 `;
 
   const paginationCss = renderMode === 'gotenberg' ? gotenbergPrintCss : renderMode === 'browser-pdf' ? `
@@ -2952,7 +2994,7 @@ ${p}.page{width:210mm;height:297mm !important;overflow:hidden !important;margin:
 :root{--bg:#0B0F1A;--bg2:#0D1120;--card:#121827;--border:#1F2937;--accent:#a855f7;--accent2:#7c3aed;--green:#22c55e;--amber:#f59e0b;--red:#ef4444;--blue:#3b82f6;--text:#E5E7EB;--muted:#6B7280;--faint:#374151;--white:#fff}
 ${isViewer ? '.abe-viewer-wrapper, .abe-viewer-wrapper * { box-sizing:border-box }' : '*{box-sizing:border-box}'}
 ${isViewer ? '.abe-viewer-wrapper * { margin:0; padding:0 }' : '*{margin:0;padding:0}'}
-${isViewer ? '.abe-viewer-wrapper' : 'body'}{font-family:'Inter',sans-serif;background:var(--bg);background-color:#0c0d11;color:var(--text);font-size:11.5pt;line-height:1.65;-webkit-print-color-adjust:exact;print-color-adjust:exact;orphans:3;widows:3}
+${isViewer ? '.abe-viewer-wrapper' : 'body'}{font-family:'Inter',sans-serif;background:var(--bg);background-color:#0c0d11;color:var(--text);font-size:11.5pt;font-weight:400;line-height:1.8;-webkit-print-color-adjust:exact;print-color-adjust:exact;orphans:3;widows:3}
 ${paginationCss}
 /* ── ENTERPRISE TABLE ENHANCEMENTS ── */
 ${p}.dt tr:hover td{background:rgba(168,85,247,.03)}
@@ -2981,7 +3023,7 @@ ${p}.pf{display:flex;justify-content:space-between;align-items:flex-end;margin-t
 ${p}.pf-tagline{font-style:italic;color:#9CA3AF;font-size:8.5px;letter-spacing:.03em;opacity:1}
 /* ── CARDS ── */
 ${p}.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:4mm 5mm;margin-bottom:3mm}
-${p}.card p{font-size:11px;line-height:1.7;color:rgba(255,255,255,0.9);margin:0}
+${p}.card p{font-size:11px;line-height:1.8;color:rgba(255,255,255,0.9);margin:0}
 /* ── METRIC NUMBER ── */
 ${p}.mn{font-family:'Space Mono',monospace;font-size:18px;font-weight:900;color:white;line-height:1.1;margin-bottom:1mm}
 /* ── BLOCK LABEL ── */
@@ -3133,7 +3175,7 @@ ${p}.section-continuation{width:100%;box-sizing:border-box;padding:0;margin:0;ba
 /* ── A4 PRINT DISCIPLINE ── */
 @media print {
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-  html, body { font-size: 10.5pt !important; background-color:#0c0d11 !important; margin: 0; padding: 0; }
+  html, body { font-size: 11.5pt !important; background-color:#0c0d11 !important; margin: 0; padding: 0; }
   ${p}.page {
     width: 210mm !important;
     height: 297mm !important;
@@ -3148,6 +3190,16 @@ ${p}.section-continuation{width:100%;box-sizing:border-box;padding:0;margin:0;ba
     break-after: page !important;
     page-break-after: always !important;
   }
+  ${p}.page-expandable {
+    height: auto !important;
+    min-height: 297mm !important;
+    overflow: visible !important;
+    justify-content: flex-start !important;
+  }
+  ${p}.page-expandable .content-body {
+    justify-content: flex-start !important;
+    gap: 25px !important;
+  }
   ${p}#page-17-icp-modeling { justify-content: space-between !important; }
   ${p}#page-4-market-definition,
   ${p}#page-15-market-context-overflow-tam-visual,
@@ -3161,14 +3213,14 @@ ${p}.section-continuation{width:100%;box-sizing:border-box;padding:0;margin:0;ba
   ${p}#page-1-cover { justify-content: space-between !important; }
   
   /* Heading Font Increase (+3pt) */
-  ${p}h1 { font-size: 57px !important; }
-  ${p}h2, ${p}.section-header { font-size: 21px !important; }
-  ${p}h3 { font-size: 15.5px !important; }
+  ${p}h1 { font-size: 64px !important; }
+  ${p}h2, ${p}.section-header { font-size: 32pt !important; }
+  ${p}h3 { font-size: 20px !important; }
 
   /* Page-Specific Filling */
   ${p}#page-2-exec-summary .card, ${p}#page-10-premium-insights .scope-cell { min-height: 200px !important; margin-bottom: 30px !important; display: flex !important; flex-direction: column !important; justify-content: center !important; }
   ${p}#page-4-market-definition .dt td, ${p}#page-7-segmentation-framework .dt td, ${p}#page-27-buying-criteria .dt td { padding: 20px !important; line-height: 2.0 !important; }
-  ${p}#page-15-market-context-overflow-tam-visual .chart-block img { height: 500px !important; object-fit: contain !important; }
+  ${p}#page-15-market-context-overflow-tam-visual .chart-block img { height: 450px !important; object-fit: contain !important; }
   ${p}#page-15-market-context-overflow-tam-visual .sc2 { min-height: 250px !important; display: flex !important; flex-direction: column !important; justify-content: center !important; }
   ${p}#page-17-icp-modeling .icp-grid { gap: 12mm !important; margin: 10mm 0 !important; }
   ${p}#page-17-icp-modeling .icp-card { padding: 8mm !important; }
@@ -3179,21 +3231,18 @@ ${p}.section-continuation{width:100%;box-sizing:border-box;padding:0;margin:0;ba
   }
   ${p}h1, ${p}h2, ${p}h3, ${p}.section-header { break-after: avoid !important; page-break-after: avoid !important; }
   ${p}.pf {
-    position: absolute !important;
-    bottom: 10mm !important;
-    left: 0 !important;
-    width: 100% !important;
-    margin: 0 !important;
-    padding: 0 18mm !important;
-    box-sizing: border-box !important;
+    position: relative !important;
+    margin-top: auto !important;
+    padding-top: 3mm !important;
+    border-top: 1px solid rgba(255,255,255,0.2) !important;
     break-before: avoid !important;
     page-break-before: avoid !important;
   }
   ${p}tr { break-inside: avoid !important; page-break-inside: avoid !important; }
-  ${p}.dt th, ${p}table th, ${p}th { font-size: 9.5pt !important; }
-  ${p}.dt td, ${p}table td, ${p}td { font-size: 9.5pt !important; }
+  ${p}.dt th, ${p}table th, ${p}th { font-size: 10.5pt !important; }
+  ${p}.dt td, ${p}table td, ${p}td { font-size: 10.5pt !important; }
   ${p}#page-4-market-definition table td, ${p}#page-4-market-definition table th { line-height: 1.6 !important; }
-  ${p}#page-15-market-context-overflow-tam-visual .chart-block { min-height: 165mm !important; display:flex !important; flex-direction:column; justify-content:center !important; }
+  ${p}#page-15-market-context-overflow-tam-visual .chart-block { min-height: 480px !important; display:flex !important; flex-direction:column; justify-content:center !important; }
   ${p}.pf-tagline { opacity: 1 !important; color: #9CA3AF !important; }
   ${p}img, ${p}.chart-block, ${p}.chart-block > div, ${p}.keep-together.chart-block {
     background: transparent !important;
@@ -3201,7 +3250,7 @@ ${p}.section-continuation{width:100%;box-sizing:border-box;padding:0;margin:0;ba
     box-shadow: none !important;
     mix-blend-mode: screen !important;
   }
-  ${p}img { max-height: none !important; overflow: visible !important; object-fit: contain !important; }
+  ${p}img { max-height: none !important; overflow: visible !important; object-fit: contain !important; width: 100% !important; }
 }
 </style>`;
 
@@ -3309,7 +3358,7 @@ ${pageFtr('Study Objective \u2014 Report Scope', 3)}
 
 <!-- Page 4 -->
 <!-- PHASE 20D: MARKET DEFINITION -->
-<div class="page section-break" id="page-4-market-definition">
+<div class="page section-break page-expandable" id="page-4-market-definition">
 ${secHead('MD', 'Market Definition')}
 <div class="content-body">
   ${secCtx('Establishes the precise market category, adjacent spaces, and the analytical lens applied to this GTM assessment.')}
@@ -3776,7 +3825,7 @@ ${pageFtr('SDR Follow-up — Part 1', 22)}
 </div>
 
 <!-- Page 23 -->
-<div class="page section-break" id="page-23-sdr-followup-part-2">
+<div class="page section-break page-expandable" id="page-23-sdr-followup-part-2">
 ${secHead('06', 'SDR Follow-up — Part 2')}
 ${secCtx('Objection handling, CTA strategy, and performance benchmarks.')}
 ${h3('sdr-sequence', '5', 'Objection Handling')}
@@ -3932,7 +3981,7 @@ ${pageFtr("Porter's Five Forces", 26)}
 </div>
 
 <!-- Page 27 -->
-<div class="page section-break" id="page-27-buying-criteria">
+<div class="page section-break page-expandable" id="page-27-buying-criteria">
 ${secHead('BC', 'Buying Criteria Matrix')}
 ${secCtx((strategy.strategy_context?.buying_criteria_context) || 'Enterprise buying decisions are evaluated across multiple criteria. This matrix maps each criterion to the buyer concern, proof required, and recommended GTM response.')}
 ${h3('buying-criteria', '1', 'Enterprise Buying Criteria')}
@@ -4027,7 +4076,7 @@ ${pageFtr('Decision Engine', 30)}
 </div>
 
 <!-- Page 31 -->
-<div class="page section-break" id="page-31-risk-execution">
+<div class="page section-break page-expandable" id="page-31-risk-execution">
 ${secHead('07', 'Revenue Intelligence — Risk & Execution')}
 ${secCtx('Assesses implementation risks and dictates the immediate strategic execution path.')}
 ${decisionEngineRisk()}
