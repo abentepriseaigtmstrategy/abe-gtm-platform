@@ -1962,22 +1962,6 @@ function renderAssumptionLedger() {
   </div>`;
 }
 
-function renderReportMetadata(co, ind, date, isDemoMode, strategy, score, confScore, charts) {
-  return renderDarkTable({
-    headers: ['Field', 'Value'],
-    rows: [
-      ['Subject Company', escapeHtml(co)],
-      ...(ind ? [['Industry', escapeHtml(ind)]] : []),
-      ['Generated', escapeHtml(date)],
-      ['Platform', 'ABE Enterprise AI Revenue Infrastructure'],
-      ['Report Mode', isDemoMode ? 'Demo — illustrative only' : 'Live / Realtime'],
-      ['Steps Completed', escapeHtml(String(strategy.steps_completed || 6)) + '/7'],
-      ['GTM Relevance Score', escapeHtml(String(score)) + '/100'],
-      ['Confidence Score', escapeHtml(String(confScore)) + '/100'],
-      ['QuickChart Charts', escapeHtml([charts.gauge ? 'Gauge' : '', charts.waterfall ? 'Waterfall' : '', charts.confidence ? 'Confidence' : '', charts.intent ? 'Intent' : '', charts.risk ? 'Risk' : ''].filter(Boolean).join(', ') || 'Fallback HTML used')]
-    ]
-  }, '', 'ABE GTMS Engine v1.0');
-}
 
 // ══════════════════════════════════════════════════════════════
 // SECTION REGISTRY
@@ -2157,6 +2141,23 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false, rende
       ${source ? `<p class="table-source" style="font-size:8px;font-style:italic;color:#aaa;margin:0 0 3mm;">Source: ${escapeHtml(source)}</p>` : ''}
     `;
     return `<div class="keep-together table-wrap">${tableHtml}</div>`;
+  };
+
+  const renderReportMetadata = () => {
+    return renderDarkTable({
+      headers: ['Field', 'Value'],
+      rows: [
+        ['Subject Company', e(co)],
+        ...(ind ? [['Industry', e(ind)]] : []),
+        ['Generated', e(date)],
+        ['Platform', 'ABE Enterprise AI Revenue Infrastructure'],
+        ['Report Mode', isDemoMode ? 'Demo — illustrative only' : 'Live / Realtime'],
+        ['Steps Completed', e(String(strategy.steps_completed || 6)) + '/7'],
+        ['GTM Relevance Score', e(String(score)) + '/100'],
+        ['Confidence Score', e(String(confScore)) + '/100'],
+        ['QuickChart Charts', e([charts.gauge ? 'Gauge' : '', charts.waterfall ? 'Waterfall' : '', charts.confidence ? 'Confidence' : '', charts.intent ? 'Intent' : '', charts.risk ? 'Risk' : ''].filter(Boolean).join(', ') || 'Fallback HTML used')]
+      ]
+    }, '', 'ABE GTMS Engine v1.0');
   };
 
   // ── Strategic positioning: robust first sentence extraction ──
@@ -3575,7 +3576,7 @@ ${h3('appendix', '7', 'AI-Estimated Fields Disclaimer')}
 TAM / SAM / SOM sizing and growth rates · Market segment estimates and priorities · ICP persona derivations (when original data was placeholder) · Account target analogs and fit scores · Buying trigger identification and signal strength · Confidence score components.<br><br>
 All competitive intelligence reflects publicly available data only. Manual validation of exact revenue figures, headcount, and funding data is recommended prior to boardroom presentation.</div>
 ${h3('appendix', '8', 'Report Metadata')}
-${renderReportMetadata(co, ind, date, isDemoMode, strategy, score, confScore, charts)}
+${renderReportMetadata()}
 <div style="text-align:center;margin-top:8mm;padding-top:5mm;border-top:1px solid var(--border)">
   <div class="am" style="margin:0 auto 3mm;width:28px;height:28px;font-size:9px">ABE</div>
   <p style="font-size:9px;color:var(--faint)">End of Report &middot; ${e(co)} &middot; ${date} &middot; Confidential</p>
