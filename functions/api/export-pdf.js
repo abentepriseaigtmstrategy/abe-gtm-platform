@@ -2353,7 +2353,7 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false, rende
     const dms = arr(s3.decision_makers);
     const whyNow = hasS7 && s7.why_now_analysis ? s7.why_now_analysis : `Market conditions and active ${(triggers[0] || 'operational pressure').toLowerCase()} dynamics create a time-sensitive engagement window.`;
     const hook = hasS7 && s7.strategic_hook ? s7.strategic_hook : (triggers.length >= 2 ? `${triggers[0]} paired with ${triggers[1]}` : `Lead with: ${triggers[0] || 'Operational pressure'}`);
-    const reason = s7.go_no_go?.reason || (score >= 75 ? `GTM score of ${score} indicates strong alignment. Initiate outbound immediately.` : score >= 50 ? `GTM score of ${score} reflects moderate alignment. Monitor triggers before committing.` : `GTM score of ${score} indicates limited fit. Re-evaluate in 90 days.`);
+    const reason = s7.go_no_go?.reasoning || s7.verdict_rationale || 'Score exceeds required threshold for market entry.';
     return `
   ${secHead('07', 'Revenue Intelligence — Decision Engine')}
   ${secCtx('Final strategic audit. Validates execution viability and dictates immediate next steps.')}
@@ -2376,7 +2376,11 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false, rende
   ${srcNote(hasS7 && s7.why_now_analysis ? 'Source: Step 7 AI analysis of market signals' : 'Source: AI inference from buying triggers and market context — validate timing independently')}
   ${h3('revenue-intelligence', '3', 'Strategic Hook')}
   <div class="ac keep-together"><strong>"${e(hook)}"</strong></div>
-  ${srcNote(hasS7 && s7.strategic_hook ? 'Source: Step 7 AI strategic analysis' : 'Source: derived from buying triggers — AI estimate')}
+  ${srcNote(hasS7 && s7.strategic_hook ? 'Source: Step 7 AI strategic analysis' : 'Source: derived from buying triggers — AI estimate')}`;
+  };
+
+  const decisionEngineRisk = () => {
+    return `
   ${h3('revenue-intelligence', '4', 'Risk &amp; Constraint Analysis')}
   ${renderRiskScoreCards(s7.risk_factors)}
   ${srcNote('30–60 day cycle estimate is an industry benchmark (AI estimate) — validate with CRM data')}
@@ -2387,7 +2391,6 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false, rende
   ${h3('revenue-intelligence', '5', 'Execution Priority & Next Best Action')}
   ${renderNextBestActionBlock(s7.next_best_action)}
   ${safe(s2.growth_rate) ? srcNote('CAGR (' + safe(s2.growth_rate) + ') is an AI market estimate — cross-reference with analyst reports') : ''}`;
-
   };
 
   // ── Weighted Confidence Matrix ──
