@@ -2128,6 +2128,9 @@
     }
 
     // ── PDF Export ────────────────────────────────────────────────────
+    // Phase 21C: Updated to handle both:
+    //   (a) application/pdf blob  — when Gotenberg is active server-side
+    //   (b) JSON { html, filename } — existing fallback path (browser-pdf / html2canvas)
     async function exportPDF() {
       const btn1 = document.getElementById('btn-export');
       const btn2 = document.getElementById('btn-export2');
@@ -2139,10 +2142,53 @@
       document.body.classList.add('force-fillers');
 
       try {
-        const data = await window.APP.api('/api/export-pdf', { strategy: window._strategy, renderMode: 'browser-pdf' });
-        if (!data.html) throw new Error(data.error || 'Export failed');
+        // Use raw fetch so we can inspect Content-Type before parsing
+        const token = window.APP ? window.APP.token() : null;
+        const exportRes = await fetch('/api/export-pdf', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { 'Authorization': 'Bearer ' + token } : {}),
+          },
+          body: JSON.stringify({ strategy: window._strategy, renderMode: 'browser-pdf' }),
+        });
 
-        // 1. Playwright PDF Service Export Path (New Architecture)
+        if (!exportRes.ok) {
+          let errMsg = 'Export failed: HTTP ' + exportRes.status;
+          try { const errData = await exportRes.json(); errMsg = errData.error || errMsg; } catch (_) {}
+          throw new Error(errMsg);
+        }
+
+        const contentType = exportRes.headers.get('Content-Type') || '';
+
+        // ── Path A: Gotenberg returned a real PDF binary ──
+        if (contentType.includes('application/pdf')) {
+          const blob = await exportRes.blob();
+          const disposition = exportRes.headers.get('Content-Disposition') || '';
+          let filename = 'GTM_Report.pdf';
+          const fnMatch = disposition.match(/filename="([^"]+)"/);
+          if (fnMatch) filename = fnMatch[1];
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = filename;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          window.URL.revokeObjectURL(url);
+          return; // Done — PDF downloaded directly
+        }
+
+        // ── Path B: JSON fallback (Gotenberg disabled or failed) ──
+        const data = await exportRes.json();
+        if (!data.html) throw new Error(data.error || 'Export failed — no HTML returned');
+
+        // Log fallback reason if Gotenberg failed
+        if (data.pdf_fallback === 'gotenberg_failed') {
+          console.warn('[exportPDF] Gotenberg failed, using client-side fallback:', data.pdf_fallback_reason);
+        }
+
+        // 1. Playwright PDF Service Export Path (legacy local dev)
         try {
           const pdfRes = await fetch('http://localhost:3001/render-pdf', {
             method: 'POST',
