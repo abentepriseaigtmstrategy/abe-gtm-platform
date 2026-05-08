@@ -106,6 +106,145 @@ async function renderPdfWithGotenberg(html, filename, env) {
   return pdfBuffer;
 }
 
+
+// ══════════════════════════════════════════════════════════════
+// PHASE 21E — MULTI-PROVIDER PDF RENDERING + VISUAL API PIPELINE
+// ══════════════════════════════════════════════════════════════
+
+function normalizeProviderList(env) {
+  const explicit = String(env?.PDF_RENDER_PROVIDER_ORDER || '').trim();
+  const engine = String(env?.PDF_RENDER_ENGINE || '').trim().toLowerCase();
+  const list = explicit
+    ? explicit.split(',').map(x => x.trim().toLowerCase()).filter(Boolean)
+    : (engine && engine !== 'auto' ? [engine] : ['gotenberg', 'browserless', 'pdfshift']);
+  return [...new Set(list.filter(x => ['gotenberg', 'browserless', 'pdfshift'].includes(x)))];
+}
+
+async function renderPdfWithBrowserless(html, filename, env) {
+  const base = (env.BROWSERLESS_URL || '').replace(/\/$/, '');
+  if (!base) throw new Error('BROWSERLESS_URL is not configured');
+  const token = env.BROWSERLESS_TOKEN || env.BROWSERLESS_API_KEY || '';
+  const endpoint = `${base}/pdf${token ? `?token=${encodeURIComponent(token)}` : ''}`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), parseInt(env.PDF_RENDER_TIMEOUT_MS || '28000', 10));
+  let res;
+  try {
+    res = await fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        html,
+        options: {
+          format: 'A4',
+          printBackground: true,
+          preferCSSPageSize: true,
+          margin: { top: '0mm', right: '0mm', bottom: '0mm', left: '0mm' },
+        },
+      }),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => '');
+    throw new Error(`Browserless HTTP ${res.status}: ${errBody.slice(0, 200)}`);
+  }
+  const pdfBuffer = await res.arrayBuffer();
+  if (!pdfBuffer || pdfBuffer.byteLength < 1000) throw new Error('Browserless returned an empty or invalid PDF binary');
+  console.info(`[Browserless] PDF rendered successfully — ${pdfBuffer.byteLength} bytes for "${filename}"`);
+  return pdfBuffer;
+}
+
+async function renderPdfWithPdfShift(html, filename, env) {
+  const apiKey = env.PDFSHIFT_API_KEY || '';
+  if (!apiKey) throw new Error('PDFSHIFT_API_KEY is not configured');
+  const endpoint = env.PDFSHIFT_URL || 'https://api.pdfshift.io/v3/convert/pdf';
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), parseInt(env.PDF_RENDER_TIMEOUT_MS || '28000', 10));
+  let res;
+  try {
+    res = await fetch(endpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Basic ' + btoa(`api:${apiKey}`),
+      },
+      body: JSON.stringify({
+        source: html,
+        format: 'A4',
+        landscape: false,
+        use_print: true,
+        sandbox: false,
+        filename,
+        margin: '0px',
+      }),
+      signal: controller.signal,
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => '');
+    throw new Error(`PDFShift HTTP ${res.status}: ${errBody.slice(0, 200)}`);
+  }
+  const pdfBuffer = await res.arrayBuffer();
+  if (!pdfBuffer || pdfBuffer.byteLength < 1000) throw new Error('PDFShift returned an empty or invalid PDF binary');
+  console.info(`[PDFShift] PDF rendered successfully — ${pdfBuffer.byteLength} bytes for "${filename}"`);
+  return pdfBuffer;
+}
+
+async function renderPdfWithExternalProvider(html, filename, env) {
+  const providerList = normalizeProviderList(env);
+  const failures = [];
+  for (const provider of providerList) {
+    try {
+      if (provider === 'gotenberg') {
+        if (!env.GOTENBERG_URL) throw new Error('GOTENBERG_URL is not configured');
+        return { provider, pdfBuffer: await renderPdfWithGotenberg(html, filename, env) };
+      }
+      if (provider === 'browserless') {
+        return { provider, pdfBuffer: await renderPdfWithBrowserless(html, filename, env) };
+      }
+      if (provider === 'pdfshift') {
+        return { provider, pdfBuffer: await renderPdfWithPdfShift(html, filename, env) };
+      }
+    } catch (err) {
+      const msg = `${provider}: ${err.message || err}`;
+      failures.push(msg);
+      console.warn(`[PDF Renderer] ${msg}`);
+    }
+  }
+  throw new Error(`All external PDF renderers failed: ${failures.join(' | ') || 'none configured'}`);
+}
+
+async function fetchUnsplashHeroImage(strategy, env) {
+  if ((env?.UNSPLASH_ENABLED || '').toLowerCase() !== 'true' || !env?.UNSPLASH_ACCESS_KEY) return null;
+  const query = encodeURIComponent(`${strategy.industry || strategy.company_name || 'business'} enterprise technology abstract`);
+  const endpoint = `https://api.unsplash.com/search/photos?query=${query}&per_page=1&orientation=landscape&content_filter=high`;
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 3500);
+  try {
+    const res = await fetch(endpoint, {
+      headers: { Authorization: `Client-ID ${env.UNSPLASH_ACCESS_KEY}` },
+      signal: controller.signal,
+    });
+    if (!res.ok) throw new Error(`Unsplash HTTP ${res.status}`);
+    const data = await res.json();
+    const photo = data?.results?.[0];
+    if (!photo?.urls?.regular) return null;
+    return {
+      url: photo.urls.regular,
+      credit: `Photo: ${photo.user?.name || 'Unsplash'} / Unsplash`,
+    };
+  } catch (err) {
+    console.warn('[Visual Assets] Unsplash unavailable:', err.message || err);
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 export async function onRequestPost(context) {
   const { request, env } = context;
   const cors = corsHeaders(env);
@@ -124,14 +263,20 @@ export async function onRequestPost(context) {
   const isViewer = url.searchParams.get('mode') === 'viewer';
   const requestedRenderMode = body.renderMode || 'browser-pdf';
 
-  // Gotenberg must never hijack viewer-mode HTML rendering; viewer mode always returns JSON/HTML.
-  const useGotenberg = !isViewer && env?.PDF_RENDER_ENGINE === 'gotenberg' && !!env?.GOTENBERG_URL;
+  // Server PDF renderers must never hijack viewer-mode HTML rendering; viewer mode always returns JSON/HTML.
+  const providerList = normalizeProviderList(env);
+  const hasExternalPdfProvider = providerList.some(provider =>
+    (provider === 'gotenberg' && !!env?.GOTENBERG_URL) ||
+    (provider === 'browserless' && !!env?.BROWSERLESS_URL) ||
+    (provider === 'pdfshift' && !!env?.PDFSHIFT_API_KEY)
+  );
+  const useExternalPdfRenderer = !isViewer && hasExternalPdfProvider && String(env?.PDF_RENDER_ENGINE || '').toLowerCase() !== 'disabled';
   const activeExportPath = isViewer
     ? 'viewer-json-html'
-    : useGotenberg
-      ? 'gotenberg-application-pdf'
+    : useExternalPdfRenderer
+      ? `external-application-pdf:${providerList.join('>')}`
       : 'json-html-fallback';
-  console.info(`[PDF Export] active_path=${activeExportPath}; requested_render_mode=${requestedRenderMode}; gotenberg_env=${env?.PDF_RENDER_ENGINE || 'unset'}; viewer=${isViewer}`);
+  console.info(`[PDF Export] active_path=${activeExportPath}; requested_render_mode=${requestedRenderMode}; providers=${providerList.join(',') || 'none'}; viewer=${isViewer}`);
 
   // ── QuickChart env config ──
   const QC = {
@@ -255,14 +400,15 @@ export async function onRequestPost(context) {
   const filename = `GTM_${strategy.company_name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
   // When Gotenberg is active, always generate with 'gotenberg' renderMode so print CSS applies correctly.
   // Viewer mode is deliberately excluded above and keeps browser-safe HTML.
-  const renderMode = useGotenberg ? 'gotenberg' : requestedRenderMode;
+  const renderMode = useExternalPdfRenderer ? 'gotenberg' : (requestedRenderMode === 'browser-pdf' ? 'gotenberg' : requestedRenderMode);
   const integration = getIntegrationStatus(env);
-  const html = buildReportHTML(strategy, charts, isDemoMode, renderMode, isViewer);
+  const visualAssets = { hero: await fetchUnsplashHeroImage(strategy, env) };
+  const html = buildReportHTML(strategy, charts, isDemoMode, renderMode, isViewer, visualAssets);
 
-  // ── Phase 21C: Gotenberg path ──────────────────────────────────────────
-  if (useGotenberg) {
+  // ── Phase 21E: External server-side PDF path ──────────────────────────────────────────
+  if (useExternalPdfRenderer) {
     try {
-      const pdfBuffer = await renderPdfWithGotenberg(html, filename, env);
+      const { provider, pdfBuffer } = await renderPdfWithExternalProvider(html, filename, env);
       return new Response(pdfBuffer, {
         status: 200,
         headers: {
@@ -270,24 +416,25 @@ export async function onRequestPost(context) {
           'Content-Type': 'application/pdf',
           'Content-Disposition': `attachment; filename="${filename}"`,
           'Cache-Control': 'no-store',
-          'X-ABE-PDF-Engine': 'gotenberg',
-          'X-ABE-Export-Path': activeExportPath,
+          'X-ABE-PDF-Engine': provider,
+          'X-ABE-Export-Path': `external-application-pdf:${provider}`,
         },
       });
     } catch (gotenbergErr) {
-      console.warn('[Gotenberg] Failed — returning JSON fallback:', gotenbergErr.message);
-      const fallbackHtml = buildReportHTML(strategy, charts, isDemoMode, 'browser-pdf', isViewer);
+      console.warn('[External PDF Renderer] Failed — returning JSON fallback:', gotenbergErr.message);
+      const fallbackHtml = buildReportHTML(strategy, charts, isDemoMode, 'gotenberg', isViewer, visualAssets);
       return new Response(
         JSON.stringify({
           html: fallbackHtml,
           filename,
-          mode: 'browser-pdf',
-          active_export_path: 'gotenberg_failed_json_html_fallback',
+          mode: 'gotenberg',
+          active_export_path: 'external_renderer_failed_readable_html_fallback',
           integration_status: integration,
-          pdf_fallback: 'gotenberg_failed',
+          pdf_fallback: 'external_renderer_failed',
           pdf_fallback_reason: gotenbergErr.message,
+          pdf_provider_order: providerList,
         }),
-        { status: 200, headers: { ...cors, 'Content-Type': 'application/json', 'X-ABE-PDF-Engine': 'json-fallback', 'X-ABE-Export-Path': 'gotenberg_failed_json_html_fallback' } }
+        { status: 200, headers: { ...cors, 'Content-Type': 'application/json', 'X-ABE-PDF-Engine': 'json-fallback', 'X-ABE-Export-Path': 'external_renderer_failed_readable_html_fallback' } }
       );
     }
   }
@@ -2248,7 +2395,7 @@ const SECTION_REGISTRY = [
 // ══════════════════════════════════════════════════════════════
 // TIER-1 ENTERPRISE A4 REPORT — dark-theme, rendered to PDF
 // ══════════════════════════════════════════════════════════════
-export function buildReportHTML(strategy, charts = {}, isDemoMode = false, renderMode = 'browser-pdf', isViewer = false) {
+export function buildReportHTML(strategy, charts = {}, isDemoMode = false, renderMode = 'browser-pdf', isViewer = false, visualAssets = {}) {
   const p = isViewer ? '.abe-viewer-wrapper ' : '';
   const s1 = strategy.step_1_market || strategy.steps?.[1] || {};
   const s2 = strategy.step_2_tam || strategy.steps?.[2] || {};
@@ -3010,6 +3157,7 @@ ${p}.section-continuation{width:100%;box-sizing:border-box;padding:0;margin:0;ba
 <div class="${isViewer ? 'abe-viewer-wrapper' : ''}">
 <!-- COVER -->
 <div class="page" style="position:relative;display:flex;flex-direction:column;justify-content:flex-start;align-items:center;text-align:center;padding:0;overflow:hidden">
+${visualAssets?.hero?.url ? `<div style="position:absolute;inset:0;background-image:linear-gradient(rgba(11,15,26,.88),rgba(11,15,26,.96)),url('${escapeHtml(visualAssets.hero.url)}');background-size:cover;background-position:center;opacity:.9;pointer-events:none"></div>` : ''}
 <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(168,85,247,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(168,85,247,.025) 1px,transparent 1px);background-size:28px 28px;pointer-events:none"></div>
 <div style="position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,var(--accent2),var(--accent),#c084fc)"></div>
 <div style="position:absolute;top:-80px;right:-80px;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,rgba(124,58,237,.1),transparent 70%);pointer-events:none"></div>
@@ -3056,6 +3204,7 @@ ${p}.section-continuation{width:100%;box-sizing:border-box;padding:0;margin:0;ba
     </div>
   </div>
 </div>
+${visualAssets?.hero?.credit ? `<div style="position:absolute;bottom:17mm;left:0;right:0;font-size:7px;color:rgba(255,255,255,.35);text-align:center;z-index:1">${escapeHtml(visualAssets.hero.credit)}</div>` : ''}
 <div style="position:absolute;bottom:12mm;left:0;right:0;font-size:8px;color:var(--faint);text-align:center;z-index:1;letter-spacing:.05em">Classification: CONFIDENTIAL — Not for External Distribution</div>
 </div>
 <!-- EXECUTIVE SUMMARY -->
