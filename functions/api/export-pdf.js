@@ -2705,7 +2705,7 @@ html, body {
   print-color-adjust: exact !important;
   background: #0B0F1A !important;
   background-color: #0c0d11 !important;
-  font-size: 12.5pt;
+  font-size: 11.5pt;
   line-height: 1.65;
   orphans: 3;
   widows: 3;
@@ -2718,14 +2718,17 @@ ${p}.page {
   background-color: #0c0d11 !important;
   padding: 0 !important;
   margin: 0 !important;
-  min-height: 100vh !important;
-  min-height: 297mm !important;
-  height: auto !important;
+  height: 100% !important;
+  overflow: hidden !important;
   display: flex !important;
   flex-direction: column !important;
   justify-content: space-between !important;
   break-after: page !important;
   page-break-after: always !important;
+}
+/* ── Vertical centering for internal containers ── */
+${p}.section, ${p}.exec-card, ${p}.scope-grid, ${p}.waterfall, ${p}.icp-grid, ${p}.tier-cards, ${p}.sourcing-funnel, ${p}.findings-grid, ${p}.triangulation-grid {
+  margin: auto 0 !important;
 }
 /* ── Vertical breathing map (final pass) ── */
 ${p}#page-17-icp-modeling {
@@ -2775,23 +2778,23 @@ ${p}.pf, ${p}.pf-wrap, ${p}.page-insight, ${p}.figure-caption, ${p}.figure-sourc
 }
 /* ── Phase 21C+: Readability — minimum font sizes (use !important to beat inline styles) ── */
 /* Tables */
-${p}.dt th, ${p}table th, ${p}th { font-size: 12pt !important; padding: 6px 7px !important; }
-${p}.dt td, ${p}table td, ${p}td { font-size: 11.5pt !important; padding: 6px 7px !important; }
-${p}table td *, ${p}.dt td *, ${p}.table-wrap td * { font-size: 11.5pt !important; }
+${p}.dt th, ${p}table th, ${p}th { font-size: 11.5pt !important; padding: 6px 7px !important; }
+${p}.dt td, ${p}table td, ${p}td { font-size: 11pt !important; padding: 6px 7px !important; }
+${p}table td *, ${p}.dt td *, ${p}.table-wrap td * { font-size: 11pt !important; }
 /* Card body text */
-${p}.card p, ${p}.card div { font-size: 11.5px !important; line-height: 1.7 !important; }
+${p}.card p, ${p}.card div { font-size: 11pt !important; line-height: 1.7 !important; }
 /* SWOT / lists */
 ${p}.sc2 li { font-size: 10px !important; line-height: 1.65 !important; }
 /* SDR body text */
-${p}.sdr-preview { font-size: 11px !important; line-height: 1.7 !important; }
+${p}.sdr-preview { font-size: 10.5pt !important; line-height: 1.7 !important; }
 /* Analyst callout */
-${p}.ac { font-size: 11px !important; line-height: 1.65 !important; }
+${p}.ac { font-size: 10.5pt !important; line-height: 1.65 !important; }
 /* Page insight */
 ${p}.page-insight-text { font-size: 10.5px !important; }
 /* Scope / ICP / sourcing cells */
 ${p}.scope-cell__value, ${p}.icp-value, ${p}.funnel-value, ${p}.tier-body { font-size: 10px !important; }
 /* Section context */
-${p}.sc { font-size: 11px !important; }
+${p}.sc { font-size: 10.5pt !important; }
 /* Tag pills — keep compact but legible */
 ${p}.tg { font-size: 9px !important; }
 /* ── Footer — make it readable, not ghosted ── */
@@ -2805,7 +2808,7 @@ ${p}.validation-note { font-size: 9px !important; }
 /* ── Table notes / sources ── */
 ${p}.table-note, ${p}.table-source { font-size: 8.5px !important; color: #aaa !important; }
 /* ── Phase 21C: Remove height-induced blank gaps ── */
-${p}.page { overflow: visible !important; }
+${p}.page { overflow: hidden !important; }
 /* ── Cover: reset its large inline padding so it doesn't create a half-blank page ── */
 ${p}.page[style*="padding:0"] { padding: 0 !important; }
 /* ── Edu-filler hidden for Gotenberg (content flows, no fixed-height pages) ── */
@@ -2813,7 +2816,7 @@ ${p}.edu-filler { display: none !important; }
 /* ── Section continuation: no extra space ── */
 ${p}.section-continuation { display: block !important; padding: 0 !important; margin: 0 !important; }
 /* ── Cover page print fixes ── */
-${p}.cover-page { overflow: visible !important; min-height: unset !important; }
+${p}.cover-page { overflow: hidden !important; min-height: unset !important; }
 ${p}.cover-page > div[style*="position:absolute"] { display: none !important; }
 ${p}.cover-page > div[style*="inset:0"] { display: none !important; }
 /* ── Keep section header with at least 2 items below it ── */
@@ -2852,8 +2855,8 @@ ${p}.page {
   background-color: #0c0d11 !important;
   padding: 0 !important;
   margin: 0 !important;
-  min-height: 100vh !important;
-  min-height: 297mm !important;
+  height: 100% !important;
+  overflow: hidden !important;
   display:flex !important;
   flex-direction:column !important;
   justify-content:space-between !important;
@@ -2888,9 +2891,9 @@ ${p}.edu-filler {
   break-inside: avoid;
   page-break-inside: avoid;
 }
-${p}.page{min-height:100vh;min-height:297mm;display:flex;flex-direction:column;justify-content:space-between;background:#0c0d11;background-color:#0c0d11}
+${p}.page{height:100% !important;overflow:hidden !important;display:flex;flex-direction:column;justify-content:space-between;background:#0c0d11;background-color:#0c0d11}
 ` : `
-${p}.page{width:210mm;min-height:100vh;min-height:297mm;overflow:visible;margin:0;background:#0c0d11;background-color:#0c0d11;padding:12mm 15mm 15mm;position:relative;page-break-after:always;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between}
+${p}.page{width:210mm;height:100% !important;overflow:hidden !important;margin:0;background:#0c0d11;background-color:#0c0d11;padding:12mm 15mm 15mm;position:relative;page-break-after:always;box-sizing:border-box;display:flex;flex-direction:column;justify-content:space-between}
 `;
   const styles = `
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -2898,7 +2901,7 @@ ${p}.page{width:210mm;min-height:100vh;min-height:297mm;overflow:visible;margin:
 :root{--bg:#0B0F1A;--bg2:#0D1120;--card:#121827;--border:#1F2937;--accent:#a855f7;--accent2:#7c3aed;--green:#22c55e;--amber:#f59e0b;--red:#ef4444;--blue:#3b82f6;--text:#E5E7EB;--muted:#6B7280;--faint:#374151;--white:#fff}
 ${isViewer ? '.abe-viewer-wrapper, .abe-viewer-wrapper * { box-sizing:border-box }' : '*{box-sizing:border-box}'}
 ${isViewer ? '.abe-viewer-wrapper * { margin:0; padding:0 }' : '*{margin:0;padding:0}'}
-${isViewer ? '.abe-viewer-wrapper' : 'body'}{font-family:'Inter',sans-serif;background:var(--bg);background-color:#0c0d11;color:var(--text);font-size:12.5pt;line-height:1.65;-webkit-print-color-adjust:exact;print-color-adjust:exact;orphans:3;widows:3}
+${isViewer ? '.abe-viewer-wrapper' : 'body'}{font-family:'Inter',sans-serif;background:var(--bg);background-color:#0c0d11;color:var(--text);font-size:11.5pt;line-height:1.65;-webkit-print-color-adjust:exact;print-color-adjust:exact;orphans:3;widows:3}
 ${paginationCss}
 /* ── ENTERPRISE TABLE ENHANCEMENTS ── */
 ${p}.dt tr:hover td{background:rgba(168,85,247,.03)}
