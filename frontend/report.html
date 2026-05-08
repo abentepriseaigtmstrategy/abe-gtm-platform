@@ -43,9 +43,10 @@
       background: var(--bg);
       background-color: #0c0d11;
       color: var(--text);
-      font-size: 10.5pt;
+      font-size: 11.5pt;
       height: 100%;
       overflow: hidden;
+      line-height: 1.65;
     }
 
     body::before {
@@ -1139,7 +1140,7 @@
       overflow: hidden;
       display: flex;
       flex-direction: column;
-      justify-content: space-between;
+      justify-content: center !important; /* FORCED VERTICAL CENTERING */
     }
 
     /* ── Vertical centering for internal containers ── */
@@ -1160,9 +1161,10 @@
     @media print {
       html,
       body {
-        font-size: 10.5pt !important;
+        font-size: 11.5pt !important;
         background-color: #0c0d11 !important;
         color: rgba(255, 255, 255, 0.9) !important;
+        line-height: 1.65 !important;
       }
 
       h1 { font-size: 57px !important; }
@@ -1185,31 +1187,31 @@
       #page-4-market-definition .dt td, 
       #page-7-segmentation-framework .dt td, 
       #page-27-buying-criteria .dt td { 
-        padding: 5% !important; 
-        line-height: 2.0 !important; 
+        padding: 3% !important; 
+        line-height: 1.8 !important; 
       }
 
       /* Page 15: TAM Waterfall Visual & SWOT expansion — switch from px to flexible units */
       #page-15-market-context-overflow-tam-visual .chart-block {
-        flex-grow: 2 !important;
+        flex-grow: 1 !important;
         display: flex !important;
         flex-direction: column !important;
         justify-content: center !important;
       }
       #page-15-market-context-overflow-tam-visual .chart-block img { 
-        max-height: 150mm !important;
+        max-height: 140mm !important;
         height: auto !important; 
         object-fit: contain !important; 
       }
       #page-15-market-context-overflow-tam-visual .sc2 { 
         flex-grow: 1 !important;
-        min-height: 150px !important; 
+        min-height: 120px !important; 
         display: flex !important; 
         flex-direction: column !important; 
         justify-content: center !important; 
       }
-      #page-17-icp-modeling .icp-grid { gap: 12mm !important; margin: 10mm 0 !important; }
-      #page-17-icp-modeling .icp-card { padding: 8mm !important; }
+      #page-17-icp-modeling .icp-grid { gap: 10mm !important; margin: 8mm 0 !important; }
+      #page-17-icp-modeling .icp-card { padding: 6mm !important; }
 
       table td,
       table th,
@@ -1219,14 +1221,14 @@
       .cm-table th,
       .appendix-table td,
       .appendix-table th {
-        font-size: 9.5pt !important;
+        font-size: 10.5pt !important;
       }
 
       table th,
       .pain-table th,
       .cm-table th,
       .appendix-table th {
-        font-size: 9.5pt !important;
+        font-size: 10.5pt !important;
       }
 
       .edu-filler.edu-filler--active {
@@ -1346,7 +1348,7 @@
         background-color: #0c0d11 !important;
         display: flex;
         flex-direction: column;
-        justify-content: space-between;
+        justify-content: center !important; /* FORCED VERTICAL CENTERING */
       }
     }
   </style>
