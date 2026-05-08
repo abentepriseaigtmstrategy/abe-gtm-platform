@@ -1008,11 +1008,14 @@ function renderTriangulationGrid(pillars) {
  */
 function renderMethodologyLedger(rows) {
   if (!Array.isArray(rows)) return '';
-  const trs = rows.map(r => `<tr>
-    <td style="border:.5px solid #444;padding:5px 6px;font-size:9.5px;vertical-align:top;font-weight:700;color:var(--accent)">${escapeHtml(r.category)}</td>
-    <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top">${safeBusinessText(r.dataUsed, 'Validation pending')}</td>
+  const trs = rows.map((r, i) => {
+    const bg = i % 2 === 0 ? '#1e1e1e' : '#2a2a2a';
+    return `<tr style="background:${bg}">
+    <td style="border:.5px solid #444;border-left:2px solid var(--accent);padding:5px 6px;font-size:9.5px;vertical-align:top;font-weight:700;color:var(--accent)">${renderSvgIcon('search', 10, 'var(--accent)')} &nbsp; ${escapeHtml(r.category)}</td>
+    <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--text)">${safeBusinessText(r.dataUsed, 'Validation pending')}</td>
     <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--amber);font-style:italic">${safeBusinessText(r.notValidated, 'Validation pending')}</td>
-  </tr>`).join('');
+  </tr>`;
+  }).join('');
   return `<div class="keep-together table-wrap" style="margin:3mm 0">
     <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-family:inherit">
       <thead><tr>
@@ -1465,17 +1468,18 @@ function renderRightToWinTable(dimensions) {
     </div>`;
   }
   const CONF_COLOR = { High: 'var(--green)', Medium: 'var(--amber)', Low: 'var(--red)' };
-  const rows = dimensions.map(d => {
+  const rows = dimensions.map((d, i) => {
     const confRaw   = safeBusinessText(d.confidence || 'Medium', 'Medium');
     const confTrim  = /^(high|medium|low)$/i.test(confRaw.trim()) ? confRaw.trim() : 'Medium';
     const confKey   = confTrim.charAt(0).toUpperCase() + confTrim.slice(1).toLowerCase();
     const confColor = CONF_COLOR[confKey] || 'var(--amber)';
-    return `<tr>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9.5px;vertical-align:top;font-weight:700;color:var(--accent)">${escapeHtml(d.dimension, 'Dimension')}</td>
+    const bg = i % 2 === 0 ? '#1e1e1e' : '#2a2a2a';
+    return `<tr style="background:${bg}">
+      <td style="border:.5px solid #444;border-left:2px solid ${confColor};padding:5px 6px;font-size:9.5px;vertical-align:top;font-weight:700;color:var(--accent)">${renderSvgIcon('trophy', 10, 'var(--accent)')} &nbsp; ${escapeHtml(d.dimension, 'Dimension')}</td>
       <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--green)">${safeBusinessText(d.our_advantage, 'Requires validation')}</td>
       <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--amber)">${safeBusinessText(d.competitor_gap, 'Requires validation')}</td>
       <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top">${safeBusinessText(d.win_condition, 'Requires validation')}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;font-weight:700;color:${confColor}">${escapeHtml(confKey)}</td>
+      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;font-weight:700;color:${confColor};text-align:center"><span style="background:${confColor}22;padding:1px 4px;border-radius:3px">${escapeHtml(confKey)}</span></td>
     </tr>`;
   }).join('');
   return `<div class="keep-together table-wrap" style="margin:3mm 0">
@@ -1630,7 +1634,7 @@ function renderBuyingCriteriaTable(criteria) {
     const valStatus = safeBusinessText(c.validation_status, 'Validation pending');
     const valColor  = /validated/i.test(valStatus) ? 'var(--green)' : /partial/i.test(valStatus) ? 'var(--amber)' : 'var(--muted)';
     return `<tr style="background:${bg}">
-      <td style="border:.5px solid #444;border-left:2px solid ${impColor};padding:5px 6px;font-size:9.5px;vertical-align:top;font-weight:700;color:var(--accent)">${escapeHtml(c.criteria, 'Criteria')}</td>
+      <td style="border:.5px solid #444;border-left:2px solid ${impColor};padding:5px 6px;font-size:9.5px;vertical-align:top;font-weight:700;color:var(--accent)">${renderSvgIcon('users', 10, 'var(--accent)')} &nbsp; ${escapeHtml(c.criteria, 'Criteria')}</td>
       <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top">${safeBusinessText(c.buyer_concern, 'Requires source validation')}</td>
       <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;font-weight:700;color:${impColor};text-align:center"><span style="background:${impColor}22;padding:1px 4px;border-radius:3px">${escapeHtml(imp)}</span></td>
       <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--amber)">${safeBusinessText(c.proof_required, 'Validation pending')}</td>
@@ -1691,12 +1695,12 @@ function renderCapabilityLandscape(capabilities) {
     const valStatus = safeBusinessText(c.validation_status, 'Validation pending');
     const valColor  = /validated/i.test(valStatus) ? 'var(--green)' : /partial/i.test(valStatus) ? 'var(--amber)' : 'var(--muted)';
     return `<tr style="background:${bg}">
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;font-weight:700;color:${color}">${escapeHtml(group)}</td>
+      <td style="border:.5px solid #444;border-left:2px solid ${color};padding:5px 6px;font-size:9px;vertical-align:top;font-weight:700;color:${color}">${renderSvgIcon('cpu', 10, color)} &nbsp; ${escapeHtml(group)}</td>
       <td style="border:.5px solid #444;padding:5px 6px;font-size:9.5px;vertical-align:top;font-weight:700;color:var(--text)">${escapeHtml(c.capability, 'Capability')}</td>
       <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--green)">${safeBusinessText(c.buyer_value, 'Requires source validation')}</td>
       <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--amber)">${safeBusinessText(c.maturity_signal, 'Validation pending')}</td>
       <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--accent)">${safeBusinessText(c.gtm_implication, 'Validation pending')}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:8.5px;vertical-align:top;color:${valColor};font-style:italic">${escapeHtml(valStatus)}</td>
+      <td style="border:.5px solid #444;padding:5px 6px;font-size:8.5px;vertical-align:top;color:${valColor};font-style:italic"><span style="border:1px solid ${valColor}40;padding:1px 3px;border-radius:2px;display:inline-block">${escapeHtml(valStatus)}</span></td>
     </tr>`;
   }).join('');
 
@@ -1747,12 +1751,12 @@ function renderRegulatoryRiskTable(risks) {
     const valStatus = safeBusinessText(r.validation_status, 'Validation pending');
     const valColor  = /validated/i.test(valStatus) ? 'var(--green)' : /partial/i.test(valStatus) ? 'var(--amber)' : 'var(--muted)';
     return `<tr style="background:${bg}">
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9.5px;vertical-align:top;font-weight:700;color:var(--accent)">${escapeHtml(r.risk_area, 'Risk Area')}</td>
+      <td style="border:.5px solid #444;border-left:2px solid var(--accent);padding:5px 6px;font-size:9.5px;vertical-align:top;font-weight:700;color:var(--accent)">${renderSvgIcon('alert-triangle', 10, 'var(--accent)')} &nbsp; ${escapeHtml(r.risk_area, 'Risk Area')}</td>
       <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top">${safeBusinessText(r.buyer_concern, 'Requires source validation')}</td>
       <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--amber)">${safeBusinessText(r.gtm_impact, 'Validation pending')}</td>
       <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--green)">${safeBusinessText(r.mitigation_message, 'Validation pending')}</td>
       <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--amber)">${safeBusinessText(r.required_proof, 'Validation pending')}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:8.5px;vertical-align:top;color:${valColor};font-style:italic">${escapeHtml(valStatus)}</td>
+      <td style="border:.5px solid #444;padding:5px 6px;font-size:8.5px;vertical-align:top;color:${valColor};font-style:italic"><span style="border:1px solid ${valColor}40;padding:1px 3px;border-radius:2px;display:inline-block">${escapeHtml(valStatus)}</span></td>
     </tr>`;
   }).join('');
 
@@ -2233,8 +2237,8 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false, rende
   const pageHdr = () => `<div class="ph"><div class="phb"><div class="am">ABE</div><div><div class="abn">AI Revenue Infrastructure</div><div class="abs">Enterprise GTM Platform</div></div></div><div class="cb">Confidential</div></div>`;
   const renderPageFooter = (label, num) => `
 <div class="pf-wrap" style="margin-top:auto;padding-top:2.5mm;break-before:avoid;page-break-before:avoid">
-  <div class="pf-tagline" style="text-align:center;margin-bottom:2mm;font-style:italic;color:var(--faint);font-size:7.5px;letter-spacing:.03em">Plan with clarity. Build with intent. Grow through trust.</div>
-  <div class="pf" style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid var(--border);padding-top:2mm;font-size:8px;color:var(--muted)">
+  <div class="pf-tagline" style="text-align:center;margin-bottom:2mm;font-style:italic;color:var(--text);font-size:8px;letter-spacing:.05em;opacity:0.85">Plan with clarity. Build with intent. Grow through trust.</div>
+  <div class="pf" style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(255,255,255,0.15);padding-top:2mm;font-size:8.5px;color:var(--text);font-weight:600">
     <span style="flex:1;text-align:left;font-weight:900;color:var(--accent)">ABE</span>
     <span style="flex:2;text-align:center;text-transform:uppercase;letter-spacing:.1em">${e(label)}</span>
     <span style="flex:1;text-align:right">Page ${num}</span>
@@ -2541,7 +2545,7 @@ ${p}.edu-filler {
   break-inside: avoid;
   page-break-inside: avoid;
 }
-${p}.page{min-height:auto;display:flex;flex-direction:column}
+${p}.page{min-height:auto;display:block}
 ` : `
 ${p}.page{width:210mm;min-height:297mm;overflow:visible;margin:0;background:var(--bg);padding:12mm 15mm 15mm;position:relative;page-break-after:always;box-sizing:border-box;display:flex;flex-direction:column}
 `;
@@ -2728,7 +2732,7 @@ ${p}.tier-card{background:var(--card);border:1px solid var(--border);border-radi
 ${p}.tier-title{font-size:7.5px;font-weight:800;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:1.5mm}
 ${p}.tier-body{font-size:9.5px;color:var(--text);line-height:1.4}
 /* SECTION CONTINUATION (browser-pdf) ── */
-${p}.section-continuation{width:100%;box-sizing:border-box;padding:0;margin:0;background:transparent;display:flex;flex-direction:column}
+${p}.section-continuation{width:100%;box-sizing:border-box;padding:0;margin:0;background:transparent;display:block}
 /* ── A4 PRINT DISCIPLINE ── */
 @media print {
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
