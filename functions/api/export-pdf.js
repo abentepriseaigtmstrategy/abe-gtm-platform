@@ -119,8 +119,19 @@ export async function onRequestPost(context) {
   const { strategy } = body;
   if (!strategy.company_name) return errRes('Missing strategy.company_name', 400, cors);
 
-  // ── Phase 21C: Gotenberg render mode detection ──
-  const useGotenberg = env?.PDF_RENDER_ENGINE === 'gotenberg' && !!env?.GOTENBERG_URL;
+  // ── Phase 21C diagnostic: identify the active export layer before rendering ──
+  const url = new URL(request.url);
+  const isViewer = url.searchParams.get('mode') === 'viewer';
+  const requestedRenderMode = body.renderMode || 'browser-pdf';
+
+  // Gotenberg must never hijack viewer-mode HTML rendering; viewer mode always returns JSON/HTML.
+  const useGotenberg = !isViewer && env?.PDF_RENDER_ENGINE === 'gotenberg' && !!env?.GOTENBERG_URL;
+  const activeExportPath = isViewer
+    ? 'viewer-json-html'
+    : useGotenberg
+      ? 'gotenberg-application-pdf'
+      : 'json-html-fallback';
+  console.info(`[PDF Export] active_path=${activeExportPath}; requested_render_mode=${requestedRenderMode}; gotenberg_env=${env?.PDF_RENDER_ENGINE || 'unset'}; viewer=${isViewer}`);
 
   // ── QuickChart env config ──
   const QC = {
@@ -241,11 +252,10 @@ export async function onRequestPost(context) {
     console.info(`[QuickChart] total calls=${chartCount}/${QC.maxPer} gauge=${!!charts.gauge} waterfall=${!!charts.waterfall} confidence=${!!charts.confidence} intent=${!!charts.intent} risk=${!!charts.risk}`);
   }
 
-  const url = new URL(request.url);
-  const isViewer = url.searchParams.get('mode') === 'viewer';
   const filename = `GTM_${strategy.company_name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
-  // When Gotenberg is active, always generate with 'gotenberg' renderMode so print CSS applies correctly
-  const renderMode = useGotenberg ? 'gotenberg' : (body.renderMode || 'browser-pdf');
+  // When Gotenberg is active, always generate with 'gotenberg' renderMode so print CSS applies correctly.
+  // Viewer mode is deliberately excluded above and keeps browser-safe HTML.
+  const renderMode = useGotenberg ? 'gotenberg' : requestedRenderMode;
   const integration = getIntegrationStatus(env);
   const html = buildReportHTML(strategy, charts, isDemoMode, renderMode, isViewer);
 
@@ -260,27 +270,31 @@ export async function onRequestPost(context) {
           'Content-Type': 'application/pdf',
           'Content-Disposition': `attachment; filename="${filename}"`,
           'Cache-Control': 'no-store',
+          'X-ABE-PDF-Engine': 'gotenberg',
+          'X-ABE-Export-Path': activeExportPath,
         },
       });
     } catch (gotenbergErr) {
       console.warn('[Gotenberg] Failed — returning JSON fallback:', gotenbergErr.message);
+      const fallbackHtml = buildReportHTML(strategy, charts, isDemoMode, 'browser-pdf', isViewer);
       return new Response(
         JSON.stringify({
-          html,
+          html: fallbackHtml,
           filename,
           mode: 'browser-pdf',
+          active_export_path: 'gotenberg_failed_json_html_fallback',
           integration_status: integration,
           pdf_fallback: 'gotenberg_failed',
           pdf_fallback_reason: gotenbergErr.message,
         }),
-        { status: 200, headers: { ...cors, 'Content-Type': 'application/json' } }
+        { status: 200, headers: { ...cors, 'Content-Type': 'application/json', 'X-ABE-PDF-Engine': 'json-fallback', 'X-ABE-Export-Path': 'gotenberg_failed_json_html_fallback' } }
       );
     }
   }
 
-  // ── Default JSON/html fallback (Gotenberg disabled) ────────────────────
-  return new Response(JSON.stringify({ html, filename, mode: renderMode, integration_status: integration }), {
-    status: 200, headers: { ...cors, 'Content-Type': 'application/json' },
+  // ── Default JSON/html fallback (Gotenberg disabled or viewer mode) ────────────────────
+  return new Response(JSON.stringify({ html, filename, mode: renderMode, active_export_path: activeExportPath, integration_status: integration }), {
+    status: 200, headers: { ...cors, 'Content-Type': 'application/json', 'X-ABE-PDF-Engine': isViewer ? 'viewer-html' : 'json-fallback', 'X-ABE-Export-Path': activeExportPath },
   });
 }
 
@@ -1041,11 +1055,11 @@ function renderInsightBox(title, body, { accent = 'var(--accent)', cls = '' } = 
 
 const renderPageFooter = (label, num) => `
 <div class="pf-wrap" style="margin-top:auto;padding-top:2.5mm;break-before:avoid;page-break-before:avoid">
-  <div class="pf-tagline" style="text-align:center;margin-bottom:2mm;font-style:italic;color:var(--text);font-size:8px;letter-spacing:.05em;opacity:0.85">Plan with clarity. Build with intent. Grow through trust.</div>
-  <div class="pf" style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(255,255,255,0.15);padding-top:2mm;font-size:8.5px;color:var(--text);font-weight:600">
-    <span style="flex:1;text-align:left;font-weight:900;color:var(--accent)">ABE</span>
-    <span style="flex:2;text-align:center;text-transform:uppercase;letter-spacing:.1em">${escapeHtml(label)}</span>
-    <span style="flex:1;text-align:right">Page ${num}</span>
+  <div class="pf-tagline" style="text-align:center;margin-bottom:2mm;font-style:italic;color:#FFFFFF;font-size:10px;letter-spacing:.04em;opacity:1">Plan with clarity. Build with intent. Grow through trust.</div>
+  <div class="pf" style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(255,255,255,0.28);padding-top:2mm;font-size:10px;color:#FFFFFF;font-weight:700;opacity:1">
+    <span style="flex:1;text-align:left;font-weight:900;color:#FFFFFF">ABE Platform</span>
+    <span style="flex:2;text-align:center;text-transform:uppercase;letter-spacing:.1em;color:#FFFFFF">${escapeHtml(label)}</span>
+    <span style="flex:1;text-align:right;color:#FFFFFF">Page ${num}</span>
   </div>
 </div>`;
 
@@ -1077,6 +1091,16 @@ const SVG_MAP = {
 const renderSvgIcon = (name, size = 16, color = 'currentColor') => {
   const paths = SVG_MAP[name] || SVG_MAP['grid'];
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle">${paths}</svg>`;
+};
+
+const renderStatusBadge = (value) => {
+  const label = safeBusinessText(value, 'Pending Validation') || 'Pending Validation';
+  const raw = label.toLowerCase();
+  const color = /critical|high risk|high/.test(raw) ? 'var(--red)'
+    : /low risk|low|validated|approved/.test(raw) ? 'var(--green)'
+    : /medium|watch|pending|requires|estimate|validation/.test(raw) ? 'var(--amber)'
+    : 'var(--accent)';
+  return `<span class="status-pill" style="display:inline-flex;align-items:center;gap:1mm;padding:1mm 2.4mm;border-radius:999px;border:1px solid ${color};background:${color}22;color:${color};font-size:9.5px;font-weight:800;white-space:nowrap">${escapeHtml(label, 'Pending Validation')}</span>`;
 };
 
 const SECTION_ICONS = {
@@ -2321,13 +2345,16 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false, rende
       const header = headers[headerIdx] || '';
       // If cell is empty, null, undefined, or bare dash — apply contextual fallback
       if (cell === undefined || cell === null || cell === '') {
-        return `<span style="color:var(--muted);font-style:italic;font-size:9px">${contextualFallback(header)}</span>`;
+        return `<span style="color:var(--muted);font-style:italic;font-size:10px">${contextualFallback(header)}</span>`;
       }
       const raw = String(cell);
       // Strip HTML tags to check for dash-only content
       const stripped = raw.replace(/<[^>]*>/g, '').trim();
       if (/^[-–—\s]+$/.test(stripped)) {
-        return `<span style="color:var(--muted);font-style:italic;font-size:9px">${contextualFallback(header)}</span>`;
+        return `<span style="color:var(--muted);font-style:italic;font-size:10px">${contextualFallback(header)}</span>`;
+      }
+      if (/^(critical|high risk|medium risk|low risk|high|medium|low|watch|go|no-go|validated|validation pending|pending validation|requires validation|requires source validation)$/i.test(stripped)) {
+        return renderStatusBadge(stripped);
       }
       return sanitizeVisibleHtml(raw);
     };
@@ -2357,7 +2384,7 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false, rende
           ${cleanRows.map((row, i) => {
             const bg = i % 2 === 0 ? '#1e1e1e' : '#2a2a2a';
             return `<tr style="background:${bg};">${row.map((cell, ci) => {
-              const rendered = cell || `<span style="color:var(--muted);font-style:italic;font-size:9px">${contextualFallback(headers[ci])}</span>`;
+              const rendered = cell || `<span style="color:var(--muted);font-style:italic;font-size:10px">${contextualFallback(headers[ci])}</span>`;
               return `<td style="border:0.5px solid #444;padding:6px;font-size:10px;vertical-align:top;word-break:break-word;overflow-wrap:anywhere;">${rendered}</td>`;
             }).join('')}</tr>`;
           }).join('')}
@@ -2646,13 +2673,13 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false, rende
   // Rules: NO transform:scale(), NO fixed-height containers, allow report to flow freely.
   // Minimum readable font sizes enforced. Section headings kept with content.
   const gotenbergPrintCss = `
-@page { size: A4; margin: 12mm 14mm; }
+@page { size: A4; margin: 10mm 12mm; }
 html, body {
   -webkit-print-color-adjust: exact !important;
   print-color-adjust: exact !important;
   background: #0B0F1A !important;
   font-size: 12px;
-  line-height: 1.65;
+  line-height: 1.6;
   orphans: 3;
   widows: 3;
 }
@@ -2703,8 +2730,8 @@ ${p}table td { font-size: 10px !important; }
 ${p}.sc2 li { font-size: 10px !important; }
 ${p}.card p { font-size: 11.5px !important; }
 ${p}.tg { font-size: 9px !important; }
-${p}.pf { font-size: 8.5px !important; }
-${p}.pf-tagline { font-size: 8px !important; opacity: 1 !important; color: #9CA3AF !important; }
+${p}.pf { font-size: 10px !important; color:#FFFFFF !important; opacity:1 !important; }
+${p}.pf-tagline { font-size: 10px !important; opacity: 1 !important; color: #FFFFFF !important; }
 ${p}.figure-caption { font-size: 10px !important; color: #f5f5f5 !important; }
 ${p}.figure-source { font-size: 8.5px !important; color: #aaa !important; }
 /* Phase 21C: Remove height-induced blank gaps */
@@ -2742,6 +2769,10 @@ ${p}h1, ${p}h2, ${p}h3, ${p}.section-header, ${p}.ph {
   break-after: avoid !important;
   page-break-after: avoid !important;
 }
+${p}table th{font-size:10.5px!important;line-height:1.35!important;padding:6px 7px!important}
+${p}table td{font-size:10px!important;line-height:1.45!important;padding:6px 7px!important}
+${p}.pf, ${p}.pf *{font-size:10px!important;color:#fff!important;opacity:1!important}
+${p}.pf-tagline{font-size:10px!important;color:#fff!important;opacity:1!important}
 ${p}.edu-filler {
   margin-top: auto;
   padding-top: 6mm;
@@ -2765,8 +2796,25 @@ ${p}.page{width:210mm;min-height:297mm;overflow:visible;margin:0;background:var(
 :root{--bg:#0B0F1A;--bg2:#0D1120;--card:#121827;--border:#1F2937;--accent:#a855f7;--accent2:#7c3aed;--green:#22c55e;--amber:#f59e0b;--red:#ef4444;--blue:#3b82f6;--text:#E5E7EB;--muted:#6B7280;--faint:#374151;--white:#fff}
 ${isViewer ? '.abe-viewer-wrapper, .abe-viewer-wrapper * { box-sizing:border-box }' : '*{box-sizing:border-box}'}
 ${isViewer ? '.abe-viewer-wrapper * { margin:0; padding:0 }' : '*{margin:0;padding:0}'}
-${isViewer ? '.abe-viewer-wrapper' : 'body'}{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:11.5px;line-height:1.65;-webkit-print-color-adjust:exact;print-color-adjust:exact;orphans:3;widows:3}
+${isViewer ? '.abe-viewer-wrapper' : 'body'}{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:12px;line-height:1.65;-webkit-print-color-adjust:exact;print-color-adjust:exact;orphans:3;widows:3}
 ${paginationCss}
+/* ── PHASE 21D READABILITY LOCK — applies to both fallback and server-rendered PDFs ── */
+${p}table{font-size:10px!important;line-height:1.45!important;border-collapse:collapse;page-break-inside:auto;break-inside:auto}
+${p}thead{display:table-header-group}
+${p}tfoot{display:table-footer-group}
+${p}tr{page-break-inside:avoid!important;break-inside:avoid!important}
+${p}th{font-size:10.5px!important;line-height:1.35!important;padding:6px 7px!important;color:#f8fafc!important}
+${p}td{font-size:10px!important;line-height:1.45!important;padding:6px 7px!important;color:#e5e7eb!important}
+${p}p, ${p}li{font-size:11.5px;line-height:1.6}
+${p}.table-note, ${p}.table-source, ${p}.figure-source{font-size:9px!important;line-height:1.35!important;color:#cbd5e1!important}
+${p}.figure-caption{font-size:10.5px!important;color:#fff!important}
+${p}.status-pill{font-size:9.5px!important;line-height:1.2!important}
+${p}h1,${p}h2,${p}h3,${p}.section-header,${p}.ph{break-after:avoid!important;page-break-after:avoid!important}
+${p}.section-start,${p}.keep-with-next{break-inside:avoid!important;page-break-inside:avoid!important}
+${p}.page,${p}.section-continuation{break-inside:auto;page-break-inside:auto}
+${p}.pf-wrap{break-before:avoid!important;page-break-before:avoid!important;color:#fff!important;opacity:1!important}
+${p}.pf,${p}.pf *{font-size:10px!important;color:#fff!important;opacity:1!important}
+${p}.pf-tagline{font-size:10px!important;color:#fff!important;opacity:1!important}
 /* ── ENTERPRISE TABLE ENHANCEMENTS ── */
 ${p}.dt tr:hover td{background:rgba(168,85,247,.03)}
 ${p}.dt tbody tr:last-child td{border-bottom:none}
