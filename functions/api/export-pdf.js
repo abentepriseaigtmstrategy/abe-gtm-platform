@@ -67,7 +67,7 @@ async function renderPdfWithGotenberg(html, filename, env) {
     encodeSimpleField('printBackground', 'true'),      // preserve dark backgrounds
     encodeSimpleField('preferCssPageSize', 'true'),    // honour @page CSS
     encodeSimpleField('emulatedMediaType', 'print'),   // use @media print rules
-    encodeSimpleField('waitDelay', '1s'),              // allow fonts/charts to load
+    encodeSimpleField('waitDelay', '2s'),              // allow fonts/charts to load
     closingBytes,
   ];
 
@@ -79,7 +79,7 @@ async function renderPdfWithGotenberg(html, filename, env) {
 
   // Send to Gotenberg with a generous but bounded timeout (28s)
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 28000);
+  const timeoutId = setTimeout(() => controller.abort(), 55000); // 55s: large reports need time
   let res;
   try {
     res = await fetch(endpoint, {
@@ -106,143 +106,32 @@ async function renderPdfWithGotenberg(html, filename, env) {
   return pdfBuffer;
 }
 
-
 // ══════════════════════════════════════════════════════════════
-// PHASE 21E — MULTI-PROVIDER PDF RENDERING + VISUAL API PIPELINE
+// REPORT HYDRATION — fetch full strategy from vault by reportId
+// Called when the frontend sends only { reportId } instead of the
+// full strategy object, or when strategy.company_name is missing.
 // ══════════════════════════════════════════════════════════════
-
-function normalizeProviderList(env) {
-  const explicit = String(env?.PDF_RENDER_PROVIDER_ORDER || '').trim();
-  const engine = String(env?.PDF_RENDER_ENGINE || '').trim().toLowerCase();
-  const list = explicit
-    ? explicit.split(',').map(x => x.trim().toLowerCase()).filter(Boolean)
-    : (engine && engine !== 'auto' ? [engine] : ['gotenberg', 'browserless', 'pdfshift']);
-  return [...new Set(list.filter(x => ['gotenberg', 'browserless', 'pdfshift'].includes(x)))];
-}
-
-async function renderPdfWithBrowserless(html, filename, env) {
-  const base = (env.BROWSERLESS_URL || '').replace(/\/$/, '');
-  if (!base) throw new Error('BROWSERLESS_URL is not configured');
-  const token = env.BROWSERLESS_TOKEN || env.BROWSERLESS_API_KEY || '';
-  const endpoint = `${base}/pdf${token ? `?token=${encodeURIComponent(token)}` : ''}`;
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), parseInt(env.PDF_RENDER_TIMEOUT_MS || '28000', 10));
-  let res;
-  try {
-    res = await fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        html,
-        options: {
-          format: 'A4',
-          printBackground: true,
-          preferCSSPageSize: true,
-          margin: { top: '0mm', right: '0mm', bottom: '0mm', left: '0mm' },
-        },
-      }),
-      signal: controller.signal,
-    });
-  } finally {
-    clearTimeout(timeoutId);
-  }
+async function hydrateStrategyFromVault(reportId, authToken, requestUrl, env) {
+  const base = new URL(requestUrl).origin;
+  const res = await fetch(`${base}/api/vault?id=${encodeURIComponent(reportId)}`, {
+    method: 'GET',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': authToken,
+    },
+  });
   if (!res.ok) {
-    const errBody = await res.text().catch(() => '');
-    throw new Error(`Browserless HTTP ${res.status}: ${errBody.slice(0, 200)}`);
+    const txt = await res.text().catch(() => '');
+    throw new Error(`Vault hydration failed (HTTP ${res.status}): ${txt.slice(0, 200)}`);
   }
-  const pdfBuffer = await res.arrayBuffer();
-  if (!pdfBuffer || pdfBuffer.byteLength < 1000) throw new Error('Browserless returned an empty or invalid PDF binary');
-  console.info(`[Browserless] PDF rendered successfully — ${pdfBuffer.byteLength} bytes for "${filename}"`);
-  return pdfBuffer;
-}
-
-async function renderPdfWithPdfShift(html, filename, env) {
-  const apiKey = env.PDFSHIFT_API_KEY || '';
-  if (!apiKey) throw new Error('PDFSHIFT_API_KEY is not configured');
-  const endpoint = env.PDFSHIFT_URL || 'https://api.pdfshift.io/v3/convert/pdf';
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), parseInt(env.PDF_RENDER_TIMEOUT_MS || '28000', 10));
-  let res;
-  try {
-    res = await fetch(endpoint, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': 'Basic ' + btoa(`api:${apiKey}`),
-      },
-      body: JSON.stringify({
-        source: html,
-        format: 'A4',
-        landscape: false,
-        use_print: true,
-        sandbox: false,
-        filename,
-        margin: '0px',
-      }),
-      signal: controller.signal,
-    });
-  } finally {
-    clearTimeout(timeoutId);
-  }
-  if (!res.ok) {
-    const errBody = await res.text().catch(() => '');
-    throw new Error(`PDFShift HTTP ${res.status}: ${errBody.slice(0, 200)}`);
-  }
-  const pdfBuffer = await res.arrayBuffer();
-  if (!pdfBuffer || pdfBuffer.byteLength < 1000) throw new Error('PDFShift returned an empty or invalid PDF binary');
-  console.info(`[PDFShift] PDF rendered successfully — ${pdfBuffer.byteLength} bytes for "${filename}"`);
-  return pdfBuffer;
-}
-
-async function renderPdfWithExternalProvider(html, filename, env) {
-  const providerList = normalizeProviderList(env);
-  const failures = [];
-  for (const provider of providerList) {
-    try {
-      if (provider === 'gotenberg') {
-        if (!env.GOTENBERG_URL) throw new Error('GOTENBERG_URL is not configured');
-        return { provider, pdfBuffer: await renderPdfWithGotenberg(html, filename, env) };
-      }
-      if (provider === 'browserless') {
-        return { provider, pdfBuffer: await renderPdfWithBrowserless(html, filename, env) };
-      }
-      if (provider === 'pdfshift') {
-        return { provider, pdfBuffer: await renderPdfWithPdfShift(html, filename, env) };
-      }
-    } catch (err) {
-      const msg = `${provider}: ${err.message || err}`;
-      failures.push(msg);
-      console.warn(`[PDF Renderer] ${msg}`);
-    }
-  }
-  throw new Error(`All external PDF renderers failed: ${failures.join(' | ') || 'none configured'}`);
-}
-
-async function fetchUnsplashHeroImage(strategy, env) {
-  if ((env?.UNSPLASH_ENABLED || '').toLowerCase() !== 'true' || !env?.UNSPLASH_ACCESS_KEY) return null;
-  const query = encodeURIComponent(`${strategy.industry || strategy.company_name || 'business'} enterprise technology abstract`);
-  const endpoint = `https://api.unsplash.com/search/photos?query=${query}&per_page=1&orientation=landscape&content_filter=high`;
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 3500);
-  try {
-    const res = await fetch(endpoint, {
-      headers: { Authorization: `Client-ID ${env.UNSPLASH_ACCESS_KEY}` },
-      signal: controller.signal,
-    });
-    if (!res.ok) throw new Error(`Unsplash HTTP ${res.status}`);
-    const data = await res.json();
-    const photo = data?.results?.[0];
-    if (!photo?.urls?.regular) return null;
-    return {
-      url: photo.urls.regular,
-      credit: `Photo: ${photo.user?.name || 'Unsplash'} / Unsplash`,
-    };
-  } catch (err) {
-    console.warn('[Visual Assets] Unsplash unavailable:', err.message || err);
-    return null;
-  } finally {
-    clearTimeout(timeoutId);
-  }
+  const data = await res.json();
+  const report = data?.report;
+  if (!report) throw new Error('Vault returned empty report for id: ' + reportId);
+  // Normalise to the flat strategy shape export-pdf expects
+  const strategy = report.full_report || report.strategy || report.report_data || report;
+  if (!strategy.company_name) throw new Error('Hydrated report is missing company_name — the saved strategy may be incomplete');
+  console.info(`[Hydration] Loaded strategy for "${strategy.company_name}" from vault id=${reportId}`);
+  return strategy;
 }
 
 export async function onRequestPost(context) {
@@ -251,32 +140,34 @@ export async function onRequestPost(context) {
   if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
   const { user, error: authErr } = await verifyAuth(request, env);
   if (!user) return errRes(authErr || 'Unauthorized', 401, cors);
+
   let body;
   try { body = await request.json(); } catch { return errRes('Invalid request body', 400, cors); }
-  const errors = validate({ strategy: 'required' }, body);
-  if (errors.length) return errRes(errors[0], 400, cors);
-  const { strategy } = body;
-  if (!strategy.company_name) return errRes('Missing strategy.company_name', 400, cors);
 
-  // ── Phase 21C diagnostic: identify the active export layer before rendering ──
-  const url = new URL(request.url);
-  const isViewer = url.searchParams.get('mode') === 'viewer';
-  const requestedRenderMode = body.renderMode || 'browser-pdf';
+  // ── Phase 21F: Strategy resolution ───────────────────────────────────
+  // Priority 1: strategy object sent directly (full payload)
+  // Priority 2: reportId sent → hydrate from vault server-side
+  // This eliminates the "Missing strategy.company_name" failure when the
+  // frontend sends only the report ID (the correct production pattern).
+  const authToken = request.headers.get('Authorization') || '';
+  let strategy = body.strategy || null;
+  let hydrationPath = 'direct';
 
-  // Server PDF renderers must never hijack viewer-mode HTML rendering; viewer mode always returns JSON/HTML.
-  const providerList = normalizeProviderList(env);
-  const hasExternalPdfProvider = providerList.some(provider =>
-    (provider === 'gotenberg' && !!env?.GOTENBERG_URL) ||
-    (provider === 'browserless' && !!env?.BROWSERLESS_URL) ||
-    (provider === 'pdfshift' && !!env?.PDFSHIFT_API_KEY)
-  );
-  const useExternalPdfRenderer = !isViewer && hasExternalPdfProvider && String(env?.PDF_RENDER_ENGINE || '').toLowerCase() !== 'disabled';
-  const activeExportPath = isViewer
-    ? 'viewer-json-html'
-    : useExternalPdfRenderer
-      ? `external-application-pdf:${providerList.join('>')}`
-      : 'json-html-fallback';
-  console.info(`[PDF Export] active_path=${activeExportPath}; requested_render_mode=${requestedRenderMode}; providers=${providerList.join(',') || 'none'}; viewer=${isViewer}`);
+  if (!strategy?.company_name && body.reportId) {
+    try {
+      strategy = await hydrateStrategyFromVault(body.reportId, authToken, request.url, env);
+      hydrationPath = 'vault';
+    } catch (hydrateErr) {
+      console.error('[Hydration] Failed:', hydrateErr.message);
+      return errRes(`Report hydration failed: ${hydrateErr.message}`, 400, cors);
+    }
+  }
+
+  if (!strategy) return errRes('Request must include either strategy object or reportId', 400, cors);
+  if (!strategy.company_name) return errRes('Strategy is missing company_name — send reportId or full strategy', 400, cors);
+
+  // ── Phase 21C: Gotenberg render mode detection ──
+  const useGotenberg = env?.PDF_RENDER_ENGINE === 'gotenberg' && !!env?.GOTENBERG_URL;
 
   // ── QuickChart env config ──
   const QC = {
@@ -397,18 +288,18 @@ export async function onRequestPost(context) {
     console.info(`[QuickChart] total calls=${chartCount}/${QC.maxPer} gauge=${!!charts.gauge} waterfall=${!!charts.waterfall} confidence=${!!charts.confidence} intent=${!!charts.intent} risk=${!!charts.risk}`);
   }
 
+  const url = new URL(request.url);
+  const isViewer = url.searchParams.get('mode') === 'viewer';
   const filename = `GTM_${strategy.company_name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
-  // When Gotenberg is active, always generate with 'gotenberg' renderMode so print CSS applies correctly.
-  // Viewer mode is deliberately excluded above and keeps browser-safe HTML.
-  const renderMode = useExternalPdfRenderer ? 'gotenberg' : (requestedRenderMode === 'browser-pdf' ? 'gotenberg' : requestedRenderMode);
+  // When Gotenberg is active, always generate with 'gotenberg' renderMode so print CSS applies correctly
+  const renderMode = useGotenberg ? 'gotenberg' : (body.renderMode || 'browser-pdf');
   const integration = getIntegrationStatus(env);
-  const visualAssets = { hero: await fetchUnsplashHeroImage(strategy, env) };
-  const html = buildReportHTML(strategy, charts, isDemoMode, renderMode, isViewer, visualAssets);
+  const html = buildReportHTML(strategy, charts, isDemoMode, renderMode, isViewer);
 
-  // ── Phase 21E: External server-side PDF path ──────────────────────────────────────────
-  if (useExternalPdfRenderer) {
+  // ── Phase 21C: Gotenberg path ──────────────────────────────────────────
+  if (useGotenberg) {
     try {
-      const { provider, pdfBuffer } = await renderPdfWithExternalProvider(html, filename, env);
+      const pdfBuffer = await renderPdfWithGotenberg(html, filename, env);
       return new Response(pdfBuffer, {
         status: 200,
         headers: {
@@ -416,32 +307,29 @@ export async function onRequestPost(context) {
           'Content-Type': 'application/pdf',
           'Content-Disposition': `attachment; filename="${filename}"`,
           'Cache-Control': 'no-store',
-          'X-ABE-PDF-Engine': provider,
-          'X-ABE-Export-Path': `external-application-pdf:${provider}`,
+          'X-ABE-PDF-Engine': 'gotenberg',
+          'X-ABE-Export-Path': `gotenberg|hydration=${hydrationPath}`,
         },
       });
     } catch (gotenbergErr) {
-      console.warn('[External PDF Renderer] Failed — returning JSON fallback:', gotenbergErr.message);
-      const fallbackHtml = buildReportHTML(strategy, charts, isDemoMode, 'gotenberg', isViewer, visualAssets);
+      console.warn('[Gotenberg] Failed — returning JSON fallback:', gotenbergErr.message);
       return new Response(
         JSON.stringify({
-          html: fallbackHtml,
+          html,
           filename,
-          mode: 'gotenberg',
-          active_export_path: 'external_renderer_failed_readable_html_fallback',
+          mode: 'browser-pdf',
           integration_status: integration,
-          pdf_fallback: 'external_renderer_failed',
+          pdf_fallback: 'gotenberg_failed',
           pdf_fallback_reason: gotenbergErr.message,
-          pdf_provider_order: providerList,
         }),
-        { status: 200, headers: { ...cors, 'Content-Type': 'application/json', 'X-ABE-PDF-Engine': 'json-fallback', 'X-ABE-Export-Path': 'external_renderer_failed_readable_html_fallback' } }
+        { status: 200, headers: { ...cors, 'Content-Type': 'application/json', 'X-ABE-PDF-Engine': 'gotenberg_failed', 'X-ABE-Export-Path': `json_fallback|hydration=${hydrationPath}` } }
       );
     }
   }
 
-  // ── Default JSON/html fallback (Gotenberg disabled or viewer mode) ────────────────────
-  return new Response(JSON.stringify({ html, filename, mode: renderMode, active_export_path: activeExportPath, integration_status: integration }), {
-    status: 200, headers: { ...cors, 'Content-Type': 'application/json', 'X-ABE-PDF-Engine': isViewer ? 'viewer-html' : 'json-fallback', 'X-ABE-Export-Path': activeExportPath },
+  // ── Default JSON/html fallback (Gotenberg disabled) ────────────────────
+  return new Response(JSON.stringify({ html, filename, mode: renderMode, integration_status: integration }), {
+    status: 200, headers: { ...cors, 'Content-Type': 'application/json', 'X-ABE-PDF-Engine': 'none', 'X-ABE-Export-Path': `json_html|hydration=${hydrationPath}` },
   });
 }
 
@@ -1202,11 +1090,11 @@ function renderInsightBox(title, body, { accent = 'var(--accent)', cls = '' } = 
 
 const renderPageFooter = (label, num) => `
 <div class="pf-wrap" style="margin-top:auto;padding-top:2.5mm;break-before:avoid;page-break-before:avoid">
-  <div class="pf-tagline" style="text-align:center;margin-bottom:2mm;font-style:italic;color:#FFFFFF;font-size:10px;letter-spacing:.04em;opacity:1">Plan with clarity. Build with intent. Grow through trust.</div>
-  <div class="pf" style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(255,255,255,0.28);padding-top:2mm;font-size:10px;color:#FFFFFF;font-weight:700;opacity:1">
-    <span style="flex:1;text-align:left;font-weight:900;color:#FFFFFF">ABE Platform</span>
-    <span style="flex:2;text-align:center;text-transform:uppercase;letter-spacing:.1em;color:#FFFFFF">${escapeHtml(label)}</span>
-    <span style="flex:1;text-align:right;color:#FFFFFF">Page ${num}</span>
+  <div class="pf-tagline" style="text-align:center;margin-bottom:2mm;font-style:italic;color:#9CA3AF;font-size:9px;letter-spacing:.05em;opacity:1">Plan with clarity. Build with intent. Grow through trust.</div>
+  <div class="pf" style="display:flex;justify-content:space-between;align-items:center;border-top:1px solid rgba(255,255,255,0.2);padding-top:2mm;font-size:9px;color:#D1D5DB;font-weight:600">
+    <span style="flex:1;text-align:left;font-weight:900;color:var(--accent)">ABE</span>
+    <span style="flex:2;text-align:center;text-transform:uppercase;letter-spacing:.1em">${escapeHtml(label)}</span>
+    <span style="flex:1;text-align:right">Page ${num}</span>
   </div>
 </div>`;
 
@@ -1238,16 +1126,6 @@ const SVG_MAP = {
 const renderSvgIcon = (name, size = 16, color = 'currentColor') => {
   const paths = SVG_MAP[name] || SVG_MAP['grid'];
   return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle">${paths}</svg>`;
-};
-
-const renderStatusBadge = (value) => {
-  const label = safeBusinessText(value, 'Pending Validation') || 'Pending Validation';
-  const raw = label.toLowerCase();
-  const color = /critical|high risk|high/.test(raw) ? 'var(--red)'
-    : /low risk|low|validated|approved/.test(raw) ? 'var(--green)'
-    : /medium|watch|pending|requires|estimate|validation/.test(raw) ? 'var(--amber)'
-    : 'var(--accent)';
-  return `<span class="status-pill" style="display:inline-flex;align-items:center;gap:1mm;padding:1mm 2.4mm;border-radius:999px;border:1px solid ${color};background:${color}22;color:${color};font-size:9.5px;font-weight:800;white-space:nowrap">${escapeHtml(label, 'Pending Validation')}</span>`;
 };
 
 const SECTION_ICONS = {
@@ -1340,21 +1218,21 @@ function renderSegmentationGrid(segments) {
     const stColor = /validated/i.test(rawSt) ? 'var(--green)' : /partial/i.test(rawSt) ? 'var(--amber)' : 'var(--muted)';
     const st     = escapeHtml(rawSt);
     return `<tr>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9.5px;vertical-align:top;font-weight:700;color:var(--accent)">${dim}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top">${items}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--green)">${pFit}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:#8b5cf6">${sFit}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:${stColor};font-style:italic">${st}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;font-weight:700;color:var(--accent)">${dim}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top">${items}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--green)">${pFit}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:#8b5cf6">${sFit}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:${stColor};font-style:italic">${st}</td>
     </tr>`;
   }).join('');
   return `<div class="keep-together table-wrap" style="margin:3mm 0">
     <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-family:inherit">
       <thead><tr>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:9px;width:22%">Dimension</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:9px;width:28%">Segments / Items</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:9px;width:18%">Primary Fit</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:9px;width:18%">Secondary Fit</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:9px;width:14%">Validation Status</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:22%">Dimension</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:28%">Segments / Items</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:18%">Primary Fit</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:18%">Secondary Fit</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:14%">Validation Status</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
@@ -1395,17 +1273,17 @@ function renderMethodologyLedger(rows) {
   const trs = rows.map((r, i) => {
     const bg = i % 2 === 0 ? '#1e1e1e' : '#2a2a2a';
     return `<tr style="background:${bg}">
-    <td style="border:.5px solid #444;border-left:2px solid var(--accent);padding:5px 6px;font-size:9.5px;vertical-align:top;font-weight:700;color:var(--accent)">${renderSvgIcon('search', 10, 'var(--accent)')} &nbsp; ${escapeHtml(r.category)}</td>
-    <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--text)">${safeBusinessText(r.dataUsed, 'Validation pending')}</td>
-    <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--amber);font-style:italic">${safeBusinessText(r.notValidated, 'Validation pending')}</td>
+    <td style="border:.5px solid #444;border-left:2px solid var(--accent);padding:6px 7px;font-size:10px;vertical-align:top;font-weight:700;color:var(--accent)">${renderSvgIcon('search', 10, 'var(--accent)')} &nbsp; ${escapeHtml(r.category)}</td>
+    <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--text)">${safeBusinessText(r.dataUsed, 'Validation pending')}</td>
+    <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--amber);font-style:italic">${safeBusinessText(r.notValidated, 'Validation pending')}</td>
   </tr>`;
   }).join('');
   return `<div class="keep-together table-wrap" style="margin:3mm 0">
     <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-family:inherit">
       <thead><tr>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:9px;width:25%">Evidence Pillar</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:9px;width:40%">Data Used (Verified)</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:9px;width:35%">Unvalidated / Excluded</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:25%">Evidence Pillar</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:40%">Data Used (Verified)</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:35%">Unvalidated / Excluded</th>
       </tr></thead>
       <tbody>${trs}</tbody>
     </table>
@@ -1433,24 +1311,24 @@ function renderTruthLedgerSummary(m) {
 function renderSegmentOpportunityTable(segments) {
   if (!Array.isArray(segments) || !segments.length) return '';
   const rows = segments.map(s => `<tr>
-    <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;font-weight:700;color:var(--accent)">${escapeHtml(s.segment)}</td>
-    <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top">${escapeHtml(s.size)}</td>
-    <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--green)">${escapeHtml(s.growth)}</td>
-    <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top">${escapeHtml(s.urgency)}</td>
-    <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top">${escapeHtml(s.fit)}</td>
-    <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--amber);font-weight:700">${escapeHtml(s.priority)}</td>
-    <td style="border:.5px solid #444;padding:5px 6px;font-size:8.5px;vertical-align:top;color:var(--muted);font-style:italic">${escapeHtml(s.status)}</td>
+    <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;font-weight:700;color:var(--accent)">${escapeHtml(s.segment)}</td>
+    <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top">${escapeHtml(s.size)}</td>
+    <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--green)">${escapeHtml(s.growth)}</td>
+    <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top">${escapeHtml(s.urgency)}</td>
+    <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top">${escapeHtml(s.fit)}</td>
+    <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--amber);font-weight:700">${escapeHtml(s.priority)}</td>
+    <td style="border:.5px solid #444;padding:6px 7px;font-size:9px;vertical-align:top;color:var(--muted);font-style:italic">${escapeHtml(s.status)}</td>
   </tr>`).join('');
   return `<div class="keep-together table-wrap" style="margin:3mm 0">
     <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-family:inherit">
       <thead><tr>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8.5px;width:18%">Segment</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8.5px;width:14%">Est. Size</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8.5px;width:14%">Growth Signal</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8.5px;width:14%">Buyer Urgency</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8.5px;width:14%">Fit Score</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8.5px;width:12%">Priority</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8.5px;width:14%">Validation</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:18%">Segment</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:14%">Est. Size</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:14%">Growth Signal</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:14%">Buyer Urgency</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:14%">Fit Score</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:12%">Priority</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:14%">Validation</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
@@ -1489,18 +1367,18 @@ function renderIcpProfileGrid(icp) {
 function renderBuyingCommitteeTable(roles) {
   if (!Array.isArray(roles) || !roles.length) return '';
   const rows = roles.map(r => `<tr>
-    <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;font-weight:700;color:var(--accent)">${escapeHtml(r.role)}</td>
-    <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top">${_cleanICP(safeBusinessText(r.title, 'Requires source validation'))}</td>
-    <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--text)">${safeBusinessText(r.focus, 'Validation pending')}</td>
-    <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--text)">${safeBusinessText(r.proof, 'Validation pending')}</td>
+    <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;font-weight:700;color:var(--accent)">${escapeHtml(r.role)}</td>
+    <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top">${_cleanICP(safeBusinessText(r.title, 'Requires source validation'))}</td>
+    <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--text)">${safeBusinessText(r.focus, 'Validation pending')}</td>
+    <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--text)">${safeBusinessText(r.proof, 'Validation pending')}</td>
   </tr>`).join('');
   return `<div class="keep-together table-wrap" style="margin:3mm 0">
     <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-family:inherit">
       <thead><tr>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8.5px;width:18%">Committee Role</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8.5px;width:25%">Target Title</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8.5px;width:30%">Messaging Focus</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8.5px;width:27%">Proof Required</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:18%">Committee Role</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:25%">Target Title</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:30%">Messaging Focus</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:27%">Proof Required</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
@@ -1820,23 +1698,23 @@ function renderCompetitorCategoryTable(competitors) {
     const threatKey  = threatTrim.charAt(0).toUpperCase() + threatTrim.slice(1).toLowerCase();
     const threatColor = THREAT_COLOR[threatKey] || 'var(--amber)';
     return `<tr>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9.5px;vertical-align:top;font-weight:700;color:var(--accent)">${escapeHtml(c.name, 'Unknown')}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top">${escapeHtml(c.category, 'Uncategorised')}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--green)">${safeBusinessText(c.strength, 'Requires validation')}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--amber)">${safeBusinessText(c.weakness, 'Requires validation')}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;font-weight:700;color:${threatColor}">${escapeHtml(threatKey)}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:8.5px;vertical-align:top;color:var(--muted);font-style:italic">${safeBusinessText(c.notes, '—')}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;font-weight:700;color:var(--accent)">${escapeHtml(c.name, 'Unknown')}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top">${escapeHtml(c.category, 'Uncategorised')}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--green)">${safeBusinessText(c.strength, 'Requires validation')}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--amber)">${safeBusinessText(c.weakness, 'Requires validation')}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;font-weight:700;color:${threatColor}">${escapeHtml(threatKey)}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:9px;vertical-align:top;color:var(--muted);font-style:italic">${safeBusinessText(c.notes, '—')}</td>
     </tr>`;
   }).join('');
   return `<div class="keep-together table-wrap" style="margin:3mm 0">
     <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-family:inherit">
       <thead><tr>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8.5px;width:18%">Competitor</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8.5px;width:16%">Category</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8.5px;width:18%">Key Strength</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8.5px;width:18%">Key Weakness</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8.5px;width:12%">Threat Level</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8.5px;width:18%">Notes</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:18%">Competitor</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:16%">Category</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:18%">Key Strength</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:18%">Key Weakness</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:12%">Threat Level</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:18%">Notes</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
@@ -1862,21 +1740,21 @@ function renderRightToWinTable(dimensions) {
     const confColor = CONF_COLOR[confKey] || 'var(--amber)';
     const bg = i % 2 === 0 ? '#1e1e1e' : '#2a2a2a';
     return `<tr style="background:${bg}">
-      <td style="border:.5px solid #444;border-left:2px solid ${confColor};padding:5px 6px;font-size:9.5px;vertical-align:top;font-weight:700;color:var(--accent)">${renderSvgIcon('trophy', 10, 'var(--accent)')} &nbsp; ${escapeHtml(d.dimension, 'Dimension')}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--green)">${safeBusinessText(d.our_advantage, 'Requires validation')}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--amber)">${safeBusinessText(d.competitor_gap, 'Requires validation')}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top">${safeBusinessText(d.win_condition, 'Requires validation')}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;font-weight:700;color:${confColor};text-align:center"><span style="background:${confColor}22;padding:1px 4px;border-radius:3px">${escapeHtml(confKey)}</span></td>
+      <td style="border:.5px solid #444;border-left:2px solid ${confColor};padding:6px 7px;font-size:10px;vertical-align:top;font-weight:700;color:var(--accent)">${renderSvgIcon('trophy', 10, 'var(--accent)')} &nbsp; ${escapeHtml(d.dimension, 'Dimension')}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--green)">${safeBusinessText(d.our_advantage, 'Requires validation')}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--amber)">${safeBusinessText(d.competitor_gap, 'Requires validation')}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top">${safeBusinessText(d.win_condition, 'Requires validation')}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;font-weight:700;color:${confColor};text-align:center"><span style="background:${confColor}22;padding:1px 4px;border-radius:3px">${escapeHtml(confKey)}</span></td>
     </tr>`;
   }).join('');
   return `<div class="keep-together table-wrap" style="margin:3mm 0">
     <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-family:inherit">
       <thead><tr>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8.5px;width:20%">Win Dimension</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8.5px;width:25%">Our Advantage</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8.5px;width:25%">Competitor Gap</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8.5px;width:20%">Win Condition</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8.5px;width:10%">Confidence</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:20%">Win Dimension</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:25%">Our Advantage</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:25%">Competitor Gap</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:20%">Win Condition</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:6px 7px;font-size:10px;width:10%">Confidence</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
@@ -2021,13 +1899,13 @@ function renderBuyingCriteriaTable(criteria) {
     const valStatus = safeBusinessText(c.validation_status, 'Validation pending');
     const valColor  = /validated/i.test(valStatus) ? 'var(--green)' : /partial/i.test(valStatus) ? 'var(--amber)' : 'var(--muted)';
     return `<tr style="background:${bg}">
-      <td style="border:.5px solid #444;border-left:2px solid ${impColor};padding:5px 6px;font-size:9.5px;vertical-align:top;font-weight:700;color:var(--accent)">${renderSvgIcon('users', 10, 'var(--accent)')} &nbsp; ${escapeHtml(c.criteria, 'Criteria')}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top">${safeBusinessText(c.buyer_concern, 'Requires source validation')}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;font-weight:700;color:${impColor};text-align:center"><span style="background:${impColor}22;padding:1px 4px;border-radius:3px">${escapeHtml(imp)}</span></td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--amber)">${safeBusinessText(c.proof_required, 'Validation pending')}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--green)">${safeBusinessText(c.gtm_message, 'Validation pending')}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top">${safeBusinessText(c.recommended_action, 'Validation pending')}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:8.5px;vertical-align:top;color:${valColor};font-style:italic"><span style="border:1px solid ${valColor}40;padding:1px 3px;border-radius:2px;display:inline-block">${escapeHtml(valStatus)}</span></td>
+      <td style="border:.5px solid #444;border-left:2px solid ${impColor};padding:6px 7px;font-size:10px;vertical-align:top;font-weight:700;color:var(--accent)">${renderSvgIcon('users', 10, 'var(--accent)')} &nbsp; ${escapeHtml(c.criteria, 'Criteria')}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top">${safeBusinessText(c.buyer_concern, 'Requires source validation')}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;font-weight:700;color:${impColor};text-align:center"><span style="background:${impColor}22;padding:1px 4px;border-radius:3px">${escapeHtml(imp)}</span></td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--amber)">${safeBusinessText(c.proof_required, 'Validation pending')}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--green)">${safeBusinessText(c.gtm_message, 'Validation pending')}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top">${safeBusinessText(c.recommended_action, 'Validation pending')}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:9px;vertical-align:top;color:${valColor};font-style:italic"><span style="border:1px solid ${valColor}40;padding:1px 3px;border-radius:2px;display:inline-block">${escapeHtml(valStatus)}</span></td>
     </tr>`;
   }).join('');
 
@@ -2082,12 +1960,12 @@ function renderCapabilityLandscape(capabilities) {
     const valStatus = safeBusinessText(c.validation_status, 'Validation pending');
     const valColor  = /validated/i.test(valStatus) ? 'var(--green)' : /partial/i.test(valStatus) ? 'var(--amber)' : 'var(--muted)';
     return `<tr style="background:${bg}">
-      <td style="border:.5px solid #444;border-left:2px solid ${color};padding:5px 6px;font-size:9px;vertical-align:top;font-weight:700;color:${color}">${renderSvgIcon('cpu', 10, color)} &nbsp; ${escapeHtml(group)}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9.5px;vertical-align:top;font-weight:700;color:var(--text)">${escapeHtml(c.capability, 'Capability')}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--green)">${safeBusinessText(c.buyer_value, 'Requires source validation')}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--amber)">${safeBusinessText(c.maturity_signal, 'Validation pending')}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--accent)">${safeBusinessText(c.gtm_implication, 'Validation pending')}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:8.5px;vertical-align:top;color:${valColor};font-style:italic"><span style="border:1px solid ${valColor}40;padding:1px 3px;border-radius:2px;display:inline-block">${escapeHtml(valStatus)}</span></td>
+      <td style="border:.5px solid #444;border-left:2px solid ${color};padding:6px 7px;font-size:10px;vertical-align:top;font-weight:700;color:${color}">${renderSvgIcon('cpu', 10, color)} &nbsp; ${escapeHtml(group)}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;font-weight:700;color:var(--text)">${escapeHtml(c.capability, 'Capability')}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--green)">${safeBusinessText(c.buyer_value, 'Requires source validation')}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--amber)">${safeBusinessText(c.maturity_signal, 'Validation pending')}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--accent)">${safeBusinessText(c.gtm_implication, 'Validation pending')}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:9px;vertical-align:top;color:${valColor};font-style:italic"><span style="border:1px solid ${valColor}40;padding:1px 3px;border-radius:2px;display:inline-block">${escapeHtml(valStatus)}</span></td>
     </tr>`;
   }).join('');
 
@@ -2138,12 +2016,12 @@ function renderRegulatoryRiskTable(risks) {
     const valStatus = safeBusinessText(r.validation_status, 'Validation pending');
     const valColor  = /validated/i.test(valStatus) ? 'var(--green)' : /partial/i.test(valStatus) ? 'var(--amber)' : 'var(--muted)';
     return `<tr style="background:${bg}">
-      <td style="border:.5px solid #444;border-left:2px solid var(--accent);padding:5px 6px;font-size:9.5px;vertical-align:top;font-weight:700;color:var(--accent)">${renderSvgIcon('alert-triangle', 10, 'var(--accent)')} &nbsp; ${escapeHtml(r.risk_area, 'Risk Area')}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top">${safeBusinessText(r.buyer_concern, 'Requires source validation')}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--amber)">${safeBusinessText(r.gtm_impact, 'Validation pending')}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--green)">${safeBusinessText(r.mitigation_message, 'Validation pending')}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--amber)">${safeBusinessText(r.required_proof, 'Validation pending')}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:8.5px;vertical-align:top;color:${valColor};font-style:italic"><span style="border:1px solid ${valColor}40;padding:1px 3px;border-radius:2px;display:inline-block">${escapeHtml(valStatus)}</span></td>
+      <td style="border:.5px solid #444;border-left:2px solid var(--accent);padding:6px 7px;font-size:10px;vertical-align:top;font-weight:700;color:var(--accent)">${renderSvgIcon('alert-triangle', 10, 'var(--accent)')} &nbsp; ${escapeHtml(r.risk_area, 'Risk Area')}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top">${safeBusinessText(r.buyer_concern, 'Requires source validation')}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--amber)">${safeBusinessText(r.gtm_impact, 'Validation pending')}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--green)">${safeBusinessText(r.mitigation_message, 'Validation pending')}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--amber)">${safeBusinessText(r.required_proof, 'Validation pending')}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:9px;vertical-align:top;color:${valColor};font-style:italic"><span style="border:1px solid ${valColor}40;padding:1px 3px;border-radius:2px;display:inline-block">${escapeHtml(valStatus)}</span></td>
     </tr>`;
   }).join('');
 
@@ -2177,11 +2055,11 @@ function renderCtaTable(ctas) {
   ]).map((c, i) => {
     const bg = i % 2 === 0 ? '#1e1e1e' : '#2a2a2a';
     return `<tr style="background:${bg}">
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9.5px;vertical-align:top;font-weight:700;color:var(--accent)">${escapeHtml(c.touch)}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--green)">${escapeHtml(c.type)}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top">${safeBusinessText(c.copy, 'Requires validation')}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--blue)">${safeBusinessText(c.intent, 'Requires validation')}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:8.5px;vertical-align:top;color:var(--muted);font-style:italic">${escapeHtml(c.status || 'Validation pending')}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;font-weight:700;color:var(--accent)">${escapeHtml(c.touch)}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--green)">${escapeHtml(c.type)}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top">${safeBusinessText(c.copy, 'Requires validation')}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--blue)">${safeBusinessText(c.intent, 'Requires validation')}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:9px;vertical-align:top;color:var(--muted);font-style:italic">${escapeHtml(c.status || 'Validation pending')}</td>
     </tr>`;
   }).join('');
   return `<div class="keep-together table-wrap" style="margin:3mm 0">
@@ -2209,11 +2087,11 @@ function renderObjectionHandlingTable(objections) {
   ]).map((o, i) => {
     const bg = i % 2 === 0 ? '#1e1e1e' : '#2a2a2a';
     return `<tr style="background:${bg}">
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9.5px;vertical-align:top;font-weight:700;color:var(--amber)">${escapeHtml(o.objection)}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top">${safeBusinessText(o.response, 'Requires validation')}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--accent)">${safeBusinessText(o.proof, 'Requires validation')}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--green)">${safeBusinessText(o.follow_up, 'Requires validation')}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:8.5px;vertical-align:top;color:var(--muted);font-style:italic">${escapeHtml(o.status || 'Validation pending')}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;font-weight:700;color:var(--amber)">${escapeHtml(o.objection)}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top">${safeBusinessText(o.response, 'Requires validation')}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--accent)">${safeBusinessText(o.proof, 'Requires validation')}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--green)">${safeBusinessText(o.follow_up, 'Requires validation')}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:9px;vertical-align:top;color:var(--muted);font-style:italic">${escapeHtml(o.status || 'Validation pending')}</td>
     </tr>`;
   }).join('');
   return `<div class="keep-together table-wrap" style="margin:3mm 0">
@@ -2308,11 +2186,11 @@ function renderProvenanceTable() {
   ].map((r, i) => {
     const bg = i % 2 === 0 ? '#1e1e1e' : '#2a2a2a';
     return `<tr style="background:${bg}">
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9.5px;vertical-align:top;font-weight:700;color:var(--accent)">${escapeHtml(r.area)}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top">${escapeHtml(r.type)}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:${r.rel === 'High' ? 'var(--green)' : r.rel === 'Medium' ? 'var(--amber)' : 'var(--red)'}">${escapeHtml(r.rel)}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:8.5px;vertical-align:top;color:${/pending|requires/i.test(r.status) ? 'var(--amber)' : 'var(--green)'};font-style:italic">${escapeHtml(r.status)}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:8.5px;vertical-align:top;color:var(--muted)">${escapeHtml(r.notes)}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;font-weight:700;color:var(--accent)">${escapeHtml(r.area)}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top">${escapeHtml(r.type)}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:${r.rel === 'High' ? 'var(--green)' : r.rel === 'Medium' ? 'var(--amber)' : 'var(--red)'}">${escapeHtml(r.rel)}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:9px;vertical-align:top;color:${/pending|requires/i.test(r.status) ? 'var(--amber)' : 'var(--green)'};font-style:italic">${escapeHtml(r.status)}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:9px;vertical-align:top;color:var(--muted)">${escapeHtml(r.notes)}</td>
     </tr>`;
   }).join('');
   return `<div class="keep-together table-wrap" style="margin:3mm 0">
@@ -2338,11 +2216,11 @@ function renderAssumptionLedger() {
   ].map((r, i) => {
     const bg = i % 2 === 0 ? '#1e1e1e' : '#2a2a2a';
     return `<tr style="background:${bg}">
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9.5px;vertical-align:top;font-weight:700;color:var(--accent)">${escapeHtml(r.assumption)}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top">${escapeHtml(r.section)}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--amber)">${escapeHtml(r.impact)}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:9px;vertical-align:top;color:var(--red)">${escapeHtml(r.risk)}</td>
-      <td style="border:.5px solid #444;padding:5px 6px;font-size:8.5px;vertical-align:top;color:var(--muted);font-style:italic">${escapeHtml(r.validation)}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;font-weight:700;color:var(--accent)">${escapeHtml(r.assumption)}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top">${escapeHtml(r.section)}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--amber)">${escapeHtml(r.impact)}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--red)">${escapeHtml(r.risk)}</td>
+      <td style="border:.5px solid #444;padding:6px 7px;font-size:9px;vertical-align:top;color:var(--muted);font-style:italic">${escapeHtml(r.validation)}</td>
     </tr>`;
   }).join('');
   return `<div class="keep-together table-wrap" style="margin:3mm 0">
@@ -2395,7 +2273,7 @@ const SECTION_REGISTRY = [
 // ══════════════════════════════════════════════════════════════
 // TIER-1 ENTERPRISE A4 REPORT — dark-theme, rendered to PDF
 // ══════════════════════════════════════════════════════════════
-export function buildReportHTML(strategy, charts = {}, isDemoMode = false, renderMode = 'browser-pdf', isViewer = false, visualAssets = {}) {
+export function buildReportHTML(strategy, charts = {}, isDemoMode = false, renderMode = 'browser-pdf', isViewer = false) {
   const p = isViewer ? '.abe-viewer-wrapper ' : '';
   const s1 = strategy.step_1_market || strategy.steps?.[1] || {};
   const s2 = strategy.step_2_tam || strategy.steps?.[2] || {};
@@ -2492,16 +2370,13 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false, rende
       const header = headers[headerIdx] || '';
       // If cell is empty, null, undefined, or bare dash — apply contextual fallback
       if (cell === undefined || cell === null || cell === '') {
-        return `<span style="color:var(--muted);font-style:italic;font-size:10px">${contextualFallback(header)}</span>`;
+        return `<span style="color:var(--muted);font-style:italic;font-size:9px">${contextualFallback(header)}</span>`;
       }
       const raw = String(cell);
       // Strip HTML tags to check for dash-only content
       const stripped = raw.replace(/<[^>]*>/g, '').trim();
       if (/^[-–—\s]+$/.test(stripped)) {
-        return `<span style="color:var(--muted);font-style:italic;font-size:10px">${contextualFallback(header)}</span>`;
-      }
-      if (/^(critical|high risk|medium risk|low risk|high|medium|low|watch|go|no-go|validated|validation pending|pending validation|requires validation|requires source validation)$/i.test(stripped)) {
-        return renderStatusBadge(stripped);
+        return `<span style="color:var(--muted);font-style:italic;font-size:9px">${contextualFallback(header)}</span>`;
       }
       return sanitizeVisibleHtml(raw);
     };
@@ -2531,7 +2406,7 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false, rende
           ${cleanRows.map((row, i) => {
             const bg = i % 2 === 0 ? '#1e1e1e' : '#2a2a2a';
             return `<tr style="background:${bg};">${row.map((cell, ci) => {
-              const rendered = cell || `<span style="color:var(--muted);font-style:italic;font-size:10px">${contextualFallback(headers[ci])}</span>`;
+              const rendered = cell || `<span style="color:var(--muted);font-style:italic;font-size:9px">${contextualFallback(headers[ci])}</span>`;
               return `<td style="border:0.5px solid #444;padding:6px;font-size:10px;vertical-align:top;word-break:break-word;overflow-wrap:anywhere;">${rendered}</td>`;
             }).join('')}</tr>`;
           }).join('')}
@@ -2820,13 +2695,14 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false, rende
   // Rules: NO transform:scale(), NO fixed-height containers, allow report to flow freely.
   // Minimum readable font sizes enforced. Section headings kept with content.
   const gotenbergPrintCss = `
-@page { size: A4; margin: 10mm 12mm; }
+@page { size: A4; margin: 14mm 16mm 12mm; }
+@page :first { margin: 10mm 14mm 12mm; }
 html, body {
   -webkit-print-color-adjust: exact !important;
   print-color-adjust: exact !important;
   background: #0B0F1A !important;
   font-size: 12px;
-  line-height: 1.6;
+  line-height: 1.65;
   orphans: 3;
   widows: 3;
 }
@@ -2869,24 +2745,58 @@ ${p}.pf, ${p}.pf-wrap, ${p}.page-insight, ${p}.figure-caption, ${p}.figure-sourc
   break-before: avoid !important;
   page-break-before: avoid !important;
 }
-/* Phase 21C: Readability — minimum font sizes */
-${p}.dt th { font-size: 10px !important; }
-${p}.dt td { font-size: 10px !important; }
-${p}table th { font-size: 10px !important; }
-${p}table td { font-size: 10px !important; }
-${p}.sc2 li { font-size: 10px !important; }
-${p}.card p { font-size: 11.5px !important; }
+/* ── Phase 21C+: Readability — minimum font sizes (use !important to beat inline styles) ── */
+/* Tables */
+${p}.dt th, ${p}table th, ${p}th { font-size: 10px !important; padding: 6px 7px !important; }
+${p}.dt td, ${p}table td, ${p}td { font-size: 10px !important; padding: 6px 7px !important; }
+/* Card body text */
+${p}.card p, ${p}.card div { font-size: 11.5px !important; line-height: 1.7 !important; }
+/* SWOT / lists */
+${p}.sc2 li { font-size: 10px !important; line-height: 1.65 !important; }
+/* SDR body text */
+${p}.sdr-preview { font-size: 11px !important; line-height: 1.7 !important; }
+/* Analyst callout */
+${p}.ac { font-size: 11px !important; line-height: 1.65 !important; }
+/* Page insight */
+${p}.page-insight-text { font-size: 10.5px !important; }
+/* Scope / ICP / sourcing cells */
+${p}.scope-cell__value, ${p}.icp-value, ${p}.funnel-value, ${p}.tier-body { font-size: 10px !important; }
+/* Section context */
+${p}.sc { font-size: 11px !important; }
+/* Tag pills — keep compact but legible */
 ${p}.tg { font-size: 9px !important; }
-${p}.pf { font-size: 10px !important; color:#FFFFFF !important; opacity:1 !important; }
-${p}.pf-tagline { font-size: 10px !important; opacity: 1 !important; color: #FFFFFF !important; }
-${p}.figure-caption { font-size: 10px !important; color: #f5f5f5 !important; }
+/* ── Footer — make it readable, not ghosted ── */
+${p}.pf { font-size: 9px !important; color: #D1D5DB !important; opacity: 1 !important; }
+${p}.pf-tagline { font-size: 8.5px !important; opacity: 1 !important; color: #9CA3AF !important; font-style: italic !important; }
+/* ── Figure captions ── */
+${p}.figure-caption { font-size: 10px !important; color: #f5f5f5 !important; font-weight: 700 !important; }
 ${p}.figure-source { font-size: 8.5px !important; color: #aaa !important; }
-/* Phase 21C: Remove height-induced blank gaps */
+/* ── Validation notes ── */
+${p}.validation-note { font-size: 9px !important; }
+/* ── Table notes / sources ── */
+${p}.table-note, ${p}.table-source { font-size: 8.5px !important; color: #aaa !important; }
+/* ── Phase 21C: Remove height-induced blank gaps ── */
 ${p}.page { overflow: visible !important; }
-/* Phase 21C: Edu-filler hidden for Gotenberg (content flows, no fixed-height pages) */
+/* ── Cover: reset its large inline padding so it doesn't create a half-blank page ── */
+${p}.page[style*="padding:0"] { padding: 0 !important; }
+/* ── Edu-filler hidden for Gotenberg (content flows, no fixed-height pages) ── */
 ${p}.edu-filler { display: none !important; }
-/* Remove excessive spacer breaks */
+/* ── Section continuation: no extra space ── */
 ${p}.section-continuation { display: block !important; padding: 0 !important; margin: 0 !important; }
+/* ── Cover page print fixes ── */
+${p}.cover-page { overflow: visible !important; min-height: unset !important; }
+${p}.cover-page > div[style*="position:absolute"] { display: none !important; }
+${p}.cover-page > div[style*="inset:0"] { display: none !important; }
+/* ── Keep section header with at least 2 items below it ── */
+${p}.sec-header, ${p}.section-header, ${p}.ph {
+  break-after: avoid !important;
+  page-break-after: avoid !important;
+  margin-bottom: 3mm !important;
+}
+/* ── Keep stat strips together ── */
+${p}.stat-row, ${p}.kpi-strip, ${p}.ww { break-inside: avoid !important; page-break-inside: avoid !important; }
+/* ── Ensure no inline opacity hides footer elements ── */
+${p}.pf *, ${p}.pf-tagline { opacity: 1 !important; }
 `;
 
   const paginationCss = renderMode === 'gotenberg' ? gotenbergPrintCss : renderMode === 'browser-pdf' ? `
@@ -2916,10 +2826,6 @@ ${p}h1, ${p}h2, ${p}h3, ${p}.section-header, ${p}.ph {
   break-after: avoid !important;
   page-break-after: avoid !important;
 }
-${p}table th{font-size:10.5px!important;line-height:1.35!important;padding:6px 7px!important}
-${p}table td{font-size:10px!important;line-height:1.45!important;padding:6px 7px!important}
-${p}.pf, ${p}.pf *{font-size:10px!important;color:#fff!important;opacity:1!important}
-${p}.pf-tagline{font-size:10px!important;color:#fff!important;opacity:1!important}
 ${p}.edu-filler {
   margin-top: auto;
   padding-top: 6mm;
@@ -2945,23 +2851,6 @@ ${isViewer ? '.abe-viewer-wrapper, .abe-viewer-wrapper * { box-sizing:border-box
 ${isViewer ? '.abe-viewer-wrapper * { margin:0; padding:0 }' : '*{margin:0;padding:0}'}
 ${isViewer ? '.abe-viewer-wrapper' : 'body'}{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);font-size:12px;line-height:1.65;-webkit-print-color-adjust:exact;print-color-adjust:exact;orphans:3;widows:3}
 ${paginationCss}
-/* ── PHASE 21D READABILITY LOCK — applies to both fallback and server-rendered PDFs ── */
-${p}table{font-size:10px!important;line-height:1.45!important;border-collapse:collapse;page-break-inside:auto;break-inside:auto}
-${p}thead{display:table-header-group}
-${p}tfoot{display:table-footer-group}
-${p}tr{page-break-inside:avoid!important;break-inside:avoid!important}
-${p}th{font-size:10.5px!important;line-height:1.35!important;padding:6px 7px!important;color:#f8fafc!important}
-${p}td{font-size:10px!important;line-height:1.45!important;padding:6px 7px!important;color:#e5e7eb!important}
-${p}p, ${p}li{font-size:11.5px;line-height:1.6}
-${p}.table-note, ${p}.table-source, ${p}.figure-source{font-size:9px!important;line-height:1.35!important;color:#cbd5e1!important}
-${p}.figure-caption{font-size:10.5px!important;color:#fff!important}
-${p}.status-pill{font-size:9.5px!important;line-height:1.2!important}
-${p}h1,${p}h2,${p}h3,${p}.section-header,${p}.ph{break-after:avoid!important;page-break-after:avoid!important}
-${p}.section-start,${p}.keep-with-next{break-inside:avoid!important;page-break-inside:avoid!important}
-${p}.page,${p}.section-continuation{break-inside:auto;page-break-inside:auto}
-${p}.pf-wrap{break-before:avoid!important;page-break-before:avoid!important;color:#fff!important;opacity:1!important}
-${p}.pf,${p}.pf *{font-size:10px!important;color:#fff!important;opacity:1!important}
-${p}.pf-tagline{font-size:10px!important;color:#fff!important;opacity:1!important}
 /* ── ENTERPRISE TABLE ENHANCEMENTS ── */
 ${p}.dt tr:hover td{background:rgba(168,85,247,.03)}
 ${p}.dt tbody tr:last-child td{border-bottom:none}
@@ -2985,8 +2874,8 @@ ${p}.cb{font-size:8px;font-weight:700;color:var(--accent);letter-spacing:.12em;t
 /* ── ABE MONOGRAM ── */
 ${p}.am{width:32px;height:32px;border-radius:8px;background:linear-gradient(135deg,var(--accent2),var(--accent));display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;color:white;letter-spacing:-.5px;flex-shrink:0}
 /* ── PAGE FOOTER — tagline on every page ── */
-${p}.pf{display:flex;justify-content:space-between;align-items:flex-end;margin-top:auto;padding-top:3mm;border-top:1px solid var(--border);font-size:8px;color:var(--muted);break-before:avoid;page-break-before:avoid}
-${p}.pf-tagline{font-style:italic;color:var(--faint);font-size:7.5px;letter-spacing:.03em}
+${p}.pf{display:flex;justify-content:space-between;align-items:flex-end;margin-top:auto;padding-top:3mm;border-top:1px solid rgba(255,255,255,0.2);font-size:9px;color:#D1D5DB;font-weight:600;break-before:avoid;page-break-before:avoid}
+${p}.pf-tagline{font-style:italic;color:#9CA3AF;font-size:8.5px;letter-spacing:.03em;opacity:1}
 /* ── CARDS ── */
 ${p}.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:4mm 5mm;margin-bottom:3mm}
 ${p}.card p{font-size:11px;line-height:1.7;color:var(--text);margin:0}
@@ -3051,15 +2940,15 @@ ${p}.num{font-family:'Space Mono',monospace;font-weight:700}
 ${p}.ha{color:var(--amber)}
 /* ── DARK TABLE ── */
 ${p}.dt{width:100%;border-collapse:collapse;font-family:inherit;margin-top:1.5mm;margin-bottom:1.5mm;break-inside:avoid;page-break-inside:avoid}
-${p}.dt th{background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:center;border:.5px solid #444;padding:5px 6px;font-size:9.5px;word-break:break-word;overflow-wrap:anywhere}
-${p}.dt td{border:.5px solid #444;padding:5px 6px;font-size:9.5px;vertical-align:top;word-break:break-word;overflow-wrap:anywhere}
+${p}.dt th{background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:center;border:.5px solid #444;padding:6px 7px;font-size:10px;word-break:break-word;overflow-wrap:anywhere}
+${p}.dt td{border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;word-break:break-word;overflow-wrap:anywhere}
 ${p}.table-wrap{break-inside:avoid;page-break-inside:avoid}
 /* ── EDU FILLER ── */
 ${p}.edu-filler{margin-top:auto;padding:4mm 5mm 4.5mm;background:linear-gradient(135deg,rgba(168,85,247,.035),rgba(18,24,39,.45));border-top:1px dashed rgba(168,85,247,.2);border-left:3px solid rgba(168,85,247,.4);border-right:1px dashed rgba(168,85,247,.12);border-bottom:1px dashed rgba(168,85,247,.12);border-radius:0 8px 8px 0;break-inside:avoid;page-break-inside:avoid}
 ${p}.edu-filler__badge{display:inline-block;background:rgba(168,85,247,.12);border:1px solid rgba(168,85,247,.25);border-radius:20px;padding:1mm 3mm;font-size:7.5px;font-weight:700;color:var(--accent);letter-spacing:.08em;margin-bottom:2mm}
 ${p}.edu-filler__term{font-size:11px;font-weight:800;color:white;margin-bottom:1.5mm}
 ${p}.edu-filler__definition{font-size:9.5px;color:var(--muted);line-height:1.6;margin-bottom:2mm}
-${p}.edu-filler__points{padding-left:4mm;margin:0 0 2mm;font-size:9px;color:var(--text);line-height:1.65}
+${p}.edu-filler__points{padding-left:4mm;margin:0 0 2mm;font-size:10px;color:var(--text);line-height:1.65}
 ${p}.edu-filler__protip{font-size:9px;color:var(--amber);border-top:1px solid rgba(245,158,11,.2);padding-top:1.5mm;margin-top:1.5mm}
 /* ── FIGURE CAPTIONS ── */
 ${p}.figure-caption{font-size:9.5px;font-weight:700;color:#f5f5f5;margin:1mm 0 .5mm;break-before:avoid;page-break-before:avoid}
@@ -3156,8 +3045,7 @@ ${p}.section-continuation{width:100%;box-sizing:border-box;padding:0;margin:0;ba
   const bodyContent = `
 <div class="${isViewer ? 'abe-viewer-wrapper' : ''}">
 <!-- COVER -->
-<div class="page" style="position:relative;display:flex;flex-direction:column;justify-content:flex-start;align-items:center;text-align:center;padding:0;overflow:hidden">
-${visualAssets?.hero?.url ? `<div style="position:absolute;inset:0;background-image:linear-gradient(rgba(11,15,26,.88),rgba(11,15,26,.96)),url('${escapeHtml(visualAssets.hero.url)}');background-size:cover;background-position:center;opacity:.9;pointer-events:none"></div>` : ''}
+<div class="page cover-page" style="position:relative;display:flex;flex-direction:column;justify-content:flex-start;align-items:center;text-align:center;padding:0;overflow:visible">
 <div style="position:absolute;inset:0;background-image:linear-gradient(rgba(168,85,247,.025) 1px,transparent 1px),linear-gradient(90deg,rgba(168,85,247,.025) 1px,transparent 1px);background-size:28px 28px;pointer-events:none"></div>
 <div style="position:absolute;top:0;left:0;right:0;height:4px;background:linear-gradient(90deg,var(--accent2),var(--accent),#c084fc)"></div>
 <div style="position:absolute;top:-80px;right:-80px;width:280px;height:280px;border-radius:50%;background:radial-gradient(circle,rgba(124,58,237,.1),transparent 70%);pointer-events:none"></div>
@@ -3193,19 +3081,18 @@ ${visualAssets?.hero?.url ? `<div style="position:absolute;inset:0;background-im
     { label: 'Confidence',value: (confScore || '—') + '/100',         opts: { color: 'var(--amber)' } },
   ], 'cover-kpi')}
   ${(s1.company_overview || s7.strategic_hook) ? `<div class="keep-together" style="max-width:148mm;margin:0 auto 4mm;background:rgba(168,85,247,.06);border:1px solid rgba(168,85,247,.2);border-left:3px solid var(--accent);border-radius:10px;padding:4mm 5.5mm;text-align:left">
-    <div style="font-size:7px;font-weight:900;text-transform:uppercase;letter-spacing:.2em;color:var(--accent);margin-bottom:2mm">Strategic Positioning</div>
+    <div style="font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.2em;color:var(--accent);margin-bottom:2mm">Strategic Positioning</div>
     <div style="font-size:10.5px;color:var(--text);line-height:1.65">${e(strategicPositioning)}.</div>
   </div>`: ''}
   <div class="keep-together" style="background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;padding:3mm 4mm;max-width:148mm;margin:0 auto;text-align:left">
-    <div style="font-size:7.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:1.5mm">Report Sections</div>
+    <div style="font-size:8.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:1.5mm">Report Sections</div>
     <div style="display:flex;flex-wrap:wrap;gap:1.5mm;align-items:center">
-      ${['01 Market', '02 TAM', '03 ICP', '04 Sourcing', '05 Keywords', '06 SDR'].map(s => `<span style="font-size:7.5px;color:var(--green);font-weight:700">${s}</span><span style="color:var(--faint);font-size:8px">·</span>`).join('')}
-      <span style="font-size:7.5px;color:var(--amber);font-weight:700">07 Intelligence</span>
+      ${['01 Market', '02 TAM', '03 ICP', '04 Sourcing', '05 Keywords', '06 SDR'].map(s => `<span style="font-size:8.5px;color:var(--green);font-weight:700">${s}</span><span style="color:var(--faint);font-size:8px">·</span>`).join('')}
+      <span style="font-size:8.5px;color:var(--amber);font-weight:700">07 Intelligence</span>
     </div>
   </div>
 </div>
-${visualAssets?.hero?.credit ? `<div style="position:absolute;bottom:17mm;left:0;right:0;font-size:7px;color:rgba(255,255,255,.35);text-align:center;z-index:1">${escapeHtml(visualAssets.hero.credit)}</div>` : ''}
-<div style="position:absolute;bottom:12mm;left:0;right:0;font-size:8px;color:var(--faint);text-align:center;z-index:1;letter-spacing:.05em">Classification: CONFIDENTIAL — Not for External Distribution</div>
+<div style="width:100%;padding:6mm 0 8mm;font-size:8px;color:var(--muted);text-align:center;letter-spacing:.05em;margin-top:auto">Classification: CONFIDENTIAL — Not for External Distribution</div>
 </div>
 <!-- EXECUTIVE SUMMARY -->
 <div class="page section-break" id="exec-summary">
@@ -3709,7 +3596,7 @@ ${s6.follow_up_sequence ? `${h3('sdr-sequence', '2', 'Follow-up Cadence')}<div c
       <div style="text-align:center;flex:1">
         <div style="width:32px;height:32px;border-radius:50%;background:${item[2]};border:2px solid rgba(255,255,255,.15);display:flex;align-items:center;justify-content:center;font-size:8px;font-weight:900;color:white;margin:0 auto 2mm">${i + 1}</div>
         <div style="font-size:8px;font-weight:700;color:white">${item[1]}</div>
-        <div style="font-size:7px;color:var(--muted)">${item[0]}</div>
+        <div style="font-size:8px;color:var(--muted)">${item[0]}</div>
       </div>
       ${i < 4 ? `<div style="flex:0 0 20px;height:1.5px;background:linear-gradient(90deg,${item[2]},${arr[i + 1][2]});opacity:.4"></div>` : ''}
     </div>`).join('')}
@@ -3727,15 +3614,15 @@ ${renderCtaTable(s6.cta_strategy)}
   <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:2.5mm">
     <div style="background:rgba(168,85,247,.05);border:1px solid rgba(168,85,247,.15);border-radius:8px;padding:3mm 3.5mm;text-align:center">
       <div style="font-family:'Space Mono',monospace;font-size:18px;font-weight:900;color:var(--accent)">15–25%</div>
-      <div style="font-size:7.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-top:1mm">Email Open Rate<br>Enterprise B2B</div>
+      <div style="font-size:8.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-top:1mm">Email Open Rate<br>Enterprise B2B</div>
     </div>
     <div style="background:rgba(59,130,246,.05);border:1px solid rgba(59,130,246,.15);border-radius:8px;padding:3mm 3.5mm;text-align:center">
       <div style="font-family:'Space Mono',monospace;font-size:18px;font-weight:900;color:#93c5fd">3–5%</div>
-      <div style="font-size:7.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-top:1mm">Reply Rate<br>Cold Outbound</div>
+      <div style="font-size:8.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-top:1mm">Reply Rate<br>Cold Outbound</div>
     </div>
     <div style="background:rgba(34,197,94,.05);border:1px solid rgba(34,197,94,.15);border-radius:8px;padding:3mm 3.5mm;text-align:center">
       <div style="font-family:'Space Mono',monospace;font-size:18px;font-weight:900;color:var(--green)">3–5x</div>
-      <div style="font-size:7.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-top:1mm">Multi-Touch Lift<br>vs Single Touch</div>
+      <div style="font-size:8.5px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-top:1mm">Multi-Touch Lift<br>vs Single Touch</div>
     </div>
   </div>
 </div>
