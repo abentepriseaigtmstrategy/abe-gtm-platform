@@ -1162,7 +1162,54 @@
       body {
         font-size: 10.5pt !important;
         background-color: #0c0d11 !important;
+        color: rgba(255, 255, 255, 0.9) !important;
       }
+
+      h1 { font-size: 57px !important; }
+      h2, .section-header { font-size: 21px !important; }
+      h3 { font-size: 15.5px !important; }
+
+      /* Page-Specific Filling (Flexible Stretching) */
+      /* Page 2 & 10: Insights/Summary Card expansion — switch from px to flex-grow */
+      #page-2-exec-summary .card, 
+      #page-10-premium-insights .scope-cell { 
+        flex-grow: 1 !important;
+        min-height: 100px !important; 
+        margin-bottom: 20px !important; 
+        display: flex !important; 
+        flex-direction: column !important; 
+        justify-content: center !important; 
+      }
+      
+      /* Page 4, 7, 27: Table padding and line-height expansion — flexible padding */
+      #page-4-market-definition .dt td, 
+      #page-7-segmentation-framework .dt td, 
+      #page-27-buying-criteria .dt td { 
+        padding: 5% !important; 
+        line-height: 2.0 !important; 
+      }
+
+      /* Page 15: TAM Waterfall Visual & SWOT expansion — switch from px to flexible units */
+      #page-15-market-context-overflow-tam-visual .chart-block {
+        flex-grow: 2 !important;
+        display: flex !important;
+        flex-direction: column !important;
+        justify-content: center !important;
+      }
+      #page-15-market-context-overflow-tam-visual .chart-block img { 
+        max-height: 150mm !important;
+        height: auto !important; 
+        object-fit: contain !important; 
+      }
+      #page-15-market-context-overflow-tam-visual .sc2 { 
+        flex-grow: 1 !important;
+        min-height: 150px !important; 
+        display: flex !important; 
+        flex-direction: column !important; 
+        justify-content: center !important; 
+      }
+      #page-17-icp-modeling .icp-grid { gap: 12mm !important; margin: 10mm 0 !important; }
+      #page-17-icp-modeling .icp-card { padding: 8mm !important; }
 
       table td,
       table th,
@@ -1299,7 +1346,7 @@
         background-color: #0c0d11 !important;
         display: flex;
         flex-direction: column;
-        justify-content: flex-start;
+        justify-content: space-between;
       }
     }
   </style>
