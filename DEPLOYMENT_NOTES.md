@@ -160,3 +160,25 @@ No code changes required for any of the above — env vars alone activate each i
 ---
 
 *Plan with clarity. Build with intent. Grow through trust.*
+
+
+## Phase 21D PDF Stabilization Patch
+
+This package includes a controlled PDF export stabilization pass:
+
+- Viewer mode is protected: `/api/export-pdf?mode=viewer` always returns JSON/HTML even when Gotenberg is enabled.
+- Export mode diagnostics are exposed through response headers:
+  - `X-ABE-PDF-Engine`
+  - `X-ABE-Export-Path`
+- Frontend `report.html` raw PDF fetch now awaits `window.APP.token()` before setting the Authorization header. This prevents `Bearer [object Promise]` and the 401 export regression.
+- Export 401 no longer force-signs the user out from the PDF button; the global auth guard remains responsible for genuine session expiry.
+- Gotenberg failures rebuild a browser-safe fallback HTML instead of returning Gotenberg-specific HTML to the client fallback renderer.
+- PDF readability CSS was strengthened: body/table fonts, footer contrast, table header groups, status pills, anti-orphan rules, and chart/table block handling.
+
+Manual validation after deploy:
+
+1. Confirm `/api/export-pdf?mode=viewer` still loads the report viewer.
+2. With `PDF_RENDER_ENGINE=gotenberg` and `GOTENBERG_URL` set, export should return `Content-Type: application/pdf`.
+3. Confirm the request contains `Authorization: Bearer <token>` and not `Bearer [object Promise]`.
+4. If Gotenberg fails, confirm JSON fallback still exports without redirecting to login.
+5. Inspect the generated PDF for readable table fonts, visible footer tagline, reduced orphan headings, and no raw floats/placeholders.
