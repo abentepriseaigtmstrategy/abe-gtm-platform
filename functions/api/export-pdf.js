@@ -68,7 +68,7 @@ async function renderPdfWithGotenberg(html, filename, env) {
     encodeSimpleField('omitBackground', 'true'),       // allow transparency from source HTML
     encodeSimpleField('preferCssPageSize', 'true'),    // honour @page CSS
     encodeSimpleField('emulatedMediaType', 'screen'),  // mirror screen dark theme in PDF
-    encodeSimpleField('waitDelay', '2s'),              // allow fonts/charts to load
+    encodeSimpleField('waitDelay', '2000ms'),          // allow fonts/charts to load
     closingBytes,
   ];
 
@@ -353,7 +353,7 @@ function renderChartOrFallback(type, base64, fallbackHtml, dimensions = { width:
     return `<div style="margin:3mm 0;line-height:0">
       <img src="data:image/png;base64,${base64}"
         width="${dimensions.width}" height="${dimensions.height}"
-        style="width:100%;height:auto;object-fit:contain;border-radius:8px;background:transparent;mix-blend-mode:multiply"
+        style="width:100%;height:auto;object-fit:contain;border-radius:8px;background:transparent;mix-blend-mode:screen"
         alt="${type} chart"/>
     </div>`;
   }
@@ -2698,31 +2698,30 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false, rende
   // Rules: NO transform:scale(), NO fixed-height containers, allow report to flow freely.
   // Minimum readable font sizes enforced. Section headings kept with content.
   const gotenbergPrintCss = `
-@page { size: A4; margin: 14mm 16mm 12mm; }
-@page :first { margin: 10mm 14mm 12mm; }
+@page { size: A4; margin: 0; }
 html, body {
   -webkit-print-color-adjust: exact !important;
   print-color-adjust: exact !important;
   background: #0B0F1A !important;
   background-color: #0c0d11 !important;
-  font-size: 11.5pt;
-  line-height: 1.65;
-  orphans: 3;
-  widows: 3;
+  font-size: 10.5pt;
+  line-height: 1.5;
+  margin: 0;
+  padding: 0;
 }
 /* Sections flow naturally — Gotenberg Chromium handles pagination */
 ${p}.page {
-  width: 100%;
-  box-sizing: border-box;
-  background: #0c0d11 !important;
+  width: 210mm !important;
+  height: 297mm !important;
+  overflow: hidden !important;
+  position: relative !important;
   background-color: #0c0d11 !important;
+  box-sizing: border-box;
   padding: 0 !important;
   margin: 0 !important;
-  height: 100% !important;
-  overflow: hidden !important;
   display: flex !important;
   flex-direction: column !important;
-  justify-content: space-between !important;
+  justify-content: flex-start !important;
   break-after: page !important;
   page-break-after: always !important;
 }
@@ -2751,14 +2750,25 @@ ${p}#page-1-cover {
 ${p}.page.section-break {
   break-before: page !important;
   page-break-before: always !important;
-  padding-top: 4mm !important;
+}
+/* Footer Lock */
+${p}.pf {
+  position: absolute !important;
+  bottom: 10mm !important;
+  left: 0 !important;
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 18mm !important;
+  box-sizing: border-box !important;
 }
 /* Headings always stay with at least first content block */
 ${p}h1, ${p}h2, ${p}h3, ${p}.section-header, ${p}.ph {
   break-after: avoid !important;
   page-break-after: avoid !important;
-  orphans: 4;
-  widows: 4;
+}
+/* Kill White Boxes on Charts */
+${p}img, ${p}.chart-block img, ${p}canvas {
+  mix-blend-mode: screen !important;
 }
 /* Keep content blocks together */
 ${p}.card, ${p}.table-wrap, ${p}.chart-block, ${p}.ac,
@@ -2769,8 +2779,6 @@ ${p}.evolution-stage, ${p}.scope-grid, ${p}.tier-cards,
 ${p}.sourcing-funnel, ${p}.findings-grid, ${p}.triangulation-grid {
   break-inside: avoid !important;
   page-break-inside: avoid !important;
-  orphans: 3;
-  widows: 3;
 }
 ${p}.pf, ${p}.pf-wrap, ${p}.page-insight, ${p}.figure-caption, ${p}.figure-source {
   break-before: avoid !important;
@@ -2778,25 +2786,25 @@ ${p}.pf, ${p}.pf-wrap, ${p}.page-insight, ${p}.figure-caption, ${p}.figure-sourc
 }
 /* ── Phase 21C+: Readability — minimum font sizes (use !important to beat inline styles) ── */
 /* Tables */
-${p}.dt th, ${p}table th, ${p}th { font-size: 11.5pt !important; padding: 6px 7px !important; }
-${p}.dt td, ${p}table td, ${p}td { font-size: 11pt !important; padding: 6px 7px !important; }
-${p}table td *, ${p}.dt td *, ${p}.table-wrap td * { font-size: 11pt !important; }
+${p}.dt th, ${p}table th, ${p}th { font-size: 9.5pt !important; padding: 4px 6px !important; }
+${p}.dt td, ${p}table td, ${p}td { font-size: 9.5pt !important; padding: 4px 6px !important; }
+${p}table td *, ${p}.dt td *, ${p}.table-wrap td * { font-size: 9.5pt !important; }
 /* Card body text */
-${p}.card p, ${p}.card div { font-size: 11pt !important; line-height: 1.7 !important; }
+${p}.card p, ${p}.card div { font-size: 10pt !important; line-height: 1.6 !important; }
 /* SWOT / lists */
-${p}.sc2 li { font-size: 10px !important; line-height: 1.65 !important; }
+${p}.sc2 li { font-size: 9pt !important; line-height: 1.5 !important; }
 /* SDR body text */
-${p}.sdr-preview { font-size: 10.5pt !important; line-height: 1.7 !important; }
+${p}.sdr-preview { font-size: 9.5pt !important; line-height: 1.6 !important; }
 /* Analyst callout */
-${p}.ac { font-size: 10.5pt !important; line-height: 1.65 !important; }
+${p}.ac { font-size: 9.5pt !important; line-height: 1.5 !important; }
 /* Page insight */
-${p}.page-insight-text { font-size: 10.5px !important; }
+${p}.page-insight-text { font-size: 9.5px !important; }
 /* Scope / ICP / sourcing cells */
-${p}.scope-cell__value, ${p}.icp-value, ${p}.funnel-value, ${p}.tier-body { font-size: 10px !important; }
+${p}.scope-cell__value, ${p}.icp-value, ${p}.funnel-value, ${p}.tier-body { font-size: 9pt !important; }
 /* Section context */
-${p}.sc { font-size: 10.5pt !important; }
+${p}.sc { font-size: 10pt !important; }
 /* Tag pills — keep compact but legible */
-${p}.tg { font-size: 9px !important; }
+${p}.tg { font-size: 8.5px !important; }
 /* ── Footer — make it readable, not ghosted ── */
 ${p}.pf { font-size: 9px !important; color: #D1D5DB !important; opacity: 1 !important; }
 ${p}.pf-tagline { font-size: 8.5px !important; opacity: 1 !important; color: #9CA3AF !important; font-style: italic !important; }
@@ -2834,7 +2842,7 @@ ${p}img, ${p}.chart-block, ${p}.chart-block > div, ${p}.keep-together.chart-bloc
   background: transparent !important;
   border: none !important;
   box-shadow: none !important;
-  mix-blend-mode: multiply !important;
+  mix-blend-mode: screen !important;
 }
 ${p}img { max-height: none !important; overflow: visible !important; object-fit: contain !important; }
 ${p}div, ${p}.card, ${p}.chart-block, ${p}.keep-together, ${p}.table-wrap { max-height: none !important; }
@@ -2842,7 +2850,7 @@ ${p}#page-19-account-sourcing-43-targets, ${p}#page-19-account-sourcing-43-targe
 ${p}#page-2-exec-summary .card { padding-top: 6mm !important; padding-bottom: 6mm !important; margin-bottom: 6mm !important; }
 ${p}#page-2-exec-summary .kpi-strip, ${p}#page-2-exec-summary .stat-row { gap: 5mm !important; margin: 5mm 0 6mm !important; }
 ${p}#page-4-market-definition table td, ${p}#page-4-market-definition table th { line-height: 1.6 !important; }
-${p}#page-15-market-context-overflow-tam-visual .chart-block { min-height: 60vh !important; min-height: 165mm !important; display:flex !important; flex-direction:column; justify-content:center !important; }
+${p}#page-15-market-context-overflow-tam-visual .chart-block { min-height: 165mm !important; display:flex !important; flex-direction:column; justify-content:center !important; }
 `;
 
   const paginationCss = renderMode === 'gotenberg' ? gotenbergPrintCss : renderMode === 'browser-pdf' ? `
@@ -3082,14 +3090,20 @@ ${p}.section-continuation{width:100%;box-sizing:border-box;padding:0;margin:0;ba
 /* ── A4 PRINT DISCIPLINE ── */
 @media print {
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-  html, body { font-size: 12.5pt !important; background-color:#0c0d11 !important; }
-  ${p}.page { background: #0c0d11 !important; background-color:#0c0d11 !important; min-height:100vh !important; min-height:297mm !important; }
-  ${p}.page, ${p}.section-continuation {
-    break-after: page !important;
-    page-break-after: always !important;
+  html, body { font-size: 10.5pt !important; background-color:#0c0d11 !important; margin: 0; padding: 0; }
+  ${p}.page {
+    width: 210mm !important;
+    height: 297mm !important;
+    overflow: hidden !important;
+    position: relative !important;
+    background-color: #0c0d11 !important;
+    margin: 0 !important;
+    padding: 0 !important;
     display: flex !important;
     flex-direction: column !important;
-    justify-content: space-between !important;
+    justify-content: flex-start !important;
+    break-after: page !important;
+    page-break-after: always !important;
   }
   ${p}#page-17-icp-modeling { justify-content: center !important; }
   ${p}#page-4-market-definition,
@@ -3105,22 +3119,30 @@ ${p}.section-continuation{width:100%;box-sizing:border-box;padding:0;margin:0;ba
   ${p}.card, ${p}.table-wrap, ${p}.chart-block, ${p}.sdr-step, ${p}.keep-together,
   ${p}.page-insight, ${p}.page-insight-expanded, ${p}.swot-grid, ${p}.ww {
     break-inside: avoid !important; page-break-inside: avoid !important;
-    orphans: 3; widows: 3;
   }
   ${p}h1, ${p}h2, ${p}h3, ${p}.section-header { break-after: avoid !important; page-break-after: avoid !important; }
-  ${p}.pf, ${p}.figure-caption, ${p}.figure-source { break-before: avoid !important; page-break-before: avoid !important; }
+  ${p}.pf {
+    position: absolute !important;
+    bottom: 10mm !important;
+    left: 0 !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 18mm !important;
+    box-sizing: border-box !important;
+    break-before: avoid !important;
+    page-break-before: avoid !important;
+  }
   ${p}tr { break-inside: avoid !important; page-break-inside: avoid !important; }
-  ${p}.dt th, ${p}table th, ${p}th { font-size: 12pt !important; }
-  ${p}.dt td, ${p}table td, ${p}td { font-size: 11.5pt !important; }
+  ${p}.dt th, ${p}table th, ${p}th { font-size: 9.5pt !important; }
+  ${p}.dt td, ${p}table td, ${p}td { font-size: 9.5pt !important; }
   ${p}#page-4-market-definition table td, ${p}#page-4-market-definition table th { line-height: 1.6 !important; }
-  ${p}#page-15-market-context-overflow-tam-visual .chart-block { min-height: 60vh !important; min-height: 165mm !important; display:flex !important; flex-direction:column; justify-content:center !important; }
-  ${p}.pf { margin-top: auto !important; padding-bottom: 1mm !important; }
+  ${p}#page-15-market-context-overflow-tam-visual .chart-block { min-height: 165mm !important; display:flex !important; flex-direction:column; justify-content:center !important; }
   ${p}.pf-tagline { opacity: 1 !important; color: #9CA3AF !important; }
   ${p}img, ${p}.chart-block, ${p}.chart-block > div, ${p}.keep-together.chart-block {
     background: transparent !important;
     border: none !important;
     box-shadow: none !important;
-    mix-blend-mode: multiply !important;
+    mix-blend-mode: screen !important;
   }
   ${p}img { max-height: none !important; overflow: visible !important; object-fit: contain !important; }
 }
