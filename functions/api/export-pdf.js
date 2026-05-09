@@ -2708,41 +2708,30 @@ html, body {
   print-color-adjust: exact !important;
   background: #0B0F1A !important;
   background-color: #0c0d11 !important;
-  font-size: 11.5pt !important;
+  font-size: 11pt !important;
   font-weight: 400 !important;
-  line-height: 1.8 !important;
+  line-height: 1.6 !important;
   margin: 0;
   padding: 0;
   color: rgba(255, 255, 255, 0.95) !important;
 }
-/* Dynamic expansion: pages can grow, no clipping */
+/* STEEL CAGE: Fixed 297mm height, content clipped if overflow */
 ${p}.page {
   width: 210mm !important;
-  min-height: 297mm !important;
-  height: auto !important;
-  overflow: visible !important;
+  height: 297mm !important;
+  overflow: hidden !important;
   position: relative !important;
   background-color: #0c0d11 !important;
   box-sizing: border-box;
-  padding: 15mm 18mm 18mm !important;
+  padding: 15mm 18mm 25mm !important;
   margin: 0 !important;
   display: flex !important;
   flex-direction: column !important;
-  justify-content: center !important;
+  justify-content: flex-start !important;
   break-after: page !important;
   page-break-after: always !important;
 }
-/* Quality Permission: Allow dense pages to expand beyond 297mm */
-${p}.page-expandable {
-  height: auto !important;
-  min-height: 297mm !important;
-  overflow: visible !important;
-  justify-content: flex-start !important;
-}
-${p}.page-expandable .content-body {
-  justify-content: flex-start !important;
-  gap: 25px !important;
-}
+/* REMOVED: page-expandable class (violates steel cage directive) */
 /* ── Content Body wrapper for centering ── */
 ${p}.content-body {
   flex-grow: 1 !important;
@@ -2757,24 +2746,24 @@ ${p}h1, ${p}h2, ${p}h3, ${p}.section-header, ${p}.ph {
   break-after: avoid !important;
   page-break-after: avoid !important;
 }
-/* Heading Font Increase */
-${p}h1 { font-size: 64px !important; margin-bottom: 12mm !important; }
-${p}h2, ${p}.section-header { font-size: 32pt !important; font-weight: 700 !important; margin-bottom: 8mm !important; }
-${p}h3 { font-size: 20px !important; margin-bottom: 6mm !important; border-bottom: 1px solid rgba(255,255,255,0.1) !important; padding-bottom: 2mm !important; }
+/* Heading Font Sizes - Steel Cage Optimized */
+${p}h1 { font-size: 48px !important; margin-bottom: 10mm !important; }
+${p}h2, ${p}.section-header { font-size: 24pt !important; font-weight: 700 !important; margin-bottom: 6mm !important; }
+${p}h3 { font-size: 16px !important; margin-bottom: 4mm !important; border-bottom: 1px solid rgba(255,255,255,0.1) !important; padding-bottom: 2mm !important; }
 
-/* Readability — minimum font sizes */
-${p}.dt th, ${p}table th, ${p}th { font-size: 10.5pt !important; padding: 12px 15px !important; background: rgba(255,255,255,0.05) !important; color: var(--accent) !important; }
-${p}.dt td, ${p}table td, ${p}td { font-size: 10.5pt !important; padding: 12px 15px !important; line-height: 1.8 !important; }
-${p}.card p, ${p}.card div { font-size: 11.5pt !important; line-height: 1.8 !important; }
-${p}.sc2 li { font-size: 10pt !important; line-height: 1.7 !important; margin-bottom: 4mm !important; }
-${p}.sc { font-size: 11.5pt !important; font-style: italic !important; opacity: 0.8 !important; margin-bottom: 10mm !important; border-left: 4px solid var(--accent) !important; }
+/* Readability — table fonts 10pt */
+${p}.dt th, ${p}table th, ${p}th { font-size: 10pt !important; padding: 8px 10px !important; background: rgba(255,255,255,0.05) !important; color: var(--accent) !important; }
+${p}.dt td, ${p}table td, ${p}td { font-size: 10pt !important; padding: 8px 10px !important; line-height: 1.6 !important; }
+${p}.card p, ${p}.card div { font-size: 11pt !important; line-height: 1.6 !important; }
+${p}.sc2 li { font-size: 10pt !important; line-height: 1.6 !important; margin-bottom: 4mm !important; }
+${p}.sc { font-size: 11pt !important; font-style: italic !important; opacity: 0.8 !important; margin-bottom: 10mm !important; border-left: 4px solid var(--accent) !important; }
 ${p}.ac { font-size: 11pt !important; padding: 8mm 10mm !important; }
-${p}.pf-tagline { font-size: 11px !important; font-weight: 500 !important; }
-${p}.pf { font-size: 11px !important; }
+${p}.pf-tagline { font-size: 9px !important; font-weight: 500 !important; }
+${p}.pf { font-size: 9px !important; }
 
-/* Chart Enhancement */
+/* Chart Enhancement - 420px min-height */
 ${p}.chart-block {
-  min-height: 480px !important;
+  min-height: 420px !important;
   display: flex !important;
   flex-direction: column !important;
   justify-content: center !important;
@@ -2900,8 +2889,7 @@ ${p}.figure-source { font-size: 9.5px !important; color: #aaa !important; }
 ${p}.validation-note { font-size: 10px !important; }
 /* ── Table notes / sources ── */
 ${p}.table-note, ${p}.table-source { font-size: 9.5px !important; color: #aaa !important; }
-/* ── Phase 21C: Remove height-induced blank gaps ── */
-${p}.page { overflow: visible !important; }
+/* ── Phase 21C: Steel cage enforced - overflow hidden maintained ── */
 /* ── Cover: reset its large inline padding so it doesn't create a half-blank page ── */
 ${p}.page[style*="padding:0"] { padding: 0 !important; }
 /* ── Edu-filler hidden for Gotenberg (content flows, no fixed-height pages) ── */
@@ -2935,7 +2923,47 @@ ${p}#page-19-account-sourcing-43-targets, ${p}#page-19-account-sourcing-43-targe
 ${p}#page-2-exec-summary .card { padding-top: 6mm !important; padding-bottom: 6mm !important; margin-bottom: 6mm !important; }
 ${p}#page-2-exec-summary .kpi-strip, ${p}#page-2-exec-summary .stat-row { gap: 5mm !important; margin: 5mm 0 6mm !important; }
 ${p}#page-4-market-definition table td, ${p}#page-4-market-definition table th { line-height: 1.6 !important; }
-${p}#page-15-market-context-overflow-tam-visual .chart-block { min-height: 480px !important; display:flex !important; flex-direction:column; justify-content:center !important; }
+${p}#page-15-market-context-overflow-tam-visual .chart-block { min-height: 420px !important; display:flex !important; flex-direction:column; justify-content:center !important; }
+
+/* ═══════════════════════════════════════════════════════════
+   HIDE SECTION HEADERS ON PAGES 2-35 (CTO DIRECTIVE)
+   ═══════════════════════════════════════════════════════════ */
+${p}#page-2-exec-summary .section-header,
+${p}#page-3-study-objective .section-header,
+${p}#page-4-market-definition .section-header,
+${p}#page-5-forecast-window .section-header,
+${p}#page-6-stakeholder-map .section-header,
+${p}#page-7-segmentation-framework .section-header,
+${p}#page-8-research-methodology .section-header,
+${p}#page-9-data-triangulation .section-header,
+${p}#page-10-premium-insights .section-header,
+${p}#page-11-market-overview .section-header,
+${p}#page-12-market-evolution .section-header,
+${p}#page-13-key-findings .section-header,
+${p}#page-14-market-context .section-header,
+${p}#page-15-market-context-overflow-tam-visual .section-header,
+${p}#page-16-tam-prioritisation .section-header,
+${p}#page-17-icp-modeling .section-header,
+${p}#page-18-account-sourcing-41-42 .section-header,
+${p}#page-19-account-sourcing-43-targets .section-header,
+${p}#page-20-keywords-intent .section-header,
+${p}#page-21-sdr-sequence .section-header,
+${p}#page-22-sdr-followup-part-1 .section-header,
+${p}#page-23-sdr-followup-part-2 .section-header,
+${p}#page-24-competitive-landscape .section-header,
+${p}#page-25-right-to-win .section-header,
+${p}#page-26-porter-five-forces .section-header,
+${p}#page-27-buying-criteria .section-header,
+${p}#page-28-tech-analysis .section-header,
+${p}#page-29-regulatory .section-header,
+${p}#page-30-decision-engine .section-header,
+${p}#page-31-risk-execution .section-header,
+${p}#page-32-execution-priority-confidence .section-header,
+${p}#page-33-appendix .section-header,
+${p}#page-34-tam-methodology .section-header,
+${p}#page-35-data-quality-audit .section-header {
+  display: none !important;
+}
 `;
 
   const paginationCss = renderMode === 'gotenberg' ? gotenbergPrintCss : renderMode === 'browser-pdf' ? `
