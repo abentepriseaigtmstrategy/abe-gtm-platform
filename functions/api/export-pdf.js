@@ -2731,6 +2731,17 @@ ${p}.page {
   break-after: page !important;
   page-break-after: always !important;
 }
+
+/* READABILITY EXPANSION: Pages 4, 23, 27, 31 permitted to flow beyond 297mm for quality */
+${p}#page-4-market-definition,
+${p}#page-23-sdr-followup-part-2,
+${p}#page-27-buying-criteria,
+${p}#page-31-risk-execution {
+  height: auto !important;
+  min-height: 297mm !important;
+  overflow: visible !important;
+}
+
 /* REMOVED: page-expandable class (violates steel cage directive) */
 /* ── Content Body wrapper for centering ── */
 ${p}.content-body {
@@ -2753,7 +2764,7 @@ ${p}h3 { font-size: 16px !important; margin-bottom: 4mm !important; border-botto
 
 /* Readability — table fonts 10pt */
 ${p}.dt th, ${p}table th, ${p}th { font-size: 10pt !important; padding: 8px 10px !important; background: rgba(255,255,255,0.05) !important; color: var(--accent) !important; }
-${p}.dt td, ${p}table td, ${p}td { font-size: 10pt !important; padding: 8px 10px !important; line-height: 1.6 !important; }
+${p}.dt td, ${p}table td, ${p}td { font-size: 10pt !important; padding: 8px 10px !important; line-height: 2.0 !important; }
 ${p}.card p, ${p}.card div { font-size: 11pt !important; line-height: 1.6 !important; }
 ${p}.sc2 li { font-size: 10pt !important; line-height: 1.6 !important; margin-bottom: 4mm !important; }
 ${p}.sc { font-size: 11pt !important; font-style: italic !important; opacity: 0.8 !important; margin-bottom: 10mm !important; border-left: 4px solid var(--accent) !important; }
@@ -2769,6 +2780,12 @@ ${p}.chart-block {
   justify-content: center !important;
   align-items: center !important;
 }
+
+/* PAGE 31 RISK CHART: Increase to 550px for label readability */
+${p}#page-31-risk-execution .chart-block {
+  min-height: 550px !important;
+}
+
 ${p}.chart-block img {
   width: 100% !important;
   height: auto !important;
@@ -2801,6 +2818,7 @@ ${p}#page-15-market-context-overflow-tam-visual .chart-block {
   display: flex !important;
   flex-direction: column !important;
   justify-content: center !important;
+  margin-bottom: 60px !important; /* OVERLAP REMOVAL: 60px margin before SWOT */
 }
 ${p}#page-15-market-context-overflow-tam-visual .chart-block img { 
   max-height: 140mm !important; /* Limit by A4 height, not px */
@@ -2813,6 +2831,7 @@ ${p}#page-15-market-context-overflow-tam-visual .sc2 {
   display: flex !important;
   flex-direction: column !important;
   justify-content: center !important;
+  margin-top: 20px !important; /* Additional spacing after chart */
 }
 
 /* Page 17: ICP Modeling spacing expansion */
@@ -2864,7 +2883,7 @@ ${p}.scope-cell__value, ${p}.icp-value, ${p}.funnel-value, ${p}.tier-body { font
 ${p}.sc { font-size: 11pt !important; }
 /* Tag pills — keep compact but legible */
 ${p}.tg { font-size: 9.5px !important; }
-/* ── Footer — absolute anchor at bottom 8mm ── */
+/* ── Footer — absolute anchor at bottom 8mm (WORKS ON ALL PAGES INCLUDING EXPANDED) ── */
 ${p}.pf {
   position: absolute !important;
   bottom: 8mm !important;
@@ -2875,7 +2894,20 @@ ${p}.pf {
   font-size: 10px !important;
   color: #D1D5DB !important;
   opacity: 1 !important;
+  z-index: 100 !important; /* Ensure footer stays on top */
 }
+
+/* Footer on expandable pages */
+${p}.page-expandable .pf,
+${p}#page-4-market-definition .pf,
+${p}#page-23-sdr-followup-part-2 .pf,
+${p}#page-27-buying-criteria .pf,
+${p}#page-31-risk-execution .pf {
+  position: relative !important; /* Switch to relative for expanded pages */
+  margin-top: 20mm !important; /* Add top margin to separate from content */
+  bottom: auto !important;
+}
+
 ${p}.pf-tagline {
   font-size: 9.5px !important;
   opacity: 1 !important;
@@ -3228,13 +3260,20 @@ ${p}.section-continuation{width:100%;box-sizing:border-box;padding:0;margin:0;ba
     justify-content: flex-start !important;
     gap: 25px !important;
   }
-  ${p}#page-17-icp-modeling { justify-content: space-between !important; }
+  
+  /* READABILITY EXPANSION: Pages permitted to flow beyond 297mm */
   ${p}#page-4-market-definition,
+  ${p}#page-23-sdr-followup-part-2,
+  ${p}#page-27-buying-criteria {
+    height: auto !important;
+    min-height: 297mm !important;
+    overflow: visible !important;
+  }
+  
+  ${p}#page-17-icp-modeling { justify-content: space-between !important; }
   ${p}#page-15-market-context-overflow-tam-visual,
   ${p}#page-18-account-sourcing-41-42,
-  ${p}#page-23-sdr-followup-part-2,
   ${p}#page-24-competitive-landscape,
-  ${p}#page-27-buying-criteria,
   ${p}#page-29-regulatory,
   ${p}#page-34-tam-methodology,
   ${p}#page-35-data-quality-audit { justify-content: space-between !important; }
@@ -3248,6 +3287,9 @@ ${p}.section-continuation{width:100%;box-sizing:border-box;padding:0;margin:0;ba
   /* Page-Specific Filling */
   ${p}#page-2-exec-summary .card, ${p}#page-10-premium-insights .scope-cell { min-height: 200px !important; margin-bottom: 30px !important; display: flex !important; flex-direction: column !important; justify-content: center !important; }
   ${p}#page-4-market-definition .dt td, ${p}#page-7-segmentation-framework .dt td, ${p}#page-27-buying-criteria .dt td { padding: 20px !important; line-height: 2.0 !important; }
+  
+  /* BOARDROOM READABILITY: All tables get line-height 2.0 */
+  ${p}table td, ${p}.dt td { line-height: 2.0 !important; }
   ${p}#page-15-market-context-overflow-tam-visual .chart-block img { height: 450px !important; object-fit: contain !important; }
   ${p}#page-15-market-context-overflow-tam-visual .sc2 { min-height: 250px !important; display: flex !important; flex-direction: column !important; justify-content: center !important; }
   ${p}#page-17-icp-modeling .icp-grid { gap: 12mm !important; margin: 10mm 0 !important; }
