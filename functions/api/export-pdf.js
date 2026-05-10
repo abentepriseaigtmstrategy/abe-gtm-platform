@@ -32,10 +32,22 @@ import { getIntegrationStatus } from './integration-readiness.js';
 async function renderPdfWithAdobe(html, filename, env) {
   const clientId = env.ADOBE_CLIENT_ID;
   const clientSecret = env.ADOBE_CLIENT_SECRET;
+  const organizationId = env.ADOBE_ORGANIZATION_ID;
   const apiBaseUrl = (env.ADOBE_API_BASE_URL || 'https://pdf-services.adobe.io').replace(/\/$/, '');
 
+  // ── Validate credentials ─────────────────────────────────────────────
   if (!clientId || !clientSecret) {
-    throw new Error('Adobe PDF Services credentials missing (ADOBE_CLIENT_ID, ADOBE_CLIENT_SECRET)');
+    throw new Error('Adobe PDF Services credentials missing: ADOBE_CLIENT_ID and ADOBE_CLIENT_SECRET must be set as Cloudflare secrets');
+  }
+
+  // Detect if credentials look like JSON (common mistake with service_principal_credentials)
+  if (clientId.trim().startsWith('{') || clientId.trim().startsWith('[')) {
+    throw new Error('Adobe ADOBE_CLIENT_ID appears to be JSON. Extract service_principal_credentials.client_id as a plain string value, not the entire JSON object');
+  }
+
+  // Validate client_id format (Adobe client IDs are typically alphanumeric with hyphens)
+  if (!/^[a-zA-Z0-9_-]+$/.test(clientId)) {
+    throw new Error('Adobe ADOBE_CLIENT_ID appears invalid. It should be a plain alphanumeric string from service_principal_credentials.client_id');
   }
 
   // ── Step 1: Obtain OAuth access token ────────────────────────────────
@@ -78,15 +90,18 @@ async function renderPdfWithAdobe(html, filename, env) {
   const assetController = new AbortController();
   const assetTimeout = setTimeout(() => assetController.abort(), 15000);
 
+  // Build asset creation headers
+  const assetHeaders = {
+    'Authorization': `Bearer ${accessToken}`,
+    'X-Api-Key': clientId,
+    'Content-Type': 'application/json',
+  };
+
   let assetRes;
   try {
     assetRes = await fetch(createAssetEndpoint, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'X-Api-Key': clientId,
-        'Content-Type': 'application/json',
-      },
+      headers: assetHeaders,
       body: JSON.stringify({ mediaType: 'text/html' }),
       signal: assetController.signal,
     });
@@ -137,16 +152,19 @@ async function renderPdfWithAdobe(html, filename, env) {
   const jobController = new AbortController();
   const jobTimeout = setTimeout(() => jobController.abort(), 30000);
 
+  // Build htmltopdf headers
+  const jobHeaders = {
+    'Authorization': `Bearer ${accessToken}`,
+    'X-Api-Key': clientId,
+    'Content-Type': 'application/json',
+    'Prefer': 'respond-async',
+  };
+
   let jobRes;
   try {
     jobRes = await fetch(htmlToPdfEndpoint, {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${accessToken}`,
-        'X-Api-Key': clientId,
-        'Content-Type': 'application/json',
-        'Prefer': 'respond-async',
-      },
+      headers: jobHeaders,
       body: JSON.stringify({
         assetID: assetId,
         outputFormat: 'pdf',
