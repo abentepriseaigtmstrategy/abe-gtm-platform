@@ -157,103 +157,6 @@
       transform: none !important;
     }
 
-    .btn-secondary {
-      background: rgba(168, 85, 247, .08);
-      color: #c4b5fd;
-      border: 1px solid rgba(168, 85, 247, .25);
-    }
-
-    .btn-secondary:hover {
-      background: rgba(168, 85, 247, .15);
-      border-color: rgba(168, 85, 247, .4);
-    }
-
-    /* ── ACTION BAR ── */
-    .action-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 16px;
-      margin: 24px 0 20px;
-      padding: 14px 18px;
-      background: rgba(18, 24, 39, .6);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      border-left: 3px solid var(--accent);
-    }
-
-    .action-bar-left {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
-
-    .web-report-badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 6px;
-      font-size: 10px;
-      font-weight: 800;
-      text-transform: uppercase;
-      letter-spacing: .12em;
-      color: var(--accent);
-    }
-
-    .web-report-badge::before {
-      content: '';
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      background: var(--green);
-      box-shadow: 0 0 6px var(--green);
-    }
-
-    .web-report-note {
-      font-size: 10px;
-      color: var(--muted);
-      font-style: italic;
-    }
-
-    .action-bar-right {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-wrap: wrap;
-      justify-content: flex-end;
-    }
-
-    .action-divider {
-      width: 1px;
-      height: 24px;
-      background: var(--border);
-      margin: 0 4px;
-    }
-
-    /* ── TOAST NOTIFICATION ── */
-    .toast {
-      position: fixed;
-      bottom: 24px;
-      right: 24px;
-      padding: 12px 18px;
-      background: var(--card);
-      border: 1px solid var(--accent);
-      border-radius: 8px;
-      font-size: 12px;
-      font-weight: 600;
-      color: var(--text);
-      box-shadow: 0 8px 32px rgba(0, 0, 0, .4);
-      z-index: 1000;
-      opacity: 0;
-      transform: translateY(12px);
-      transition: all .25s ease;
-      pointer-events: none;
-    }
-
-    .toast.show {
-      opacity: 1;
-      transform: translateY(0);
-    }
-
     /* ── LAYOUT ── */
     .wrap {
       position: relative;
@@ -1357,45 +1260,6 @@
       }
     }
 
-    /* ── Print Mode: Hide UI only, preserve theme ── */
-    @media print {
-      /* Hide all UI chrome — report content remains exactly as in browser */
-      #topnav,
-      .action-bar,
-      .ph-actions,
-      #mobile-menu-btn,
-      #mobile-nav-drawer,
-      #abe-toast,
-      .tour-btn,
-      .help-btn,
-      .dev-tools {
-        display: none !important;
-      }
-
-      /* Allow natural page breaks */
-      .section {
-        page-break-inside: auto !important;
-        break-inside: auto !important;
-      }
-
-      table,
-      .dt,
-      .card {
-        page-break-inside: avoid !important;
-        break-inside: avoid !important;
-      }
-
-      tr {
-        page-break-inside: avoid !important;
-        break-inside: avoid !important;
-      }
-
-      /* Page margins */
-      @page {
-        margin: 15mm;
-      }
-    }
-
     /* ── Filler box visual ── */
     .edu-filler.edu-filler--active {
       margin-top: 14px;
@@ -1511,7 +1375,7 @@
     </a>
     <div class="nav-right">
       <a href="vault.html" class="btn btn-outline">← Vault</a>
-      <button id="btn-export" class="btn btn-primary" onclick="exportPDF()" disabled>Export PDF Snapshot</button>
+      <button id="btn-export" class="btn btn-primary" onclick="exportPDF()" disabled>Export PDF</button>
       <button onclick="window.APP.signOut()" class="btn btn-outline">Sign Out</button>
     </div>
     <button id="mobile-menu-btn" onclick="toggleMobileNav()" aria-label="Menu">
@@ -1566,31 +1430,9 @@
           <div class="title" id="r-company"></div>
           <div class="meta" id="r-meta"></div>
         </div>
-      </div>
-
-      <!-- Action Bar: Share, Copy Link, Export Options -->
-      <div class="action-bar">
-        <div class="action-bar-left">
-          <div class="web-report-badge">Web Report</div>
-          <div class="web-report-note">This web report is the primary source. PDF is a downloadable snapshot.</div>
-        </div>
-        <div class="action-bar-right">
-          <button class="btn btn-secondary" onclick="shareReport()" title="Copy report link to clipboard">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
-            Share Report
-          </button>
-          <button class="btn btn-secondary" onclick="copyReportLink()" title="Copy current URL to clipboard">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-            Copy Report Link
-          </button>
-          <button class="btn btn-primary" onclick="exportPDF()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-            Export PDF Snapshot
-          </button>
-          <button class="btn btn-secondary" onclick="openPrintMode()">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-            Print / Save as PDF
-          </button>
+        <div class="ph-actions">
+          <a href="vault.html" class="btn btn-outline">← Vault</a>
+          <button id="btn-export2" class="btn btn-primary" onclick="exportPDF()">Export PDF</button>
         </div>
       </div>
 
@@ -2337,6 +2179,7 @@
       document.getElementById('loading-state').style.display = 'none';
       document.getElementById('report-content').style.display = 'block';
       document.getElementById('btn-export').disabled = false;
+      document.getElementById('btn-export2').disabled = false;
 
       // Cover positioning strip
       const positioningText = safe(s1.company_overview) || safe(r.company_name) + ' — GTM intelligence report.';
@@ -2384,11 +2227,9 @@
             document.getElementById('loading-state').style.display = 'none';
             container.style.display = 'block';
             document.getElementById('btn-export').disabled = false;
-
-            window._strategy = strategy;
+            document.getElementById('btn-export2').disabled = false;
             
-            // Initialize print mode if ?print=1
-            initPrintMode();
+            window._strategy = strategy;
             return;
           }
           throw new Error('API render returned empty payload');
@@ -2396,8 +2237,6 @@
           console.warn('%c[Viewer] Source: Legacy-Fallback', 'color: #f59e0b; font-weight: bold', viewerErr.message);
           renderReport(report); // Fallback to client-side JS engine
         }
-        // Initialize print mode if ?print=1
-        initPrintMode();
       } catch (e) {
         showError('Failed to load report: ' + e.message);
       }
@@ -2427,53 +2266,14 @@
     // REMOVED: html2canvas / jsPDF browser rendering (compressed, broken)
     // REMOVED: renderHtmlToPdf function
     //
-
-    // ── Share / Copy Link Functions ───────────────────────────────────
-    function shareReport() {
-      copyReportLink();
-    }
-
-    function copyReportLink() {
-      const url = window.location.href;
-      navigator.clipboard.writeText(url).then(() => {
-        abeToast('Report link copied.', 'success', 2500);
-      }).catch(() => {
-        abeToast('Could not copy link. Please copy URL manually.', 'error', 3000);
-      });
-    }
-
-    // ── Browser Print Mode ─────────────────────────────────────────────
-    function openPrintMode() {
-      const params = new URLSearchParams(location.search);
-      const id = params.get('id');
-      if (!id) {
-        abeToast('No report ID found. Cannot open print view.', 'error', 3000);
-        return;
-      }
-      const printUrl = location.origin + location.pathname + '?id=' + encodeURIComponent(id) + '&print=1';
-      window.open(printUrl, '_blank');
-    }
-
-    function checkPrintMode() {
-      const params = new URLSearchParams(location.search);
-      return params.get('print') === '1';
-    }
-
-    function initPrintMode() {
-      if (!checkPrintMode()) return;
-      // Wait for content to render then trigger print dialog
-      // Browser @media print CSS handles UI hiding — no theme changes
-      setTimeout(() => {
-        window.print();
-      }, 1500);
-    }
-
     // Diagnostic: check response headers in DevTools Network tab:
     //   X-ABE-PDF-Engine   → "gotenberg" | "gotenberg_failed" | "none"
     //   X-ABE-Export-Path  → active path + hydration source
     async function exportPDF() {
       const btn1 = document.getElementById('btn-export');
-      if (btn1) { btn1.disabled = true; btn1.textContent = 'Generating PDF Snapshot…'; }
+      const btn2 = document.getElementById('btn-export2');
+      if (btn1) { btn1.disabled = true; btn1.textContent = 'Generating…'; }
+      if (btn2) { btn2.disabled = true; btn2.textContent = 'Generating PDF — this may take 15–30s…'; }
 
       try {
         // Auth token — same pattern as auth-guard.js apiFetch()
@@ -2576,7 +2376,8 @@
         console.error('[exportPDF] Error:', e);
         alert('PDF export failed: ' + e.message);
       } finally {
-        if (btn1) { btn1.disabled = false; btn1.textContent = 'Export PDF Snapshot'; }
+        if (btn1) { btn1.disabled = false; btn1.textContent = 'Export PDF'; }
+        if (btn2) { btn2.disabled = false; btn2.textContent = 'Export PDF'; }
       }
     }
 
