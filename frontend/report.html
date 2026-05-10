@@ -1357,91 +1357,19 @@
       }
     }
 
-    /* ── Browser Print Mode (light background, hide UI) ── */
-    body.print-mode {
-      background: #ffffff !important;
-      color: #111827 !important;
-    }
-
-    body.print-mode #topnav,
-    body.print-mode .action-bar,
-    body.print-mode .ph-actions,
-    body.print-mode #mobile-menu-btn,
-    body.print-mode #mobile-nav-drawer,
-    body.print-mode #abe-toast {
-      display: none !important;
-    }
-
+    /* ── Print Mode: Hide UI only, preserve theme ── */
     @media print {
-      /* Hide all UI chrome */
+      /* Hide all UI chrome — report content remains exactly as in browser */
       #topnav,
       .action-bar,
       .ph-actions,
       #mobile-menu-btn,
       #mobile-nav-drawer,
-      #abe-toast {
+      #abe-toast,
+      .tour-btn,
+      .help-btn,
+      .dev-tools {
         display: none !important;
-      }
-
-      /* Light printable background */
-      html,
-      body {
-        background: #ffffff !important;
-        color: #111827 !important;
-        -webkit-print-color-adjust: exact !important;
-        print-color-adjust: exact !important;
-      }
-
-      /* Ensure content is visible */
-      #report-content {
-        display: block !important;
-        background: #ffffff !important;
-      }
-
-      /* Adjust text colors for light background */
-      .title,
-      .section-header,
-      .sec-title,
-      h1, h2, h3 {
-        color: #111827 !important;
-      }
-
-      .meta,
-      .sec-context,
-      .fl,
-      .label {
-        color: #4b5563 !important;
-      }
-
-      /* Cards on light background */
-      .card,
-      .score-strip,
-      .section {
-        background: #f9fafb !important;
-        border-color: #e5e7eb !important;
-      }
-
-      /* Tables */
-      table,
-      .dt {
-        background: #ffffff !important;
-      }
-
-      .dt th {
-        background: #f3f4f6 !important;
-        color: #111827 !important;
-        border-color: #d1d5db !important;
-      }
-
-      .dt td {
-        color: #374151 !important;
-        border-color: #e5e7eb !important;
-      }
-
-      /* Ensure links are visible */
-      a {
-        color: #7c3aed !important;
-        text-decoration: none !important;
       }
 
       /* Allow natural page breaks */
@@ -1638,10 +1566,6 @@
           <div class="title" id="r-company"></div>
           <div class="meta" id="r-meta"></div>
         </div>
-        <div class="ph-actions">
-          <a href="vault.html" class="btn btn-outline">← Vault</a>
-          <button id="btn-export2" class="btn btn-primary" onclick="exportPDF()">Export PDF Snapshot</button>
-        </div>
       </div>
 
       <!-- Action Bar: Share, Copy Link, Export Options -->
@@ -1666,13 +1590,6 @@
           <button class="btn btn-secondary" onclick="openPrintMode()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
             Print / Save as PDF
-          </button>
-          <div class="action-divider"></div>
-          <button class="btn btn-outline" disabled title="Coming soon">
-            Export PPTX
-          </button>
-          <button class="btn btn-outline" disabled title="Coming soon">
-            Export DOCX
           </button>
         </div>
       </div>
@@ -2420,7 +2337,6 @@
       document.getElementById('loading-state').style.display = 'none';
       document.getElementById('report-content').style.display = 'block';
       document.getElementById('btn-export').disabled = false;
-      document.getElementById('btn-export2').disabled = false;
 
       // Cover positioning strip
       const positioningText = safe(s1.company_overview) || safe(r.company_name) + ' — GTM intelligence report.';
@@ -2468,8 +2384,7 @@
             document.getElementById('loading-state').style.display = 'none';
             container.style.display = 'block';
             document.getElementById('btn-export').disabled = false;
-            document.getElementById('btn-export2').disabled = false;
-            
+
             window._strategy = strategy;
             
             // Initialize print mode if ?print=1
@@ -2546,9 +2461,8 @@
 
     function initPrintMode() {
       if (!checkPrintMode()) return;
-      // Add print class to body for CSS targeting
-      document.body.classList.add('print-mode');
-      // Wait for content to render then trigger print
+      // Wait for content to render then trigger print dialog
+      // Browser @media print CSS handles UI hiding — no theme changes
       setTimeout(() => {
         window.print();
       }, 1500);
@@ -2559,9 +2473,7 @@
     //   X-ABE-Export-Path  → active path + hydration source
     async function exportPDF() {
       const btn1 = document.getElementById('btn-export');
-      const btn2 = document.getElementById('btn-export2');
-      if (btn1) { btn1.disabled = true; btn1.textContent = 'Generating…'; }
-      if (btn2) { btn2.disabled = true; btn2.textContent = 'Generating PDF — this may take 15–30s…'; }
+      if (btn1) { btn1.disabled = true; btn1.textContent = 'Generating PDF Snapshot…'; }
 
       try {
         // Auth token — same pattern as auth-guard.js apiFetch()
@@ -2664,8 +2576,7 @@
         console.error('[exportPDF] Error:', e);
         alert('PDF export failed: ' + e.message);
       } finally {
-        if (btn1) { btn1.disabled = false; btn1.textContent = 'Export PDF'; }
-        if (btn2) { btn2.disabled = false; btn2.textContent = 'Export PDF'; }
+        if (btn1) { btn1.disabled = false; btn1.textContent = 'Export PDF Snapshot'; }
       }
     }
 
