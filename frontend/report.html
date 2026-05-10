@@ -1357,6 +1357,117 @@
       }
     }
 
+    /* ── Browser Print Mode (light background, hide UI) ── */
+    body.print-mode {
+      background: #ffffff !important;
+      color: #111827 !important;
+    }
+
+    body.print-mode #topnav,
+    body.print-mode .action-bar,
+    body.print-mode .ph-actions,
+    body.print-mode #mobile-menu-btn,
+    body.print-mode #mobile-nav-drawer,
+    body.print-mode #abe-toast {
+      display: none !important;
+    }
+
+    @media print {
+      /* Hide all UI chrome */
+      #topnav,
+      .action-bar,
+      .ph-actions,
+      #mobile-menu-btn,
+      #mobile-nav-drawer,
+      #abe-toast {
+        display: none !important;
+      }
+
+      /* Light printable background */
+      html,
+      body {
+        background: #ffffff !important;
+        color: #111827 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
+      }
+
+      /* Ensure content is visible */
+      #report-content {
+        display: block !important;
+        background: #ffffff !important;
+      }
+
+      /* Adjust text colors for light background */
+      .title,
+      .section-header,
+      .sec-title,
+      h1, h2, h3 {
+        color: #111827 !important;
+      }
+
+      .meta,
+      .sec-context,
+      .fl,
+      .label {
+        color: #4b5563 !important;
+      }
+
+      /* Cards on light background */
+      .card,
+      .score-strip,
+      .section {
+        background: #f9fafb !important;
+        border-color: #e5e7eb !important;
+      }
+
+      /* Tables */
+      table,
+      .dt {
+        background: #ffffff !important;
+      }
+
+      .dt th {
+        background: #f3f4f6 !important;
+        color: #111827 !important;
+        border-color: #d1d5db !important;
+      }
+
+      .dt td {
+        color: #374151 !important;
+        border-color: #e5e7eb !important;
+      }
+
+      /* Ensure links are visible */
+      a {
+        color: #7c3aed !important;
+        text-decoration: none !important;
+      }
+
+      /* Allow natural page breaks */
+      .section {
+        page-break-inside: auto !important;
+        break-inside: auto !important;
+      }
+
+      table,
+      .dt,
+      .card {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+
+      tr {
+        page-break-inside: avoid !important;
+        break-inside: avoid !important;
+      }
+
+      /* Page margins */
+      @page {
+        margin: 15mm;
+      }
+    }
+
     /* ── Filler box visual ── */
     .edu-filler.edu-filler--active {
       margin-top: 14px;
@@ -1551,6 +1662,10 @@
           <button class="btn btn-primary" onclick="exportPDF()">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
             Export PDF Snapshot
+          </button>
+          <button class="btn btn-secondary" onclick="openPrintMode()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+            Print / Save as PDF
           </button>
           <div class="action-divider"></div>
           <button class="btn btn-outline" disabled title="Coming soon">
@@ -2356,6 +2471,9 @@
             document.getElementById('btn-export2').disabled = false;
             
             window._strategy = strategy;
+            
+            // Initialize print mode if ?print=1
+            initPrintMode();
             return;
           }
           throw new Error('API render returned empty payload');
@@ -2363,6 +2481,8 @@
           console.warn('%c[Viewer] Source: Legacy-Fallback', 'color: #f59e0b; font-weight: bold', viewerErr.message);
           renderReport(report); // Fallback to client-side JS engine
         }
+        // Initialize print mode if ?print=1
+        initPrintMode();
       } catch (e) {
         showError('Failed to load report: ' + e.message);
       }
@@ -2405,6 +2525,33 @@
       }).catch(() => {
         abeToast('Could not copy link. Please copy URL manually.', 'error', 3000);
       });
+    }
+
+    // ── Browser Print Mode ─────────────────────────────────────────────
+    function openPrintMode() {
+      const params = new URLSearchParams(location.search);
+      const id = params.get('id');
+      if (!id) {
+        abeToast('No report ID found. Cannot open print view.', 'error', 3000);
+        return;
+      }
+      const printUrl = location.origin + location.pathname + '?id=' + encodeURIComponent(id) + '&print=1';
+      window.open(printUrl, '_blank');
+    }
+
+    function checkPrintMode() {
+      const params = new URLSearchParams(location.search);
+      return params.get('print') === '1';
+    }
+
+    function initPrintMode() {
+      if (!checkPrintMode()) return;
+      // Add print class to body for CSS targeting
+      document.body.classList.add('print-mode');
+      // Wait for content to render then trigger print
+      setTimeout(() => {
+        window.print();
+      }, 1500);
     }
 
     // Diagnostic: check response headers in DevTools Network tab:
