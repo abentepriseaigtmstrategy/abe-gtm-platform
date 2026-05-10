@@ -30,24 +30,30 @@ import { getIntegrationStatus } from './integration-readiness.js';
  * Adobe docs: https://developer.adobe.com/document-services/docs/apis/pdf-services/#tag/Create-PDF
  */
 async function renderPdfWithAdobe(html, filename, env) {
-  const clientId = env.ADOBE_CLIENT_ID;
-  const clientSecret = env.ADOBE_CLIENT_SECRET;
-  const organizationId = env.ADOBE_ORGANIZATION_ID;
+  const clientId = String(env.ADOBE_CLIENT_ID || '').trim();
+  const clientSecret = String(env.ADOBE_CLIENT_SECRET || '').trim();
   const apiBaseUrl = (env.ADOBE_API_BASE_URL || 'https://pdf-services.adobe.io').replace(/\/$/, '');
 
   // ── Validate credentials ─────────────────────────────────────────────
+  // Check existence and type
   if (!clientId || !clientSecret) {
     throw new Error('Adobe PDF Services credentials missing: ADOBE_CLIENT_ID and ADOBE_CLIENT_SECRET must be set as Cloudflare secrets');
   }
 
   // Detect if credentials look like JSON (common mistake with service_principal_credentials)
-  if (clientId.trim().startsWith('{') || clientId.trim().startsWith('[')) {
+  if (clientId.startsWith('{') || clientId.startsWith('[')) {
     throw new Error('Adobe ADOBE_CLIENT_ID appears to be JSON. Extract service_principal_credentials.client_id as a plain string value, not the entire JSON object');
   }
+  if (clientSecret.startsWith('{') || clientSecret.startsWith('[')) {
+    throw new Error('Adobe ADOBE_CLIENT_SECRET appears to be JSON. Extract service_principal_credentials.client_secret as a plain string value, not the entire JSON object');
+  }
 
-  // Validate client_id format (Adobe client IDs are typically alphanumeric with hyphens)
-  if (!/^[a-zA-Z0-9_-]+$/.test(clientId)) {
-    throw new Error('Adobe ADOBE_CLIENT_ID appears invalid. It should be a plain alphanumeric string from service_principal_credentials.client_id');
+  // Detect if credentials contain JSON key names (indicates full JSON blob was pasted)
+  if (clientId.includes('service_principal_credentials') || clientId.includes('client_id')) {
+    throw new Error('Adobe ADOBE_CLIENT_ID contains unexpected text. It should be only the plain value from service_principal_credentials.client_id');
+  }
+  if (clientSecret.includes('service_principal_credentials') || clientSecret.includes('client_secret')) {
+    throw new Error('Adobe ADOBE_CLIENT_SECRET contains unexpected text. It should be only the plain value from service_principal_credentials.client_secret');
   }
 
   // ── Step 1: Obtain OAuth access token ────────────────────────────────
