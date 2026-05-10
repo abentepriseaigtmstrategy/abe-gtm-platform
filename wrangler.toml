@@ -16,8 +16,25 @@ ALLOWED_ORIGIN    = "*"
 SUPABASE_URL      = "https://cwcvneluhlimhlzowabv.supabase.co"
 SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3Y3ZuZWx1aGxpbWhsem93YWJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2MzAxMjAsImV4cCI6MjA4OTIwNjEyMH0.SZDS-svU-kFh_OkUq3AjQY64F-71MpbBsFd6Iin5DlQ"
 
-PDF_RENDER_ENGINE = "gotenberg"
+# ── Adobe PDF Services (Primary) ────────────────────────────────────
+PDF_RENDER_ENGINE = "adobe"
+ADOBE_API_BASE_URL = "https://pdf-services.adobe.io"
+
+# ── Gotenberg (Fallback) ───────────────────────────────────────────
 GOTENBERG_URL = "https://gotenberg-production-e409.up.railway.app"
+
+# ── ADOBE PDF SERVICES SECRETS ────────────────────────────────────
+# These MUST be added as Cloudflare Secrets (not in this file):
+#   dash.cloudflare.com → Workers & Pages → abe-gtm-platform
+#   → Settings → Environment Variables → Add variables
+#   Name:  ADOBE_CLIENT_ID
+#   Value: (from Adobe Developer Console → Project → Credentials)
+#   Type:  Secret
+#
+#   Name:  ADOBE_CLIENT_SECRET
+#   Value: (from Adobe Developer Console → Project → Credentials)
+#   Type:  Secret
+# ─────────────────────────────────────────────────────────────────
 # ── SUPABASE_SERVICE_ROLE_KEY ─────────────────────────────────────
 # This key MUST NOT be stored in any file.
 # Add it manually in Cloudflare Dashboard:
@@ -27,3 +44,4 @@ GOTENBERG_URL = "https://gotenberg-production-e409.up.railway.app"
 #   Value: (paste from Supabase → Settings → API → service_role)
 #   Type:  Secret
 # ─────────────────────────────────────────────────────────────────
+v
