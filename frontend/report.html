@@ -157,6 +157,103 @@
       transform: none !important;
     }
 
+    .btn-secondary {
+      background: rgba(168, 85, 247, .08);
+      color: #c4b5fd;
+      border: 1px solid rgba(168, 85, 247, .25);
+    }
+
+    .btn-secondary:hover {
+      background: rgba(168, 85, 247, .15);
+      border-color: rgba(168, 85, 247, .4);
+    }
+
+    /* ── ACTION BAR ── */
+    .action-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin: 24px 0 20px;
+      padding: 14px 18px;
+      background: rgba(18, 24, 39, .6);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      border-left: 3px solid var(--accent);
+    }
+
+    .action-bar-left {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .web-report-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: .12em;
+      color: var(--accent);
+    }
+
+    .web-report-badge::before {
+      content: '';
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--green);
+      box-shadow: 0 0 6px var(--green);
+    }
+
+    .web-report-note {
+      font-size: 10px;
+      color: var(--muted);
+      font-style: italic;
+    }
+
+    .action-bar-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .action-divider {
+      width: 1px;
+      height: 24px;
+      background: var(--border);
+      margin: 0 4px;
+    }
+
+    /* ── TOAST NOTIFICATION ── */
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      right: 24px;
+      padding: 12px 18px;
+      background: var(--card);
+      border: 1px solid var(--accent);
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+      box-shadow: 0 8px 32px rgba(0, 0, 0, .4);
+      z-index: 1000;
+      opacity: 0;
+      transform: translateY(12px);
+      transition: all .25s ease;
+      pointer-events: none;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
     /* ── LAYOUT ── */
     .wrap {
       position: relative;
@@ -1375,7 +1472,7 @@
     </a>
     <div class="nav-right">
       <a href="vault.html" class="btn btn-outline">← Vault</a>
-      <button id="btn-export" class="btn btn-primary" onclick="exportPDF()" disabled>Export PDF</button>
+      <button id="btn-export" class="btn btn-primary" onclick="exportPDF()" disabled>Export PDF Snapshot</button>
       <button onclick="window.APP.signOut()" class="btn btn-outline">Sign Out</button>
     </div>
     <button id="mobile-menu-btn" onclick="toggleMobileNav()" aria-label="Menu">
@@ -1432,7 +1529,36 @@
         </div>
         <div class="ph-actions">
           <a href="vault.html" class="btn btn-outline">← Vault</a>
-          <button id="btn-export2" class="btn btn-primary" onclick="exportPDF()">Export PDF</button>
+          <button id="btn-export2" class="btn btn-primary" onclick="exportPDF()">Export PDF Snapshot</button>
+        </div>
+      </div>
+
+      <!-- Action Bar: Share, Copy Link, Export Options -->
+      <div class="action-bar">
+        <div class="action-bar-left">
+          <div class="web-report-badge">Web Report</div>
+          <div class="web-report-note">This web report is the primary source. PDF is a downloadable snapshot.</div>
+        </div>
+        <div class="action-bar-right">
+          <button class="btn btn-secondary" onclick="shareReport()" title="Copy report link to clipboard">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+            Share Report
+          </button>
+          <button class="btn btn-secondary" onclick="copyReportLink()" title="Copy current URL to clipboard">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+            Copy Report Link
+          </button>
+          <button class="btn btn-primary" onclick="exportPDF()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export PDF Snapshot
+          </button>
+          <div class="action-divider"></div>
+          <button class="btn btn-outline" disabled title="Coming soon">
+            Export PPTX
+          </button>
+          <button class="btn btn-outline" disabled title="Coming soon">
+            Export DOCX
+          </button>
         </div>
       </div>
 
@@ -2266,6 +2392,21 @@
     // REMOVED: html2canvas / jsPDF browser rendering (compressed, broken)
     // REMOVED: renderHtmlToPdf function
     //
+
+    // ── Share / Copy Link Functions ───────────────────────────────────
+    function shareReport() {
+      copyReportLink();
+    }
+
+    function copyReportLink() {
+      const url = window.location.href;
+      navigator.clipboard.writeText(url).then(() => {
+        abeToast('Report link copied.', 'success', 2500);
+      }).catch(() => {
+        abeToast('Could not copy link. Please copy URL manually.', 'error', 3000);
+      });
+    }
+
     // Diagnostic: check response headers in DevTools Network tab:
     //   X-ABE-PDF-Engine   → "gotenberg" | "gotenberg_failed" | "none"
     //   X-ABE-Export-Path  → active path + hydration source
