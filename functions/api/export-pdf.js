@@ -1,19 +1,257 @@
 /**
- * /api/export-pdf  (v6 — Phase 21C: Gotenberg Server-Side PDF + Print Flow Cleanup)
+ * /api/export-pdf  (v7 — Phase 22: Adobe PDF Services Primary + Gotenberg Fallback)
  * Cloudflare Pages Function
  * INPUT:  POST { strategy: { company_name, industry, step_1_market, ... } }
- * OUTPUT: application/pdf (Gotenberg) or JSON { html, filename, mode } (fallback)
+ * OUTPUT: application/pdf (Adobe or Gotenberg) or JSON { html, filename, mode } (fallback)
  *
  * Env vars:
- *   PDF_RENDER_ENGINE=gotenberg   → enables Gotenberg path
- *   GOTENBERG_URL=https://...     → Gotenberg service base URL
+ *   PDF_RENDER_ENGINE=adobe|gotenberg   → selects primary renderer
+ *   ADOBE_CLIENT_ID=xxx               → Adobe PDF Services OAuth client ID
+ *   ADOBE_CLIENT_SECRET=xxx           → Adobe PDF Services OAuth client secret
+ *   ADOBE_API_BASE_URL=https://...    → Adobe PDF Services API base (optional, defaults to US region)
+ *   GOTENBERG_URL=https://...         → Gotenberg service base URL (fallback)
  */
 import { verifyAuth, corsHeaders, validate, errRes } from './_middleware.js';
 import { normalizeStrategy } from './gtm-intelligence.js';
 import { getIntegrationStatus } from './integration-readiness.js';
 
 // ══════════════════════════════════════════════════════════════
-// PHASE 21C — GOTENBERG SERVER-SIDE PDF HELPER
+// PHASE 22 — ADOBE PDF SERVICES HELPER (PRIMARY)
+// ══════════════════════════════════════════════════════════════
+
+/**
+ * renderPdfWithAdobe(html, filename, env)
+ *
+ * Sends final report HTML to Adobe PDF Services API.
+ * Uses OAuth Server-to-Server authentication.
+ * Returns an ArrayBuffer (PDF binary) on success.
+ * Throws a clear Error if Adobe fails so the caller can fallback to Gotenberg.
+ *
+ * Adobe docs: https://developer.adobe.com/document-services/docs/apis/pdf-services/#tag/Create-PDF
+ */
+async function renderPdfWithAdobe(html, filename, env) {
+  const clientId = env.ADOBE_CLIENT_ID;
+  const clientSecret = env.ADOBE_CLIENT_SECRET;
+  const apiBaseUrl = (env.ADOBE_API_BASE_URL || 'https://pdf-services.adobe.io').replace(/\/$/, '');
+
+  if (!clientId || !clientSecret) {
+    throw new Error('Adobe PDF Services credentials missing (ADOBE_CLIENT_ID, ADOBE_CLIENT_SECRET)');
+  }
+
+  // ── Step 1: Obtain OAuth access token ────────────────────────────────
+  const tokenEndpoint = `${apiBaseUrl}/token`;
+  const tokenController = new AbortController();
+  const tokenTimeout = setTimeout(() => tokenController.abort(), 15000);
+
+  let tokenRes;
+  try {
+    tokenRes = await fetch(tokenEndpoint, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Authorization': `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
+      },
+      body: new URLSearchParams({
+        'grant_type': 'client_credentials',
+        'scope': 'openid,AdobeID,read_organizations,additional_info.projectedProductContext',
+      }),
+      signal: tokenController.signal,
+    });
+  } finally {
+    clearTimeout(tokenTimeout);
+  }
+
+  if (!tokenRes.ok) {
+    const errBody = await tokenRes.text().catch(() => '');
+    throw new Error(`Adobe OAuth failed (HTTP ${tokenRes.status}): ${errBody.slice(0, 200)}`);
+  }
+
+  const tokenData = await tokenRes.json();
+  const accessToken = tokenData.access_token;
+  if (!accessToken) {
+    throw new Error('Adobe OAuth response missing access_token');
+  }
+
+  // ── Step 2: Create asset for HTML upload ───────────────────────────────
+  const createAssetEndpoint = `${apiBaseUrl}/assets`;
+  const assetController = new AbortController();
+  const assetTimeout = setTimeout(() => assetController.abort(), 15000);
+
+  let assetRes;
+  try {
+    assetRes = await fetch(createAssetEndpoint, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'X-Api-Key': clientId,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ mediaType: 'text/html' }),
+      signal: assetController.signal,
+    });
+  } finally {
+    clearTimeout(assetTimeout);
+  }
+
+  if (!assetRes.ok) {
+    const errBody = await assetRes.text().catch(() => '');
+    throw new Error(`Adobe asset creation failed (HTTP ${assetRes.status}): ${errBody.slice(0, 200)}`);
+  }
+
+  const assetData = await assetRes.json();
+  const assetId = assetData?.asset?.assetID;
+  const uploadUri = assetData?.asset?.uploadUri;
+
+  if (!assetId || !uploadUri) {
+    throw new Error('Adobe asset creation response missing assetID or uploadUri');
+  }
+
+  // ── Step 3: Upload HTML content to the asset URI ───────────────────────
+  const htmlBytes = new TextEncoder().encode(html);
+  const uploadController = new AbortController();
+  const uploadTimeout = setTimeout(() => uploadController.abort(), 30000);
+
+  let uploadRes;
+  try {
+    uploadRes = await fetch(uploadUri, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'text/html',
+        'Content-Length': String(htmlBytes.length),
+      },
+      body: htmlBytes,
+      signal: uploadController.signal,
+    });
+  } finally {
+    clearTimeout(uploadTimeout);
+  }
+
+  if (!uploadRes.ok) {
+    const errBody = await uploadRes.text().catch(() => '');
+    throw new Error(`Adobe HTML upload failed (HTTP ${uploadRes.status}): ${errBody.slice(0, 200)}`);
+  }
+
+  // ── Step 4: Submit HTML to PDF job with assetID ────────────────────────
+  const htmlToPdfEndpoint = `${apiBaseUrl}/operation/htmltopdf`;
+  const jobController = new AbortController();
+  const jobTimeout = setTimeout(() => jobController.abort(), 30000);
+
+  let jobRes;
+  try {
+    jobRes = await fetch(htmlToPdfEndpoint, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'X-Api-Key': clientId,
+        'Content-Type': 'application/json',
+        'Prefer': 'respond-async',
+      },
+      body: JSON.stringify({
+        assetID: assetId,
+        outputFormat: 'pdf',
+      }),
+      signal: jobController.signal,
+    });
+  } finally {
+    clearTimeout(jobTimeout);
+  }
+
+  if (!jobRes.ok) {
+    const errBody = await jobRes.text().catch(() => '');
+    throw new Error(`Adobe HTML to PDF job failed (HTTP ${jobRes.status}): ${errBody.slice(0, 200)}`);
+  }
+
+  // ── Step 5: Poll job status until completion ─────────────────────────
+  const statusUri = jobRes.headers.get('Location');
+  if (!statusUri) {
+    throw new Error('Adobe HTML to PDF response missing Location header for polling');
+  }
+
+  let pollResult = null;
+  const maxPollAttempts = 30;
+  const pollIntervalMs = 2000;
+
+  for (let attempt = 1; attempt <= maxPollAttempts; attempt++) {
+    await new Promise(r => setTimeout(r, pollIntervalMs));
+
+    const pollController = new AbortController();
+    const pollTimeout = setTimeout(() => pollController.abort(), 10000);
+
+    let pollRes;
+    try {
+      pollRes = await fetch(statusUri, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'X-Api-Key': clientId,
+        },
+        signal: pollController.signal,
+      });
+    } finally {
+      clearTimeout(pollTimeout);
+    }
+
+    if (!pollRes.ok) {
+      const errBody = await pollRes.text().catch(() => '');
+      throw new Error(`Adobe job status poll failed (HTTP ${pollRes.status}): ${errBody.slice(0, 200)}`);
+    }
+
+    const pollData = await pollRes.json();
+    const status = pollData?.status;
+
+    if (status === 'done' || status === 'succeeded') {
+      pollResult = pollData;
+      break;
+    }
+
+    if (status === 'failed' || status === 'error') {
+      const errorDetail = pollData?.error?.message || JSON.stringify(pollData?.error) || 'Unknown error';
+      throw new Error(`Adobe PDF job failed: ${errorDetail}`);
+    }
+
+    if (attempt === maxPollAttempts) {
+      throw new Error('Adobe PDF job polling timed out after 60 seconds');
+    }
+  }
+
+  if (!pollResult) {
+    throw new Error('Adobe PDF job polling ended without result');
+  }
+
+  // ── Step 6: Get download URI and download PDF ─────────────────────────
+  const downloadUri = pollResult?.asset?.downloadUri;
+  if (!downloadUri) {
+    throw new Error('Adobe job result missing downloadUri');
+  }
+
+  const downloadController = new AbortController();
+  const downloadTimeout = setTimeout(() => downloadController.abort(), 30000);
+
+  let downloadRes;
+  try {
+    downloadRes = await fetch(downloadUri, {
+      method: 'GET',
+      signal: downloadController.signal,
+    });
+  } finally {
+    clearTimeout(downloadTimeout);
+  }
+
+  if (!downloadRes.ok) {
+    throw new Error(`Adobe PDF download failed (HTTP ${downloadRes.status})`);
+  }
+
+  const pdfBuffer = await downloadRes.arrayBuffer();
+  if (!pdfBuffer || pdfBuffer.byteLength < 1000) {
+    throw new Error('Adobe returned an empty or invalid PDF binary');
+  }
+
+  console.info(`[Adobe] PDF rendered successfully — ${pdfBuffer.byteLength} bytes for "${filename}"`);
+  return pdfBuffer;
+}
+
+// ══════════════════════════════════════════════════════════════
+// PHASE 21C — GOTENBERG SERVER-SIDE PDF HELPER (FALLBACK)
 // ══════════════════════════════════════════════════════════════
 
 /**
@@ -167,8 +405,11 @@ export async function onRequestPost(context) {
   if (!strategy) return errRes('Request must include either strategy object or reportId', 400, cors);
   if (!strategy.company_name) return errRes('Strategy is missing company_name — send reportId or full strategy', 400, cors);
 
-  // ── Phase 21C: Gotenberg render mode detection ──
+  // ── Phase 22: Renderer selection ──
+  // Priority: Adobe → Gotenberg → JSON/HTML fallback
+  const useAdobe = env?.PDF_RENDER_ENGINE === 'adobe' && !!env?.ADOBE_CLIENT_ID && !!env?.ADOBE_CLIENT_SECRET;
   const useGotenberg = env?.PDF_RENDER_ENGINE === 'gotenberg' && !!env?.GOTENBERG_URL;
+  const hasGotenbergFallback = !!env?.GOTENBERG_URL;
 
   // ── QuickChart env config ──
   const QC = {
@@ -292,12 +533,68 @@ export async function onRequestPost(context) {
   const url = new URL(request.url);
   const isViewer = url.searchParams.get('mode') === 'viewer';
   const filename = `GTM_${strategy.company_name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
-  // When Gotenberg is active, always generate with 'gotenberg' renderMode so print CSS applies correctly
-  const renderMode = useGotenberg ? 'gotenberg' : (body.renderMode || 'browser-pdf');
+  
+  // Determine render mode for CSS optimization
+  const renderMode = useAdobe ? 'adobe' : (useGotenberg ? 'gotenberg' : (body.renderMode || 'browser-pdf'));
   const integration = getIntegrationStatus(env);
   const html = buildReportHTML(strategy, charts, isDemoMode, renderMode, isViewer);
 
-  // ── Phase 21C: Gotenberg path ──────────────────────────────────────────
+  // ── Phase 22: Adobe PDF Services path (PRIMARY) ─────────────────────────
+  if (useAdobe) {
+    try {
+      const pdfBuffer = await renderPdfWithAdobe(html, filename, env);
+      return new Response(pdfBuffer, {
+        status: 200,
+        headers: {
+          ...cors,
+          'Content-Type': 'application/pdf',
+          'Content-Disposition': `attachment; filename="${filename}"`,
+          'Cache-Control': 'no-store',
+          'X-ABE-PDF-Engine': 'adobe',
+          'X-ABE-Export-Path': `adobe|hydration=${hydrationPath}`,
+        },
+      });
+    } catch (adobeErr) {
+      console.warn('[Adobe] Failed — attempting Gotenberg fallback:', adobeErr.message);
+      
+      // ── Fallback to Gotenberg if Adobe fails ─────────────────────────
+      if (hasGotenbergFallback) {
+        try {
+          const pdfBuffer = await renderPdfWithGotenberg(html, filename, env);
+          return new Response(pdfBuffer, {
+            status: 200,
+            headers: {
+              ...cors,
+              'Content-Type': 'application/pdf',
+              'Content-Disposition': `attachment; filename="${filename}"`,
+              'Cache-Control': 'no-store',
+              'X-ABE-PDF-Engine': 'gotenberg_via_adobe_fallback',
+              'X-ABE-Export-Path': `gotenberg|adobe_failed|hydration=${hydrationPath}`,
+              'X-ABE-Fallback-Reason': adobeErr.message.slice(0, 200),
+            },
+          });
+        } catch (gotenbergErr) {
+          console.warn('[Gotenberg] Also failed — returning JSON fallback:', gotenbergErr.message);
+        }
+      }
+      
+      // ── Final fallback to JSON/HTML ────────────────────────────────────
+      return new Response(
+        JSON.stringify({
+          html,
+          filename,
+          mode: 'browser-pdf',
+          integration_status: integration,
+          pdf_fallback: 'adobe_failed',
+          pdf_fallback_reason: adobeErr.message,
+          pdf_secondary_fallback: hasGotenbergFallback ? 'gotenberg_also_failed' : 'gotenberg_not_configured',
+        }),
+        { status: 200, headers: { ...cors, 'Content-Type': 'application/json', 'X-ABE-PDF-Engine': 'adobe_failed', 'X-ABE-Export-Path': `json_fallback|adobe_failed|hydration=${hydrationPath}` } }
+      );
+    }
+  }
+
+  // ── Phase 21C: Gotenberg path (when Adobe not configured) ───────────────
   if (useGotenberg) {
     try {
       const pdfBuffer = await renderPdfWithGotenberg(html, filename, env);
@@ -328,7 +625,7 @@ export async function onRequestPost(context) {
     }
   }
 
-  // ── Default JSON/html fallback (Gotenberg disabled) ────────────────────
+  // ── Default JSON/html fallback (no PDF engine configured) ─────────────
   return new Response(JSON.stringify({ html, filename, mode: renderMode, integration_status: integration }), {
     status: 200, headers: { ...cors, 'Content-Type': 'application/json', 'X-ABE-PDF-Engine': 'none', 'X-ABE-Export-Path': `json_html|hydration=${hydrationPath}` },
   });
