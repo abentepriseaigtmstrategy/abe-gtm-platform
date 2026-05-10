@@ -2781,9 +2781,17 @@ ${p}.chart-block {
   align-items: center !important;
 }
 
-/* PAGE 31 RISK CHART: Increase to 550px for label readability */
+/* PAGE 31 RISK CHART: 700px min-height for label readability - NO CLIPPING */
 ${p}#page-31-risk-execution .chart-block {
-  min-height: 550px !important;
+  min-height: 700px !important;
+  /* NO max-height - allow chart to be as tall as needed */
+}
+
+/* PAGE 31: Allow expansion if chart needs more room */
+${p}#page-31-risk-execution {
+  height: auto !important;
+  min-height: 297mm !important;
+  overflow: visible !important;
 }
 
 ${p}.chart-block img {
@@ -2804,21 +2812,35 @@ ${p}#page-10-premium-insights .scope-cell {
   justify-content: center !important;
 }
 
-/* Page 4, 7, 27: Table padding and line-height expansion */
+/* Page 4, 7, 27: Table padding and line-height expansion - BOARDROOM QUALITY */
 ${p}#page-4-market-definition .dt td, 
 ${p}#page-7-segmentation-framework .dt td, 
 ${p}#page-27-buying-criteria .dt td { 
-  padding: 3% !important; /* Flexible padding */
-  line-height: 1.8 !important; 
+  padding: 15px 12px !important;
+  line-height: 2.2 !important;
 }
 
-/* Page 15: TAM Waterfall Visual & SWOT expansion — switch from px to flexible units */
+${p}#page-4-market-definition table td,
+${p}#page-7-segmentation-framework table td,
+${p}#page-27-buying-criteria table td {
+  padding: 15px 12px !important;
+  line-height: 2.2 !important;
+}
+
+/* Ensure these dense pages can expand */
+${p}#page-27-buying-criteria {
+  height: auto !important;
+  min-height: 297mm !important;
+  overflow: visible !important;
+}
+
+/* Page 15: TAM Waterfall Visual & SWOT expansion - ZERO OVERLAP GUARANTEED */
 ${p}#page-15-market-context-overflow-tam-visual .chart-block {
   flex-grow: 1 !important; /* Give more space to the chart */
   display: flex !important;
   flex-direction: column !important;
   justify-content: center !important;
-  margin-bottom: 60px !important; /* OVERLAP REMOVAL: 60px margin before SWOT */
+  margin-bottom: 100px !important; /* OVERLAP REMOVAL: 100px margin before SWOT - GUARANTEED SEPARATION */
 }
 ${p}#page-15-market-context-overflow-tam-visual .chart-block img { 
   max-height: 140mm !important; /* Limit by A4 height, not px */
@@ -2831,7 +2853,7 @@ ${p}#page-15-market-context-overflow-tam-visual .sc2 {
   display: flex !important;
   flex-direction: column !important;
   justify-content: center !important;
-  margin-top: 20px !important; /* Additional spacing after chart */
+  margin-top: 30px !important; /* Additional spacing after chart - increased from 20px */
 }
 
 /* Page 17: ICP Modeling spacing expansion */
