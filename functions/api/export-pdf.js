@@ -43,18 +43,19 @@ async function renderPdfWithAdobe(html, filename, env) {
   const tokenController = new AbortController();
   const tokenTimeout = setTimeout(() => tokenController.abort(), 15000);
 
+  // Build token request body with client credentials
+  const tokenBody = new URLSearchParams();
+  tokenBody.set('client_id', clientId);
+  tokenBody.set('client_secret', clientSecret);
+
   let tokenRes;
   try {
     tokenRes = await fetch(tokenEndpoint, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': `Basic ${btoa(`${clientId}:${clientSecret}`)}`,
       },
-      body: new URLSearchParams({
-        'grant_type': 'client_credentials',
-        'scope': 'openid,AdobeID,read_organizations,additional_info.projectedProductContext',
-      }),
+      body: tokenBody.toString(),
       signal: tokenController.signal,
     });
   } finally {
