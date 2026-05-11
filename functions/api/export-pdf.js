@@ -1,5 +1,6 @@
 /**
- * /api/export-pdf  (v7 — Phase 22: Adobe PDF Services Primary + Gotenberg Fallback)
+ * /api/export-pdf  (v7.2 — Phase 22: Adobe PDF Services Primary + Gotenberg Fallback)
+ * Cache-bust: 2026-05-11-B
  * Cloudflare Pages Function
  * INPUT:  POST { strategy: { company_name, industry, step_1_market, ... } }
  * OUTPUT: application/pdf (Adobe or Gotenberg) or JSON { html, filename, mode } (fallback)
@@ -174,9 +175,7 @@ async function renderPdfWithAdobe(html, filename, env) {
       method: 'POST',
       headers: jobHeaders,
       body: JSON.stringify({
-        input: {
-          assetID: assetId
-        }
+        assetID: assetId
       }),
       signal: jobController.signal,
     });
@@ -186,6 +185,7 @@ async function renderPdfWithAdobe(html, filename, env) {
 
   if (!jobRes.ok) {
     const errBody = await jobRes.text().catch(() => '');
+    console.error(`[Adobe] HTML to PDF job failed: HTTP ${jobRes.status}, assetId=${assetId?.slice(0, 8)}..., body=${errBody.slice(0, 200)}`);
     throw new Error(`Adobe HTML to PDF job failed (HTTP ${jobRes.status}): ${errBody.slice(0, 200)}`);
   }
 
