@@ -174,8 +174,9 @@ async function renderPdfWithAdobe(html, filename, env) {
       method: 'POST',
       headers: jobHeaders,
       body: JSON.stringify({
-        assetID: assetId,
-        outputFormat: 'pdf',
+        input: {
+          assetID: assetId
+        }
       }),
       signal: jobController.signal,
     });
