@@ -1,6 +1,6 @@
 /**
- * /api/export-pdf  (v7.4 — Phase 22D: Full-Bleed Enterprise CSS)
- * Cache-bust: 2026-05-11-D
+ * /api/export-pdf  (v7.7 — Phase 22G: Explicit 35-Page Layout)
+ * Cache-bust: 2026-05-11-G
  * Cloudflare Pages Function
  * INPUT:  POST { strategy: { company_name, industry, step_1_market, ... } }
  * OUTPUT: application/pdf (Adobe or Gotenberg) or JSON { html, filename, mode } (fallback)
@@ -3022,13 +3022,13 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false, rende
   // FULL HTML DOCUMENT
   // ════════════════════════════════════════════════════════════
 
-  // ── Phase 21D: Enterprise Print Profile v2 ─────────────────────────────────
-  // FULL BLEED, natural flow, NO fixed heights, centered content
+  // ── Phase 21D: Enterprise Print Profile v3 ─────────────────────────────────
+  // COMPLETE STYLING - matches viewer layout, compact sizing for ~15 pages
   const enterprisePrintCss = `
-/* ── PAGE SETUP ── FULL BLEED, NO MARGINS ── */
+/* ── PAGE SETUP ── COMPACT A4 ── */
 @page {
   size: A4;
-  margin: 0;
+  margin: 10mm 12mm 12mm 12mm;
 }
 
 @page :first {
@@ -3045,21 +3045,20 @@ html, body {
   padding: 0;
   background: #0B0F1A !important;
   background-color: #0c0d11 !important;
-  color: #ffffff !important;
+  color: #E5E7EB !important;
   font-family: 'Inter', sans-serif;
-  font-size: 11pt;
-  line-height: 1.6;
+  font-size: 10.5pt;
+  line-height: 1.5;
   -webkit-print-color-adjust: exact;
   print-color-adjust: exact;
 }
 
-/* ── PAGES ── FULL WIDTH, CONTENT PADDING ── */
+/* ── PAGES ── EXPLICIT 35-PAGE LAYOUT ── */
 ${p}.page {
   width: 210mm;
   min-height: 297mm;
   max-height: 297mm;
   background: #0c0d11 !important;
-  background-color: #0c0d11 !important;
   padding: 12mm 15mm 15mm 15mm;
   margin: 0;
   break-after: page;
@@ -3067,85 +3066,414 @@ ${p}.page {
   overflow: hidden;
   position: relative;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
 }
 
-/* ── COVER PAGE ── CENTERED ── */
+/* ── COVER PAGE STYLING ── */
 ${p}.page.cover-page {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
   text-align: center;
-  padding: 20mm;
+  padding: 12mm 15mm;
+  min-height: 0;
 }
 
-/* ── TYPOGRAPHY ── */
+/* ── TYPOGRAPHY ── COMPACT ── */
 ${p}h1 { 
-  font-size: 28pt;
+  font-size: 24pt;
   font-weight: 800;
-  margin: 0 0 8mm 0;
-  line-height: 1.2;
+  margin: 0 0 4mm 0;
+  line-height: 1.15;
   color: #ffffff;
 }
 ${p}h2, ${p}.section-header { 
-  font-size: 16pt;
+  font-size: 13pt;
   font-weight: 700;
-  margin: 6mm 0 4mm 0;
+  margin: 4mm 0 2mm 0;
   color: #f0f0f0;
 }
 ${p}h3 { 
-  font-size: 13pt;
+  font-size: 11pt;
   font-weight: 600;
-  margin: 5mm 0 3mm 0;
-  padding-bottom: 2mm;
+  margin: 3mm 0 2mm 0;
+  padding-bottom: 1mm;
   border-bottom: 1px solid #333;
   color: #E5E7EB;
 }
 ${p}p, ${p}li {
-  font-size: 10.5pt;
-  line-height: 1.6;
-  margin: 0 0 3mm 0;
+  font-size: 9.5pt;
+  line-height: 1.5;
+  margin: 0 0 2mm 0;
   color: rgba(255,255,255,0.9);
 }
 
-/* ── TABLES ── */
-${p}table {
+/* ── TABLES ── COMPACT ── */
+${p}table, ${p}.dark-table {
   width: 100%;
   border-collapse: collapse;
-  margin: 4mm 0;
-  font-size: 9.5pt;
+  margin: 2mm 0;
+  font-size: 8.5pt;
 }
-${p}table th { 
-  background: #1a1f2e;
+${p}table th, ${p}.dark-table th { 
+  background: #2a2a2a;
   color: #f0f0f0;
   font-weight: 600;
-  padding: 8px 10px;
+  padding: 4px 6px;
   text-align: left;
-  border: 1px solid #333;
+  border: 0.5px solid #444;
+  font-size: 7.5pt;
 }
-${p}table td { 
-  padding: 8px 10px;
-  line-height: 1.5;
-  border: 1px solid #333;
+${p}table td, ${p}.dark-table td { 
+  padding: 4px 6px;
+  line-height: 1.4;
+  border: 0.5px solid #444;
   vertical-align: top;
+  font-size: 8.5pt;
 }
 
-/* ── CARDS ── */
+/* ── CARDS ── COMPACT ── */
 ${p}.card {
   background: #121827;
   border: 1px solid #2a2f3e;
   border-radius: 6px;
-  padding: 4mm;
-  margin: 3mm 0;
+  padding: 2.5mm;
+  margin: 2mm 0;
 }
 ${p}.card-grid {
   display: grid;
-  gap: 3mm;
+  gap: 2mm;
+  margin: 2mm 0;
+}
+
+/* ── SCORE STRIP / METRICS ── */
+${p}.score-strip, .score-strip {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 8px;
+  margin: 8px 0 12px;
+}
+${p}.sc {
+  background: rgba(18, 24, 39, .7);
+  border: 1px solid #1F2937;
+  border-radius: 10px;
+  padding: 10px 12px;
+  position: relative;
+  overflow: hidden;
+  text-align: center;
+}
+${p}.sc::before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: linear-gradient(90deg, #7c3aed, #a855f7);
+  opacity: .6;
+}
+${p}.sv {
+  font-size: 18px;
+  font-weight: 900;
+  font-family: 'Space Mono', monospace;
+  color: white;
+  letter-spacing: -0.5px;
+}
+${p}.sl {
+  font-size: 7px;
+  text-transform: uppercase;
+  letter-spacing: .15em;
+  color: #6B7280;
+  font-weight: 700;
+  margin-top: 2px;
+}
+${p}.sv.green { color: #22c55e; }
+${p}.sv.amber { color: #f59e0b; }
+${p}.sv.red { color: #ef4444; }
+${p}.sv.purple { color: #a855f7; }
+
+/* ── SWOT GRID ── */
+${p}.sg, ${p}.swot-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 8px 0;
+}
+${p}.sc2 {
+  border: 1px solid #1F2937;
+  border-radius: 8px;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, .25);
+}
+${p}.sl {
+  font-size: 7px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .15em;
+  margin-bottom: 4px;
+}
+${p}.sc2 ul {
+  padding-left: 12px;
+  margin: 0;
+}
+${p}.sc2 li {
+  font-size: 8pt;
+  margin-bottom: 2px;
+  line-height: 1.4;
+}
+
+/* ── WATERFALL ── */
+${p}.ww, ${p}.waterfall {
+  margin: 6px 0 10px;
+}
+${p}.wb {
+  display: flex;
+  align-items: center;
+  margin-bottom: 6px;
+  gap: 6px;
+}
+${p}.wv {
+  width: 100px;
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  text-align: right;
+  color: white;
+  flex-shrink: 0;
+}
+${p}.wftrack {
+  flex: 1;
+  background: rgba(255, 255, 255, .08);
+  border-radius: 4px;
+  height: 14px;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .06);
+}
+${p}.wf {
+  height: 100%;
+  border-radius: 4px;
+  min-width: 2px;
+}
+${p}.wfb { background: linear-gradient(90deg, #1d4ed8, #3b82f6); width: 80%; }
+${p}.wfa { background: linear-gradient(90deg, #7c3aed, #a855f7); width: 50%; }
+${p}.wfm { background: linear-gradient(90deg, #b45309, #f59e0b); width: 20%; }
+
+/* ── CONFIDENCE MATRIX ── */
+${p}.cmrow {
+  margin-bottom: 6px;
+}
+${p}.cmhdr {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 2px;
+}
+${p}.cmlbl {
+  font-size: 8px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: #6B7280;
+}
+${p}.cmscore {
+  font-family: 'Space Mono', monospace;
+  font-size: 10px;
+  font-weight: 900;
+  color: #a855f7;
+}
+${p}.cmtrack {
+  background: rgba(255, 255, 255, .07);
+  border-radius: 3px;
+  height: 6px;
+  overflow: hidden;
+}
+${p}.cmfill {
+  height: 100%;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #7c3aed, #a855f7);
+  min-width: 2px;
+}
+${p}.cmrow-overall .cmtrack {
+  height: 10px;
+  border-radius: 5px;
+}
+${p}.cmrow-overall .cmfill {
+  background: linear-gradient(90deg, #5b21b6, #7c3aed, #a855f7, #c084fc);
+}
+
+/* ── SDR EMAIL SEQUENCE ── */
+${p}.sdr-step {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+${p}.sdr-num {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  color: white;
+  font-size: 10px;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+${p}.sdr-body {
+  flex: 1;
+  background: rgba(255,255,255,.02);
+  border: 1px solid #1F2937;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+${p}.sdr-angle {
+  color: #a855f7;
+  font-weight: 800;
+  font-size: 8px;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+}
+${p}.sdr-subject {
+  font-size: 9pt;
+  border-bottom: 1px solid rgba(255,255,255,.05);
+  padding-bottom: 4px;
+  margin-bottom: 4px;
+}
+${p}.sdr-preview {
+  font-size: 8.5pt;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+/* ── TAGS ── */
+${p}.tg, ${p}.tag {
+  font-size: 8px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(168, 85, 247, .1);
+  color: #a855f7;
+  border: 1px solid rgba(168, 85, 247, .2);
+  display: inline-block;
+  margin: 1px;
+}
+${p}.tg.green, ${p}.tag.green {
+  background: rgba(34, 197, 94, .1);
+  color: #22c55e;
+  border-color: rgba(34, 197, 94, .2);
+}
+${p}.tg.blue, ${p}.tag.blue {
+  background: rgba(59, 130, 246, .1);
+  color: #60a5fa;
+  border-color: rgba(59, 130, 246, .2);
+}
+${p}.tg.amber, ${p}.tag.amber {
+  background: rgba(245, 158, 11, .1);
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, .2);
+}
+
+/* ── ANALYST CALLOUT ── */
+${p}.ac {
+  background: rgba(168, 85, 247, .04);
+  border: 1px solid rgba(168, 85, 247, .2);
+  border-left: 3px solid #a855f7;
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin: 6px 0;
+  font-size: 9pt;
+}
+${p}.ac strong {
+  color: #a855f7;
+}
+${p}.ac.amber {
+  background: rgba(245, 158, 11, .04);
+  border-color: rgba(245, 158, 11, .2);
+  border-left-color: #f59e0b;
+}
+${p}.ac.amber strong {
+  color: #f59e0b;
+}
+
+/* ── PAGE HEADER / FOOTER ── */
+${p}.ph {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4mm;
+  padding-bottom: 2mm;
+  border-bottom: 1px solid #1F2937;
+}
+${p}.phb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+${p}.am {
+  width: 28px;
+  height: 28px;
+  background: linear-gradient(135deg, #7c3aed, #a855f7);
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Space Mono', monospace;
+  font-size: 9px;
+  font-weight: 700;
+  color: white;
+}
+${p}.abn {
+  font-size: 9px;
+  font-weight: 800;
+  color: white;
+}
+${p}.abs {
+  font-size: 6px;
+  color: #6B7280;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+${p}.cb {
+  font-size: 7px;
+  color: #a855f7;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+${p}.pf {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: auto;
+  padding-top: 3mm;
+  border-top: 1px solid #1F2937;
+  font-size: 7px;
+  color: #6B7280;
+}
+${p}.pf-tagline {
+  font-style: italic;
+  color: #a855f7;
+}
+
+/* ── CHARTS ── */
+${p}.chart-block {
+  width: 100%;
+  text-align: center;
   margin: 3mm 0;
+  background: transparent;
+}
+${p}.chart-block img {
+  max-width: 100%;
+  max-height: 180px;
+  height: auto;
+  object-fit: contain;
 }
 
 /* ── PAGE BREAKS ── */
-${p}.card, ${p}.table-wrap, ${p}.chart-block, ${p}tr {
+${p}.card, ${p}.table-wrap, ${p}.chart-block, ${p}tr, ${p}.keep-together {
   break-inside: avoid;
   page-break-inside: avoid;
 }
@@ -3154,51 +3482,66 @@ ${p}h1, ${p}h2, ${p}h3, ${p}.section-header {
   page-break-after: avoid;
 }
 
-/* ── CHARTS ── */
-${p}.chart-block {
-  width: 100%;
-  text-align: center;
-  margin: 4mm 0;
-  background: transparent;
-}
-${p}.chart-block img {
-  max-width: 100%;
-  max-height: 260px;
-  height: auto;
-  object-fit: contain;
-}
-
 /* ── UTILITY ── */
 ${p}.text-center { text-align: center; }
 ${p}.mt-2 { margin-top: 2mm; }
 ${p}.mt-4 { margin-top: 4mm; }
 ${p}.mb-2 { margin-bottom: 2mm; }
 ${p}.mb-4 { margin-bottom: 4mm; }
+${p}.num { font-family: 'Space Mono', monospace; color: #a855f7; font-weight: 700; }
 
 /* ── COVER PAGE SPECIFIC ── */
 ${p}.cover-title {
-  font-size: 36pt;
+  font-size: 32pt;
   font-weight: 900;
-  margin: 0 0 10mm 0;
+  margin: 0 0 6mm 0;
   color: #ffffff;
+  letter-spacing: -1px;
 }
 ${p}.cover-subtitle {
-  font-size: 12pt;
+  font-size: 10pt;
   color: #6B7280;
   letter-spacing: 0.15em;
   text-transform: uppercase;
-  margin: 0 0 15mm 0;
+  margin: 0 0 8mm 0;
 }
 ${p}.cover-gauge {
-  max-width: 240px;
+  max-width: 200px;
   margin: 0 auto;
 }
 ${p}.cover-metrics {
   display: flex;
   justify-content: center;
-  gap: 8mm;
-  margin-top: 10mm;
+  gap: 6mm;
+  margin-top: 6mm;
   flex-wrap: wrap;
+}
+
+/* ── SCOPE GRID ── */
+${p}.scope-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin: 8px 0;
+}
+${p}.scope-cell {
+  background: rgba(18, 24, 39, .6);
+  border: 1px solid #1F2937;
+  border-radius: 6px;
+  padding: 8px 10px;
+}
+${p}.scope-cell__label {
+  font-size: 7px;
+  font-weight: 900;
+  text-transform: uppercase;
+  letter-spacing: .1em;
+  color: #a855f7;
+  margin-bottom: 3px;
+}
+${p}.scope-cell__value {
+  font-size: 8.5pt;
+  line-height: 1.4;
+  color: #E5E7EB;
 }
 
 `
@@ -3389,64 +3732,35 @@ ${p}.tier-title{font-size:7.5px;font-weight:800;text-transform:uppercase;letter-
 ${p}.tier-body{font-size:9.5px;color:var(--text);line-height:1.4}
 /* SECTION CONTINUATION (browser-pdf) ── */
 ${p}.section-continuation{width:100%;box-sizing:border-box;padding:0;margin:0;background:transparent;display:block}
-/* ── A4 PRINT DISCIPLINE ── */
+/* ── A4 PRINT DISCIPLINE ── 35 PAGE FORMAT ── */
 @media print {
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
-  html, body { font-size: 11.5pt !important; background-color:#0c0d11 !important; margin: 0; padding: 0; }
+  html, body { font-size: 11pt !important; background-color:#0c0d11 !important; margin: 0; padding: 0; }
+  
+  /* Explicit pages - 35 page layout */
   ${p}.page {
     width: 210mm !important;
     height: 297mm !important;
+    min-height: 297mm !important;
+    max-height: 297mm !important;
     overflow: hidden !important;
     position: relative !important;
     background-color: #0c0d11 !important;
     margin: 0 !important;
-    padding: 0 !important;
+    padding: 12mm 15mm 15mm 15mm !important;
     display: flex !important;
     flex-direction: column !important;
-    justify-content: space-between !important;
     break-after: page !important;
     page-break-after: always !important;
   }
-  ${p}.page-expandable {
-    height: auto !important;
-    min-height: 297mm !important;
-    overflow: visible !important;
-    justify-content: flex-start !important;
-  }
-  ${p}.page-expandable .content-body {
-    justify-content: flex-start !important;
-    gap: 25px !important;
-  }
   
-  /* READABILITY EXPANSION: Pages permitted to flow beyond 297mm */
-  ${p}#page-4-market-definition,
-  ${p}#page-23-sdr-followup-part-2,
-  ${p}#page-27-buying-criteria {
-    height: auto !important;
-    min-height: 297mm !important;
-    overflow: visible !important;
-  }
+  /* Boardroom readability */
+  ${p}h1 { font-size: 28pt !important; }
+  ${p}h2, ${p}.section-header { font-size: 16pt !important; }
+  ${p}h3 { font-size: 13pt !important; }
   
-  ${p}#page-17-icp-modeling { justify-content: space-between !important; }
-  ${p}#page-15-market-context-overflow-tam-visual,
-  ${p}#page-18-account-sourcing-41-42,
-  ${p}#page-24-competitive-landscape,
-  ${p}#page-29-regulatory,
-  ${p}#page-34-tam-methodology,
-  ${p}#page-35-data-quality-audit { justify-content: space-between !important; }
-  ${p}#page-1-cover { justify-content: space-between !important; }
-  
-  /* Heading Font Increase (+3pt) */
-  ${p}h1 { font-size: 64px !important; }
-  ${p}h2, ${p}.section-header { font-size: 32pt !important; }
-  ${p}h3 { font-size: 20px !important; }
-
-  /* Page-Specific Filling */
-  ${p}#page-2-exec-summary .card, ${p}#page-10-premium-insights .scope-cell { min-height: 200px !important; margin-bottom: 30px !important; display: flex !important; flex-direction: column !important; justify-content: center !important; }
-  ${p}#page-4-market-definition .dt td, ${p}#page-7-segmentation-framework .dt td, ${p}#page-27-buying-criteria .dt td { padding: 20px !important; line-height: 2.0 !important; }
-  
-  /* BOARDROOM READABILITY: All tables get line-height 2.0 */
-  ${p}table td, ${p}.dt td { line-height: 2.0 !important; }
+  /* Comfortable table spacing */
+  ${p}table td, ${p}.dt td { line-height: 1.6 !important; padding: 8px 10px !important; }
   ${p}#page-15-market-context-overflow-tam-visual .chart-block img { height: 450px !important; object-fit: contain !important; }
   ${p}#page-15-market-context-overflow-tam-visual .sc2 { min-height: 250px !important; display: flex !important; flex-direction: column !important; justify-content: center !important; }
   ${p}#page-17-icp-modeling .icp-grid { gap: 12mm !important; margin: 10mm 0 !important; }
