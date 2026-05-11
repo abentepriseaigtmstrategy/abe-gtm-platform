@@ -1,6 +1,6 @@
 /**
- * /api/export-pdf  (v7.2 — Phase 22: Adobe PDF Services Primary + Gotenberg Fallback)
- * Cache-bust: 2026-05-11-B
+ * /api/export-pdf  (v7.3 — Phase 22: Adobe PDF Services + Enterprise Print CSS)
+ * Cache-bust: 2026-05-11-C
  * Cloudflare Pages Function
  * INPUT:  POST { strategy: { company_name, industry, step_1_market, ... } }
  * OUTPUT: application/pdf (Adobe or Gotenberg) or JSON { html, filename, mode } (fallback)
@@ -3022,12 +3022,55 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false, rende
   // FULL HTML DOCUMENT
   // ════════════════════════════════════════════════════════════
 
-  // ── Phase 21C: Gotenberg-specific print profile ────────────────────────
-  // When Gotenberg renders, we use headless Chromium with print media.
-  // Rules: NO transform:scale(), NO fixed-height containers, allow report to flow freely.
-  // Minimum readable font sizes enforced. Section headings kept with content.
-  const gotenbergPrintCss = `
-@page { size: A4; margin: 0; }
+  // ── Phase 21C: Enterprise Print Profile (Adobe/Gotenberg/Chromium) ────────────────────────
+  // Global Flexi Standards: Proper page breaks, headers/footers, breathing space
+  // NO fixed-height steel cage - content flows naturally with page breaks
+  const enterprisePrintCss = `
+/* ── PAGE SETUP WITH HEADERS/FOOTERS ── */
+@page {
+  size: A4;
+  margin: 15mm 18mm 20mm 18mm;
+  
+  @top-center {
+    content: "ABE — AI Revenue Infrastructure";
+    font-family: 'Inter', sans-serif;
+    font-size: 8pt;
+    color: #6B7280;
+    border-bottom: 0.5px solid #1F2937;
+    padding-bottom: 2mm;
+  }
+  
+  @bottom-center {
+    content: "Plan with clarity. Build with intent. Grow through trust.";
+    font-family: 'Inter', sans-serif;
+    font-size: 7.5pt;
+    color: #a855f7;
+    font-style: italic;
+    border-top: 0.5px solid #1F2937;
+    padding-top: 2mm;
+  }
+  
+  @bottom-right {
+    content: "Page " counter(page);
+    font-family: 'Space Mono', monospace;
+    font-size: 8pt;
+    color: #6B7280;
+  }
+}
+
+/* Cover page - full bleed, no header */
+@page :first {
+  margin: 0;
+  @top-center { content: none; }
+  @bottom-center { 
+    content: "Plan with clarity. Build with intent. Grow through trust.";
+    font-size: 9pt;
+    padding-bottom: 10mm;
+  }
+  @bottom-right { content: none; }
+}
+
+/* ── BASE STYLES ── */
 html, body {
   -webkit-print-color-adjust: exact !important;
   print-color-adjust: exact !important;
@@ -3035,88 +3078,175 @@ html, body {
   background-color: #0c0d11 !important;
   font-size: 11pt !important;
   font-weight: 400 !important;
-  line-height: 1.6 !important;
+  line-height: 1.7 !important;
   margin: 0;
   padding: 0;
   color: rgba(255, 255, 255, 0.95) !important;
 }
-/* STEEL CAGE: Fixed 297mm height, content clipped if overflow */
+
+/* ── PAGE CONTAINERS - Natural flow, NO fixed height ── */
 ${p}.page {
-  width: 210mm !important;
-  height: 297mm !important;
-  overflow: hidden !important;
-  position: relative !important;
+  width: 100% !important;
+  min-height: 257mm !important; /* A4 minus margins */
   background-color: #0c0d11 !important;
   box-sizing: border-box;
-  padding: 15mm 18mm 25mm !important;
+  padding: 0 !important;
   margin: 0 !important;
   display: flex !important;
   flex-direction: column !important;
   justify-content: flex-start !important;
   break-after: page !important;
   page-break-after: always !important;
+  position: relative !important;
 }
 
-/* READABILITY EXPANSION: Pages 4, 23, 27, 31 permitted to flow beyond 297mm for quality */
-${p}#page-4-market-definition,
-${p}#page-23-sdr-followup-part-2,
-${p}#page-27-buying-criteria,
-${p}#page-31-risk-execution {
-  height: auto !important;
+/* Cover page special handling */
+${p}.page.cover-page {
   min-height: 297mm !important;
-  overflow: visible !important;
+  justify-content: center !important;
+  align-items: center !important;
+  padding: 15mm !important;
 }
 
-/* REMOVED: page-expandable class (violates steel cage directive) */
-/* ── Content Body wrapper for centering ── */
+/* ── CONTENT BODY WITH BREATHING SPACE ── */
 ${p}.content-body {
-  flex-grow: 1 !important;
+  flex: 1 !important;
   display: flex !important;
   flex-direction: column !important;
   justify-content: center !important;
-  gap: 10mm !important;
-  margin: 5mm 0 !important;
+  gap: 8mm !important;
+  padding: 5mm 0 !important;
 }
-/* Headings always stay with at least first content block */
-${p}h1, ${p}h2, ${p}h3, ${p}.section-header, ${p}.ph {
+
+/* ── TYPOGRAPHY - LARGER, READABLE ── */
+${p}h1 { 
+  font-size: 36pt !important; 
+  font-weight: 800 !important;
+  margin-bottom: 8mm !important;
+  line-height: 1.2 !important;
+}
+${p}h2, ${p}.section-header { 
+  font-size: 18pt !important; 
+  font-weight: 700 !important; 
+  margin-bottom: 5mm !important;
+  margin-top: 4mm !important;
+  color: #f0f0f0 !important;
+}
+${p}h3 { 
+  font-size: 14pt !important; 
+  font-weight: 600 !important;
+  margin-bottom: 3mm !important;
+  margin-top: 3mm !important;
+  border-bottom: 1px solid rgba(255,255,255,0.1) !important;
+  padding-bottom: 2mm !important;
+  color: #E5E7EB !important;
+}
+${p}p, ${p}li {
+  font-size: 11pt !important;
+  line-height: 1.7 !important;
+  margin-bottom: 3mm !important;
+}
+
+/* ── TABLES - COMPACT BUT READABLE ── */
+${p}table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  margin: 4mm 0 !important;
+}
+${p}table th { 
+  font-size: 10pt !important; 
+  padding: 6px 8px !important;
+  background: #2a2a2a !important;
+  color: #f0f0f0 !important;
+  font-weight: 600 !important;
+  text-align: left !important;
+  border: 0.5px solid #444 !important;
+}
+${p}table td { 
+  font-size: 10pt !important; 
+  padding: 6px 8px !important;
+  line-height: 1.5 !important;
+  border: 0.5px solid #444 !important;
+  vertical-align: top !important;
+}
+
+/* ── CARDS - PROPER SPACING ── */
+${p}.card {
+  background: #121827 !important;
+  border: 1px solid #1F2937 !important;
+  border-radius: 6px !important;
+  padding: 5mm !important;
+  margin: 3mm 0 !important;
+}
+${p}.card-grid {
+  display: grid !important;
+  gap: 4mm !important;
+  margin: 4mm 0 !important;
+}
+
+/* ── PAGE BREAK RULES ── */
+/* Prevent orphaned elements */
+${p}.card, ${p}.table-wrap, ${p}.chart-block, ${p}tr {
+  break-inside: avoid !important;
+  page-break-inside: avoid !important;
+}
+/* Keep headings with content */
+${p}h1, ${p}h2, ${p}h3, ${p}.section-header {
   break-after: avoid !important;
   page-break-after: avoid !important;
 }
-/* Heading Font Sizes - Steel Cage Optimized */
-${p}h1 { font-size: 48px !important; margin-bottom: 10mm !important; }
-${p}h2, ${p}.section-header { font-size: 24pt !important; font-weight: 700 !important; margin-bottom: 6mm !important; }
-${p}h3 { font-size: 16px !important; margin-bottom: 4mm !important; border-bottom: 1px solid rgba(255,255,255,0.1) !important; padding-bottom: 2mm !important; }
+/* Section starts on new page */
+${p}.section-start {
+  break-before: page !important;
+  page-break-before: always !important;
+}
 
-/* Readability — table fonts 10pt */
-${p}.dt th, ${p}table th, ${p}th { font-size: 10pt !important; padding: 8px 10px !important; background: rgba(255,255,255,0.05) !important; color: var(--accent) !important; }
-${p}.dt td, ${p}table td, ${p}td { font-size: 10pt !important; padding: 8px 10px !important; line-height: 2.0 !important; }
-${p}.card p, ${p}.card div { font-size: 11pt !important; line-height: 1.6 !important; }
-${p}.sc2 li { font-size: 10pt !important; line-height: 1.6 !important; margin-bottom: 4mm !important; }
-${p}.sc { font-size: 11pt !important; font-style: italic !important; opacity: 0.8 !important; margin-bottom: 10mm !important; border-left: 4px solid var(--accent) !important; }
-${p}.ac { font-size: 11pt !important; padding: 8mm 10mm !important; }
-${p}.pf-tagline { font-size: 9px !important; font-weight: 500 !important; }
-${p}.pf { font-size: 9px !important; }
-
-/* Chart Enhancement - 420px min-height */
+/* ── CHARTS - PROPER SIZING ── */
 ${p}.chart-block {
-  min-height: 420px !important;
+  min-height: 200px !important;
+  max-height: 350px !important;
   display: flex !important;
   flex-direction: column !important;
   justify-content: center !important;
   align-items: center !important;
+  margin: 4mm 0 !important;
+}
+${p}.chart-block img {
+  max-width: 100% !important;
+  max-height: 320px !important;
+  object-fit: contain !important;
 }
 
-/* PAGE 31 RISK CHART: 700px min-height for label readability - NO CLIPPING */
-${p}#page-31-risk-execution .chart-block {
-  min-height: 700px !important;
-  /* NO max-height - allow chart to be as tall as needed */
+/* ── UTILITY CLASSES ── */
+${p}.text-center { text-align: center !important; }
+${p}.mt-2 { margin-top: 2mm !important; }
+${p}.mt-4 { margin-top: 4mm !important; }
+${p}.mb-2 { margin-bottom: 2mm !important; }
+${p}.mb-4 { margin-bottom: 4mm !important; }
+${p}.breathing-space { 
+  padding: 6mm 0 !important;
+  margin: 4mm 0 !important;
+  border-top: 1px dashed rgba(168,85,247,0.2) !important;
 }
 
-/* PAGE 31: Allow expansion if chart needs more room */
-${p}#page-31-risk-execution {
-  height: auto !important;
-  min-height: 297mm !important;
-  overflow: visible !important;
+/* ── COVER PAGE SPECIFIC ── */
+${p}.cover-title {
+  font-size: 42pt !important;
+  font-weight: 900 !important;
+  text-align: center !important;
+  margin-bottom: 15mm !important;
+}
+${p}.cover-subtitle {
+  font-size: 14pt !important;
+  text-align: center !important;
+  color: #6B7280 !important;
+  letter-spacing: 0.2em !important;
+  text-transform: uppercase !important;
+  margin-bottom: 20mm !important;
+}
+${p}.cover-gauge {
+  max-width: 280px !important;
+  margin: 0 auto !important;
 }
 
 ${p}.chart-block img {
@@ -3343,58 +3473,10 @@ ${p}#page-34-tam-methodology .section-header,
 ${p}#page-35-data-quality-audit .section-header {
   display: none !important;
 }
-`;
+`
 
-  const paginationCss = renderMode === 'gotenberg' ? gotenbergPrintCss : renderMode === 'browser-pdf' ? `
-${!isViewer ? '@page { size: A4; margin: 12mm; } body { padding: 0 !important; height: auto !important; }' : ''}
-/* browser-pdf: content flows naturally — Chromium handles pagination. */
-${p}.page {
-  width: 100%;
-  box-sizing: border-box;
-  background: #0c0d11 !important;
-  background-color: #0c0d11 !important;
-  padding: 0 !important;
-  margin: 0 !important;
-  height: 100% !important;
-  overflow: hidden !important;
-  display:flex !important;
-  flex-direction:column !important;
-  justify-content:space-between !important;
-}
-${p}.page.section-break {
-  break-before: page !important;
-  page-break-before: always !important;
-}
-${p}.card, ${p}.table-wrap, ${p}.chart-block, ${p}.ac, ${p}.swot-grid,
-${p}.page-insight, ${p}.page-insight-expanded, ${p}.sdr-step, ${p}tr {
-  break-inside: avoid !important;
-  page-break-inside: avoid !important;
-}
-${p}.page-insight, ${p}.page-insight-expanded, ${p}.pf {
-  break-before: avoid !important;
-  page-break-before: avoid !important;
-}
-${p}h1, ${p}h2, ${p}h3, ${p}.section-header, ${p}.ph {
-  break-after: avoid !important;
-  page-break-after: avoid !important;
-}
-${p}.edu-filler {
-  margin-top: auto;
-  padding-top: 6mm;
-  border-top: 1px dashed rgba(168,85,247,.2);
-  border-left: 3px solid rgba(168,85,247,.4);
-  border-right: 1px dashed rgba(168,85,247,.12);
-  border-bottom: 1px dashed rgba(168,85,247,.12);
-  border-radius: 0 8px 8px 0;
-  padding: 4mm 5mm 4.5mm 5mm;
-  background: linear-gradient(135deg, rgba(168,85,247,.035), rgba(18,24,39,.45));
-  break-inside: avoid;
-  page-break-inside: avoid;
-}
-${p}.page{height:297mm !important;overflow:hidden !important;display:flex;flex-direction:column;justify-content:center;background:#0c0d11;background-color:#0c0d11}
-` : `
-${p}.page{width:210mm;height:297mm !important;overflow:hidden !important;margin:0;background:#0c0d11;background-color:#0c0d11;padding:12mm 15mm 15mm;position:relative;page-break-after:always;box-sizing:border-box;display:flex;flex-direction:column;justify-content:center}
-`;
+  const paginationCss = (renderMode === 'gotenberg' || renderMode === 'adobe') ? enterprisePrintCss : '';
+
   const styles = `
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
