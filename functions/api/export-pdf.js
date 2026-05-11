@@ -121,11 +121,13 @@ async function renderPdfWithAdobe(html, filename, env) {
   }
 
   const assetData = await assetRes.json();
-  const assetId = assetData?.asset?.assetID;
-  const uploadUri = assetData?.asset?.uploadUri;
+  // Adobe API returns assetID and uploadUri directly (flat response)
+  const assetId = assetData?.assetID || assetData?.asset?.assetID;
+  const uploadUri = assetData?.uploadUri || assetData?.asset?.uploadUri;
 
   if (!assetId || !uploadUri) {
-    throw new Error('Adobe asset creation response missing assetID or uploadUri');
+    const availFields = Object.keys(assetData || {}).join(', ');
+    throw new Error(`Adobe asset creation response missing assetID or uploadUri. Available fields: ${availFields.slice(0, 100)}`);
   }
 
   // ── Step 3: Upload HTML content to the asset URI ───────────────────────
