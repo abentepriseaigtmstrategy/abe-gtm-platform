@@ -22,3 +22,14 @@ ADOBE_API_BASE_URL = "https://pdf-services.adobe.io"
 
 # Gotenberg (Fallback)
 GOTENBERG_URL = "https://gotenberg-production-e409.up.railway.app"
+
+# ADOBE PDF SERVICES SECRETS (Required - add via Cloudflare Dashboard)
+# From your Adobe credentials JSON file, extract these plain string values:
+#
+# ADOBE_CLIENT_ID = client_credentials.client_id (e.g., "b908c317efae4cf79a7141db2021d755")
+# ADOBE_CLIENT_SECRET = client_credentials.client_secret (e.g., "p8e-LMERm8F8rI9SH89N4rvdtoXDeYJ_b5mw")
+#
+# DO NOT paste the entire JSON - only the individual string values.
+# Add these in Cloudflare Dashboard: Workers & Pages → abe-gtm-platform → Settings → Environment Variables
+# Set Type to "Secret" for both values.
+#
