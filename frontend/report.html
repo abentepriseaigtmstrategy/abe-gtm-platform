@@ -1390,8 +1390,8 @@
     <a href="gtm-strategy.html">GTM Strategy</a>
     <a href="vault.html">Strategy Vault</a>
     <button class="active-mobile" style="color:#a855f7;background:rgba(168,85,247,.1)">Report</button>
-    <button onclick="exportPDF()" id="mobile-export-pdf">Export PDF</button>
-    <button onclick="exportHTML()" id="mobile-export-html">Download HTML</button>
+    <button onclick="exportPDF()" id="mobile-export-pdf" disabled>Export PDF</button>
+    <button onclick="exportHTML()" id="mobile-export-html" disabled>Download HTML</button>
     <button onclick="window.APP.signOut()" style="color:#ef4444;">Sign Out</button>
   </div>
 
@@ -2187,6 +2187,12 @@
       document.getElementById('btn-export2').disabled = false;
       document.getElementById('btn-export-html').disabled = false;
       document.getElementById('btn-export-html2').disabled = false;
+      
+      // Enable mobile export buttons
+      const mobilePdfBtn = document.getElementById('mobile-export-pdf');
+      const mobileHtmlBtn = document.getElementById('mobile-export-html');
+      if (mobilePdfBtn) mobilePdfBtn.disabled = false;
+      if (mobileHtmlBtn) mobileHtmlBtn.disabled = false;
 
       // Cover positioning strip
       const positioningText = safe(s1.company_overview) || safe(r.company_name) + ' — GTM intelligence report.';
@@ -2199,7 +2205,25 @@
     </div>`;
       }
 
-      window._strategy = r;
+      // Store sanitized strategy (remove sensitive backend data)
+      window._strategy = sanitizeStrategyForFrontend(r);
+    }
+
+    // ── Sanitize Strategy ── Remove sensitive backend data before storing in frontend memory
+    function sanitizeStrategyForFrontend(strategy) {
+      if (!strategy || typeof strategy !== 'object') return strategy;
+      // Create shallow copy without sensitive fields
+      const { backend_intelligence, step_7_intelligence, ...safeStrategy } = strategy;
+      // Keep step_7_intelligence but remove backend_intelligence sub-field if exists
+      if (step_7_intelligence && typeof step_7_intelligence === 'object') {
+        const { backend_intelligence: bi7, ...safeS7 } = step_7_intelligence;
+        safeStrategy.step_7_intelligence = safeS7;
+      }
+      // Remove any other potentially sensitive fields
+      delete safeStrategy._internal;
+      delete safeStrategy._raw_prompts;
+      delete safeStrategy._api_logs;
+      return safeStrategy;
     }
 
     // ── Load Report ───────────────────────────────────────────────────
@@ -2238,7 +2262,14 @@
             document.getElementById('btn-export-html').disabled = false;
             document.getElementById('btn-export-html2').disabled = false;
             
-            window._strategy = strategy;
+            // Enable mobile export buttons
+            const mobilePdfBtn = document.getElementById('mobile-export-pdf');
+            const mobileHtmlBtn = document.getElementById('mobile-export-html');
+            if (mobilePdfBtn) mobilePdfBtn.disabled = false;
+            if (mobileHtmlBtn) mobileHtmlBtn.disabled = false;
+            
+            // Store sanitized strategy (remove sensitive backend data)
+            window._strategy = sanitizeStrategyForFrontend(strategy);
             return;
           }
           throw new Error('API render returned empty payload');
@@ -2391,6 +2422,9 @@
     }
 
     // ── Export HTML — Download report as standalone HTML file ─────────
+    // SECURITY: Only captures rendered DOM content (reportContent.innerHTML).
+    // Does NOT include window._strategy or any JavaScript data.
+    // Sensitive backend data (backend_intelligence, formulas) is stripped by sanitizeStrategyForFrontend().
     async function exportHTML() {
       const btn1 = document.getElementById('btn-export-html');
       const btn2 = document.getElementById('btn-export-html2');
@@ -2398,10 +2432,19 @@
       if (btn2) { btn2.disabled = true; btn2.textContent = 'Preparing HTML…'; }
 
       try {
-        // Get current report content
+        // Get current report content (rendered DOM only - no JS data)
         const reportContent = document.getElementById('report-content');
         const companyName = document.getElementById('r-company')?.textContent || 'GTM_Report';
         const filename = companyName.replace(/[^a-z0-9]/gi, '_') + '.html';
+
+        // Sanitize HTML content - remove any data-* attributes that might contain sensitive info
+        let safeHtml = reportContent.innerHTML;
+        // Remove data attributes that might contain backend data
+        safeHtml = safeHtml.replace(/\sdata-[a-z0-9-]+="[^"]*"/gi, '');
+        // Remove any script tags if present
+        safeHtml = safeHtml.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+        // Remove any event handlers
+        safeHtml = safeHtml.replace(/\son\w+="[^"]*"/gi, '');
 
         // Build standalone HTML with all styles inline
         const htmlDoc = `<!DOCTYPE html>
@@ -2428,7 +2471,7 @@
   </style>
 </head>
 <body>
-  ${reportContent.innerHTML}
+  ${safeHtml}
 </body>
 </html>`;
 
