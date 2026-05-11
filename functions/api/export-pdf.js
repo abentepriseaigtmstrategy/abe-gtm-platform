@@ -1,6 +1,6 @@
 /**
- * /api/export-pdf  (v7.3 — Phase 22: Adobe PDF Services + Enterprise Print CSS)
- * Cache-bust: 2026-05-11-C
+ * /api/export-pdf  (v7.4 — Phase 22D: Full-Bleed Enterprise CSS)
+ * Cache-bust: 2026-05-11-D
  * Cloudflare Pages Function
  * INPUT:  POST { strategy: { company_name, industry, step_1_market, ... } }
  * OUTPUT: application/pdf (Adobe or Gotenberg) or JSON { html, filename, mode } (fallback)
@@ -3022,457 +3022,185 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false, rende
   // FULL HTML DOCUMENT
   // ════════════════════════════════════════════════════════════
 
-  // ── Phase 21C: Enterprise Print Profile (Adobe/Gotenberg/Chromium) ────────────────────────
-  // Global Flexi Standards: Proper page breaks, headers/footers, breathing space
-  // NO fixed-height steel cage - content flows naturally with page breaks
+  // ── Phase 21D: Enterprise Print Profile v2 ─────────────────────────────────
+  // FULL BLEED, natural flow, NO fixed heights, centered content
   const enterprisePrintCss = `
-/* ── PAGE SETUP WITH HEADERS/FOOTERS ── */
+/* ── PAGE SETUP ── FULL BLEED, NO MARGINS ── */
 @page {
   size: A4;
-  margin: 15mm 18mm 20mm 18mm;
-  
-  @top-center {
-    content: "ABE — AI Revenue Infrastructure";
-    font-family: 'Inter', sans-serif;
-    font-size: 8pt;
-    color: #6B7280;
-    border-bottom: 0.5px solid #1F2937;
-    padding-bottom: 2mm;
-  }
-  
-  @bottom-center {
-    content: "Plan with clarity. Build with intent. Grow through trust.";
-    font-family: 'Inter', sans-serif;
-    font-size: 7.5pt;
-    color: #a855f7;
-    font-style: italic;
-    border-top: 0.5px solid #1F2937;
-    padding-top: 2mm;
-  }
-  
-  @bottom-right {
-    content: "Page " counter(page);
-    font-family: 'Space Mono', monospace;
-    font-size: 8pt;
-    color: #6B7280;
-  }
+  margin: 0;
 }
 
-/* Cover page - full bleed, no header */
 @page :first {
   margin: 0;
-  @top-center { content: none; }
-  @bottom-center { 
-    content: "Plan with clarity. Build with intent. Grow through trust.";
-    font-size: 9pt;
-    padding-bottom: 10mm;
-  }
-  @bottom-right { content: none; }
 }
 
-/* ── BASE STYLES ── */
+/* ── BASE RESET ── */
+* {
+  box-sizing: border-box;
+}
+
 html, body {
-  -webkit-print-color-adjust: exact !important;
-  print-color-adjust: exact !important;
-  background: #0B0F1A !important;
-  background-color: #0c0d11 !important;
-  font-size: 11pt !important;
-  font-weight: 400 !important;
-  line-height: 1.7 !important;
   margin: 0;
   padding: 0;
-  color: rgba(255, 255, 255, 0.95) !important;
-}
-
-/* ── PAGE CONTAINERS - Natural flow, NO fixed height ── */
-${p}.page {
-  width: 100% !important;
-  min-height: 257mm !important; /* A4 minus margins */
+  background: #0B0F1A !important;
   background-color: #0c0d11 !important;
+  color: #ffffff !important;
+  font-family: 'Inter', sans-serif;
+  font-size: 11pt;
+  line-height: 1.6;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+/* ── PAGES ── FULL WIDTH, CONTENT PADDING ── */
+${p}.page {
+  width: 210mm;
+  min-height: 297mm;
+  max-height: 297mm;
+  background: #0c0d11 !important;
+  background-color: #0c0d11 !important;
+  padding: 12mm 15mm 15mm 15mm;
+  margin: 0;
+  break-after: page;
+  page-break-after: always;
+  overflow: hidden;
+  position: relative;
   box-sizing: border-box;
-  padding: 0 !important;
-  margin: 0 !important;
-  display: flex !important;
-  flex-direction: column !important;
-  justify-content: flex-start !important;
-  break-after: page !important;
-  page-break-after: always !important;
-  position: relative !important;
 }
 
-/* Cover page special handling */
+/* ── COVER PAGE ── CENTERED ── */
 ${p}.page.cover-page {
-  min-height: 297mm !important;
-  justify-content: center !important;
-  align-items: center !important;
-  padding: 15mm !important;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+  padding: 20mm;
 }
 
-/* ── CONTENT BODY WITH BREATHING SPACE ── */
-${p}.content-body {
-  flex: 1 !important;
-  display: flex !important;
-  flex-direction: column !important;
-  justify-content: center !important;
-  gap: 8mm !important;
-  padding: 5mm 0 !important;
-}
-
-/* ── TYPOGRAPHY - LARGER, READABLE ── */
+/* ── TYPOGRAPHY ── */
 ${p}h1 { 
-  font-size: 36pt !important; 
-  font-weight: 800 !important;
-  margin-bottom: 8mm !important;
-  line-height: 1.2 !important;
+  font-size: 28pt;
+  font-weight: 800;
+  margin: 0 0 8mm 0;
+  line-height: 1.2;
+  color: #ffffff;
 }
 ${p}h2, ${p}.section-header { 
-  font-size: 18pt !important; 
-  font-weight: 700 !important; 
-  margin-bottom: 5mm !important;
-  margin-top: 4mm !important;
-  color: #f0f0f0 !important;
+  font-size: 16pt;
+  font-weight: 700;
+  margin: 6mm 0 4mm 0;
+  color: #f0f0f0;
 }
 ${p}h3 { 
-  font-size: 14pt !important; 
-  font-weight: 600 !important;
-  margin-bottom: 3mm !important;
-  margin-top: 3mm !important;
-  border-bottom: 1px solid rgba(255,255,255,0.1) !important;
-  padding-bottom: 2mm !important;
-  color: #E5E7EB !important;
+  font-size: 13pt;
+  font-weight: 600;
+  margin: 5mm 0 3mm 0;
+  padding-bottom: 2mm;
+  border-bottom: 1px solid #333;
+  color: #E5E7EB;
 }
 ${p}p, ${p}li {
-  font-size: 11pt !important;
-  line-height: 1.7 !important;
-  margin-bottom: 3mm !important;
+  font-size: 10.5pt;
+  line-height: 1.6;
+  margin: 0 0 3mm 0;
+  color: rgba(255,255,255,0.9);
 }
 
-/* ── TABLES - COMPACT BUT READABLE ── */
+/* ── TABLES ── */
 ${p}table {
-  width: 100% !important;
-  border-collapse: collapse !important;
-  margin: 4mm 0 !important;
+  width: 100%;
+  border-collapse: collapse;
+  margin: 4mm 0;
+  font-size: 9.5pt;
 }
 ${p}table th { 
-  font-size: 10pt !important; 
-  padding: 6px 8px !important;
-  background: #2a2a2a !important;
-  color: #f0f0f0 !important;
-  font-weight: 600 !important;
-  text-align: left !important;
-  border: 0.5px solid #444 !important;
+  background: #1a1f2e;
+  color: #f0f0f0;
+  font-weight: 600;
+  padding: 8px 10px;
+  text-align: left;
+  border: 1px solid #333;
 }
 ${p}table td { 
-  font-size: 10pt !important; 
-  padding: 6px 8px !important;
-  line-height: 1.5 !important;
-  border: 0.5px solid #444 !important;
-  vertical-align: top !important;
+  padding: 8px 10px;
+  line-height: 1.5;
+  border: 1px solid #333;
+  vertical-align: top;
 }
 
-/* ── CARDS - PROPER SPACING ── */
+/* ── CARDS ── */
 ${p}.card {
-  background: #121827 !important;
-  border: 1px solid #1F2937 !important;
-  border-radius: 6px !important;
-  padding: 5mm !important;
-  margin: 3mm 0 !important;
+  background: #121827;
+  border: 1px solid #2a2f3e;
+  border-radius: 6px;
+  padding: 4mm;
+  margin: 3mm 0;
 }
 ${p}.card-grid {
-  display: grid !important;
-  gap: 4mm !important;
-  margin: 4mm 0 !important;
+  display: grid;
+  gap: 3mm;
+  margin: 3mm 0;
 }
 
-/* ── PAGE BREAK RULES ── */
-/* Prevent orphaned elements */
+/* ── PAGE BREAKS ── */
 ${p}.card, ${p}.table-wrap, ${p}.chart-block, ${p}tr {
-  break-inside: avoid !important;
-  page-break-inside: avoid !important;
+  break-inside: avoid;
+  page-break-inside: avoid;
 }
-/* Keep headings with content */
 ${p}h1, ${p}h2, ${p}h3, ${p}.section-header {
-  break-after: avoid !important;
-  page-break-after: avoid !important;
-}
-/* Section starts on new page */
-${p}.section-start {
-  break-before: page !important;
-  page-break-before: always !important;
+  break-after: avoid;
+  page-break-after: avoid;
 }
 
-/* ── CHARTS - PROPER SIZING ── */
+/* ── CHARTS ── */
 ${p}.chart-block {
-  min-height: 200px !important;
-  max-height: 350px !important;
-  display: flex !important;
-  flex-direction: column !important;
-  justify-content: center !important;
-  align-items: center !important;
-  margin: 4mm 0 !important;
+  width: 100%;
+  text-align: center;
+  margin: 4mm 0;
+  background: transparent;
 }
 ${p}.chart-block img {
-  max-width: 100% !important;
-  max-height: 320px !important;
-  object-fit: contain !important;
+  max-width: 100%;
+  max-height: 260px;
+  height: auto;
+  object-fit: contain;
 }
 
-/* ── UTILITY CLASSES ── */
-${p}.text-center { text-align: center !important; }
-${p}.mt-2 { margin-top: 2mm !important; }
-${p}.mt-4 { margin-top: 4mm !important; }
-${p}.mb-2 { margin-bottom: 2mm !important; }
-${p}.mb-4 { margin-bottom: 4mm !important; }
-${p}.breathing-space { 
-  padding: 6mm 0 !important;
-  margin: 4mm 0 !important;
-  border-top: 1px dashed rgba(168,85,247,0.2) !important;
-}
+/* ── UTILITY ── */
+${p}.text-center { text-align: center; }
+${p}.mt-2 { margin-top: 2mm; }
+${p}.mt-4 { margin-top: 4mm; }
+${p}.mb-2 { margin-bottom: 2mm; }
+${p}.mb-4 { margin-bottom: 4mm; }
 
 /* ── COVER PAGE SPECIFIC ── */
 ${p}.cover-title {
-  font-size: 42pt !important;
-  font-weight: 900 !important;
-  text-align: center !important;
-  margin-bottom: 15mm !important;
+  font-size: 36pt;
+  font-weight: 900;
+  margin: 0 0 10mm 0;
+  color: #ffffff;
 }
 ${p}.cover-subtitle {
-  font-size: 14pt !important;
-  text-align: center !important;
-  color: #6B7280 !important;
-  letter-spacing: 0.2em !important;
-  text-transform: uppercase !important;
-  margin-bottom: 20mm !important;
+  font-size: 12pt;
+  color: #6B7280;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  margin: 0 0 15mm 0;
 }
 ${p}.cover-gauge {
-  max-width: 280px !important;
-  margin: 0 auto !important;
+  max-width: 240px;
+  margin: 0 auto;
+}
+${p}.cover-metrics {
+  display: flex;
+  justify-content: center;
+  gap: 8mm;
+  margin-top: 10mm;
+  flex-wrap: wrap;
 }
 
-${p}.chart-block img {
-  width: 100% !important;
-  height: auto !important;
-  object-fit: contain !important;
-}
-
-/* Page-Specific Filling (Flexible Stretching) */
-/* Page 2 & 10: Insights/Summary Card expansion — switch from px to flex-grow */
-${p}#page-2-exec-summary .card, 
-${p}#page-10-premium-insights .scope-cell { 
-  flex-grow: 1 !important;
-  min-height: 100px !important; 
-  margin-bottom: 20px !important; 
-  display: flex !important;
-  flex-direction: column !important;
-  justify-content: center !important;
-}
-
-/* Page 4, 7, 27: Table padding and line-height expansion - BOARDROOM QUALITY */
-${p}#page-4-market-definition .dt td, 
-${p}#page-7-segmentation-framework .dt td, 
-${p}#page-27-buying-criteria .dt td { 
-  padding: 15px 12px !important;
-  line-height: 2.2 !important;
-}
-
-${p}#page-4-market-definition table td,
-${p}#page-7-segmentation-framework table td,
-${p}#page-27-buying-criteria table td {
-  padding: 15px 12px !important;
-  line-height: 2.2 !important;
-}
-
-/* Ensure these dense pages can expand */
-${p}#page-27-buying-criteria {
-  height: auto !important;
-  min-height: 297mm !important;
-  overflow: visible !important;
-}
-
-/* Page 15: TAM Waterfall Visual & SWOT expansion - ZERO OVERLAP GUARANTEED */
-${p}#page-15-market-context-overflow-tam-visual .chart-block {
-  flex-grow: 1 !important; /* Give more space to the chart */
-  display: flex !important;
-  flex-direction: column !important;
-  justify-content: center !important;
-  margin-bottom: 100px !important; /* OVERLAP REMOVAL: 100px margin before SWOT - GUARANTEED SEPARATION */
-}
-${p}#page-15-market-context-overflow-tam-visual .chart-block img { 
-  max-height: 140mm !important; /* Limit by A4 height, not px */
-  height: auto !important;
-  object-fit: contain !important; 
-}
-${p}#page-15-market-context-overflow-tam-visual .sc2 { 
-  flex-grow: 1 !important;
-  min-height: 120px !important; 
-  display: flex !important;
-  flex-direction: column !important;
-  justify-content: center !important;
-  margin-top: 30px !important; /* Additional spacing after chart - increased from 20px */
-}
-
-/* Page 17: ICP Modeling spacing expansion */
-${p}#page-17-icp-modeling .icp-grid { 
-  gap: 10mm !important; 
-  margin: 8mm 0 !important; 
-}
-${p}#page-17-icp-modeling .icp-card {
-  padding: 6mm !important;
-}
-
-/* Kill White Boxes on Charts */
-${p}img, ${p}.chart-block img, ${p}canvas {
-  background: transparent !important;
-  mix-blend-mode: screen !important;
-}
-/* Keep content blocks together */
-${p}.card, ${p}.table-wrap, ${p}.chart-block, ${p}.ac,
-${p}.swot-grid, ${p}.page-insight, ${p}.page-insight-expanded,
-${p}.sdr-step, ${p}tr, ${p}.keep-together,
-${p}.kpi-strip, ${p}.icp-grid, ${p}.droc-grid,
-${p}.evolution-stage, ${p}.scope-grid, ${p}.tier-cards,
-${p}.sourcing-funnel, ${p}.findings-grid, ${p}.triangulation-grid {
-  break-inside: avoid !important;
-  page-break-inside: avoid !important;
-}
-${p}.pf, ${p}.pf-wrap, ${p}.page-insight, ${p}.figure-caption, ${p}.figure-source {
-  break-before: avoid !important;
-  page-break-before: avoid !important;
-}
-/* ── Phase 21C+: Readability — minimum font sizes (use !important to beat inline styles) ── */
-/* Tables */
-  ${p}.dt th, ${p}table th, ${p}th { font-size: 10.5pt !important; padding: 6px 8px !important; }
-  ${p}.dt td, ${p}table td, ${p}td { font-size: 10.5pt !important; padding: 6px 8px !important; }
-  ${p}table td *, ${p}.dt td *, ${p}.table-wrap td * { font-size: 10.5pt !important; }
-/* Card body text */
-${p}.card p, ${p}.card div { font-size: 11.5pt !important; line-height: 1.8 !important; }
-/* SWOT / lists */
-${p}.sc2 li { font-size: 10pt !important; line-height: 1.6 !important; }
-/* SDR body text */
-${p}.sdr-preview { font-size: 10pt !important; line-height: 1.7 !important; }
-/* Analyst callout */
-${p}.ac { font-size: 11pt !important; line-height: 1.6 !important; }
-/* Page insight */
-${p}.page-insight-text { font-size: 10.5px !important; }
-/* Scope / ICP / sourcing cells */
-${p}.scope-cell__value, ${p}.icp-value, ${p}.funnel-value, ${p}.tier-body { font-size: 10pt !important; }
-/* Section context */
-${p}.sc { font-size: 11pt !important; }
-/* Tag pills — keep compact but legible */
-${p}.tg { font-size: 9.5px !important; }
-/* ── Footer — absolute anchor at bottom 8mm (WORKS ON ALL PAGES INCLUDING EXPANDED) ── */
-${p}.pf {
-  position: absolute !important;
-  bottom: 8mm !important;
-  left: 18mm !important;
-  right: 18mm !important;
-  border-top: 1px solid rgba(255,255,255,0.2);
-  padding-top: 3mm;
-  font-size: 10px !important;
-  color: #D1D5DB !important;
-  opacity: 1 !important;
-  z-index: 100 !important; /* Ensure footer stays on top */
-}
-
-/* Footer on expandable pages */
-${p}.page-expandable .pf,
-${p}#page-4-market-definition .pf,
-${p}#page-23-sdr-followup-part-2 .pf,
-${p}#page-27-buying-criteria .pf,
-${p}#page-31-risk-execution .pf {
-  position: relative !important; /* Switch to relative for expanded pages */
-  margin-top: 20mm !important; /* Add top margin to separate from content */
-  bottom: auto !important;
-}
-
-${p}.pf-tagline {
-  font-size: 9.5px !important;
-  opacity: 1 !important;
-  color: #9CA3AF !important;
-  font-style: italic !important;
-}
-/* ── Figure captions ── */
-${p}.figure-caption { font-size: 11px !important; color: #f5f5f5 !important; font-weight: 700 !important; }
-${p}.figure-source { font-size: 9.5px !important; color: #aaa !important; }
-/* ── Validation notes ── */
-${p}.validation-note { font-size: 10px !important; }
-/* ── Table notes / sources ── */
-${p}.table-note, ${p}.table-source { font-size: 9.5px !important; color: #aaa !important; }
-/* ── Phase 21C: Steel cage enforced - overflow hidden maintained ── */
-/* ── Cover: reset its large inline padding so it doesn't create a half-blank page ── */
-${p}.page[style*="padding:0"] { padding: 0 !important; }
-/* ── Edu-filler hidden for Gotenberg (content flows, no fixed-height pages) ── */
-${p}.edu-filler { display: none !important; }
-/* ── Section continuation: no extra space ── */
-${p}.section-continuation { display: block !important; padding: 0 !important; margin: 0 !important; }
-/* ── Cover page print fixes ── */
-${p}.cover-page { overflow: hidden !important; min-height: unset !important; }
-${p}.cover-page > div[style*="position:absolute"] { display: none !important; }
-${p}.cover-page > div[style*="inset:0"] { display: none !important; }
-/* ── Keep section header with at least 2 items below it ── */
-${p}.sec-header, ${p}.section-header, ${p}.ph {
-  break-after: avoid !important;
-  page-break-after: avoid !important;
-  margin-bottom: 3mm !important;
-}
-/* ── Keep stat strips together ── */
-${p}.stat-row, ${p}.kpi-strip, ${p}.ww { break-inside: avoid !important; page-break-inside: avoid !important; }
-/* ── Ensure no inline opacity hides footer elements ── */
-${p}.pf *, ${p}.pf-tagline { opacity: 1 !important; }
-/* ── Gotenberg rendering artifacts: remove ghost boxes on charts/images ── */
-${p}img, ${p}.chart-block, ${p}.chart-block > div, ${p}.keep-together.chart-block {
-  background: transparent !important;
-  border: none !important;
-  box-shadow: none !important;
-  mix-blend-mode: screen !important;
-}
-${p}img { max-height: none !important; overflow: visible !important; object-fit: contain !important; }
-${p}div, ${p}.card, ${p}.chart-block, ${p}.keep-together, ${p}.table-wrap { max-height: none !important; }
-${p}#page-19-account-sourcing-43-targets, ${p}#page-19-account-sourcing-43-targets * { max-height: none !important; overflow: visible !important; }
-${p}#page-2-exec-summary .card { padding-top: 6mm !important; padding-bottom: 6mm !important; margin-bottom: 6mm !important; }
-${p}#page-2-exec-summary .kpi-strip, ${p}#page-2-exec-summary .stat-row { gap: 5mm !important; margin: 5mm 0 6mm !important; }
-${p}#page-4-market-definition table td, ${p}#page-4-market-definition table th { line-height: 1.6 !important; }
-${p}#page-15-market-context-overflow-tam-visual .chart-block { min-height: 420px !important; display:flex !important; flex-direction:column; justify-content:center !important; }
-
-/* ═══════════════════════════════════════════════════════════
-   HIDE SECTION HEADERS ON PAGES 2-35 (CTO DIRECTIVE)
-   ═══════════════════════════════════════════════════════════ */
-${p}#page-2-exec-summary .section-header,
-${p}#page-3-study-objective .section-header,
-${p}#page-4-market-definition .section-header,
-${p}#page-5-forecast-window .section-header,
-${p}#page-6-stakeholder-map .section-header,
-${p}#page-7-segmentation-framework .section-header,
-${p}#page-8-research-methodology .section-header,
-${p}#page-9-data-triangulation .section-header,
-${p}#page-10-premium-insights .section-header,
-${p}#page-11-market-overview .section-header,
-${p}#page-12-market-evolution .section-header,
-${p}#page-13-key-findings .section-header,
-${p}#page-14-market-context .section-header,
-${p}#page-15-market-context-overflow-tam-visual .section-header,
-${p}#page-16-tam-prioritisation .section-header,
-${p}#page-17-icp-modeling .section-header,
-${p}#page-18-account-sourcing-41-42 .section-header,
-${p}#page-19-account-sourcing-43-targets .section-header,
-${p}#page-20-keywords-intent .section-header,
-${p}#page-21-sdr-sequence .section-header,
-${p}#page-22-sdr-followup-part-1 .section-header,
-${p}#page-23-sdr-followup-part-2 .section-header,
-${p}#page-24-competitive-landscape .section-header,
-${p}#page-25-right-to-win .section-header,
-${p}#page-26-porter-five-forces .section-header,
-${p}#page-27-buying-criteria .section-header,
-${p}#page-28-tech-analysis .section-header,
-${p}#page-29-regulatory .section-header,
-${p}#page-30-decision-engine .section-header,
-${p}#page-31-risk-execution .section-header,
-${p}#page-32-execution-priority-confidence .section-header,
-${p}#page-33-appendix .section-header,
-${p}#page-34-tam-methodology .section-header,
-${p}#page-35-data-quality-audit .section-header {
-  display: none !important;
-}
 `
 
   const paginationCss = (renderMode === 'gotenberg' || renderMode === 'adobe') ? enterprisePrintCss : '';
