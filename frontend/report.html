@@ -44,8 +44,9 @@
       background-color: #0c0d11;
       color: var(--text);
       font-size: 11.5pt;
-      height: 100%;
-      overflow: hidden;
+      min-height: 100vh;
+      overflow-y: auto;
+      overflow-x: hidden;
       line-height: 1.65;
     }
 
@@ -1376,6 +1377,7 @@
     <div class="nav-right">
       <a href="vault.html" class="btn btn-outline">← Vault</a>
       <button id="btn-export" class="btn btn-primary" onclick="exportPDF()" disabled>Export PDF</button>
+      <button id="btn-export-html" class="btn btn-outline" onclick="exportHTML()" disabled>Download HTML</button>
       <button onclick="window.APP.signOut()" class="btn btn-outline">Sign Out</button>
     </div>
     <button id="mobile-menu-btn" onclick="toggleMobileNav()" aria-label="Menu">
@@ -1388,6 +1390,8 @@
     <a href="gtm-strategy.html">GTM Strategy</a>
     <a href="vault.html">Strategy Vault</a>
     <button class="active-mobile" style="color:#a855f7;background:rgba(168,85,247,.1)">Report</button>
+    <button onclick="exportPDF()" id="mobile-export-pdf">Export PDF</button>
+    <button onclick="exportHTML()" id="mobile-export-html">Download HTML</button>
     <button onclick="window.APP.signOut()" style="color:#ef4444;">Sign Out</button>
   </div>
 
@@ -1433,6 +1437,7 @@
         <div class="ph-actions">
           <a href="vault.html" class="btn btn-outline">← Vault</a>
           <button id="btn-export2" class="btn btn-primary" onclick="exportPDF()">Export PDF</button>
+          <button id="btn-export-html2" class="btn btn-outline" onclick="exportHTML()">Download HTML</button>
         </div>
       </div>
 
@@ -2180,6 +2185,8 @@
       document.getElementById('report-content').style.display = 'block';
       document.getElementById('btn-export').disabled = false;
       document.getElementById('btn-export2').disabled = false;
+      document.getElementById('btn-export-html').disabled = false;
+      document.getElementById('btn-export-html2').disabled = false;
 
       // Cover positioning strip
       const positioningText = safe(s1.company_overview) || safe(r.company_name) + ' — GTM intelligence report.';
@@ -2228,6 +2235,8 @@
             container.style.display = 'block';
             document.getElementById('btn-export').disabled = false;
             document.getElementById('btn-export2').disabled = false;
+            document.getElementById('btn-export-html').disabled = false;
+            document.getElementById('btn-export-html2').disabled = false;
             
             window._strategy = strategy;
             return;
@@ -2378,6 +2387,69 @@
       } finally {
         if (btn1) { btn1.disabled = false; btn1.textContent = 'Export PDF'; }
         if (btn2) { btn2.disabled = false; btn2.textContent = 'Export PDF'; }
+      }
+    }
+
+    // ── Export HTML — Download report as standalone HTML file ─────────
+    async function exportHTML() {
+      const btn1 = document.getElementById('btn-export-html');
+      const btn2 = document.getElementById('btn-export-html2');
+      if (btn1) { btn1.disabled = true; btn1.textContent = 'Preparing…'; }
+      if (btn2) { btn2.disabled = true; btn2.textContent = 'Preparing HTML…'; }
+
+      try {
+        // Get current report content
+        const reportContent = document.getElementById('report-content');
+        const companyName = document.getElementById('r-company')?.textContent || 'GTM_Report';
+        const filename = companyName.replace(/[^a-z0-9]/gi, '_') + '.html';
+
+        // Build standalone HTML with all styles inline
+        const htmlDoc = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${companyName} — GTM Intelligence Report</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  <style>
+    :root { --bg: #0B0F1A; --card: #121827; --border: #1F2937; --accent: #a855f7; --text: #E5E7EB; --muted: #6B7280; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); font-size: 11.5pt; line-height: 1.65; padding: 40px; }
+    .ph { display: flex; justify-content: space-between; margin-bottom: 36px; }
+    .ph-left .title { font-size: 30px; font-weight: 900; color: white; }
+    .section { background: rgba(18, 24, 39, .6); border: 1px solid var(--border); border-radius: 16px; padding: 28px 32px; margin-bottom: 20px; }
+    .sec-header { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+    .sec-num { width: 28px; height: 28px; border-radius: 50%; background: var(--accent); color: white; font-size: 10px; font-weight: 900; display: flex; align-items: center; justify-content: center; }
+    .sec-title { font-size: 15px; font-weight: 800; color: white; }
+    table { width: 100%; border-collapse: collapse; font-size: 11px; margin: 12px 0; }
+    th, td { padding: 10px; text-align: left; border-bottom: 1px solid var(--border); }
+    th { color: var(--muted); font-size: 8px; text-transform: uppercase; letter-spacing: .12em; }
+    @media print { body { background: white; color: black; } }
+  </style>
+</head>
+<body>
+  ${reportContent.innerHTML}
+</body>
+</html>`;
+
+        // Download as file
+        const blob = new Blob([htmlDoc], { type: 'text/html' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        window.URL.revokeObjectURL(url);
+
+        console.info('[exportHTML] ✅ HTML downloaded:', filename);
+      } catch (e) {
+        console.error('[exportHTML] Error:', e);
+        alert('HTML export failed: ' + e.message);
+      } finally {
+        if (btn1) { btn1.disabled = false; btn1.textContent = 'Download HTML'; }
+        if (btn2) { btn2.disabled = false; btn2.textContent = 'Download HTML'; }
       }
     }
 
