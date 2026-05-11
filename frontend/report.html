@@ -2421,10 +2421,9 @@
       }
     }
 
-    // ── Export HTML — Download report as standalone HTML file ─────────
-    // SECURITY: Only captures rendered DOM content (reportContent.innerHTML).
-    // Does NOT include window._strategy or any JavaScript data.
-    // Sensitive backend data (backend_intelligence, formulas) is stripped by sanitizeStrategyForFrontend().
+    // ── Export HTML — Enterprise Grade with Print-to-PDF Support ─────────
+    // Captures complete report with all visual elements, converts canvas to images,
+    // and provides print CSS for exact PDF conversion
     async function exportHTML() {
       const btn1 = document.getElementById('btn-export-html');
       const btn2 = document.getElementById('btn-export-html2');
@@ -2432,25 +2431,44 @@
       if (btn2) { btn2.disabled = true; btn2.textContent = 'Preparing HTML…'; }
 
       try {
-        // Get current report content (rendered DOM only - no JS data)
         const reportContent = document.getElementById('report-content');
         const companyName = document.getElementById('r-company')?.textContent || 'GTM_Report';
         const filename = companyName.replace(/[^a-z0-9]/gi, '_') + '.html';
 
-        // Get HTML content
-        let safeHtml = reportContent.innerHTML;
+        // Clone the content to modify it without affecting the original
+        const clone = reportContent.cloneNode(true);
         
-        // Remove action buttons section (ph-actions) - we don't want Vault/Export buttons in exported HTML
-        safeHtml = safeHtml.replace(/<div class="ph-actions"[^>]*>[\s\S]*?<\/div>/gi, '');
+        // Remove action buttons
+        const actions = clone.querySelector('.ph-actions');
+        if (actions) actions.remove();
         
-        // Remove data attributes that might contain backend data
-        safeHtml = safeHtml.replace(/\sdata-[a-z0-9-]+="[^"]*"/gi, '');
-        // Remove any script tags if present
-        safeHtml = safeHtml.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
-        // Remove any event handlers
-        safeHtml = safeHtml.replace(/\son\w+="[^"]*"/gi, '');
+        // Convert canvas elements to images (charts, gauges)
+        const canvases = reportContent.querySelectorAll('canvas');
+        canvases.forEach((canvas, index) => {
+          try {
+            const dataUrl = canvas.toDataURL('image/png');
+            const img = document.createElement('img');
+            img.src = dataUrl;
+            img.style.maxWidth = '100%';
+            img.style.height = 'auto';
+            const cloneCanvas = clone.querySelectorAll('canvas')[index];
+            if (cloneCanvas) {
+              cloneCanvas.parentNode.replaceChild(img, cloneCanvas);
+            }
+          } catch (e) {
+            console.warn('Could not convert canvas:', e);
+          }
+        });
 
-        // Build standalone HTML with PROPER PAGINATION (35 pages like PDF)
+        // Get the processed HTML
+        let safeHtml = clone.innerHTML;
+        
+        // Clean up attributes that might leak data
+        safeHtml = safeHtml.replace(/\sdata-[a-z0-9-]+="[^"]*"/gi, '');
+        safeHtml = safeHtml.replace(/\son\w+="[^"]*"/gi, '');
+        safeHtml = safeHtml.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '');
+
+        // Enterprise-grade HTML with comprehensive print support
         const htmlDoc = `<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2459,10 +2477,18 @@
   <title>${companyName} — GTM Intelligence Report</title>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
   <style>
-    :root { --bg: #0B0F1A; --bg-alt: #0D1120; --card: #121827; --border: #1F2937; --accent: #a855f7; --accent2: #7c3aed; --green: #22c55e; --amber: #f59e0b; --red: #ef4444; --blue: #3b82f6; --text: #E5E7EB; --muted: #6B7280; --white: #ffffff; }
+    :root { 
+      --bg: #0B0F1A; --bg-alt: #0D1120; --card: #121827; --border: #1F2937; 
+      --accent: #a855f7; --accent2: #7c3aed; --green: #22c55e; --amber: #f59e0b; 
+      --red: #ef4444; --blue: #3b82f6; --text: #E5E7EB; --muted: #6B7280; --white: #ffffff; 
+    }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     
-    /* ── PAGE SETUP ── A4 PAGINATION ── */
+    /* ════════════════════════════════════════════════════════════════════
+       ENTERPRISE PRINT CSS — A4 Format, Auto-Pagination, Universal Flexi-Mode
+       Works for 20, 35, or 50+ page reports — content determines pagination
+    ═════════════════════════════════════════════════════════════════════ */
+    
     @page {
       size: A4 portrait;
       margin: 10mm 12mm 12mm 12mm;
@@ -2470,7 +2496,7 @@
     
     html, body {
       font-family: 'Inter', sans-serif;
-      background: #1a1a1a;
+      background: #0B0F1A;
       color: var(--text);
       font-size: 10.5pt;
       line-height: 1.55;
@@ -2480,50 +2506,109 @@
       print-color-adjust: exact;
     }
     
-    /* Report wrapper - A4 width minus margins = 186mm */
+    /* Report container — fills A4 page width */
     .report-wrapper {
-      width: 186mm;
+      width: 186mm;  /* 210mm - 12mm - 12mm margins */
       max-width: 186mm;
       margin: 0 auto;
       background: var(--bg);
-      box-shadow: 0 0 20px rgba(0,0,0,0.5);
+      min-height: 100vh;
     }
     
-    /* Content padding for print margins */
     .report-content {
-      padding: 2mm 0;
+      padding: 4mm 0;
       background: var(--bg);
     }
     
-    /* Prevent breaking inside important elements */
-    .section, .ph, .score-strip, .swot-cell, .analyst-callout, table, 
-    .cover-strip, .field, .waterfall, .email-card {
+    /* ════════════════════════════════════════════════════════════════════
+       PAGE BREAK & PAGINATION RULES
+    ═════════════════════════════════════════════════════════════════════ */
+    
+    /* Sections start new page when needed */
+    .section {
       break-inside: avoid;
       page-break-inside: avoid;
+      break-before: auto;
+      page-break-before: auto;
     }
     
-    /* Keep headers with their content */
-    h1, h2, h3, .sec-header {
+    /* Critical elements — never break inside */
+    .score-strip, .swot-cell, .analyst-callout, table, 
+    .cover-strip, .field, .waterfall, .email-card,
+    .chart-container, .gauge-wrapper, .kpi-card {
+      break-inside: avoid !important;
+      page-break-inside: avoid !important;
+    }
+    
+    /* Headers — keep with content */
+    h1, h2, h3, .sec-header, .section-title {
       break-after: avoid;
       page-break-after: avoid;
     }
     
-    /* Page Header */
+    /* ════════════════════════════════════════════════════════════════════
+       TYPOGRAPHY
+    ═════════════════════════════════════════════════════════════════════ */
+    
+    h1 { 
+      font-size: 24pt; font-weight: 800; 
+      color: #ffffff; margin: 0 0 4mm 0;
+      line-height: 1.15;
+    }
+    h2, .section-header { 
+      font-size: 13pt; font-weight: 700; 
+      color: #f0f0f0; margin: 4mm 0 2mm 0;
+    }
+    h3 { 
+      font-size: 11pt; font-weight: 600; 
+      color: #E5E7EB; margin: 3mm 0 2mm 0;
+      padding-bottom: 1mm;
+      border-bottom: 1px solid #333;
+    }
+    p, li {
+      font-size: 9.5pt;
+      line-height: 1.5;
+      margin: 0 0 2mm 0;
+      color: rgba(255,255,255,0.9);
+    }
+    
+    /* ════════════════════════════════════════════════════════════════════
+       PAGE HEADER
+    ═════════════════════════════════════════════════════════════════════ */
+    
     .ph { 
       display: flex; 
       align-items: flex-start; 
       justify-content: space-between; 
       margin-bottom: 4mm; 
       gap: 24px; 
-      padding-top: 4mm;
+      padding: 4mm 0;
       border-bottom: 1px solid var(--border);
-      padding-bottom: 3mm;
     }
-    .ph-left .label { font-size: 8px; text-transform: uppercase; letter-spacing: .2em; color: var(--accent); font-weight: 700; margin-bottom: 4px; }
-    .ph-left .title { font-size: 22px; font-weight: 900; color: white; letter-spacing: -.5px; }
-    .ph-left .meta { font-size: 9px; color: var(--muted); margin-top: 4px; }
+    .ph-left .label { 
+      font-size: 8px; 
+      text-transform: uppercase; 
+      letter-spacing: .2em; 
+      color: var(--accent); 
+      font-weight: 700; 
+      margin-bottom: 4px; 
+    }
+    .ph-left .title { 
+      font-size: 22px; 
+      font-weight: 900; 
+      color: white; 
+      letter-spacing: -.5px; 
+    }
+    .ph-left .meta { 
+      font-size: 9px; 
+      color: var(--muted); 
+      margin-top: 4px; 
+    }
     
-    /* KPI Score Strip */
+    /* ════════════════════════════════════════════════════════════════════
+       KPI SCORE STRIP — Enterprise Cards
+    ═════════════════════════════════════════════════════════════════════ */
+    
     .score-strip { 
       display: grid; 
       grid-template-columns: repeat(5, 1fr); 
@@ -2549,33 +2634,30 @@
       background: linear-gradient(90deg, var(--accent2), var(--accent)); 
       opacity: .6; 
     }
-    .sv { font-size: 18px; font-weight: 900; font-family: 'Space Mono', monospace; color: white; letter-spacing: -0.5px; }
-    .sl { font-size: 7px; text-transform: uppercase; letter-spacing: .15em; color: var(--muted); font-weight: 700; margin-top: 2px; }
+    .sv { 
+      font-size: 18px; 
+      font-weight: 900; 
+      font-family: 'Space Mono', monospace; 
+      color: white; 
+      letter-spacing: -0.5px; 
+    }
+    .sl { 
+      font-size: 7px; 
+      text-transform: uppercase; 
+      letter-spacing: .15em; 
+      color: var(--muted); 
+      font-weight: 700; 
+      margin-top: 2px; 
+    }
     .sv.green { color: var(--green); }
     .sv.amber { color: var(--amber); }
     .sv.purple { color: var(--accent); }
     .sv.red { color: var(--red); }
     
-    /* Cover Strip */
-    .cover-strip { 
-      background: linear-gradient(135deg, rgba(168, 85, 247, .06), rgba(124, 58, 237, .04)); 
-      border: 1px solid rgba(168, 85, 247, .15); 
-      border-left: 3px solid var(--accent); 
-      border-radius: 8px; 
-      padding: 8px 12px; 
-      margin-bottom: 12px; 
-    }
-    .cover-strip .cs-label { 
-      font-size: 7px; 
-      font-weight: 900; 
-      text-transform: uppercase; 
-      letter-spacing: .15em; 
-      color: var(--accent); 
-      margin-bottom: 3px; 
-    }
-    .cover-strip .cs-text { font-size: 10px; color: var(--text); line-height: 1.5; }
+    /* ════════════════════════════════════════════════════════════════════
+       SECTIONS — Enterprise Cards
+    ═════════════════════════════════════════════════════════════════════ */
     
-    /* Sections */
     .section { 
       background: rgba(18, 24, 39, .6); 
       border: 1px solid var(--border); 
@@ -2611,28 +2693,10 @@
       border-bottom: 1px dashed var(--border); 
     }
     
-    /* Tables */
-    table { 
-      width: 100%; 
-      border-collapse: collapse; 
-      font-size: 8.5pt; 
-      margin: 6px 0; 
-    }
-    th, td { 
-      padding: 6px 8px; 
-      text-align: left; 
-      border-bottom: 0.5px solid var(--border); 
-    }
-    th { 
-      color: var(--muted); 
-      font-size: 7px; 
-      text-transform: uppercase; 
-      letter-spacing: .1em; 
-      font-weight: 700; 
-      background: #2a2a2a; 
-    }
+    /* ════════════════════════════════════════════════════════════════════
+       SWOT GRID
+    ═════════════════════════════════════════════════════════════════════ */
     
-    /* SWOT */
     .swot-grid { 
       display: grid; 
       grid-template-columns: 1fr 1fr; 
@@ -2663,7 +2727,10 @@
     .swot-cell ul { padding-left: 12px; margin: 0; }
     .swot-cell li { font-size: 8pt; margin-bottom: 2px; line-height: 1.4; }
     
-    /* Waterfall */
+    /* ════════════════════════════════════════════════════════════════════
+       WATERFALL CHARTS
+    ═════════════════════════════════════════════════════════════════════ */
+    
     .waterfall { margin: 6px 0 8px; }
     .wf-row { 
       display: flex; 
@@ -2705,7 +2772,34 @@
     .wf-amber { background: linear-gradient(90deg, #b45309, #f59e0b); }
     .wf-green { background: linear-gradient(90deg, #15803d, #16a34a); }
     
-    /* Analyst Callouts */
+    /* ════════════════════════════════════════════════════════════════════
+       TABLES — Enterprise Dark Tables
+    ═════════════════════════════════════════════════════════════════════ */
+    
+    table { 
+      width: 100%; 
+      border-collapse: collapse; 
+      font-size: 8.5pt; 
+      margin: 6px 0; 
+    }
+    th, td { 
+      padding: 6px 8px; 
+      text-align: left; 
+      border-bottom: 0.5px solid var(--border); 
+    }
+    th { 
+      color: var(--muted); 
+      font-size: 7px; 
+      text-transform: uppercase; 
+      letter-spacing: .1em; 
+      font-weight: 700; 
+      background: #2a2a2a; 
+    }
+    
+    /* ════════════════════════════════════════════════════════════════════
+       ANALYST CALLOUTS
+    ═════════════════════════════════════════════════════════════════════ */
+    
     .analyst-callout { 
       background: rgba(168, 85, 247, .04); 
       border: 1px solid rgba(168, 85, 247, .2); 
@@ -2724,7 +2818,10 @@
     }
     .analyst-callout.amber strong { color: var(--amber); }
     
-    /* Tags */
+    /* ════════════════════════════════════════════════════════════════════
+       TAGS & LABELS
+    ═════════════════════════════════════════════════════════════════════ */
+    
     .tag { 
       font-size: 7px; 
       font-weight: 600; 
@@ -2742,11 +2839,10 @@
       border-color: rgba(34, 197, 94, .2); 
     }
     
-    /* Grids */
-    .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
-    .grid3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    /* ════════════════════════════════════════════════════════════════════
+       FIELDS
+    ═════════════════════════════════════════════════════════════════════ */
     
-    /* Fields */
     .field { margin-bottom: 8px; }
     .fl { 
       font-size: 7px; 
@@ -2766,48 +2862,130 @@
       border-left: 2px solid var(--accent); 
     }
     
-    /* Print optimization */
+    /* ════════════════════════════════════════════════════════════════════
+       CHARTS & GAUGES — Ensure images fit properly
+    ═════════════════════════════════════════════════════════════════════ */
+    
+    .chart-container, .gauge-wrapper {
+      text-align: center;
+      margin: 8px 0;
+    }
+    .chart-container img, .gauge-wrapper img {
+      max-width: 100%;
+      height: auto;
+      max-height: 200px;
+    }
+    
+    /* ════════════════════════════════════════════════════════════════════
+       PRINT SPECIFIC — Critical for PDF conversion
+    ═════════════════════════════════════════════════════════════════════ */
+    
     @media print {
       html, body { 
-        background: white !important; 
+        background: #0B0F1A !important; 
         margin: 0 !important; 
         padding: 0 !important;
+        -webkit-print-color-adjust: exact !important;
+        print-color-adjust: exact !important;
       }
+      
       .report-wrapper { 
         width: 100% !important;
         max-width: none !important; 
         margin: 0 !important; 
         box-shadow: none !important;
+        background: #0B0F1A !important;
       }
+      
       .report-content { 
         padding: 0 !important; 
+        background: #0B0F1A !important;
+      }
+      
+      /* Force dark backgrounds in print */
+      .section { 
+        background: rgba(18, 24, 39, .6) !important; 
+        border-color: var(--border) !important;
+      }
+      
+      .sc { 
+        background: rgba(18, 24, 39, .7) !important;
+      }
+      
+      /* Ensure page breaks work */
+      .section {
+        break-inside: avoid;
+        page-break-inside: avoid;
       }
     }
     
-    /* Screen view - center the report */
+    /* ════════════════════════════════════════════════════════════════════
+       SCREEN VIEW — Preview mode
+    ═════════════════════════════════════════════════════════════════════ */
+    
     @media screen {
       body { 
-        background: #2a2a2a; 
+        background: #1a1a1a; 
         padding: 20px; 
       }
       .report-wrapper {
         width: 186mm;
         max-width: 186mm;
         margin: 0 auto;
+        box-shadow: 0 0 30px rgba(0,0,0,0.8);
       }
+    }
+    
+    /* Print button for HTML preview */
+    .print-actions {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      display: flex;
+      gap: 10px;
+      z-index: 1000;
+    }
+    .print-btn {
+      background: linear-gradient(135deg, var(--accent2), var(--accent));
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 4px 15px rgba(168, 85, 247, 0.4);
+    }
+    .print-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 6px 20px rgba(168, 85, 247, 0.5);
+    }
+    @media print {
+      .print-actions { display: none; }
     }
   </style>
 </head>
 <body>
+  <div class="print-actions">
+    <button class="print-btn" onclick="window.print()">🖨️ Print / Save as PDF</button>
+  </div>
+  
   <div class="report-wrapper">
     <div class="report-content">
       ${safeHtml}
     </div>
   </div>
+  
+  <script>
+    // Auto-print prompt after content loads
+    window.addEventListener('load', function() {
+      console.log('📄 GTM Report loaded. Click "Print / Save as PDF" to generate PDF.');
+    });
+  </script>
 </body>
 </html>`;
 
-        // Download as file
+        // Download the complete HTML file
         const blob = new Blob([htmlDoc], { type: 'text/html' });
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
@@ -2817,6 +2995,8 @@
         a.click();
         a.remove();
         window.URL.revokeObjectURL(url);
+        
+        console.info('[exportHTML] ✅ Enterprise HTML exported:', filename);
 
         console.info('[exportHTML] ✅ HTML downloaded:', filename);
       } catch (e) {
