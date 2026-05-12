@@ -3134,17 +3134,18 @@ html, body {
 ${p}.page {
   width: 210mm;
   min-height: 297mm;
-  max-height: 297mm;
   background: #0c0d11 !important;
   padding: 12mm 15mm 15mm 15mm;
   margin: 0;
   break-after: page;
   page-break-after: always;
-  overflow: hidden;
+  overflow: hidden; /* Prevent content spill, use page breaks instead */
   position: relative;
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
+  justify-content: flex-start; /* Ensure content starts from top */
+  align-items: stretch; /* Ensure full-width alignment */
 }
 
 /* ── STEP 7 DECISION ENGINE PAGE CONTAINER ── */
@@ -3204,7 +3205,7 @@ ${p}table, ${p}.dark-table {
   margin: 2mm 0;
   font-size: 8.5pt;
 }
-${p}table th, ${p}.dark-table th { 
+${p}table th, ${p}.dark-table th {
   background: #2a2a2a;
   color: #f0f0f0;
   font-weight: 600;
@@ -3213,7 +3214,7 @@ ${p}table th, ${p}.dark-table th {
   border: 0.5px solid #444;
   font-size: 7.5pt;
 }
-${p}table td, ${p}.dark-table td { 
+${p}table td, ${p}.dark-table td {
   padding: 4px 6px;
   line-height: 1.4;
   border: 0.5px solid #444;
@@ -3228,11 +3229,14 @@ ${p}.card {
   border-radius: 6px;
   padding: 2.5mm;
   margin: 2mm 0;
+  width: 100%;
+  max-width: 100%;
 }
 ${p}.card-grid {
   display: grid;
   gap: 2mm;
   margin: 2mm 0;
+  width: 100%;
 }
 
 /* ── SCORE STRIP / METRICS ── */
@@ -3560,9 +3564,21 @@ ${p}.chart-block img {
 }
 
 /* ── PAGE BREAKS ── */
-${p}.card, ${p}.table-wrap, ${p}.chart-block, ${p}tr, ${p}.keep-together {
+/* Allow content to flow naturally across pages to prevent overflow */
+${p}.card, ${p}.table-wrap, ${p}.chart-block {
+  break-inside: auto;
+  page-break-inside: auto;
+}
+/* Only keep small elements together to prevent orphaned content */
+${p}tr {
   break-inside: avoid;
   page-break-inside: avoid;
+}
+/* Keep-together only for small inline elements, not large blocks */
+${p}.keep-together {
+  break-inside: avoid;
+  page-break-inside: avoid;
+  max-height: 250mm; /* Allow break if content exceeds page height */
 }
 ${p}h1, ${p}h2, ${p}h3, ${p}.section-header {
   break-after: avoid;
@@ -3823,29 +3839,29 @@ ${p}.section-continuation{width:100%;box-sizing:border-box;padding:0;margin:0;ba
 @media print {
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   html, body { font-size: 11pt !important; background-color:#0c0d11 !important; margin: 0; padding: 0; }
-  
-  /* Explicit pages - 35 page layout */
+
+  /* Explicit pages - allow dynamic content flow */
   ${p}.page {
     width: 210mm !important;
-    height: 297mm !important;
     min-height: 297mm !important;
-    max-height: 297mm !important;
-    overflow: hidden !important;
+    overflow: hidden !important; /* Prevent content spill */
     position: relative !important;
     background-color: #0c0d11 !important;
     margin: 0 !important;
     padding: 12mm 15mm 15mm 15mm !important;
     display: flex !important;
     flex-direction: column !important;
+    justify-content: flex-start !important;
+    align-items: stretch !important;
     break-after: page !important;
     page-break-after: always !important;
   }
-  
+
   /* Boardroom readability */
   ${p}h1 { font-size: 28pt !important; }
   ${p}h2, ${p}.section-header { font-size: 16pt !important; }
   ${p}h3 { font-size: 13pt !important; }
-  
+
   /* Comfortable table spacing */
   ${p}table td, ${p}.dt td { line-height: 1.6 !important; padding: 8px 10px !important; }
   ${p}#page-15-market-context-overflow-tam-visual .chart-block img { height: 450px !important; object-fit: contain !important; }
@@ -3853,9 +3869,17 @@ ${p}.section-continuation{width:100%;box-sizing:border-box;padding:0;margin:0;ba
   ${p}#page-17-icp-modeling .icp-grid { gap: 12mm !important; margin: 10mm 0 !important; }
   ${p}#page-17-icp-modeling .icp-card { padding: 8mm !important; }
 
-  ${p}.card, ${p}.table-wrap, ${p}.chart-block, ${p}.sdr-step, ${p}.keep-together,
+  /* Allow content to break across pages to prevent overflow */
+  ${p}.card, ${p}.table-wrap, ${p}.chart-block {
+    break-inside: auto !important;
+    page-break-inside: auto !important;
+  }
+  /* Only keep small elements together */
+  ${p}.sdr-step, ${p}.keep-together,
   ${p}.page-insight, ${p}.page-insight-expanded, ${p}.swot-grid, ${p}.ww {
-    break-inside: avoid !important; page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    max-height: 250mm !important; /* Allow break if content exceeds page */
   }
   ${p}h1, ${p}h2, ${p}h3, ${p}.section-header { break-after: avoid !important; page-break-after: avoid !important; }
   ${p}.pf {
