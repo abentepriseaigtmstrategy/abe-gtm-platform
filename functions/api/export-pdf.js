@@ -1361,6 +1361,77 @@ function safeText(value, fallback = '') {
 }
 
 // ══════════════════════════════════════════════════════════════
+// CONTENT BUDGETING HELPERS (PDF Spillover Prevention)
+// ══════════════════════════════════════════════════════════════
+
+/**
+ * clampText(value, maxChars, suffix)
+ * Truncates text to maxChars, preserving word boundaries.
+ * Adds suffix (default '...') if truncated.
+ */
+function clampText(value, maxChars, suffix = '...') {
+  const cleaned = safeBusinessText(value, '');
+  if (cleaned.length <= maxChars) return cleaned;
+  // Find last space before limit to preserve word boundary
+  const truncated = cleaned.slice(0, maxChars);
+  const lastSpace = truncated.lastIndexOf(' ');
+  if (lastSpace > maxChars * 0.7) {
+    return truncated.slice(0, lastSpace) + suffix;
+  }
+  return truncated + suffix;
+}
+
+/**
+ * normalizeStep7Data(step7Data)
+ * Normalizes and caps Step 7 Decision Engine content fields.
+ * Returns an object with capped fields and truncation flags.
+ */
+function normalizeStep7Data(step7Data = {}) {
+  const caps = {
+    verdict_rationale: 450,
+    why_now_analysis: 450,
+    strategic_hook: 300,
+    risk_analysis: 700,
+    recommended_action: 500,
+  };
+
+  const result = {};
+  const truncatedFields = [];
+
+  for (const [key, maxChars] of Object.entries(caps)) {
+    const raw = step7Data[key] || '';
+    const capped = clampText(raw, maxChars);
+    result[key] = capped;
+    if (safeBusinessText(raw, '').length > maxChars) {
+      truncatedFields.push(key);
+    }
+  }
+
+  // Preserve other fields unchanged
+  for (const [key, value] of Object.entries(step7Data)) {
+    if (!caps.hasOwnProperty(key)) {
+      result[key] = value;
+    }
+  }
+
+  result._truncated = truncatedFields.length > 0;
+  result._truncatedFields = truncatedFields;
+
+  return result;
+}
+
+/**
+ * getTruncationNote(truncatedFields)
+ * Returns a visible note when content was truncated.
+ */
+function getTruncationNote(truncatedFields = []) {
+  if (truncatedFields.length === 0) return '';
+  return `<div class="truncation-note" style="font-size:8px;color:var(--amber);font-style:italic;margin-top:2mm;padding:2mm 3mm;background:rgba(245,158,11,.05);border-left:2px solid var(--amber);border-radius:0 4px 4px 0">
+    ⚠ Content shortened for PDF layout. Full details remain available in the platform report.
+  </div>`;
+}
+
+// ══════════════════════════════════════════════════════════════
 // PHASE 20C — VISUAL REPORT COMPONENTS
 // Pure, stateless helpers. Safe for both browser-pdf and viewer.
 // All output is sanitized via escapeHtml / safeBusinessText.
@@ -2933,14 +3004,17 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false, rende
   };
 
   // ── Decision Engine (Step 7) ──
+  // Normalize Step 7 data to prevent PDF spillover
+  const s7Normalized = normalizeStep7Data(s7);
   const decisionEngineSummary = () => {
     if (!score && !confScore) return '';
     const hasS7 = s7 && Object.keys(s7).length > 1;
     const triggers = arr(s3.buying_triggers);
     const dms = arr(s3.decision_makers);
-    const whyNow = hasS7 && s7.why_now_analysis ? s7.why_now_analysis : `Market conditions and active ${(triggers[0] || 'operational pressure').toLowerCase()} dynamics create a time-sensitive engagement window.`;
-    const hook = hasS7 && s7.strategic_hook ? s7.strategic_hook : (triggers.length >= 2 ? `${triggers[0]} paired with ${triggers[1]}` : `Lead with: ${triggers[0] || 'Operational pressure'}`);
-    const reason = s7.go_no_go?.reasoning || s7.verdict_rationale || 'Score exceeds required threshold for market entry.';
+    // Use normalized/capped Step 7 data
+    const whyNow = hasS7 && s7Normalized.why_now_analysis ? s7Normalized.why_now_analysis : `Market conditions and active ${(triggers[0] || 'operational pressure').toLowerCase()} dynamics create a time-sensitive engagement window.`;
+    const hook = hasS7 && s7Normalized.strategic_hook ? s7Normalized.strategic_hook : (triggers.length >= 2 ? `${triggers[0]} paired with ${triggers[1]}` : `Lead with: ${triggers[0] || 'Operational pressure'}`);
+    const reason = s7Normalized.go_no_go?.reasoning || s7Normalized.verdict_rationale || 'Score exceeds required threshold for market entry.';
     return `
   ${secHead('07', 'Revenue Intelligence — Decision Engine')}
   ${secCtx('Final strategic audit. Validates execution viability and dictates immediate next steps.')}
@@ -2963,13 +3037,16 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false, rende
   ${srcNote(hasS7 && s7.why_now_analysis ? 'Source: Step 7 AI analysis of market signals' : 'Source: AI inference from buying triggers and market context — validate timing independently')}
   ${h3('revenue-intelligence', '3', 'Strategic Hook')}
   <div class="ac keep-together"><strong>"${e(hook)}"</strong></div>
-  ${srcNote(hasS7 && s7.strategic_hook ? 'Source: Step 7 AI strategic analysis' : 'Source: derived from buying triggers — AI estimate')}`;
+  ${srcNote(hasS7 && s7.strategic_hook ? 'Source: Step 7 AI strategic analysis' : 'Source: derived from buying triggers — AI estimate')}
+  ${getTruncationNote(s7Normalized._truncatedFields)}`;
   };
 
   const decisionEngineRisk = () => {
+    // Use normalized risk factors if available
+    const riskFactors = s7Normalized.risk_analysis || s7.risk_factors;
     return `
   ${h3('revenue-intelligence', '4', 'Risk &amp; Constraint Analysis')}
-  ${renderRiskScoreCards(s7.risk_factors)}
+  ${renderRiskScoreCards(riskFactors)}
   ${srcNote('30–60 day cycle estimate is an industry benchmark (AI estimate) — validate with CRM data')}
   ${charts.risk
         ? `<div class="keep-together chart-block" style="margin:2mm 0 4mm"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:2mm">RISK SEVERITY ASSESSMENT</div>${renderChartOrFallback('Risk Severity', charts.risk, '', { width: 480, height: 180 })}<p class="figure-caption" style="font-size:10px; font-weight:bold; color:#f5f5f5; margin:1mm 0 0.5mm;">Figure 4: Risk Severity Assessment</p><p class="figure-source" style="font-size:8px; font-style:italic; color:#aaa; margin:0;">Source: ABE GTMS Engine v1.0</p></div>`
@@ -3068,6 +3145,16 @@ ${p}.page {
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
+}
+
+/* ── STEP 7 DECISION ENGINE PAGE CONTAINER ── */
+${p}.page.step7-page {
+  /* Inherits all .page properties */
+  /* Ensures Step 7 content is isolated and cannot spill to other pages */
+  break-after: page !important;
+  page-break-after: always !important;
+  break-inside: avoid !important;
+  page-break-inside: avoid !important;
 }
 
 /* ── COVER PAGE STYLING ── */
@@ -4596,7 +4683,7 @@ ${pageFtr('Regulatory Landscape', 29)}
 </div>
 
 <!-- Page 30 -->
-<div class="page section-break" id="page-30-decision-engine">
+<div class="page step7-page section-break" id="page-30-decision-engine">
 ${renderInsightBox(
   'RISK — GTM ACTIVATION',
   strategy.strategy_context?.regulatory_summary ||
@@ -4617,7 +4704,7 @@ ${pageFtr('Decision Engine', 30)}
 </div>
 
 <!-- Page 31 -->
-<div class="page section-break page-expandable" id="page-31-risk-execution">
+<div class="page step7-page section-break page-expandable" id="page-31-risk-execution">
 ${secHead('07', 'Revenue Intelligence — Risk & Execution')}
 ${secCtx('Assesses implementation risks and dictates the immediate strategic execution path.')}
 ${decisionEngineRisk()}
