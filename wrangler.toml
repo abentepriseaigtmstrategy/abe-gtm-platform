@@ -16,8 +16,8 @@ ALLOWED_ORIGIN = "*"
 SUPABASE_URL = "https://cwcvneluhlimhlzowabv.supabase.co"
 SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3Y3ZuZWx1aGxpbWhsem93YWJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2MzAxMjAsImV4cCI6MjA4OTIwNjEyMH0.SZDS-svU-kFh_OkUq3AjQY64F-71MpbBsFd6Iin5DlQ"
 
-# Adobe PDF Services (Primary)
-PDF_RENDER_ENGINE = "adobe"
+# Adobe PDF Services (Fallback)
+PDF_RENDER_ENGINE = "gotenberg"
 ADOBE_API_BASE_URL = "https://pdf-services.adobe.io"
 
 # Gotenberg (Fallback)
