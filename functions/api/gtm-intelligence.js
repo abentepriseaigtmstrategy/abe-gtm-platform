@@ -17,10 +17,12 @@ function safeNumber(val, fallback = 0) {
  */
 export function calculateGTMScore(s1 = {}, s7 = {}, strategy = {}, isDemoMode = false) {
   return safeNumber(
-    s1.gtm_relevance_score ||
     s7.score_breakdown?.total ||
     s7.gtm_score ||
-    strategy.gtm_score
+    strategy.gtm_score ||
+    s1.gtm_relevance_score ||
+    (strategy.step_2_tam && strategy.step_2_tam.total_score) ||
+    (strategy.steps && strategy.steps[2] && strategy.steps[2].total_score)
   ) || (isDemoMode ? 60 : 0);
 }
 
