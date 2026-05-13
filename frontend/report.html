@@ -1351,14 +1351,8 @@
         page-break-after: always;
         break-after: page;
         width: 210mm !important;
-        height: 297mm !important;
-        max-height: 297mm !important;
-        overflow: hidden !important;
-        position: relative !important;
         background-color: #0c0d11 !important;
-        display: flex;
-        flex-direction: column;
-        justify-content: center !important; /* FORCED VERTICAL CENTERING */
+        display: block;
       }
     }
   </style>
@@ -2227,56 +2221,35 @@
     }
 
     // ── Load Report ───────────────────────────────────────────────────
+    //
+    // ARCHITECTURE NOTE (Single Source of Truth — Phase 22):
+    // /api/export-pdf is a RENDERER-ONLY endpoint. It is NOT a viewer.
+    //
+    // This function ONLY calls /api/vault to fetch the persisted strategy
+    // object, then calls renderReport() to display it using the client-side
+    // JS engine. QuickChart is NEVER called during viewing — only during export.
+    //
+    // To trigger PDF export the user clicks "Export PDF", which calls exportPDF()
+    // which posts to /api/export-pdf as a one-shot render + download.
     async function loadReport() {
       const params = new URLSearchParams(location.search);
       const id = params.get('id');
       if (!id) { showError('No report ID specified. Please open from the Vault.'); return; }
-      
+
       try {
         const data = await window.APP.api('/api/vault?id=' + encodeURIComponent(id), null, 'GET');
         const report = data.report;
         if (!report) { showError('Report not found.'); return; }
-        
-        // ── Strategy Normalization (v5 — Production) ──
-        const strategy = report.full_report || report.strategy || report.report_data || report;
 
-        // ── Phase 3: Production Canonical Viewer ──
-        try {
-          const forceFallback = params.get('force_fallback') === 'true';
-          if (forceFallback) throw new Error('Forced failure (dev-mode)');
+        // The vault returns a fully-hydrated strategy object containing:
+        //   step_1_market … step_7_intelligence (persisted by save-report.js)
+        // We use the report object directly — no /api/export-pdf call for viewing.
+        console.log('%c[Viewer] Rendering from vault data — single source of truth', 'color: #22c55e; font-weight: bold');
+        renderReport(report);
 
-          console.log('[Phase 3] Initiating API-driven viewer render...');
-          const viewerData = await window.APP.api('/api/export-pdf?mode=viewer', { strategy: strategy }, 'POST');
-
-          if (viewerData && viewerData.html) {
-            console.log('%c[Viewer] Source: API-Canonical', 'color: #22c55e; font-weight: bold');
-            
-            const container = document.getElementById('report-content');
-            container.innerHTML = viewerData.html;
-            
-            // UI State Sync
-            document.getElementById('loading-state').style.display = 'none';
-            container.style.display = 'block';
-            document.getElementById('btn-export').disabled = false;
-            document.getElementById('btn-export2').disabled = false;
-            document.getElementById('btn-export-html').disabled = false;
-            document.getElementById('btn-export-html2').disabled = false;
-            
-            // Enable mobile export buttons
-            const mobilePdfBtn = document.getElementById('mobile-export-pdf');
-            const mobileHtmlBtn = document.getElementById('mobile-export-html');
-            if (mobilePdfBtn) mobilePdfBtn.disabled = false;
-            if (mobileHtmlBtn) mobileHtmlBtn.disabled = false;
-            
-            // Store sanitized strategy (remove sensitive backend data)
-            window._strategy = sanitizeStrategyForFrontend(strategy);
-            return;
-          }
-          throw new Error('API render returned empty payload');
-        } catch (viewerErr) {
-          console.warn('%c[Viewer] Source: Legacy-Fallback', 'color: #f59e0b; font-weight: bold', viewerErr.message);
-          renderReport(report); // Fallback to client-side JS engine
-        }
+        // Store sanitized copy for later PDF export (exportPDF() reads window._strategy
+        // as a cache-hint so the backend can skip a second vault lookup).
+        window._strategy = sanitizeStrategyForFrontend(report);
       } catch (e) {
         showError('Failed to load report: ' + e.message);
       }
