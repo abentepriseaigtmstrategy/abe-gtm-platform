@@ -578,6 +578,12 @@ export async function onRequestPost(context) {
     const matrixIcpFit = hasLiveSubs ? liveIcpFit : Math.round(confScore * 0.2);
     const matrixCompleteness = hasLiveSubs ? liveCompleteness : Math.round(confScore * 0.15);
 
+    console.info('[QuickChart] Input values:', {
+      gauge: { score: gtmScore, verdict },
+      waterfall: { tamRaw, tamNum, samRaw, samNum, somRawVal, somNum },
+      confidence: { veracity: matrixVeracity, timing: matrixTiming, icpFit: matrixIcpFit, completeness: matrixCompleteness, overall: confScore }
+    });
+
     // ── KV Chart Caching (DEFERRED — add env.KV when available) ──
     // When env.KV is present, wrap fetchQuickChartBase64 with:
     //   const cacheKey = `chart:gauge:${gtmScore}:${verdict}`;        TTL demo=604800 live=86400
@@ -591,6 +597,7 @@ export async function onRequestPost(context) {
 
     let chartCount = 0;
     const tryFetch = async (type, config, w, h) => {
+      console.info(`[QuickChart] Fetching ${type} chart:`, { configSize: JSON.stringify(config).length });
       if (chartCount >= QC.maxPer) {
         console.warn(`[QuickChart] max calls (${QC.maxPer}) reached — fallback for ${type}`);
         return null;
@@ -625,6 +632,7 @@ export async function onRequestPost(context) {
       label: typeof s === 'string' ? s : (s.signal || s.label || `Signal ${i + 1}`),
       strength: typeof s === 'object' && s.strength ? s.strength : [72, 58, 65, 50][i] || 60
     }));
+    console.info('[QuickChart] Intent chart inputs:', intentItems);
     const [intent, risk] = await Promise.allSettled([
       tryFetch('intent', buildIntentSignalChartConfig(intentItems), 480, 180),
       tryFetch('risk', buildRiskSeverityChartConfig(verdict, gtmScore), 480, 180),
@@ -781,7 +789,8 @@ function renderChartOrFallback(type, base64, fallbackHtml, dimensions = { width:
         alt="${type} chart"/>
     </div>`;
   }
-  return fallbackHtml;
+  if (fallbackHtml) return fallbackHtml;
+  return `<div class="card keep-together" style="text-align:center;padding:6mm;"><p style="color:var(--muted);font-style:italic">${type} visualization requires validated data</p></div>`;
 }
 
 function normalizeCompanyName(name) {
@@ -1079,6 +1088,10 @@ async function fetchQuickChartBase64(config, width, height, qc, chartType = 'def
 
 // ── Fallback renderers ──
 function renderGaugeFallback(score, verdict) {
+  const hasValidScore = typeof score === 'number' && !isNaN(score) && score > 0;
+  if (!hasValidScore) {
+    return `<div class="card keep-together" style="text-align:center;padding:8mm;"><p style="color:var(--muted);font-style:italic;font-size:11px">Score pending validation</p></div>`;
+  }
   const color = /^go$/i.test(verdict) ? 'var(--green)' : /no/i.test(verdict) ? 'var(--red)' : 'var(--amber)';
   const circ = 157, filled = Math.round((score / 100) * circ);
   return `<svg width="130" height="80" viewBox="0 0 130 80" xmlns="http://www.w3.org/2000/svg">
@@ -2702,8 +2715,51 @@ const SECTION_REGISTRY = [
 // ══════════════════════════════════════════════════════════════
 export function buildReportHTML(strategy, charts = {}, isDemoMode = false, renderMode = 'browser-pdf', isViewer = false) {
   const p = isViewer ? '.abe-viewer-wrapper ' : '';
-  const s1 = strategy.step_1_market || strategy.steps?.[1] || {};
-  const s2 = strategy.step_2_tam || strategy.steps?.[2] || {};
+  
+  // Merge Step 1 data from all possible keys
+  const baseS1 = strategy.step_1_market || strategy.steps?.[1] || {};
+  const s1 = {
+    ...baseS1,
+    ...(strategy.market_research || {}),
+    ...(strategy.market_context || {}),
+    company_overview: 
+      baseS1.company_overview || 
+      strategy.company_overview || 
+      (strategy.company_profile?.overview) || 
+      (strategy.scraped_profile?.overview) || 
+      strategy.company_profile || 
+      strategy.scraped_profile || 
+      '',
+    market_position: 
+      baseS1.market_position || 
+      (strategy.market_context?.market_position) || 
+      '',
+    swot: 
+      baseS1.swot || 
+      strategy.swot || 
+      strategy.swot_analysis || 
+      (strategy.step_1_market?.swot) || 
+      {},
+    growth_signals: 
+      baseS1.growth_signals || 
+      strategy.growth_signals || 
+      strategy.strategic_growth_signals || 
+      [],
+    tech_stack_hints: 
+      baseS1.tech_stack_hints || 
+      strategy.tech_stack || 
+      strategy.tech_stack_indicators || 
+      []
+  };
+  
+  // Merge Step 2 data from all possible keys
+  const baseS2 = strategy.step_2_tam || strategy.steps?.[2] || {};
+  const s2 = {
+    ...baseS2,
+    ...(strategy.tam_mapping || {}),
+    ...(strategy.step_2_tam || {})
+  };
+  
   const s3 = strategy.step_3_icp || strategy.steps?.[3] || {};
   const s4 = strategy.step_4_sourcing || strategy.steps?.[4] || {};
   const s5 = strategy.step_5_keywords || strategy.steps?.[5] || {};
@@ -2936,7 +2992,14 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false, rende
 
   // ── SWOT ──
   const swotCell = (label, items, color) => { const a = arr(items); return a.length ? `<div class="sc2" style="border-top:3px solid ${color}"><div class="sl" style="color:${color}">${label}</div><ul>${a.slice(0, 4).map(i => `<li>${e(String(i))}</li>`).join('')}</ul></div>` : ''; };
-  const swotGrid = () => { const sw = s1.swot; if (!sw || typeof sw !== 'object') return ''; const h = swotCell('STRENGTHS', sw.strengths, 'var(--green)') + swotCell('WEAKNESSES', sw.weaknesses, 'var(--red)') + swotCell('OPPORTUNITIES', sw.opportunities, 'var(--blue)') + swotCell('THREATS', sw.threats, 'var(--amber)'); return h ? `<div class="sg swot-grid">${h}</div>` : ''; };
+  const swotGrid = () => { 
+    const sw = s1.swot; 
+    if (!sw || typeof sw !== 'object') {
+      return `<div class="card keep-together"><p style="color:var(--muted);font-style:italic">No validated SWOT data available</p></div>`;
+    } 
+    const h = swotCell('STRENGTHS', sw.strengths, 'var(--green)') + swotCell('WEAKNESSES', sw.weaknesses, 'var(--red)') + swotCell('OPPORTUNITIES', sw.opportunities, 'var(--blue)') + swotCell('THREATS', sw.threats, 'var(--amber)'); 
+    return h ? `<div class="sg swot-grid">${h}</div>` : `<div class="card keep-together"><p style="color:var(--muted);font-style:italic">No validated SWOT data available</p></div>`; 
+  };
 
   // ── TAM Waterfall with math ──
   const wfBar = (label, value, w, cls) => value ? `<div class="wb"><div class="wv">${e(safe(value))}</div><div class="wftrack"><div class="wf ${cls}" style="width:${w}"></div></div><span style="margin-left:2mm;font-size:9px;color:var(--muted)">${label}</span></div>` : '';
@@ -4269,9 +4332,10 @@ ${pageFtr('Key Findings', 13)}
 ${secHead('MC', 'Market Context — Company Overview & Market Position')}
 ${secCtx('Company overview and market position.')}
 ${h3('market-research', '1', 'Company Overview')}
-<div class="card keep-together"><p>${e(safe(s1.company_overview) || '—')}</p></div>
+<div class="card keep-together"><p>${e(safe(s1.company_overview) || 'Requires source validation')}</p></div>
 ${h3('market-research', '2', 'Market Position & Stage')}
-${renderDarkTable({
+${(() => {
+  const table = renderDarkTable({
     headers: ['Attribute', 'Value'],
     rows: [
       ['Market Position', safe(s1.market_position)],
@@ -4279,7 +4343,9 @@ ${renderDarkTable({
       ['Employee Count', safe(s1.employee_count)],
       ['Products/Services', safe(s1.products_services)]
     ].filter(r => r[1])
-  }, '', 'ABE GTMS Engine v1.0')}
+  }, '', 'ABE GTMS Engine v1.0');
+  return table || `<div class="card keep-together"><p style="color:var(--muted);font-style:italic">Market position requires enrichment</p></div>`;
+})()}
 ${pageFtr('Market Context', 14)}
 </div>
 
@@ -4290,9 +4356,18 @@ ${secCtx('Market sizing and TAM visual waterfall.')}
 ${h3('market-research', '3', 'SWOT Analysis')}
 ${swotGrid()}
 ${h3('market-research', '4', 'Strategic Growth Signals')}
-<div class="keep-together" style="margin-bottom:3mm">${tags(s1.growth_signals, 'green')}</div>
+<div class="keep-together" style="margin-bottom:3mm">${(() => {
+  const t = tags(s1.growth_signals, 'green');
+  return t || `<div class="card"><p style="color:var(--muted);font-style:italic">No validated growth signals available</p></div>`;
+})()}</div>
 ${h3('market-research', '5', 'Tech Stack Indicators')}
-<div class="keep-together" style="display:flex;flex-wrap:wrap;gap:2mm;margin-bottom:3mm">${arr(s1.tech_stack_hints).slice(0, 6).map(t => `<div style="display:inline-flex;align-items:center;gap:2mm;background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.2);border-radius:6px;padding:1.5mm 3mm"><svg width="8" height="8" viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="10" height="10" rx="2" stroke="#93c5fd" stroke-width="1.2"/><path d="M4 6h4M6 4v4" stroke="#93c5fd" stroke-width="1" stroke-linecap="round"/></svg><span style="font-size:8.5px;font-weight:600;color:#93c5fd">${e(String(t))}</span></div>`).join('')}</div>
+<div class="keep-together" style="display:flex;flex-wrap:wrap;gap:2mm;margin-bottom:3mm">${(() => {
+  const techHints = arr(s1.tech_stack_hints);
+  if (techHints.length) {
+    return techHints.slice(0, 6).map(t => `<div style="display:inline-flex;align-items:center;gap:2mm;background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.2);border-radius:6px;padding:1.5mm 3mm"><svg width="8" height="8" viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="10" height="10" rx="2" stroke="#93c5fd" stroke-width="1.2"/><path d="M4 6h4M6 4v4" stroke="#93c5fd" stroke-width="1" stroke-linecap="round"/></svg><span style="font-size:8.5px;font-weight:600;color:#93c5fd">${e(String(t))}</span></div>`).join('');
+  }
+  return `<div class="card" style="width:100%"><p style="color:var(--muted);font-style:italic">Tech stack indicators not detected from current input</p></div>`;
+})()}</div>
 ${h3('tam-mapping', '2.1', 'Market Sizing')}
 ${renderMetricStrip([
   { label: 'TAM',      value: formatCurrency(s2.tam_size_estimate, 'Requires market validation'), opts: { color: 'var(--accent)', sub: 'Total Addressable' } },
