@@ -3141,137 +3141,37 @@ async function downloadExport() {
 }
 
 /**
- * renderBackendHtmlToPdf
- * Takes an HTML string returned by /api/export-pdf, injects it into a
- * hidden container, renders each .page div with html2canvas, and saves
- * the result as an A4 PDF via jsPDF.
+ * renderBackendHtmlToPdf — DISABLED (Phase 22 architecture)
+ *
+ * html2canvas + jsPDF client-side rendering is permanently retired:
+ *   • iframe capture clips content at 1123px (1 A4 page)
+ *   • html2canvas drops CSS gradients, dark backgrounds, custom fonts
+ *   • Results in blank covers, cropped content, wrong colours
+ *
+ * All PDF generation must go through POST /api/export-pdf (Gotenberg backend).
+ * Do NOT restore this function or call it from exportViaBackend().
  */
-async function renderBackendHtmlToPdf(htmlString, filename) {
-  // Ensure jsPDF is loaded
-  if (!window.jspdf) {
-    await new Promise((resolve, reject) => {
-      const s = document.createElement('script');
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-      s.onload = resolve;
-      s.onerror = () => reject(new Error('Failed to load jsPDF'));
-      document.head.appendChild(s);
-    });
-  }
-
-  // Ensure html2canvas is loaded
-  if (!window.html2canvas) {
-    await new Promise((resolve, reject) => {
-      const s = document.createElement('script');
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-      s.onload = resolve;
-      s.onerror = () => reject(new Error('Failed to load html2canvas'));
-      document.head.appendChild(s);
-    });
-  }
-
-  const iframe = document.createElement('iframe');
-  iframe.sandbox = 'allow-same-origin';
-  iframe.style.position = 'fixed';
-  iframe.style.top = '20px';
-  iframe.style.left = '20px';
-  iframe.style.width = '794px';
-  iframe.style.height = '1123px';
-  iframe.style.visibility = 'hidden';
-  iframe.style.pointerEvents = 'none';
-  iframe.style.opacity = '0';
-  iframe.style.zIndex = '999999';
-  iframe.srcdoc = htmlString;
-  document.body.appendChild(iframe);
-
-  try {
-    const iframeWindow = iframe.contentWindow;
-    const iframeDoc = iframe.contentDocument || iframeWindow.document;
-
-    await new Promise((resolve, reject) => {
-      const cleanup = () => {
-        iframe.removeEventListener('load', cleanup);
-        resolve();
-      };
-      if (iframeDoc.readyState === 'complete') {
-        resolve();
-      } else {
-        iframe.addEventListener('load', cleanup);
-        setTimeout(() => {
-          if (iframeDoc.readyState === 'complete') resolve();
-        }, 500);
-      }
-    });
-
-    if (iframeDoc.fonts && iframeDoc.fonts.ready) {
-      await iframeDoc.fonts.ready;
-    }
-
-    const images = Array.from(iframeDoc.images || []);
-    await Promise.all(images.map((img) => {
-      if (img.complete) return Promise.resolve();
-      return new Promise((resolve) => {
-        img.onload = () => resolve();
-        img.onerror = () => resolve();
-      });
-    }));
-
-    const pages = Array.from(iframeDoc.querySelectorAll('.page'));
-    const targets = pages.length > 0 ? pages : [iframeDoc.body];
-
-    const { jsPDF } = window.jspdf;
-    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-
-    for (let index = 0; index < targets.length; index++) {
-      const target = targets[index];
-      const originalWidth = target.style.width;
-      const originalMinHeight = target.style.minHeight;
-      const originalBoxSizing = target.style.boxSizing;
-
-      target.style.width = '794px';
-      target.style.minHeight = '1123px';
-      target.style.boxSizing = 'border-box';
-
-      const canvas = await window.html2canvas(target, {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#0d1120',
-        windowWidth: 794,
-        windowHeight: 1123,
-      });
-
-      target.style.width = originalWidth;
-      target.style.minHeight = originalMinHeight;
-      target.style.boxSizing = originalBoxSizing;
-
-      const imgData = canvas.toDataURL('image/jpeg', 0.92);
-      if (index > 0) pdf.addPage();
-      pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
-    }
-
-    pdf.save(filename);
-  } finally {
-    document.body.removeChild(iframe);
-  }
+async function renderBackendHtmlToPdf(_htmlString, _filename) {
+  throw new Error(
+    '[ABE Phase 22] renderBackendHtmlToPdf is disabled. ' +
+    'Use POST /api/export-pdf for all PDF generation.'
+  );
 }
 
+// exportViaBackend — Phase 22 version
+// Calls POST /api/export-pdf. Handles:
+//   Path A: Gotenberg active → binary application/pdf → download
+//   Path B: Gotenberg not configured → JSON with html → download HTML
+// Does NOT use html2canvas, jsPDF, iframe, or localhost:3001.
 async function exportViaBackend() {
-  showToast('Generating Enterprise Report via backend...', 'info');
+  showToast('Generating Enterprise Report via backend…', 'info');
   closeExportModal();
 
-  // Build payload using current phase-based data keys
+  // Build a complete strategy payload for the renderer
   const strategy = {
     company_name:        state.company,
     industry:            state.industry || '',
     steps_completed:     Object.values(state.steps).filter(s => s.status === 'complete').length,
-    // Phase keys (new) — also include legacy aliases for backward compat with export-pdf.js
-    phase_1_signals:     state.steps[1]?.data || null,
-    phase_2_scoring:     state.steps[2]?.data || null,
-    phase_3_verdict:     state.steps[3]?.data || null,
-    phase_4_deal_lens:   state.steps[4]?.data || null,
-    phase_5_risks:       state.steps[5]?.data || null,
-    phase_6_final:       state.steps[6]?.data || null,
-    // Legacy aliases so older export-pdf.js versions still work
     step_1_market:       state.steps[1]?.data || null,
     step_2_tam:          state.steps[2]?.data || null,
     step_3_icp:          state.steps[3]?.data || null,
@@ -3289,13 +3189,59 @@ async function exportViaBackend() {
       headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
       body: JSON.stringify({ strategy }),
     });
+
+    console.info(
+      '[gtm-strategy/exportViaBackend] Engine:', res.headers.get('X-ABE-PDF-Engine') || 'unknown',
+      '| Status:', res.status,
+    );
+
+    if (!res.ok) {
+      let errMsg = 'Export failed: HTTP ' + res.status;
+      try {
+        const ct = res.headers.get('Content-Type') || '';
+        const errBody = ct.includes('application/json') ? await res.json() : await res.text();
+        errMsg = errBody?.error || errBody?.message || String(errBody) || errMsg;
+      } catch (_) {}
+      throw new Error(errMsg);
+    }
+
+    const contentType = res.headers.get('Content-Type') || '';
+    const filename = (strategy.company_name || 'GTM_Report').replace(/[^a-zA-Z0-9]/g, '_')
+      + '_' + new Date().toISOString().slice(0, 10) + '.pdf';
+
+    // ── Path A: binary PDF (Gotenberg) ─────────────────────────────────
+    if (contentType.includes('application/pdf')) {
+      const blob = await res.blob();
+      const disposition = res.headers.get('Content-Disposition') || '';
+      const fnMatch = disposition.match(/filename="([^"]+)"/);
+      const dlName = fnMatch ? fnMatch[1] : filename;
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = dlName;
+      document.body.appendChild(a); a.click(); a.remove();
+      window.URL.revokeObjectURL(url);
+      showToast('Enterprise Report Downloaded', 'success');
+      return;
+    }
+
+    // ── Path B: JSON with html (Gotenberg not configured) ─────────
     const data = await res.json();
-    if (!res.ok || !data.html) throw new Error(data.error || 'Export failed');
-    const filename = data.filename || ('GTM_Strategy_' + state.company.replace(/[^a-zA-Z0-9]/g,'_') + '_' + new Date().toISOString().slice(0,10) + '.pdf');
-    await renderBackendHtmlToPdf(data.html, filename);
-    showToast('Enterprise Report Downloaded', 'success');
+    if (data.html) {
+      const blob = new Blob([data.html], { type: 'text/html' });
+      const url  = window.URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = filename.replace(/\.pdf$/, '.html');
+      document.body.appendChild(a); a.click(); a.remove();
+      window.URL.revokeObjectURL(url);
+      showToast('Downloaded as HTML — open in Chrome → Print → Save as PDF', 'info');
+      return;
+    }
+
+    throw new Error(data.error || 'No content returned from server');
+
   } catch (err) {
-    console.error('Backend PDF export failed:', err);
+    console.error('[gtm-strategy/exportViaBackend]', err);
     showToast('PDF export failed: ' + err.message, 'error');
   }
 }
@@ -3310,745 +3256,13 @@ function copyAllToClipboard() {
    multi-page A4 PDF with cover page, section headers, branded
    colours, and all 6 steps + optional Step 7 intelligence.
 ═══════════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════════════════════════════
+   PROFESSIONAL PDF GENERATOR — REMOVED (Phase 22 architecture)
+   All PDF generation must go through POST /api/export-pdf (Gotenberg backend).
+═══════════════════════════════════════════════════════════════ */
 async function generateProfessionalPDF() {
-  showToast('Building Enterprise GTM Report…', 'info');
-
-  /* ── CDN loaders ─────────────────────────────────────────────── */
-  if (!window.jspdf) {
-    await new Promise((res, rej) => {
-      const s = document.createElement('script');
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
-      s.onload = res; s.onerror = () => rej(new Error('jsPDF load failed'));
-      document.head.appendChild(s);
-    });
-  }
-  if (!window.html2canvas) {
-    await new Promise((res, rej) => {
-      const s = document.createElement('script');
-      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
-      s.onload = res; s.onerror = () => rej(new Error('html2canvas load failed'));
-      document.head.appendChild(s);
-    });
-  }
-
-  /* ── Data helpers ─────────────────────────────────────────────── */
-  const p1 = state.steps[1]?.data || {};
-  const p2 = state.steps[2]?.data || {};
-  const p3 = state.steps[3]?.data || {};
-  const p4 = state.steps[4]?.data || {};
-  const p5 = state.steps[5]?.data || {};
-  const p6 = state.steps[6]?.data || {};
-  const s7 = state.step7 || {};
-  const bi = state.backend_intelligence || s7.backend_intelligence || {};
-
-  const esc  = s => (s||'').toString()
-    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  const arr  = v => Array.isArray(v) ? v : (v ? [v] : []);
-  const safe = (v, fallback='—') => (v !== undefined && v !== null && v !== '') ? v : fallback;
-  const dateStr = new Date().toLocaleDateString('en-GB',{year:'numeric',month:'long',day:'numeric'});
-  const co = esc(state.company || 'Company');
-  const ind = esc(state.industry || '');
-
-  /* ── Score helpers ───────────────────────────────────────────── */
-  const demand   = p2.demand_score?.score           ?? 0;
-  const timing   = p2.market_timing_score?.score    ?? 0;
-  const icp      = p2.icp_fit_score?.score          ?? 0;
-  const data_c   = p2.data_completeness_score?.score ?? 0;
-  const total    = p2.total_score ?? (demand + timing + icp + data_c);
-  const verdict  = (bi.verdict || s7.verdict || p3.verdict || p6.verdict || 'PENDING').toUpperCase();
-  const confScore = bi.confScore ?? s7.confidence_score ?? p5.confidence_score ?? Math.round(total * 0.85);
-  const vc = verdict === 'GO'
-    ? { color:'#22c55e', bg:'rgba(34,197,94,0.15)', border:'#22c55e', label:'GO' }
-    : verdict === 'NO GO'
-    ? { color:'#ef4444', bg:'rgba(239,68,68,0.15)', border:'#ef4444', label:'NO GO' }
-    : { color:'#f59e0b', bg:'rgba(245,158,11,0.15)', border:'#f59e0b', label:'CONDITIONAL GO' };
-
-  /* ── SVG score ring ──────────────────────────────────────────── */
-  const ring = (val, max, color, label, sub) => {
-    const pct  = Math.min(val / max, 1);
-    const r    = 36; const circ = 2 * Math.PI * r;
-    const dash = circ * pct;
-    return `<div style="text-align:center;padding:12px 8px;">
-      <svg width="96" height="96" viewBox="0 0 96 96">
-        <circle cx="48" cy="48" r="${r}" fill="none" stroke="rgba(255,255,255,0.06)" stroke-width="8"/>
-        <circle cx="48" cy="48" r="${r}" fill="none" stroke="${color}" stroke-width="8"
-          stroke-dasharray="${dash} ${circ}" stroke-linecap="round"
-          transform="rotate(-90 48 48)"/>
-        <text x="48" y="46" text-anchor="middle" fill="${color}"
-          font-family="Space Mono,monospace" font-size="16" font-weight="900">${val}</text>
-        <text x="48" y="60" text-anchor="middle" fill="#6b7280"
-          font-family="sans-serif" font-size="9">/${max}</text>
-      </svg>
-      <div style="font-size:11px;font-weight:700;color:${color};margin-top:2px;">${esc(label)}</div>
-      <div style="font-size:9px;color:#6b7280;">${esc(sub||'')}</div>
-    </div>`;
-  };
-
-  /* ── Bar chart via QuickChart ───────────────────────────────── */
-  const scoreBarChart = encodeURIComponent(JSON.stringify({
-    type:'bar',
-    data:{
-      labels:['Demand (40)','Timing (25)','ICP Fit (20)','Data (15)'],
-      datasets:[{
-        label:'Score',
-        data:[demand, timing, icp, data_c],
-        backgroundColor:['rgba(34,197,94,0.8)','rgba(96,165,250,0.8)','rgba(168,85,247,0.8)','rgba(245,158,11,0.8)'],
-        borderRadius:6
-      }]
-    },
-    options:{
-      plugins:{legend:{display:false}},
-      scales:{
-        x:{ticks:{color:'#9ca3af'},grid:{color:'rgba(255,255,255,0.04)'}},
-        y:{max:40,ticks:{color:'#9ca3af'},grid:{color:'rgba(255,255,255,0.04)'}}
-      }
-    }
-  }));
-  const barChartUrl = `https://quickchart.io/chart?backgroundColor=transparent&transparent=true&width=600&height=220&c=${scoreBarChart}`;
-
-  /* ── Confidence gauge via QuickChart ────────────────────────── */
-  const gaugeChart = encodeURIComponent(JSON.stringify({
-    type:'radialGauge',
-    data:{datasets:[{data:[confScore],backgroundColor:'#22c55e',borderWidth:0}]},
-    options:{
-      plugins:{datalabels:{display:false}},
-      centerArea:{displayText:true,text:`${confScore}%`,fontColor:'#e5e7eb',fontSize:28,fontStyle:'bold'}
-    }
-  }));
-  const gaugeUrl = `https://quickchart.io/chart?backgroundColor=transparent&transparent=true&width=220&height=220&c=${gaugeChart}`;
-
-  /* ── SWOT data ────────────────────────────────────────────────── */
-  const demandSignals = arr(p1.demand_signals);
-  const timingSignals = arr(p1.market_timing);
-  const icpFit        = p1.icp_fit || {};
-  const mismatches    = arr(icpFit.mismatches).filter(m => m && m !== 'missing data');
-  const missing       = arr(p1.data_completeness?.missing).filter(m => m && m !== 'missing data');
-
-  const swotS = demandSignals.filter(s=>s.strength==='High').map(s=>s.signal).slice(0,3);
-  const swotW = mismatches.slice(0,2).concat(missing.slice(0,2));
-  const swotO = timingSignals.filter(s=>s.strength==='High').map(s=>s.signal).slice(0,3);
-  const swotT = arr(p5.key_risks).filter(r=>r.impact==='high').map(r=>r.risk).slice(0,3);
-
-  const swotRow = (items) => items.length
-    ? items.map(i=>`<div class="list-line"><span class="bullet">›</span>${esc(i)}</div>`).join('')
-    : '<div style="color:#6b7280;font-size:11px;">No data available</div>';
-
-  /* ── Risk cards ─────────────────────────────────────────────── */
-  const riskCards = arr(p5.key_risks).map(r => {
-    const ic = r.impact === 'high' ? '#ef4444' : r.impact === 'medium' ? '#f59e0b' : '#6b7280';
-    return `<div class="card compact" style="border-left:3px solid ${ic};background:${ic}08;">
-      <div style="font-size:10px;font-weight:800;color:${ic};text-transform:uppercase;letter-spacing:.08em;">⚠ ${esc(r.impact||'')} Impact</div>
-      <div style="font-size:9px;color:#6b7280;margin-bottom:6px;">Source: ${esc(r.source||'')}</div>
-      <div style="font-size:12px;color:#e5e7eb;margin-bottom:6px;">${esc(r.risk||'')}</div>
-      ${r.mitigation ? `<div style="font-size:10px;color:#4ade80;">→ ${esc(r.mitigation)}</div>` : ''}
-    </div>`;
-  }).join('') || '<p style="color:#6b7280;">No critical risks identified at this time.</p>';
-
-  /* ── Section header helper ───────────────────────────────────── */
-  const sectionHeader = (num, title, subtitle) => `
-    <div class="doc-header">
-      <div class="doc-brand">ABE GTM STRATEGY REPORT</div>
-      <div class="doc-meta">${co} · ${dateStr}</div>
-    </div>
-    <div class="section-title">
-      <div class="section-num">${String(num).padStart(2,'0')}</div>
-      <h1>${esc(title)}</h1>
-      ${subtitle ? `<p>${esc(subtitle)}</p>` : ''}
-    </div>`;
-
-  const subHeader = (num, title, subtitle) => `
-    <div class="section-title" style="margin-top:18px;">
-      <div class="section-num">${String(num).padStart(2,'0')}</div>
-      <h1 style="font-size:18px;">${esc(title)}</h1>
-      ${subtitle ? `<p>${esc(subtitle)}</p>` : ''}
-    </div>`;
-
-  const footer = (page) => `
-    <div class="footer">
-      <span>ABE · GTM Strategy Report · ${co}</span>
-      <span>${page}</span>
-    </div>`;
-
-  const bar = (val, max, color) => {
-    const pct = Math.max(0, Math.min(100, Math.round((Number(val || 0) / max) * 100)));
-    return `<div class="bar"><div style="width:${pct}%;background:${color};"></div></div>`;
-  };
-
-  const signalRows = (signals, typeColor) => signals.length ? signals.map(s => {
-    const strength = s.strength || '—';
-    const sColor = strength === 'High' ? '#22c55e' : strength === 'Medium' ? '#f59e0b' : '#6b7280';
-    return `<tr>
-      <td style="width:62%;font-size:11px;color:#e5e7eb;">${esc(s.signal)}</td>
-      <td style="width:22%;"><span class="tag" style="border-color:${typeColor}55;color:${typeColor};background:${typeColor}18;">${esc(s.type || s.category || 'Signal')}</span></td>
-      <td style="width:16%;font-weight:800;color:${sColor};font-size:10px;">${esc(strength)}</td>
-    </tr>`;
-  }).join('') : '<tr><td colspan="3" style="color:#6b7280;font-size:11px;">No signals extracted.</td></tr>';
-
-  /* ── Divider ─────────────────────────────────────────────────── */
-  const div = `<div style="height:1px;background:linear-gradient(90deg,#a855f766,transparent);margin:24px 0;"></div>`;
-
-  /* ══════════════════════════════════════════════════════════════
-     BUILD HTML DOCUMENT — single-column, A4-safe
-  ══════════════════════════════════════════════════════════════ */
-  const html = `<!DOCTYPE html>
-<html><head><meta charset="UTF-8">
-<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
-<style>
-  * { box-sizing:border-box; margin:0; padding:0; }
-  html, body { width:210mm; min-height:100%; background:#0d1120; overflow-x:hidden; }
-  body { color:#e5e7eb; font-family:'Inter',sans-serif; font-size:12px; line-height:1.55; }
-  .page { width:210mm; height:297mm; min-height:297mm; padding:58px 68px 76px; background:#0d1120; position:relative; page-break-after:always; overflow:hidden; display: flex; flex-direction: column; justify-content: space-between; }
-  .page:last-child { page-break-after:auto; }
-  .doc-header { width:100%; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:10px; margin-bottom:18px; }
-  .doc-brand { font-family:'Space Mono',monospace; font-size:9px; font-weight:900; color:#a855f7; letter-spacing:.18em; text-transform:uppercase; }
-  .doc-meta { margin-top:3px; font-size:9px; color:#6b7280; font-family:'Space Mono',monospace; }
-  .section-title { width:100%; margin:0 0 18px; padding-bottom:14px; border-bottom:1px solid rgba(168,85,247,0.22); }
-  .section-num { display:inline-block; font-family:'Space Mono',monospace; font-size:10px; font-weight:900; color:white; background:#7c3aed; border-radius:6px; padding:5px 9px; margin-bottom:9px; }
-  .section-title h1 { font-size:21px; line-height:1.2; font-weight:900; color:white; letter-spacing:0; }
-  .section-title p { font-size:11px; color:#9ca3af; margin-top:4px; }
-  .card { width:100%; background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.07); border-radius:8px; padding:14px 16px; margin-bottom:12px; }
-  .card.compact { padding:12px 14px; }
-  .gold-rule { height:2px; background:linear-gradient(90deg,#a855f7,#7c3aed,transparent); border-radius:2px; margin:20px auto; }
-  .label { font-size:9px; font-weight:700; color:#a855f7; text-transform:uppercase; letter-spacing:.12em; margin-bottom:6px; }
-  .mono { font-family:'Space Mono',monospace; }
-  table { width:100%; max-width:100%; table-layout:fixed; border-collapse:collapse; font-size:11px; border-radius:8px; overflow:hidden; border:1px solid rgba(255,255,255,0.08); margin:9px 0 13px; }
-  th { background:rgba(168,85,247,0.12); color:#c4b5fd; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.1em; padding:8px 10px; text-align:left; border-bottom:2px solid rgba(168,85,247,0.3); }
-  td { padding:8px 10px; border-bottom:1px solid rgba(255,255,255,0.05); color:#d1d5db; vertical-align:top; overflow-wrap:anywhere; }
-  tr:last-child td { border-bottom:none; }
-  .tag { display:inline-block; padding:3px 9px; border-radius:20px; font-size:9px; font-weight:700; margin:2px; }
-  .tag-green  { background:rgba(34,197,94,.12); color:#4ade80; border:1px solid rgba(34,197,94,.2); }
-  .tag-blue   { background:rgba(96,165,250,.12); color:#60a5fa; border:1px solid rgba(96,165,250,.2); }
-  .tag-purple { background:rgba(168,85,247,.12); color:#c4b5fd; border:1px solid rgba(168,85,247,.2); }
-  .tag-amber  { background:rgba(245,158,11,.12); color:#fbbf24; border:1px solid rgba(245,158,11,.2); }
-  .bar { width:100%; height:7px; background:rgba(255,255,255,0.07); border-radius:4px; overflow:hidden; margin-top:5px; }
-  .bar div { height:100%; border-radius:4px; }
-  .list-line { font-size:10px; color:#d1d5db; margin:0 0 6px; padding-left:13px; position:relative; }
-  .bullet { position:absolute; left:0; color:#a855f7; }
-  .footer { position:absolute; bottom:45px; left:68px; right:68px; display:table; width:658px; font-size:8px; color:#374151; border-top:1px solid rgba(255,255,255,0.05); padding-top:6px; font-family:'Space Mono',monospace; }
-  .footer span { display:table-cell; width:50%; }
-  .footer span:last-child { text-align:right; }
-  .cover-page { text-align:center; padding-top:180px; }
-  .cover-logo { width:72px; height:72px; background:linear-gradient(135deg,#a855f7,#7c3aed); border-radius:18px; margin:0 auto 20px; box-shadow:0 20px 60px rgba(168,85,247,.4); font-family:'Space Mono',monospace; font-size:20px; font-weight:900; color:white; line-height:72px; }
-  .metric-table td { text-align:center; border-bottom:none; }
-  .metric-value { font-family:'Space Mono',monospace; font-size:34px; line-height:1; font-weight:900; }
-  .metric-label { font-size:9px; color:#6b7280; margin-top:6px; text-transform:uppercase; letter-spacing:.08em; }
-</style>
-</head><body>
-
-<!-- ═══════════════════════════════════════════════
-     PAGE 1 — COVER
-═══════════════════════════════════════════════ -->
-<div class="page cover-page">
-  <div style="margin-bottom:48px;">
-    <div class="cover-logo">ABE</div>
-    <div style="font-size:9px;font-weight:700;color:#a855f7;letter-spacing:.25em;text-transform:uppercase;margin-bottom:12px;">GTM Strategy Report</div>
-    <div style="font-size:40px;font-weight:900;color:white;letter-spacing:-.02em;line-height:1.1;margin-bottom:8px;">${co}</div>
-    ${ind ? `<div style="font-size:14px;color:#9ca3af;">${ind}</div>` : ''}
-  </div>
-
-  <div class="gold-rule" style="width:120px;"></div>
-
-  <table class="metric-table" style="width:520px;margin:32px auto;border:none;background:transparent;">
-    <tr>
-      <td>
-        <div class="metric-value" style="color:${vc.color};">${total}</div>
-        <div class="metric-label">GTM Score / 100</div>
-      </td>
-      <td>
-        <div class="metric-value" style="color:${vc.color};font-size:28px;">${vc.label}</div>
-        <div class="metric-label">Qualification</div>
-      </td>
-      <td>
-        <div class="metric-value" style="color:#9ca3af;">${confScore}</div>
-        <div class="metric-label">Confidence</div>
-      </td>
-    </tr>
-  </table>
-
-  <div class="gold-rule" style="width:120px;"></div>
-
-  <div style="margin:32px auto 0;max-width:500px;">
-    <div style="font-size:13px;color:#d1d5db;line-height:1.8;">${esc(safe(p6.executive_brief, p3.verdict_reasoning || 'GTM qualification report generated by ABE AI Revenue Infrastructure platform.'))}</div>
-  </div>
-
-  <div class="footer">
-    <span>CLASSIFICATION: CONFIDENTIAL</span>
-    <span>${dateStr}</span>
-  </div>
-</div>
-
-<!-- ═══════════════════════════════════════════════
-     PAGE 2 — SCORE SUMMARY + EXEC BRIEF
-═══════════════════════════════════════════════ -->
-<div class="page">
-  ${sectionHeader('ES','Executive Summary & Score Breakdown','Data-backed GTM qualification across 4 dimensions')}
-
-  <div class="card">
-    <div class="label">Score Breakdown</div>
-    <table>
-      <tr><th>Dimension</th><th>Score</th><th>Max</th><th>Key Insight</th></tr>
-      <tr><td>Demand Signals</td><td class="mono" style="font-size:16px;font-weight:900;color:#22c55e;">${demand}</td><td>40</td><td>${esc(p2.demand_score?.rationale||'—')}</td></tr>
-      <tr><td>Market Timing</td><td class="mono" style="font-size:16px;font-weight:900;color:#60a5fa;">${timing}</td><td>25</td><td>${esc(p2.market_timing_score?.rationale||'—')}</td></tr>
-      <tr><td>ICP Fit</td><td class="mono" style="font-size:16px;font-weight:900;color:#a855f7;">${icp}</td><td>20</td><td>${esc(p2.icp_fit_score?.rationale||'—')}</td></tr>
-      <tr><td>Data Completeness</td><td class="mono" style="font-size:16px;font-weight:900;color:#f59e0b;">${data_c}</td><td>15</td><td>${esc(p2.data_completeness_score?.rationale||'—')}</td></tr>
-      <tr style="border-top:2px solid rgba(168,85,247,0.4);"><td style="font-weight:900;color:${vc.color};">TOTAL</td><td class="mono" style="font-size:18px;font-weight:900;color:${vc.color};">${total}</td><td colspan="2" style="color:#6b7280;">/100</td></tr>
-    </table>
-  </div>
-
-  <div class="card" style="padding:14px;">
-    <div class="label">Score Distribution</div>
-    <table style="border:none;margin:0;background:transparent;">
-      <tr><td style="width:26%;border:none;color:#22c55e;font-weight:800;">Demand</td><td style="width:12%;border:none;" class="mono">${demand}/40</td><td style="border:none;">${bar(demand,40,'#22c55e')}</td></tr>
-      <tr><td style="border:none;color:#60a5fa;font-weight:800;">Timing</td><td style="border:none;" class="mono">${timing}/25</td><td style="border:none;">${bar(timing,25,'#60a5fa')}</td></tr>
-      <tr><td style="border:none;color:#a855f7;font-weight:800;">ICP Fit</td><td style="border:none;" class="mono">${icp}/20</td><td style="border:none;">${bar(icp,20,'#a855f7')}</td></tr>
-      <tr><td style="border:none;color:#f59e0b;font-weight:800;">Data</td><td style="border:none;" class="mono">${data_c}/15</td><td style="border:none;">${bar(data_c,15,'#f59e0b')}</td></tr>
-    </table>
-    <div style="font-family:'Space Mono',monospace;font-size:9px;color:#6b7280;margin-top:8px;">${esc(p2.score_verification || demand + ' + ' + timing + ' + ' + icp + ' + ' + data_c + ' = ' + total)}</div>
-  </div>
-
-  ${div}
-
-  <!-- Verdict block -->
-  <div style="border:2px solid ${vc.border};background:${vc.bg};border-radius:12px;padding:18px 20px;margin-bottom:14px;">
-    <div class="mono" style="font-size:30px;font-weight:900;color:${vc.color};margin-bottom:8px;">${vc.label}</div>
-    <div>
-      <div style="font-size:11px;font-weight:700;color:${vc.color};text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">
-        ${esc(p3.demand_assessment||'—').toUpperCase()} DEMAND · ${esc(p3.icp_assessment||'—').toUpperCase()} ICP FIT
-      </div>
-      <div style="font-size:12px;color:#d1d5db;">${esc(safe(p3.verdict_reasoning,'—'))}</div>
-    </div>
-    ${arr(p3.conditions).length ? `
-    <div style="margin-top:12px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.08);">
-      <div style="font-size:10px;font-weight:700;color:#f59e0b;margin-bottom:6px;">CONDITIONS TO SATISFY:</div>
-      ${arr(p3.conditions).map(c=>`<div style="font-size:11px;color:#fbbf24;margin-bottom:3px;">› ${esc(c)}</div>`).join('')}
-    </div>` : ''}
-  </div>
-
-  <div class="card">
-    <div class="label">Score Basis</div>
-    <div class="mono" style="font-size:11px;color:#c4b5fd;">${esc(safe(p3.score_basis,'—'))}</div>
-    <div style="margin-top:10px;font-size:11px;color:#9ca3af;border-top:1px solid rgba(255,255,255,0.06);padding-top:8px;">
-      <strong style="color:#e5e7eb;">What would change this verdict:</strong> ${esc(safe(p3.what_would_change_verdict,'—'))}
-    </div>
-  </div>
-
-  <div class="footer">
-    <span>ABE · GTM Strategy Report · ${co}</span>
-    <span>Page 2</span>
-  </div>
-</div>
-
-<!-- ═══════════════════════════════════════════════
-     PAGE 3 — MARKET RESEARCH & DEMAND SIGNALS
-═══════════════════════════════════════════════ -->
-<div class="page">
-  ${sectionHeader(1,'Market Research & Insights','Demand signals · Market timing · ICP fit · Data completeness')}
-
-  <div class="label">Market Demand Signals</div>
-  <div class="card" style="padding:14px 16px;">
-    <table style="margin:0;">${signalRows(demandSignals, '#22c55e')}</table>
-  </div>
-
-  ${div}
-
-  <div class="label">Market Timing & Trends</div>
-  <div class="card" style="padding:14px 16px;">
-    <table style="margin:0;">${signalRows(timingSignals, '#60a5fa')}</table>
-  </div>
-
-  ${div}
-
-  <!-- ICP Fit + Data side by side (safe 2-col) -->
-  <table>
-    <tr>
-      <th style="width:50%;">ICP Fit Assessment</th>
-      <th style="width:50%;">Data Completeness</th>
-    </tr>
-    <tr>
-      <td>
-        <div style="margin-bottom:8px;color:#e5e7eb;font-size:12px;">${esc(safe(icpFit.target_description,'missing data'))}</div>
-        ${arr(icpFit.fit_indicators).map(f=>`<div style="font-size:10px;color:#4ade80;margin-bottom:3px;">✓ ${esc(f)}</div>`).join('')}
-        ${arr(icpFit.mismatches).filter(m=>m&&m!=='missing data').map(m=>`<div style="font-size:10px;color:#f87171;margin-bottom:3px;">⚠ ${esc(m)}</div>`).join('')}
-      </td>
-      <td>
-        ${arr(p1.data_completeness?.available).map(a=>`<div style="font-size:10px;color:#4ade80;margin-bottom:3px;">✓ ${esc(a)}</div>`).join('') || '<div style="font-size:10px;color:#6b7280;">No data available fields listed</div>'}
-        <div style="margin-top:8px;">
-          ${arr(p1.data_completeness?.missing).filter(m=>m&&m!=='missing data').map(m=>`<div style="font-size:10px;color:#f87171;margin-bottom:3px;">✗ ${esc(m)}</div>`).join('') || ''}
-        </div>
-      </td>
-    </tr>
-  </table>
-
-  <div class="card" style="border-left:3px solid #a855f7;">
-    <div class="label">Analyst Insight</div>
-    <div style="font-size:12px;color:#d1d5db;font-style:italic;">"${esc(safe(p1.analyst_insight,'No analyst insight available.'))}"</div>
-  </div>
-
-  <div class="footer">
-    <span>ABE · GTM Strategy Report · ${co}</span>
-    <span>Page 3</span>
-  </div>
-</div>
-
-<!-- ═══════════════════════════════════════════════
-     PAGE 4 — TAM ANALYSIS / SCORING DETAIL
-═══════════════════════════════════════════════ -->
-<div class="page">
-  ${sectionHeader(2,'Market Attractiveness & TAM Analysis','Demand · Timing · ICP Fit · Data Quality scoring')}
-
-  <table>
-    <tr>
-      <th>Category</th>
-      <th>Score</th>
-      <th>Max</th>
-      <th>Rationale</th>
-    </tr>
-    ${[
-      ['📈 Demand Signals',   p2.demand_score,           40, '#22c55e'],
-      ['⏱ Market Timing',    p2.market_timing_score,    25, '#60a5fa'],
-      ['🎯 ICP Fit',         p2.icp_fit_score,          20, '#a855f7'],
-      ['📋 Data Completeness',p2.data_completeness_score,15, '#f59e0b'],
-    ].map(([label,obj,max,col]) => `
-    <tr>
-      <td style="font-weight:700;color:${col};">${esc(label)}</td>
-      <td style="font-family:'Space Mono',monospace;font-size:16px;font-weight:900;color:${col};">${obj?.score??0}</td>
-      <td style="color:#6b7280;">${max}</td>
-      <td style="font-size:11px;">${esc(obj?.rationale||'—')}
-        ${obj?.sub_breakdown ? `<div style="margin-top:4px;font-size:9px;font-family:'Space Mono',monospace;color:#a855f7;">${esc(obj.sub_breakdown)}</div>` : ''}
-      </td>
-    </tr>`).join('')}
-    <tr style="border-top:2px solid rgba(168,85,247,0.4);">
-      <td style="font-weight:900;color:${vc.color};font-size:13px;">TOTAL</td>
-      <td style="font-family:'Space Mono',monospace;font-size:22px;font-weight:900;color:${vc.color};" colspan="2">${total}/100</td>
-      <td style="font-family:'Space Mono',monospace;font-size:10px;color:#a855f7;">${esc(p2.score_verification||'—')}</td>
-    </tr>
-  </table>
-
-  ${div}
-
-  <!-- Analyst insights from scoring -->
-  <div class="card" style="border-left:3px solid #60a5fa;">
-    <div class="label">Scoring Analyst Note</div>
-    <div style="font-size:12px;color:#d1d5db;font-style:italic;">"${esc(safe(p2.analyst_insight,'—'))}"</div>
-  </div>
-
-  ${div}
-
-  ${subHeader(3,'GTM Recommendation','Score-based qualification decision')}
-
-  <div style="border:2px solid ${vc.border};background:${vc.bg};border-radius:12px;padding:20px 22px;margin-bottom:14px;">
-    <div class="mono" style="font-size:32px;font-weight:900;color:${vc.color};margin-bottom:6px;">${vc.label}</div>
-    <div style="font-size:10px;font-weight:700;color:${vc.color};letter-spacing:.1em;margin-bottom:4px;">TOTAL SCORE: ${total}/100</div>
-    <div style="font-size:12px;color:#d1d5db;margin-bottom:14px;">${esc(safe(bi.reasoning || p3.verdict_reasoning,'Verdict based on signal scoring across all four dimensions.'))}</div>
-    <div>
-      <div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:14px;">
-        <div style="font-size:9px;font-weight:700;color:#9ca3af;margin-bottom:6px;">DEMAND ASSESSMENT</div>
-        <div style="font-size:13px;font-weight:800;color:${p3.demand_assessment==='strong'?'#22c55e':p3.demand_assessment==='partial'?'#f59e0b':'#ef4444'};">${esc((p3.demand_assessment||'—').toUpperCase())}</div>
-      </div>
-      <div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:14px;margin-top:10px;">
-        <div style="font-size:9px;font-weight:700;color:#9ca3af;margin-bottom:6px;">ICP ASSESSMENT</div>
-        <div style="font-size:13px;font-weight:800;color:${p3.icp_assessment==='strong'?'#22c55e':p3.icp_assessment==='partial'?'#f59e0b':'#ef4444'};">${esc((p3.icp_assessment||'—').toUpperCase())}</div>
-      </div>
-      <div style="background:rgba(0,0,0,0.3);border-radius:8px;padding:14px;margin-top:10px;">
-        <div style="font-size:9px;font-weight:700;color:#9ca3af;margin-bottom:6px;">SCORE BASIS</div>
-        <div style="font-size:10px;font-family:'Space Mono',monospace;color:#c4b5fd;">${esc(safe(p3.score_basis,'—'))}</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="footer">
-    <span>ABE · GTM Strategy Report · ${co}</span>
-    <span>Page 4</span>
-  </div>
-</div>
-
-<!-- ═══════════════════════════════════════════════
-     PAGE 5 — GTM STRATEGY / DEAL LENS
-═══════════════════════════════════════════════ -->
-<div class="page">
-  ${sectionHeader(4,'Target Accounts & GTM Strategy','ICP · Roles · Deal sizing · Sales approach')}
-
-  <div class="card">
-    <div class="label">Target Roles</div>
-    ${arr(p4.target_roles).map(r=>`<span class="tag tag-purple">${esc(r)}</span>`).join('') || '<div style="color:#6b7280;font-size:11px;">No target roles specified.</div>'}
-  </div>
-
-  <div class="card">
-    <div class="label">Solution Angle</div>
-    <div style="font-size:13px;color:#e5e7eb;line-height:1.7;">${esc(safe(p4.solution_angle,'—'))}</div>
-  </div>
-
-  <div class="card">
-    <div class="label">Sales Approach</div>
-    <div style="font-size:13px;color:#e5e7eb;line-height:1.7;">${esc(safe(p4.sales_approach,'—'))}</div>
-  </div>
-
-  <div class="card">
-    <div class="label">Core Problem (Signal-Backed)</div>
-    <div style="font-size:13px;color:#e5e7eb;line-height:1.7;">${esc(safe(p4.core_problem,'—'))}</div>
-  </div>
-
-  <div class="card" style="border-left:3px solid #a855f7;">
-    <div class="label">Solution Pitch</div>
-    <div style="font-size:13px;color:#d1d5db;line-height:1.7;font-style:italic;">${esc(safe(p4.solution_pitch,'—'))}</div>
-  </div>
-
-  <table>
-    <tr>
-      <th style="width:50%;">Why Now</th>
-      <th style="width:50%;">Estimated Deal Size</th>
-    </tr>
-    <tr>
-      <td style="font-size:12px;">${esc(safe(p4.why_now,'—'))}</td>
-      <td>
-        <div style="font-size:20px;font-weight:900;color:#22c55e;font-family:'Space Mono',monospace;">${esc(safe(p4.estimated_deal_size?.range,'—'))}</div>
-        ${p4.estimated_deal_size?.is_estimate ? '<div style="font-size:9px;color:#6b7280;">(Estimate)</div>' : ''}
-        <div style="font-size:10px;color:#9ca3af;margin-top:4px;">${esc(safe(p4.estimated_deal_size?.basis,''))}</div>
-      </td>
-    </tr>
-  </table>
-
-  ${p4.approach_rationale ? `<div class="card"><div class="label">Approach Rationale</div><div style="font-size:12px;color:#d1d5db;">${esc(p4.approach_rationale)}</div></div>` : ''}
-
-  ${div}
-
-  <!-- SWOT Analysis -->
-  <div style="margin-bottom:8px;">
-    <div class="label" style="font-size:11px;">SWOT Analysis — Derived from Market Signals</div>
-  </div>
-  <table>
-    <tr>
-      <th style="background:rgba(34,197,94,0.1);color:#4ade80;border-bottom-color:#22c55e;width:50%;">💪 Strengths</th>
-      <th style="background:rgba(239,68,68,0.1);color:#f87171;border-bottom-color:#ef4444;width:50%;">⚠ Weaknesses</th>
-    </tr>
-    <tr>
-      <td style="vertical-align:top;">${swotRow(swotS.length ? swotS : ['Strong demand signal presence','Clear ICP target identified'])}</td>
-      <td style="vertical-align:top;">${swotRow(swotW.length ? swotW : ['Data completeness gaps noted','Validation still required'])}</td>
-    </tr>
-    <tr>
-      <th style="background:rgba(96,165,250,0.1);color:#60a5fa;border-bottom-color:#3b82f6;border-top:1px solid rgba(255,255,255,0.06);">🚀 Opportunities</th>
-      <th style="background:rgba(245,158,11,0.1);color:#fbbf24;border-bottom-color:#f59e0b;border-top:1px solid rgba(255,255,255,0.06);">🔴 Threats</th>
-    </tr>
-    <tr>
-      <td style="vertical-align:top;">${swotRow(swotO.length ? swotO : ['Favourable market timing signals','Growing demand in target segment'])}</td>
-      <td style="vertical-align:top;">${swotRow(swotT.length ? swotT : ['Execution risks identified','Competitive pressure possible'])}</td>
-    </tr>
-  </table>
-
-  <div class="footer">
-    <span>ABE · GTM Strategy Report · ${co}</span>
-    <span>Page 5</span>
-  </div>
-</div>
-
-<!-- ═══════════════════════════════════════════════
-     PAGE 6 — EXECUTION RISKS + CONFIDENCE
-═══════════════════════════════════════════════ -->
-<div class="page">
-  ${sectionHeader(5,'Execution Risks & Considerations','Derived from missing and weak signals only')}
-
-  ${riskCards}
-
-  ${div}
-
-  <div class="card">
-    <div class="label">Confidence</div>
-    <div class="mono" style="font-size:30px;font-weight:900;color:${confScore>=70?'#22c55e':confScore>=45?'#f59e0b':'#ef4444'};margin-bottom:6px;">${confScore}/100</div>
-    ${bar(confScore,100,confScore>=70?'#22c55e':confScore>=45?'#f59e0b':'#ef4444')}
-    <div style="font-size:12px;color:#d1d5db;margin-top:12px;margin-bottom:12px;">${esc(safe(p5.confidence_reasoning,'Confidence derived from data completeness and signal strength.'))}</div>
-    <div class="label">Validation Required</div>
-    ${arr(p5.validation_needed).map(v=>`<span class="tag tag-blue" style="margin-bottom:4px;">${esc(v)}</span>`).join('') || '<span style="color:#6b7280;font-size:11px;">None specified</span>'}
-  </div>
-
-  ${div}
-
-  <div class="card" style="border-left:3px solid #ef4444;">
-    <div class="label">Risk Analyst Note</div>
-    <div style="font-size:12px;color:#d1d5db;font-style:italic;">"${esc(safe(p5.analyst_insight,'No specific analyst note available.'))}"</div>
-  </div>
-
-  <div class="footer">
-    <span>ABE · GTM Strategy Report · ${co}</span>
-    <span>Page 6</span>
-  </div>
-</div>
-
-<!-- ═══════════════════════════════════════════════
-     PAGE 7 — FINAL OUTPUT / ACTION PLAN
-═══════════════════════════════════════════════ -->
-<div class="page">
-  ${sectionHeader(6,'GTM Summary & Action Plan','Complete synthesised strategy output')}
-
-  <!-- Signal highlights -->
-  <div class="label">Top Market Signals</div>
-  <div class="card" style="padding:14px 16px;margin-bottom:14px;">
-    <table style="margin:0;">${arr(p6.signal_highlights).length ? arr(p6.signal_highlights).map(s => {
-      const t = s.type?.toLowerCase();
-      const cls = t==='demand' ? 'tag-green' : t==='timing' ? 'tag-blue' : 'tag-purple';
-      return `<tr>
-        <td style="width:22%;"><span class="tag ${cls}">${esc(s.type||'')}</span></td>
-        <td style="width:18%;"><span class="tag ${s.strength==='High'?'tag-green':s.strength==='Medium'?'tag-amber':''}">${esc(s.strength||'')}</span></td>
-        <td style="font-size:12px;color:#e5e7eb;">${esc(s.signal||'')}</td>
-      </tr>`;
-    }).join('') : '<tr><td style="color:#6b7280;font-size:11px;">Run all phases to populate signal highlights.</td></tr>'}</table>
-  </div>
-
-  ${div}
-
-  <div class="card">
-    <div class="label">GTM Strategy Summary</div>
-    <div style="font-size:12px;color:#d1d5db;line-height:1.75;">${esc(safe(p6.deal_lens_summary,'—'))}</div>
-  </div>
-
-  <div class="card">
-    <div class="label">Risk Summary</div>
-    <div style="font-size:12px;color:#d1d5db;line-height:1.75;">${esc(safe(p6.risks_summary,'—'))}</div>
-  </div>
-
-  <div class="card">
-    <div class="label">Confidence Note</div>
-    <div style="font-size:12px;color:#d1d5db;">${esc(safe(p6.confidence_note,'—'))}</div>
-  </div>
-
-  ${div}
-
-  <!-- Next action callout -->
-  <div style="background:linear-gradient(135deg,rgba(168,85,247,0.15),rgba(124,58,237,0.1));border:1px solid rgba(168,85,247,0.3);border-radius:12px;padding:20px 22px;">
-    <div style="font-size:9px;font-weight:700;color:#a855f7;letter-spacing:.15em;text-transform:uppercase;margin-bottom:8px;">Recommended Next Action</div>
-    <div style="font-size:15px;font-weight:700;color:white;line-height:1.6;">→ ${esc(safe(p6.recommended_next_action, s7?.next_steps?.[0] || 'Complete all 6 phases to generate a recommended next action.'))}</div>
-  </div>
-
-  ${s7?.strategic_hook ? `
-  ${div}
-  <div class="card" style="border-left:3px solid #22c55e;">
-    <div class="label">Revenue Intelligence — Strategic Hook (Step 7)</div>
-    <div style="font-size:12px;color:#4ade80;font-style:italic;">"${esc(s7.strategic_hook)}"</div>
-    ${s7.why_now ? `<div style="font-size:11px;color:#9ca3af;margin-top:8px;">Why now: ${esc(s7.why_now)}</div>` : ''}
-  </div>` : ''}
-
-  <!-- Final score summary bar -->
-  <div style="margin-top:16px;background:rgba(0,0,0,0.4);border-radius:10px;padding:14px 16px;">
-    <div class="mono" style="font-size:36px;font-weight:900;color:${vc.color};">${total}</div>
-    ${bar(total,100,vc.color)}
-    <div style="font-size:10px;color:#9ca3af;margin-top:6px;">GTM Score · ${vc.label} · Confidence ${confScore}/100</div>
-    <div class="mono" style="font-size:18px;font-weight:900;color:${vc.color};margin-top:8px;">${vc.label}</div>
-  </div>
-
-  <div class="footer">
-    <span>ABE · GTM Strategy Report · ${co} · ${dateStr}</span>
-    <span>Page 7 · CONFIDENTIAL</span>
-  </div>
-</div>
-
-</body></html>`;
-
-  /* ── Render to PDF ─────────────────────────────────────────── */
-
-  // A4 in pixels at 96 dpi — must be consistent everywhere
-  const A4W = 794;
-  const A4H = 1123;
-
-  // Keep the render DOM at a real A4 origin. Negative left offsets can
-  // introduce a blank capture gutter when html2canvas is also given x:0.
-  const container = document.createElement('div');
-  container.style.cssText = [
-    'position:absolute',
-    'top:0',
-    'left:0',
-    `width:${A4W}px`,
-    'background:#0d1120',
-    'visibility:hidden',
-    'overflow:visible',
-    'pointer-events:none',
-    'z-index:-9999',
-  ].join(';');
-  container.innerHTML = html;
-  document.body.appendChild(container);
-
-  // Force every .page to exact A4 pixel dimensions so html2canvas
-  // captures a consistent frame — no scrollHeight variance, no overflow
-  container.querySelectorAll('.page').forEach(p => {
-    p.style.width       = A4W + 'px';
-    p.style.height      = A4H + 'px';
-    p.style.minHeight   = A4H + 'px';
-    p.style.maxHeight   = A4H + 'px';
-    p.style.overflow    = 'hidden';
-    p.style.boxSizing   = 'border-box';
-    p.style.pageBreakAfter = 'always';
-  });
-
-  // 1. Two rAF ticks — lets the browser finish layout/paint
-  await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
-
-  // 2. Wait for document fonts (Inter, Space Mono from Google Fonts)
-  try { await document.fonts.ready; } catch (_) {}
-
-  // 3. Wait for every <img> in the container (QuickChart, gauges, etc.)
-  const imgEls = Array.from(container.querySelectorAll('img'));
-  await Promise.all(imgEls.map(img =>
-    img.complete
-      ? Promise.resolve()
-      : new Promise(r => { img.onload = r; img.onerror = r; })
-  ));
-
-  // 4. Small final buffer for any CSS transitions / repaints
-  await new Promise(r => setTimeout(r, 600));
-
-  try {
-    const { jsPDF } = window.jspdf;
-    const html2canvasFn = window.html2canvas || html2canvas;
-    const pdf   = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
-    const pages = Array.from(container.querySelectorAll('.page'));
-
-    for (let i = 0; i < pages.length; i++) {
-      const canvas = await html2canvasFn(pages[i], {
-        scale:           2,          // 2× for retina-quality sharpness
-        useCORS:         true,
-        allowTaint:      true,
-        logging:         false,
-        backgroundColor: '#0d1120',
-        width:           A4W,
-        height:          A4H,
-        windowWidth:     A4W,        // Prevents viewport-relative layout
-        windowHeight:    A4H,
-        scrollX:         0,
-        scrollY:         0,
-        x:               0,
-        y:               0,
-        onclone(clonedDoc) {
-          // Re-apply exact dimensions in the cloned document so any
-          // inherited styles from the live page can't bleed in
-          clonedDoc.querySelectorAll('.page').forEach(p => {
-            p.style.width     = A4W + 'px';
-            p.style.height    = A4H + 'px';
-            p.style.minHeight = A4H + 'px';
-            p.style.overflow  = 'hidden';
-          });
-          // Ensure body background matches
-          clonedDoc.body.style.background = '#0d1120';
-          clonedDoc.body.style.margin     = '0';
-          clonedDoc.body.style.padding    = '0';
-        },
-      });
-
-      const imgData = canvas.toDataURL('image/jpeg', 0.94);
-      if (i > 0) pdf.addPage();
-      // Always fill the full A4 page — no aspect-ratio guessing
-      pdf.addImage(imgData, 'JPEG', 0, 0, 210, 297);
-    }
-
-    const filename = `GTM_Strategy_${state.company.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
-    pdf.save(filename);
-    showToast('GTM Strategy Report downloaded ✓', 'success');
-  } catch (e) {
-    showToast('PDF generation failed: ' + e.message, 'error');
-    console.error(e);
-  } finally {
-    document.body.removeChild(container);
-  }
+  throw new Error('generateProfessionalPDF removed; use /api/export-pdf');
 }
-
-
 function copyEmail(btn) {
   const block = btn.closest('.email-block');
   const subject = block.querySelector('.email-subject')?.textContent || '';
