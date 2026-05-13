@@ -405,9 +405,47 @@ async function hydrateStrategyFromVault(reportId, authToken, requestUrl, env) {
   if (!report) throw new Error('Vault returned empty report for id: ' + reportId);
   // Normalise to the flat strategy shape export-pdf expects
   const strategy = report.full_report || report.strategy || report.report_data || report;
-  if (!strategy.company_name) throw new Error('Hydrated report is missing company_name — the saved strategy may be incomplete');
-  console.info(`[Hydration] Loaded strategy for "${strategy.company_name}" from vault id=${reportId}`);
-  return strategy;
+  
+  // Normalize company_name from all possible fields
+  const candidateFields = [
+    () => strategy.company_name,
+    () => strategy.companyName,
+    () => strategy.company,
+    () => strategy.name,
+    () => strategy.target_company,
+    () => strategy.business_name,
+    () => strategy.strategy?.company_name,
+    () => strategy.strategy?.companyName,
+    () => strategy.strategy?.company,
+    () => strategy.report?.company_name,
+    () => strategy.report?.companyName,
+    () => strategy.company_profile?.name,
+    () => strategy.company_profile?.company_name,
+    () => strategy.scraped_profile?.company_name,
+    () => strategy.scraped_profile?.name,
+    () => strategy.input?.company_name,
+    () => strategy.input?.company,
+    () => strategy.website_profile?.company_name,
+  ];
+
+  let normalizedCompanyName = null;
+  for (const getCandidate of candidateFields) {
+    const candidate = getCandidate();
+    if (candidate && typeof candidate === 'string' && candidate.trim()) {
+      normalizedCompanyName = candidate.trim();
+      break;
+    }
+  }
+
+  if (!normalizedCompanyName) {
+    throw new Error('Hydrated report is missing company_name — the saved strategy may be incomplete');
+  }
+
+  // Ensure strategy has top-level company_name (backward compatibility + future-proof)
+  const normalizedStrategy = { ...strategy, company_name: normalizedCompanyName };
+  
+  console.info(`[Hydration] Loaded strategy for "${normalizedCompanyName}" from vault id=${reportId}`);
+  return normalizedStrategy;
 }
 
 export async function onRequestPost(context) {
