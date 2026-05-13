@@ -534,20 +534,47 @@ export async function onRequestPost(context) {
     (strategy.step_1_market?.analyst_insight || '').toLowerCase().includes('demo mode')
   );
 
+  // Get data from all possible nested sources (used for both charts and stepsPresent)
+  const nestedAllSources = [
+    strategy,
+    strategy.full_report || {},
+    strategy.report_data || {},
+    strategy.report || {},
+    strategy.strategy || {}
+  ];
+  
+  const getFromAllSources = (key) => {
+    for (const src of nestedAllSources) {
+      if (src[key] !== undefined && src[key] !== null && src[key] !== '') {
+        return src[key];
+      }
+    }
+    return undefined;
+  };
+  
+  const getObjFromAllSources = (key) => {
+    for (const src of nestedAllSources) {
+      if (src[key] && typeof src[key] === 'object' && !Array.isArray(src[key])) {
+        return src[key];
+      }
+    }
+    return {};
+  };
+  
   // ── Pre-fetch QuickChart images ──
   const charts = { gauge: null, waterfall: null, confidence: null, intent: null, risk: null };
   if (QC.enabled) {
-    const s2 = strategy.step_2_tam || {};
-    const s7 = strategy.step_7_intelligence || {};
-    const s1 = strategy.step_1_market || {};
+    const s2 = getObjFromAllSources('step_2_tam') || (strategy.steps?.[2] ? strategy.steps[2] : {});
+    const s7 = getObjFromAllSources('step_7_intelligence') || {};
+    const s1 = getObjFromAllSources('step_1_market') || (strategy.steps?.[1] ? strategy.steps[1] : {});
     const gtmScore = parseInt(
       s1.gtm_relevance_score ||
       s7.score_breakdown?.total ||
       s7.gtm_score ||
-      strategy.gtm_score
+      getFromAllSources('gtm_score')
     ) || (isDemoMode ? 60 : 0);
     const verdict = s7.go_no_go?.recommendation ||
-      s7.verdict || strategy.verdict ||
+      s7.verdict || getFromAllSources('verdict') ||
       (gtmScore >= 75 ? 'Go' : gtmScore >= 50 ? 'Watch' : 'No-Go') ||
       (isDemoMode ? 'Watch' : 'Watch');
     const confScore = parseInt(
@@ -625,7 +652,7 @@ export async function onRequestPost(context) {
     charts.confidence = cm.status === 'fulfilled' ? cm.value : null;
 
     // ── Optional mini charts (max 2 additional calls) ──
-    const _s5 = strategy.step_5_keywords || strategy.steps?.[5] || {};
+    const _s5 = getObjFromAllSources('step_5_keywords') || (strategy.steps?.[5] ? strategy.steps[5] : {});
     const _arr = v => Array.isArray(v) ? v : (v ? [String(v)] : []);
     const intentSignals = _arr(_s5?.intent_signals || _s5?.intent_topics || []);
     const intentItems = intentSignals.slice(0, 4).map((s, i) => ({
@@ -645,11 +672,23 @@ export async function onRequestPost(context) {
   const filename = `GTM_${strategy.company_name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
 
   // ── Structured diagnostic log (appears in Cloudflare Workers tail logs) ──
-  const s7Present = !!(strategy.step_7_intelligence && Object.keys(strategy.step_7_intelligence).length > 0);
+  const s7Present = !!(getObjFromAllSources('step_7_intelligence') && Object.keys(getObjFromAllSources('step_7_intelligence')).length > 0);
   const stepsPresent = [1,2,3,4,5,6,7].filter(n => {
     if (n === 7) return s7Present;
-    return !!(strategy[`step_${n}_market`] || strategy[`step_${n}_tam`] || strategy[`step_${n}_icp`] ||
-              strategy[`step_${n}_sourcing`] || strategy[`step_${n}_keywords`] || strategy[`step_${n}_messaging`]);
+    const keysByStep = {
+      1: ['step_1_market'],
+      2: ['step_2_tam'],
+      3: ['step_3_icp'],
+      4: ['step_4_sourcing'],
+      5: ['step_5_keywords'],
+      6: ['step_6_messaging']
+    };
+    return keysByStep[n]?.some(key => {
+      for (const src of [strategy, strategy.full_report, strategy.report_data, strategy.report, strategy.strategy]) {
+        if (src?.[key] && Object.keys(src[key]).length > 0) return true;
+      }
+      return false;
+    }) || !!(strategy.steps?.[n] && Object.keys(strategy.steps[n]).length > 0);
   });
   console.info('[export-pdf] === EXPORT REQUEST ===', JSON.stringify({
     company:     strategy.company_name,
@@ -2339,26 +2378,26 @@ function renderBuyingCriteriaTable(criteria) {
     const valStatus = safeBusinessText(c.validation_status, 'Validation pending');
     const valColor  = /validated/i.test(valStatus) ? 'var(--green)' : /partial/i.test(valStatus) ? 'var(--amber)' : 'var(--muted)';
     return `<tr style="background:${bg}">
-      <td style="border:.5px solid #444;border-left:2px solid ${impColor};padding:6px 7px;font-size:10px;vertical-align:top;font-weight:700;color:var(--accent)">${renderSvgIcon('users', 10, 'var(--accent)')} &nbsp; ${escapeHtml(c.criteria, 'Criteria')}</td>
-      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top">${safeBusinessText(c.buyer_concern, 'Requires source validation')}</td>
-      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;font-weight:700;color:${impColor};text-align:center"><span style="background:${impColor}22;padding:1px 4px;border-radius:3px">${escapeHtml(imp)}</span></td>
-      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--amber)">${safeBusinessText(c.proof_required, 'Validation pending')}</td>
-      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--green)">${safeBusinessText(c.gtm_message, 'Validation pending')}</td>
-      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top">${safeBusinessText(c.recommended_action, 'Validation pending')}</td>
-      <td style="border:.5px solid #444;padding:6px 7px;font-size:9px;vertical-align:top;color:${valColor};font-style:italic"><span style="border:1px solid ${valColor}40;padding:1px 3px;border-radius:2px;display:inline-block">${escapeHtml(valStatus)}</span></td>
+      <td style="border:.5px solid #444;border-left:2px solid ${impColor};padding:8px 10px;font-size:10px;vertical-align:top;font-weight:700;color:var(--accent);min-width:100px;word-wrap:break-word;white-space:normal;">${renderSvgIcon('users', 10, 'var(--accent)')} &nbsp; ${escapeHtml(c.criteria, 'Criteria')}</td>
+      <td style="border:.5px solid #444;padding:8px 10px;font-size:10px;vertical-align:top;min-width:120px;word-wrap:break-word;white-space:normal;">${safeBusinessText(c.buyer_concern, 'Requires source validation')}</td>
+      <td style="border:.5px solid #444;padding:8px 10px;font-size:10px;vertical-align:top;font-weight:700;color:${impColor};text-align:center;min-width:80px;word-wrap:break-word;white-space:normal;"><span style="background:${impColor}22;padding:1px 4px;border-radius:3px">${escapeHtml(imp)}</span></td>
+      <td style="border:.5px solid #444;padding:8px 10px;font-size:10px;vertical-align:top;color:var(--amber);min-width:120px;word-wrap:break-word;white-space:normal;">${safeBusinessText(c.proof_required, 'Validation pending')}</td>
+      <td style="border:.5px solid #444;padding:8px 10px;font-size:10px;vertical-align:top;color:var(--green);min-width:120px;word-wrap:break-word;white-space:normal;">${safeBusinessText(c.gtm_message, 'Validation pending')}</td>
+      <td style="border:.5px solid #444;padding:8px 10px;font-size:10px;vertical-align:top;min-width:120px;word-wrap:break-word;white-space:normal;">${safeBusinessText(c.recommended_action, 'Validation pending')}</td>
+      <td style="border:.5px solid #444;padding:8px 10px;font-size:9px;vertical-align:top;color:${valColor};font-style:italic;min-width:80px;word-wrap:break-word;white-space:normal;"><span style="border:1px solid ${valColor}40;padding:1px 3px;border-radius:2px;display:inline-block">${escapeHtml(valStatus)}</span></td>
     </tr>`;
   }).join('');
 
   return `<div class="keep-together table-wrap" style="margin:3mm 0">
-    <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-family:inherit">
+    <table style="width:100%;table-layout:auto;border-collapse:collapse;font-family:inherit">
       <thead><tr>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8px;width:12%">Criteria</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8px;width:17%">Buyer Concern</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:center;border:.5px solid #444;padding:5px 6px;font-size:8px;width:10%">Importance</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8px;width:17%">Proof Required</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8px;width:17%">GTM Message</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8px;width:17%">Recommended Action</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8px;width:10%">Validation</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:8px 10px;font-size:9px;min-width:100px;word-wrap:break-word;white-space:normal;">Criteria</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:8px 10px;font-size:9px;min-width:120px;word-wrap:break-word;white-space:normal;">Buyer Concern</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:center;border:.5px solid #444;padding:8px 10px;font-size:9px;min-width:80px;word-wrap:break-word;white-space:normal;">Importance</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:8px 10px;font-size:9px;min-width:120px;word-wrap:break-word;white-space:normal;">Proof Required</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:8px 10px;font-size:9px;min-width:120px;word-wrap:break-word;white-space:normal;">GTM Message</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:8px 10px;font-size:9px;min-width:120px;word-wrap:break-word;white-space:normal;">Recommended Action</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:8px 10px;font-size:9px;min-width:80px;word-wrap:break-word;white-space:normal;">Validation</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
@@ -2400,12 +2439,12 @@ function renderCapabilityLandscape(capabilities) {
     const valStatus = safeBusinessText(c.validation_status, 'Validation pending');
     const valColor  = /validated/i.test(valStatus) ? 'var(--green)' : /partial/i.test(valStatus) ? 'var(--amber)' : 'var(--muted)';
     return `<tr style="background:${bg}">
-      <td style="border:.5px solid #444;border-left:2px solid ${color};padding:6px 7px;font-size:10pt;vertical-align:top;font-weight:700;color:${color}">${renderSvgIcon('cpu', 10, color)} &nbsp; ${escapeHtml(group)}</td>
-      <td style="border:.5px solid #444;padding:6px 7px;font-size:10pt;vertical-align:top;font-weight:700;color:var(--text)">${escapeHtml(c.capability, 'Capability')}</td>
-      <td style="border:.5px solid #444;padding:6px 7px;font-size:10pt;vertical-align:top;color:var(--green)">${safeBusinessText(c.buyer_value, 'Requires source validation')}</td>
-      <td style="border:.5px solid #444;padding:6px 7px;font-size:10pt;vertical-align:top;color:var(--amber)">${safeBusinessText(c.maturity_signal, 'Validation pending')}</td>
-      <td style="border:.5px solid #444;padding:6px 7px;font-size:10pt;vertical-align:top;color:var(--accent)">${safeBusinessText(c.gtm_implication, 'Validation pending')}</td>
-      <td style="border:.5px solid #444;padding:6px 7px;font-size:10pt;vertical-align:top;color:${valColor};font-style:italic"><span style="border:1px solid ${valColor}40;padding:1px 3px;border-radius:2px;display:inline-block">${escapeHtml(valStatus)}</span></td>
+      <td style="border:.5px solid #444;border-left:2px solid ${color};padding:8px 10px;font-size:10px;vertical-align:top;font-weight:700;color:${color};min-width:100px;word-wrap:break-word;white-space:normal;">${renderSvgIcon('cpu', 10, color)} &nbsp; ${escapeHtml(group)}</td>
+      <td style="border:.5px solid #444;padding:8px 10px;font-size:10px;vertical-align:top;font-weight:700;color:var(--text);min-width:120px;word-wrap:break-word;white-space:normal;">${escapeHtml(c.capability, 'Capability')}</td>
+      <td style="border:.5px solid #444;padding:8px 10px;font-size:10px;vertical-align:top;color:var(--green);min-width:140px;word-wrap:break-word;white-space:normal;">${safeBusinessText(c.buyer_value, 'Requires source validation')}</td>
+      <td style="border:.5px solid #444;padding:8px 10px;font-size:10px;vertical-align:top;color:var(--amber);min-width:120px;word-wrap:break-word;white-space:normal;">${safeBusinessText(c.maturity_signal, 'Validation pending')}</td>
+      <td style="border:.5px solid #444;padding:8px 10px;font-size:10px;vertical-align:top;color:var(--accent);min-width:140px;word-wrap:break-word;white-space:normal;">${safeBusinessText(c.gtm_implication, 'Validation pending')}</td>
+      <td style="border:.5px solid #444;padding:8px 10px;font-size:9px;vertical-align:top;color:${valColor};font-style:italic;min-width:80px;word-wrap:break-word;white-space:normal;"><span style="border:1px solid ${valColor}40;padding:1px 3px;border-radius:2px;display:inline-block">${escapeHtml(valStatus)}</span></td>
     </tr>`;
   }).join('');
 
@@ -2424,14 +2463,14 @@ function renderCapabilityLandscape(capabilities) {
 
   return `<div class="keep-together" style="display:flex;gap:3mm;margin-bottom:4mm">${countStrip}</div>
   <div class="keep-together table-wrap" style="margin:3mm 0">
-    <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-family:inherit">
+    <table style="width:100%;table-layout:auto;border-collapse:collapse;font-family:inherit">
       <thead><tr>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:10pt;width:14%">Group</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:10pt;width:18%">Capability</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:10pt;width:20%">Buyer Value</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:10pt;width:16%">Maturity Signal</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:10pt;width:20%">GTM Implication</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:10pt;width:12%">Validation</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:8px 10px;font-size:9px;min-width:100px;word-wrap:break-word;white-space:normal;">Group</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:8px 10px;font-size:9px;min-width:120px;word-wrap:break-word;white-space:normal;">Capability</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:8px 10px;font-size:9px;min-width:140px;word-wrap:break-word;white-space:normal;">Buyer Value</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:8px 10px;font-size:9px;min-width:120px;word-wrap:break-word;white-space:normal;">Maturity Signal</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:8px 10px;font-size:9px;min-width:140px;word-wrap:break-word;white-space:normal;">GTM Implication</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:8px 10px;font-size:9px;min-width:80px;word-wrap:break-word;white-space:normal;">Validation</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
@@ -2456,24 +2495,24 @@ function renderRegulatoryRiskTable(risks) {
     const valStatus = safeBusinessText(r.validation_status, 'Validation pending');
     const valColor  = /validated/i.test(valStatus) ? 'var(--green)' : /partial/i.test(valStatus) ? 'var(--amber)' : 'var(--muted)';
     return `<tr style="background:${bg}">
-      <td style="border:.5px solid #444;border-left:2px solid var(--accent);padding:6px 7px;font-size:10px;vertical-align:top;font-weight:700;color:var(--accent)">${renderSvgIcon('alert-triangle', 10, 'var(--accent)')} &nbsp; ${escapeHtml(r.risk_area, 'Risk Area')}</td>
-      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top">${safeBusinessText(r.buyer_concern, 'Requires source validation')}</td>
-      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--amber)">${safeBusinessText(r.gtm_impact, 'Validation pending')}</td>
-      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--green)">${safeBusinessText(r.mitigation_message, 'Validation pending')}</td>
-      <td style="border:.5px solid #444;padding:6px 7px;font-size:10px;vertical-align:top;color:var(--amber)">${safeBusinessText(r.required_proof, 'Validation pending')}</td>
-      <td style="border:.5px solid #444;padding:6px 7px;font-size:9px;vertical-align:top;color:${valColor};font-style:italic"><span style="border:1px solid ${valColor}40;padding:1px 3px;border-radius:2px;display:inline-block">${escapeHtml(valStatus)}</span></td>
+      <td style="border:.5px solid #444;border-left:2px solid var(--accent);padding:8px 10px;font-size:10px;vertical-align:top;font-weight:700;color:var(--accent);min-width:100px;word-wrap:break-word;white-space:normal;">${renderSvgIcon('alert-triangle', 10, 'var(--accent)')} &nbsp; ${escapeHtml(r.risk_area, 'Risk Area')}</td>
+      <td style="border:.5px solid #444;padding:8px 10px;font-size:10px;vertical-align:top;min-width:120px;word-wrap:break-word;white-space:normal;">${safeBusinessText(r.buyer_concern, 'Requires source validation')}</td>
+      <td style="border:.5px solid #444;padding:8px 10px;font-size:10px;vertical-align:top;color:var(--amber);min-width:120px;word-wrap:break-word;white-space:normal;">${safeBusinessText(r.gtm_impact, 'Validation pending')}</td>
+      <td style="border:.5px solid #444;padding:8px 10px;font-size:10px;vertical-align:top;color:var(--green);min-width:140px;word-wrap:break-word;white-space:normal;">${safeBusinessText(r.mitigation_message, 'Validation pending')}</td>
+      <td style="border:.5px solid #444;padding:8px 10px;font-size:10px;vertical-align:top;color:var(--amber);min-width:120px;word-wrap:break-word;white-space:normal;">${safeBusinessText(r.required_proof, 'Validation pending')}</td>
+      <td style="border:.5px solid #444;padding:8px 10px;font-size:9px;vertical-align:top;color:${valColor};font-style:italic;min-width:80px;word-wrap:break-word;white-space:normal;"><span style="border:1px solid ${valColor}40;padding:1px 3px;border-radius:2px;display:inline-block">${escapeHtml(valStatus)}</span></td>
     </tr>`;
   }).join('');
 
   return `<div class="keep-together table-wrap" style="margin:3mm 0">
-    <table style="width:100%;table-layout:fixed;border-collapse:collapse;font-family:inherit">
+    <table style="width:100%;table-layout:auto;border-collapse:collapse;font-family:inherit">
       <thead><tr>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8px;width:14%">Risk Area</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8px;width:18%">Buyer Concern</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8px;width:16%">GTM Impact</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8px;width:20%">Mitigation Message</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8px;width:20%">Required Proof</th>
-        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:5px 6px;font-size:8px;width:12%">Validation</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:8px 10px;font-size:9px;min-width:100px;word-wrap:break-word;white-space:normal;">Risk Area</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:8px 10px;font-size:9px;min-width:120px;word-wrap:break-word;white-space:normal;">Buyer Concern</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:8px 10px;font-size:9px;min-width:120px;word-wrap:break-word;white-space:normal;">GTM Impact</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:8px 10px;font-size:9px;min-width:140px;word-wrap:break-word;white-space:normal;">Mitigation Message</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:8px 10px;font-size:9px;min-width:120px;word-wrap:break-word;white-space:normal;">Required Proof</th>
+        <th style="background:#2a2a2a;color:#f0f0f0;font-weight:700;text-align:left;border:.5px solid #444;padding:8px 10px;font-size:9px;min-width:80px;word-wrap:break-word;white-space:normal;">Validation</th>
       </tr></thead>
       <tbody>${rows}</tbody>
     </table>
@@ -2716,55 +2755,94 @@ const SECTION_REGISTRY = [
 export function buildReportHTML(strategy, charts = {}, isDemoMode = false, renderMode = 'browser-pdf', isViewer = false) {
   const p = isViewer ? '.abe-viewer-wrapper ' : '';
   
+  // Get data from all possible nested objects
+  const nestedReportSources = [
+    strategy,
+    strategy.full_report || {},
+    strategy.report_data || {},
+    strategy.report || {},
+    strategy.strategy || {}
+  ];
+  
+  // Helper to get a value from all nested sources
+  const getFromReportSources = (key) => {
+    for (const src of nestedReportSources) {
+      if (src[key] !== undefined && src[key] !== null && src[key] !== '') {
+        return src[key];
+      }
+    }
+    return undefined;
+  };
+  
+  // Helper to get an object from all nested sources
+  const getObjFromReportSources = (key) => {
+    for (const src of nestedReportSources) {
+      if (src[key] && typeof src[key] === 'object' && !Array.isArray(src[key])) {
+        return src[key];
+      }
+    }
+    return {};
+  };
+  
+  // Helper to get an array from all nested sources
+  const getArrFromReportSources = (key) => {
+    for (const src of nestedReportSources) {
+      if (src[key] && Array.isArray(src[key]) && src[key].length > 0) {
+        return src[key];
+      }
+    }
+    return [];
+  };
+  
   // Merge Step 1 data from all possible keys
-  const baseS1 = strategy.step_1_market || strategy.steps?.[1] || {};
+  const baseS1 = getObjFromReportSources('step_1_market') || (strategy.steps?.[1] ? strategy.steps[1] : {});
   const s1 = {
     ...baseS1,
-    ...(strategy.market_research || {}),
-    ...(strategy.market_context || {}),
+    ...getObjFromReportSources('market_research'),
+    ...getObjFromReportSources('market_context'),
     company_overview: 
       baseS1.company_overview || 
-      strategy.company_overview || 
-      (strategy.company_profile?.overview) || 
-      (strategy.scraped_profile?.overview) || 
-      strategy.company_profile || 
-      strategy.scraped_profile || 
+      getFromReportSources('company_overview') || 
+      (getObjFromReportSources('company_profile').overview) || 
+      (getObjFromReportSources('scraped_profile').overview) || 
+      getObjFromReportSources('company_profile') || 
+      getObjFromReportSources('scraped_profile') || 
       '',
     market_position: 
       baseS1.market_position || 
-      (strategy.market_context?.market_position) || 
+      (getObjFromReportSources('market_context').market_position) || 
+      getFromReportSources('market_position') || 
       '',
     swot: 
       baseS1.swot || 
-      strategy.swot || 
-      strategy.swot_analysis || 
-      (strategy.step_1_market?.swot) || 
+      getObjFromReportSources('swot') || 
+      getObjFromReportSources('swot_analysis') || 
       {},
     growth_signals: 
       baseS1.growth_signals || 
-      strategy.growth_signals || 
-      strategy.strategic_growth_signals || 
+      getArrFromReportSources('growth_signals') || 
+      getArrFromReportSources('strategic_growth_signals') || 
       [],
     tech_stack_hints: 
       baseS1.tech_stack_hints || 
-      strategy.tech_stack || 
-      strategy.tech_stack_indicators || 
+      getArrFromReportSources('tech_stack') || 
+      getArrFromReportSources('tech_stack_indicators') || 
       []
   };
   
   // Merge Step 2 data from all possible keys
-  const baseS2 = strategy.step_2_tam || strategy.steps?.[2] || {};
+  const baseS2 = getObjFromReportSources('step_2_tam') || (strategy.steps?.[2] ? strategy.steps[2] : {});
   const s2 = {
     ...baseS2,
-    ...(strategy.tam_mapping || {}),
-    ...(strategy.step_2_tam || {})
+    ...getObjFromReportSources('tam_mapping')
   };
   
-  const s3 = strategy.step_3_icp || strategy.steps?.[3] || {};
-  const s4 = strategy.step_4_sourcing || strategy.steps?.[4] || {};
-  const s5 = strategy.step_5_keywords || strategy.steps?.[5] || {};
-  const s6 = strategy.step_6_messaging || strategy.steps?.[6] || {};
-  const s7 = strategy.step_7_intelligence || {};
+  // Merge steps 3-7 from all possible keys
+  const s3 = getObjFromReportSources('step_3_icp') || (strategy.steps?.[3] ? strategy.steps[3] : {});
+  const s4 = getObjFromReportSources('step_4_sourcing') || (strategy.steps?.[4] ? strategy.steps[4] : {});
+  const s5 = getObjFromReportSources('step_5_keywords') || (strategy.steps?.[5] ? strategy.steps[5] : {});
+  const s6 = getObjFromReportSources('step_6_messaging') || (strategy.steps?.[6] ? strategy.steps[6] : {});
+  const s7 = getObjFromReportSources('step_7_intelligence') || {};
   const coRaw = strategy.company_name || 'Company';
   const co = normalizeCompanyName(coRaw);
   const ind = strategy.industry || '';
