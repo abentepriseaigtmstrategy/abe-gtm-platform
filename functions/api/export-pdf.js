@@ -2749,6 +2749,78 @@ const SECTION_REGISTRY = [
   { id: 'appendix_metadata',      order: 18, required: true,  mode: 'both', title: 'Appendix — Report Metadata' },
 ];
 
+// GOLDEN_GTM_REPORT: Test fixture for verifying export-pdf.js rendering
+const GOLDEN_GTM_REPORT = {
+  company_name: "TINTIN Staff Infotech",
+  industry: "IT Services",
+  company_overview: "TINTIN Staff Infotech is an IT services company helping small and mid-market businesses build web, mobile, automation, and AI-enabled software solutions.",
+  market_position: "Emerging IT services provider positioned for SMB and mid-market digital transformation demand.",
+  step_1_market: {
+    company_overview: "TINTIN Staff Infotech is an IT services company helping small and mid-market businesses build web, mobile, automation, and AI-enabled software solutions.",
+    market_position: "Emerging IT services provider positioned for SMB and mid-market digital transformation demand.",
+    gtm_relevance_score: 60,
+    market_context: "SMB and mid-market companies continue to invest in software modernization, automation, and AI-enabled operational systems.",
+    swot: {
+      strengths: [
+        "Flexible IT services delivery model",
+        "Capability across web, mobile, automation, and AI-enabled solutions",
+        "Cost-effective offshore delivery advantage"
+      ],
+      weaknesses: [
+        "Limited public proof points and customer case studies",
+        "Low validated brand authority in enterprise accounts",
+        "Incomplete market and revenue benchmark data"
+      ],
+      opportunities: [
+        "Growing demand for AI-enabled business automation",
+        "SMB digital transformation adoption",
+        "Partnership-led expansion into international markets"
+      ],
+      threats: [
+        "Crowded IT services market",
+        "Low switching cost for buyers",
+        "Pressure from larger agencies and freelance marketplaces"
+      ]
+    },
+    growth_signals: [
+      "AI automation demand is increasing among SMB buyers",
+      "Businesses are consolidating vendors for web, app, and automation work",
+      "Outbound GTM can target companies modernizing legacy workflows"
+    ],
+    tech_stack_indicators: [
+      "Web development",
+      "Mobile app development",
+      "Business process automation",
+      "AI/ML enablement",
+      "Cloud deployment"
+    ]
+  },
+  step_2_tam: {
+    tam_size_estimate: "USD 1.8B",
+    sam_estimate: "USD 720M",
+    cagr: "13%",
+    waterfall: {
+      tam_value: "USD 1.8B",
+      sam_value: "USD 720M",
+      som_value: "USD 126M"
+    }
+  },
+  step_7_intelligence: {
+    gtm_score: 60,
+    confidence_score: 58,
+    verdict: "WATCH",
+    confidence_breakdown: {
+      signal_veracity: 24,
+      market_timing: 16,
+      icp_fit: 14,
+      data_completeness: 9
+    },
+    score_breakdown: {
+      total: 60
+    }
+  }
+};
+
 // ══════════════════════════════════════════════════════════════
 // TIER-1 ENTERPRISE A4 REPORT — dark-theme, rendered to PDF
 // ══════════════════════════════════════════════════════════════
@@ -2825,6 +2897,7 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false, rende
       [],
     tech_stack_hints: 
       baseS1.tech_stack_hints || 
+      baseS1.tech_stack_indicators || 
       getArrFromReportSources('tech_stack') || 
       getArrFromReportSources('tech_stack_indicators') || 
       []
@@ -2834,7 +2907,8 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false, rende
   const baseS2 = getObjFromReportSources('step_2_tam') || (strategy.steps?.[2] ? strategy.steps[2] : {});
   const s2 = {
     ...baseS2,
-    ...getObjFromReportSources('tam_mapping')
+    ...getObjFromReportSources('tam_mapping'),
+    growth_rate: baseS2.growth_rate || baseS2.cagr || getFromReportSources('growth_rate') || getFromReportSources('cagr')
   };
   
   // Merge steps 3-7 from all possible keys
@@ -2980,6 +3054,9 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false, rende
   };
 
   const renderReportMetadata = () => {
+    // Check step 7 from all nested sources
+    const s7ForMetadata = getObjFromReportSources('step_7_intelligence');
+    const hasStep7 = s7ForMetadata && Object.keys(s7ForMetadata).length > 0;
     return renderDarkTable({
       headers: ['Field', 'Value'],
       rows: [
@@ -2988,7 +3065,7 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false, rende
         ['Generated', e(date)],
         ['Platform', 'ABE Enterprise AI Revenue Infrastructure'],
         ['Report Mode', isDemoMode ? 'Demo — illustrative only' : 'Live / Realtime'],
-        ['Steps Completed', (strategy.step_7_intelligence && Object.keys(strategy.step_7_intelligence).length > 0) ? '7/7' : e(String(strategy.steps_completed || 6)) + '/7'],
+        ['Steps Completed', hasStep7 ? '7/7' : e(String(strategy.steps_completed || 6)) + '/7'],
         ['GTM Relevance Score', e(String(score)) + '/100'],
         ['Confidence Score', e(String(confScore)) + '/100'],
         ['QuickChart Charts', e([charts.gauge ? 'Gauge' : '', charts.waterfall ? 'Waterfall' : '', charts.confidence ? 'Confidence' : '', charts.intent ? 'Intent' : '', charts.risk ? 'Risk' : ''].filter(Boolean).join(', ') || 'Fallback HTML used')]
@@ -4981,3 +5058,4 @@ ${pageFtr('Data Quality Audit', 35)}
   const fullDocumentHtml = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">${styles}</head><body>${bodyContent}</body></html>`;
   return sanitizeVisibleHtml(fullDocumentHtml);
 }
+v
