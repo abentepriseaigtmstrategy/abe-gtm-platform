@@ -2729,9 +2729,13 @@ function renderStep2(d) {
   // Step 2: Market Attractiveness & TAM Analysis
   function scoreBlock(elId, scoreObj, maxPts) {
     const s = scoreObj?.score ?? 0;
-    const color = s >= maxPts * 0.8 ? '#22c55e' : s >= maxPts * 0.5 ? '#f59e0b' : '#ef4444';
+    // Use scoreObj.max if available, otherwise default to maxPts
+    const max = scoreObj?.max ?? maxPts;
+    const displayScore = s;
+    const displayMax = `/${max}`;
+    const color = s >= max * 0.8 ? '#22c55e' : s >= max * 0.5 ? '#f59e0b' : '#ef4444';
     document.getElementById(elId).innerHTML =
-      `<strong style="font-size:20px;color:${color};font-family:'Space Mono',monospace;">${s}/${maxPts}</strong>` +
+      `<strong style="font-size:20px;color:${color};font-family:'Space Mono',monospace;">${displayScore}${displayMax}</strong>` +
       (scoreObj?.rationale ? `<br><span style="font-size:11px;color:#9ca3af;">${escHtml(scoreObj.rationale)}</span>` : '') +
       (scoreObj?.sub_breakdown ? `<br><code style="font-size:9px;color:var(--accent);">${escHtml(scoreObj.sub_breakdown)}</code>` : '');
   }
