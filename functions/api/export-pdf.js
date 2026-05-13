@@ -1,16 +1,26 @@
 /**
- * /api/export-pdf  (v7.7 — Phase 22G: Explicit 35-Page Layout)
- * Cache-bust: 2026-05-11-G
+ * /api/export-pdf  (v7.8 — Phase 22 Unified Architecture)
+ * Cache-bust: 2026-05-12-UA
  * Cloudflare Pages Function
+ *
+ * ARCHITECTURE (Single Source of Truth):
+ *   This endpoint is a RENDERER-ONLY function. It does NOT serve the viewer.
+ *   - report.html renders using client-side renderReport() — never calls this endpoint for viewing.
+ *   - This endpoint is called ONLY when the user explicitly clicks "Export PDF" or "Download HTML".
+ *   - QuickChart.io calls only happen here (never during page view).
+ *
  * INPUT:  POST { strategy: { company_name, industry, step_1_market, ... } }
- * OUTPUT: application/pdf (Adobe or Gotenberg) or JSON { html, filename, mode } (fallback)
+ *           OR POST { reportId: "<uuid>" }   (backend hydrates from vault)
+ * OUTPUT: application/pdf (Gotenberg or Adobe) or JSON { html, filename, mode } (fallback)
  *
  * Env vars:
- *   PDF_RENDER_ENGINE=adobe|gotenberg   → selects primary renderer
- *   ADOBE_CLIENT_ID=xxx               → Adobe PDF Services OAuth client ID
- *   ADOBE_CLIENT_SECRET=xxx           → Adobe PDF Services OAuth client secret
- *   ADOBE_API_BASE_URL=https://...    → Adobe PDF Services API base (optional, defaults to US region)
- *   GOTENBERG_URL=https://...         → Gotenberg service base URL (fallback)
+ *   PDF_RENDER_ENGINE=gotenberg|adobe  → selects primary renderer
+ *   GOTENBERG_URL=https://...          → Gotenberg service base URL
+ *   ADOBE_CLIENT_ID=xxx                → Adobe PDF Services OAuth client ID
+ *   ADOBE_CLIENT_SECRET=xxx            → Adobe PDF Services OAuth client secret
+ *   ADOBE_API_BASE_URL=https://...     → Adobe PDF Services API base (optional)
+ *   QUICKCHART_ENABLED=true|false      → enable/disable QuickChart (default: true)
+ *   QUICKCHART_API_KEY=xxx             → optional QuickChart API key
  */
 import { verifyAuth, corsHeaders, validate, errRes } from './_middleware.js';
 import { normalizeStrategy } from './gtm-intelligence.js';
@@ -331,9 +341,8 @@ async function renderPdfWithGotenberg(html, filename, env) {
     encodeSimpleField('marginLeft', '0'),
     encodeSimpleField('marginRight', '0'),
     encodeSimpleField('printBackground', 'true'),      // preserve dark backgrounds
-    encodeSimpleField('omitBackground', 'true'),       // allow transparency from source HTML
     encodeSimpleField('preferCssPageSize', 'true'),    // honour @page CSS
-    encodeSimpleField('emulatedMediaType', 'screen'),  // mirror screen dark theme in PDF
+    encodeSimpleField('emulatedMediaType', 'print'),   // use print media type
     encodeSimpleField('waitDelay', '2000ms'),          // allow fonts/charts to load
     closingBytes,
   ];
@@ -412,15 +421,14 @@ export async function onRequestPost(context) {
   try { body = await request.json(); } catch { return errRes('Invalid request body', 400, cors); }
 
   // ── Phase 21F: Strategy resolution ───────────────────────────────────
-  // Priority 1: strategy object sent directly (full payload)
-  // Priority 2: reportId sent → hydrate from vault server-side
-  // This eliminates the "Missing strategy.company_name" failure when the
-  // frontend sends only the report ID (the correct production pattern).
+  // Priority 1: reportId sent → ALWAYS hydrate from vault server-side (source of truth)
+  // Priority 2: no reportId → use direct strategy object
+  // This ensures vault always uses the latest saved report data when reportId is present.
   const authToken = request.headers.get('Authorization') || '';
-  let strategy = body.strategy || null;
+  let strategy = null;
   let hydrationPath = 'direct';
 
-  if (!strategy?.company_name && body.reportId) {
+  if (body.reportId) {
     try {
       strategy = await hydrateStrategyFromVault(body.reportId, authToken, request.url, env);
       hydrationPath = 'vault';
@@ -428,6 +436,8 @@ export async function onRequestPost(context) {
       console.error('[Hydration] Failed:', hydrateErr.message);
       return errRes(`Report hydration failed: ${hydrateErr.message}`, 400, cors);
     }
+  } else if (body.strategy) {
+    strategy = body.strategy;
   }
 
   if (!strategy) return errRes('Request must include either strategy object or reportId', 400, cors);
@@ -438,6 +448,24 @@ export async function onRequestPost(context) {
   const useAdobe = env?.PDF_RENDER_ENGINE === 'adobe' && !!env?.ADOBE_CLIENT_ID && !!env?.ADOBE_CLIENT_SECRET;
   const useGotenberg = env?.PDF_RENDER_ENGINE === 'gotenberg' && !!env?.GOTENBERG_URL;
   const hasGotenbergFallback = !!env?.GOTENBERG_URL;
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // ARCHITECTURE GUARD: ?mode=viewer is RETIRED (Phase 22 Unified Architecture)
+  // report.html now uses client-side renderReport() for the viewer — it never
+  // calls /api/export-pdf for viewing. If this guard triggers, the caller has
+  // old code that must be updated.
+  // ─────────────────────────────────────────────────────────────────────────
+  const url = new URL(request.url);
+  if (url.searchParams.get('mode') === 'viewer') {
+    console.warn('[export-pdf] Rejected ?mode=viewer call — viewer mode is retired (Phase 22). Use client-side renderReport() in report.html instead.');
+    return new Response(
+      JSON.stringify({
+        error: 'The ?mode=viewer endpoint is retired. report.html now renders directly from vault data using client-side renderReport(). See Phase 22 architecture notes.',
+        code:  'VIEWER_MODE_RETIRED',
+      }),
+      { status: 410, headers: { ...cors, 'Content-Type': 'application/json', 'X-ABE-Export-Path': 'viewer_mode_rejected' } }
+    );
+  }
 
   // ── QuickChart env config ──
   const QC = {
@@ -483,12 +511,9 @@ export async function onRequestPost(context) {
     const somNum = (!somRawVal || somIsPercent) ? tamNum * 0.07 : parseMoneyValue(somRawVal, tamNum * 0.07);
 
     const formatUSD = n => { if (n >= 1000) return `USD ${(n / 1000).toFixed(1).replace(/\.0$/, '')}B`; if (n > 0) return `USD ${Math.round(n)}M`; return 'USD 0'; };
-    s2.tam_size_estimate = formatUSD(tamNum);
-    s2.sam_estimate = formatUSD(samNum);
-    if (!s2.waterfall) s2.waterfall = {};
-    s2.waterfall.tam_value = formatUSD(tamNum);
-    s2.waterfall.sam_value = formatUSD(samNum);
-    s2.waterfall.som_value = formatUSD(somNum);
+    const formattedTam = formatUSD(tamNum);
+    const formattedSam = formatUSD(samNum);
+    const formattedSom = formatUSD(somNum);
 
     // ── Live-mode confidence sub-field extraction ──
     const liveVeracity = safeNumber(s7.signal_veracity || s7.confidence_breakdown?.signal_veracity, 0);
@@ -558,14 +583,37 @@ export async function onRequestPost(context) {
     console.info(`[QuickChart] total calls=${chartCount}/${QC.maxPer} gauge=${!!charts.gauge} waterfall=${!!charts.waterfall} confidence=${!!charts.confidence} intent=${!!charts.intent} risk=${!!charts.risk}`);
   }
 
-  const url = new URL(request.url);
-  const isViewer = url.searchParams.get('mode') === 'viewer';
   const filename = `GTM_${strategy.company_name.replace(/[^a-zA-Z0-9]/g, '_')}_${new Date().toISOString().slice(0, 10)}.pdf`;
-  
+
+  // ── Structured diagnostic log (appears in Cloudflare Workers tail logs) ──
+  const s7Present = !!(strategy.step_7_intelligence && Object.keys(strategy.step_7_intelligence).length > 0);
+  const stepsPresent = [1,2,3,4,5,6,7].filter(n => {
+    if (n === 7) return s7Present;
+    return !!(strategy[`step_${n}_market`] || strategy[`step_${n}_tam`] || strategy[`step_${n}_icp`] ||
+              strategy[`step_${n}_sourcing`] || strategy[`step_${n}_keywords`] || strategy[`step_${n}_messaging`]);
+  });
+  console.info('[export-pdf] === EXPORT REQUEST ===', JSON.stringify({
+    company:     strategy.company_name,
+    hydration:   hydrationPath,
+    renderer:    useAdobe ? 'adobe' : useGotenberg ? 'gotenberg' : 'json_fallback',
+    step7:       s7Present,
+    steps:       stepsPresent,
+    isDemoMode,
+    quickChart:  QC.enabled,
+    quickChartResults: {
+      gauge:      !!charts.gauge,
+      waterfall:  !!charts.waterfall,
+      confidence: !!charts.confidence,
+      intent:     !!charts.intent,
+      risk:       !!charts.risk,
+    },
+  }));
+
   // Determine render mode for CSS optimization
   const renderMode = useAdobe ? 'adobe' : (useGotenberg ? 'gotenberg' : (body.renderMode || 'browser-pdf'));
   const integration = getIntegrationStatus(env);
-  const html = buildReportHTML(strategy, charts, isDemoMode, renderMode, isViewer);
+  // isViewer=false: this endpoint never serves the viewer (see ARCHITECTURE GUARD above)
+  const html = buildReportHTML(strategy, charts, isDemoMode, renderMode, false);
 
   // ── Phase 22: Adobe PDF Services path (PRIMARY) ─────────────────────────
   if (useAdobe) {
@@ -1358,77 +1406,6 @@ function truncateWords(text, limit = 70) {
 
 function safeText(value, fallback = '') {
   return safeBusinessText(value, fallback);
-}
-
-// ══════════════════════════════════════════════════════════════
-// CONTENT BUDGETING HELPERS (PDF Spillover Prevention)
-// ══════════════════════════════════════════════════════════════
-
-/**
- * clampText(value, maxChars, suffix)
- * Truncates text to maxChars, preserving word boundaries.
- * Adds suffix (default '...') if truncated.
- */
-function clampText(value, maxChars, suffix = '...') {
-  const cleaned = safeBusinessText(value, '');
-  if (cleaned.length <= maxChars) return cleaned;
-  // Find last space before limit to preserve word boundary
-  const truncated = cleaned.slice(0, maxChars);
-  const lastSpace = truncated.lastIndexOf(' ');
-  if (lastSpace > maxChars * 0.7) {
-    return truncated.slice(0, lastSpace) + suffix;
-  }
-  return truncated + suffix;
-}
-
-/**
- * normalizeStep7Data(step7Data)
- * Normalizes and caps Step 7 Decision Engine content fields.
- * Returns an object with capped fields and truncation flags.
- */
-function normalizeStep7Data(step7Data = {}) {
-  const caps = {
-    verdict_rationale: 450,
-    why_now_analysis: 450,
-    strategic_hook: 300,
-    risk_analysis: 700,
-    recommended_action: 500,
-  };
-
-  const result = {};
-  const truncatedFields = [];
-
-  for (const [key, maxChars] of Object.entries(caps)) {
-    const raw = step7Data[key] || '';
-    const capped = clampText(raw, maxChars);
-    result[key] = capped;
-    if (safeBusinessText(raw, '').length > maxChars) {
-      truncatedFields.push(key);
-    }
-  }
-
-  // Preserve other fields unchanged
-  for (const [key, value] of Object.entries(step7Data)) {
-    if (!caps.hasOwnProperty(key)) {
-      result[key] = value;
-    }
-  }
-
-  result._truncated = truncatedFields.length > 0;
-  result._truncatedFields = truncatedFields;
-
-  return result;
-}
-
-/**
- * getTruncationNote(truncatedFields)
- * Returns a visible note when content was truncated.
- */
-function getTruncationNote(truncatedFields = []) {
-  if (truncatedFields.length === 0) return '';
-  return `<div class="truncation-note" style="font-size:8px;color:var(--amber);font-style:italic;margin-top:2mm;padding:2mm 3mm;background:rgba(245,158,11,.05);border-left:2px solid var(--amber);border-radius:0 4px 4px 0">
-    ⚠ Content shortened for PDF layout. Full details remain available in the platform report.
-  </div>`;
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -3004,17 +2981,14 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false, rende
   };
 
   // ── Decision Engine (Step 7) ──
-  // Normalize Step 7 data to prevent PDF spillover
-  const s7Normalized = normalizeStep7Data(s7);
   const decisionEngineSummary = () => {
     if (!score && !confScore) return '';
     const hasS7 = s7 && Object.keys(s7).length > 1;
     const triggers = arr(s3.buying_triggers);
     const dms = arr(s3.decision_makers);
-    // Use normalized/capped Step 7 data
-    const whyNow = hasS7 && s7Normalized.why_now_analysis ? s7Normalized.why_now_analysis : `Market conditions and active ${(triggers[0] || 'operational pressure').toLowerCase()} dynamics create a time-sensitive engagement window.`;
-    const hook = hasS7 && s7Normalized.strategic_hook ? s7Normalized.strategic_hook : (triggers.length >= 2 ? `${triggers[0]} paired with ${triggers[1]}` : `Lead with: ${triggers[0] || 'Operational pressure'}`);
-    const reason = s7Normalized.go_no_go?.reasoning || s7Normalized.verdict_rationale || 'Score exceeds required threshold for market entry.';
+    const whyNow = hasS7 && s7.why_now_analysis ? s7.why_now_analysis : `Market conditions and active ${(triggers[0] || 'operational pressure').toLowerCase()} dynamics create a time-sensitive engagement window.`;
+    const hook = hasS7 && s7.strategic_hook ? s7.strategic_hook : (triggers.length >= 2 ? `${triggers[0]} paired with ${triggers[1]}` : `Lead with: ${triggers[0] || 'Operational pressure'}`);
+    const reason = s7.go_no_go?.reasoning || s7.verdict_rationale || 'Score exceeds required threshold for market entry.';
     return `
   ${secHead('07', 'Revenue Intelligence — Decision Engine')}
   ${secCtx('Final strategic audit. Validates execution viability and dictates immediate next steps.')}
@@ -3037,16 +3011,13 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false, rende
   ${srcNote(hasS7 && s7.why_now_analysis ? 'Source: Step 7 AI analysis of market signals' : 'Source: AI inference from buying triggers and market context — validate timing independently')}
   ${h3('revenue-intelligence', '3', 'Strategic Hook')}
   <div class="ac keep-together"><strong>"${e(hook)}"</strong></div>
-  ${srcNote(hasS7 && s7.strategic_hook ? 'Source: Step 7 AI strategic analysis' : 'Source: derived from buying triggers — AI estimate')}
-  ${getTruncationNote(s7Normalized._truncatedFields)}`;
+  ${srcNote(hasS7 && s7.strategic_hook ? 'Source: Step 7 AI strategic analysis' : 'Source: derived from buying triggers — AI estimate')}`;
   };
 
   const decisionEngineRisk = () => {
-    // Use normalized risk factors if available
-    const riskFactors = s7Normalized.risk_analysis || s7.risk_factors;
     return `
   ${h3('revenue-intelligence', '4', 'Risk &amp; Constraint Analysis')}
-  ${renderRiskScoreCards(riskFactors)}
+  ${renderRiskScoreCards(s7.risk_factors)}
   ${srcNote('30–60 day cycle estimate is an industry benchmark (AI estimate) — validate with CRM data')}
   ${charts.risk
         ? `<div class="keep-together chart-block" style="margin:2mm 0 4mm"><div style="font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);margin-bottom:2mm">RISK SEVERITY ASSESSMENT</div>${renderChartOrFallback('Risk Severity', charts.risk, '', { width: 480, height: 180 })}<p class="figure-caption" style="font-size:10px; font-weight:bold; color:#f5f5f5; margin:1mm 0 0.5mm;">Figure 4: Risk Severity Assessment</p><p class="figure-source" style="font-size:8px; font-style:italic; color:#aaa; margin:0;">Source: ABE GTMS Engine v1.0</p></div>`
@@ -3130,32 +3101,17 @@ html, body {
   print-color-adjust: exact;
 }
 
-/* ── PAGES ── EXPLICIT 35-PAGE LAYOUT ── */
+/* ── PAGES ── DYNAMIC LAYOUT ── */
 ${p}.page {
   width: 210mm;
-  min-height: 297mm;
   background: #0c0d11 !important;
   padding: 12mm 15mm 15mm 15mm;
   margin: 0;
   break-after: page;
   page-break-after: always;
-  overflow: hidden; /* Prevent content spill, use page breaks instead */
   position: relative;
   box-sizing: border-box;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-start; /* Ensure content starts from top */
-  align-items: stretch; /* Ensure full-width alignment */
-}
-
-/* ── STEP 7 DECISION ENGINE PAGE CONTAINER ── */
-${p}.page.step7-page {
-  /* Inherits all .page properties */
-  /* Ensures Step 7 content is isolated and cannot spill to other pages */
-  break-after: page !important;
-  page-break-after: always !important;
-  break-inside: avoid !important;
-  page-break-inside: avoid !important;
+  display: block;
 }
 
 /* ── COVER PAGE STYLING ── */
@@ -3205,7 +3161,7 @@ ${p}table, ${p}.dark-table {
   margin: 2mm 0;
   font-size: 8.5pt;
 }
-${p}table th, ${p}.dark-table th {
+${p}table th, ${p}.dark-table th { 
   background: #2a2a2a;
   color: #f0f0f0;
   font-weight: 600;
@@ -3214,7 +3170,7 @@ ${p}table th, ${p}.dark-table th {
   border: 0.5px solid #444;
   font-size: 7.5pt;
 }
-${p}table td, ${p}.dark-table td {
+${p}table td, ${p}.dark-table td { 
   padding: 4px 6px;
   line-height: 1.4;
   border: 0.5px solid #444;
@@ -3229,14 +3185,11 @@ ${p}.card {
   border-radius: 6px;
   padding: 2.5mm;
   margin: 2mm 0;
-  width: 100%;
-  max-width: 100%;
 }
 ${p}.card-grid {
   display: grid;
   gap: 2mm;
   margin: 2mm 0;
-  width: 100%;
 }
 
 /* ── SCORE STRIP / METRICS ── */
@@ -3564,21 +3517,9 @@ ${p}.chart-block img {
 }
 
 /* ── PAGE BREAKS ── */
-/* Allow content to flow naturally across pages to prevent overflow */
-${p}.card, ${p}.table-wrap, ${p}.chart-block {
-  break-inside: auto;
-  page-break-inside: auto;
-}
-/* Only keep small elements together to prevent orphaned content */
-${p}tr {
+${p}.card, ${p}.table-wrap, ${p}.chart-block, ${p}tr, ${p}.keep-together {
   break-inside: avoid;
   page-break-inside: avoid;
-}
-/* Keep-together only for small inline elements, not large blocks */
-${p}.keep-together {
-  break-inside: avoid;
-  page-break-inside: avoid;
-  max-height: 250mm; /* Allow break if content exceeds page height */
 }
 ${p}h1, ${p}h2, ${p}h3, ${p}.section-header {
   break-after: avoid;
@@ -3839,29 +3780,23 @@ ${p}.section-continuation{width:100%;box-sizing:border-box;padding:0;margin:0;ba
 @media print {
   * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
   html, body { font-size: 11pt !important; background-color:#0c0d11 !important; margin: 0; padding: 0; }
-
-  /* Explicit pages - allow dynamic content flow */
+  
+  /* Dynamic pages */
   ${p}.page {
     width: 210mm !important;
-    min-height: 297mm !important;
-    overflow: hidden !important; /* Prevent content spill */
-    position: relative !important;
     background-color: #0c0d11 !important;
     margin: 0 !important;
     padding: 12mm 15mm 15mm 15mm !important;
-    display: flex !important;
-    flex-direction: column !important;
-    justify-content: flex-start !important;
-    align-items: stretch !important;
+    display: block !important;
     break-after: page !important;
     page-break-after: always !important;
   }
-
+  
   /* Boardroom readability */
   ${p}h1 { font-size: 28pt !important; }
   ${p}h2, ${p}.section-header { font-size: 16pt !important; }
   ${p}h3 { font-size: 13pt !important; }
-
+  
   /* Comfortable table spacing */
   ${p}table td, ${p}.dt td { line-height: 1.6 !important; padding: 8px 10px !important; }
   ${p}#page-15-market-context-overflow-tam-visual .chart-block img { height: 450px !important; object-fit: contain !important; }
@@ -3869,17 +3804,9 @@ ${p}.section-continuation{width:100%;box-sizing:border-box;padding:0;margin:0;ba
   ${p}#page-17-icp-modeling .icp-grid { gap: 12mm !important; margin: 10mm 0 !important; }
   ${p}#page-17-icp-modeling .icp-card { padding: 8mm !important; }
 
-  /* Allow content to break across pages to prevent overflow */
-  ${p}.card, ${p}.table-wrap, ${p}.chart-block {
-    break-inside: auto !important;
-    page-break-inside: auto !important;
-  }
-  /* Only keep small elements together */
-  ${p}.sdr-step, ${p}.keep-together,
+  ${p}.card, ${p}.table-wrap, ${p}.chart-block, ${p}.sdr-step, ${p}.keep-together,
   ${p}.page-insight, ${p}.page-insight-expanded, ${p}.swot-grid, ${p}.ww {
-    break-inside: avoid !important;
-    page-break-inside: avoid !important;
-    max-height: 250mm !important; /* Allow break if content exceeds page */
+    break-inside: avoid !important; page-break-inside: avoid !important;
   }
   ${p}h1, ${p}h2, ${p}h3, ${p}.section-header { break-after: avoid !important; page-break-after: avoid !important; }
   ${p}.pf {
@@ -4707,7 +4634,7 @@ ${pageFtr('Regulatory Landscape', 29)}
 </div>
 
 <!-- Page 30 -->
-<div class="page step7-page section-break" id="page-30-decision-engine">
+<div class="page section-break" id="page-30-decision-engine">
 ${renderInsightBox(
   'RISK — GTM ACTIVATION',
   strategy.strategy_context?.regulatory_summary ||
@@ -4728,7 +4655,7 @@ ${pageFtr('Decision Engine', 30)}
 </div>
 
 <!-- Page 31 -->
-<div class="page step7-page section-break page-expandable" id="page-31-risk-execution">
+<div class="page section-break page-expandable" id="page-31-risk-execution">
 ${secHead('07', 'Revenue Intelligence — Risk & Execution')}
 ${secCtx('Assesses implementation risks and dictates the immediate strategic execution path.')}
 ${decisionEngineRisk()}
