@@ -1704,7 +1704,7 @@
     function renderSWOT(s1) {
       const sw = s1.swot;
       const liItems = a => (Array.isArray(a) ? a : (a ? String(a).split(',') : [])).filter(Boolean).map(i => `<li>${esc(i.trim())}</li>`).join('');
-      // Use real SWOT data when available
+      // Primary: use real SWOT data (present in both demo and new 6-phase Phase 1 output)
       if (sw && typeof sw === 'object') {
         const hasData = [sw.strengths, sw.weaknesses, sw.opportunities, sw.threats].some(a => Array.isArray(a) && a.length);
         if (hasData) {
@@ -1716,7 +1716,34 @@
       </div>`;
         }
       }
-      // Fallback: derive from available fields
+      // Fallback A: new 6-phase Phase 1 structure (demand_signals / market_timing / icp_fit / data_completeness)
+      const demandSignals = Array.isArray(s1.demand_signals) ? s1.demand_signals : [];
+      const marketTiming  = Array.isArray(s1.market_timing)  ? s1.market_timing  : [];
+      const icpFit        = s1.icp_fit || {};
+      const missing       = Array.isArray(s1.data_completeness && s1.data_completeness.missing) ? s1.data_completeness.missing : [];
+      if (demandSignals.length || marketTiming.length) {
+        const strengths     = demandSignals.filter(s => s.strength === 'High').map(s => s.signal).slice(0, 3);
+        if (!strengths.length) strengths.push(...demandSignals.map(s => s.signal).slice(0, 2));
+        if (!strengths.length) strengths.push('Market presence identified from available signals');
+        const weaknesses    = missing.filter(m => m && !m.startsWith('missing data:')).slice(0, 2)
+                              .concat(missing.filter(m => m && m.startsWith('missing data:')).map(m => m.replace('missing data: ','')).slice(0, 2));
+        const icpMismatches = Array.isArray(icpFit.mismatches) ? icpFit.mismatches.filter(m => m && m !== 'missing data').slice(0, 2) : [];
+        if (!weaknesses.length) weaknesses.push(...icpMismatches);
+        if (!weaknesses.length) weaknesses.push('Insufficient verified data — manual validation recommended');
+        const opportunities = marketTiming.filter(s => s.strength === 'High').map(s => s.signal).slice(0, 3);
+        if (!opportunities.length) opportunities.push(...marketTiming.map(s => s.signal).slice(0, 2));
+        if (!opportunities.length) opportunities.push('Emerging market timing — further signal research required');
+        const threats = [...marketTiming.filter(s => s.category === 'competition').map(s => s.signal),
+                         ...icpMismatches].slice(0, 3);
+        if (!threats.length) threats.push('Competitive landscape uncertainty — monitor market timing signals');
+        return `<div class="swot-grid">
+    <div class="swot-cell swot-s"><div class="swot-label">Strengths</div><ul>${liItems(strengths)}</ul></div>
+    <div class="swot-cell swot-w"><div class="swot-label">Weaknesses</div><ul>${liItems(weaknesses)}</ul></div>
+    <div class="swot-cell swot-o"><div class="swot-label">Opportunities</div><ul>${liItems(opportunities)}</ul></div>
+    <div class="swot-cell swot-t"><div class="swot-label">Threats</div><ul>${liItems(threats)}</ul></div>
+  </div>`;
+      }
+      // Fallback B: legacy fields (growth_signals / market_position)
       const gs = safe(s1.growth_signals); const mp = safe(s1.market_position);
       if (!gs && !mp) return '';
       const growthArr = Array.isArray(s1.growth_signals) ? s1.growth_signals : (s1.growth_signals ? [String(s1.growth_signals)] : []);
