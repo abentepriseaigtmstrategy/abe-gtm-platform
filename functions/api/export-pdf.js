@@ -403,8 +403,10 @@ async function hydrateStrategyFromVault(reportId, authToken, requestUrl, env) {
   const data = await res.json();
   const report = data?.report;
   if (!report) throw new Error('Vault returned empty report for id: ' + reportId);
+  console.info('[Hydration] Raw vault response data:', JSON.stringify(data, null, 2));
   // Normalise to the flat strategy shape export-pdf expects
   const strategy = report.full_report || report.strategy || report.report_data || report;
+  console.info('[Hydration] Normalized strategy object:', JSON.stringify(strategy, null, 2));
   
   // Normalize company_name from all possible fields
   const candidateFields = [
@@ -429,15 +431,19 @@ async function hydrateStrategyFromVault(reportId, authToken, requestUrl, env) {
   ];
 
   let normalizedCompanyName = null;
-  for (const getCandidate of candidateFields) {
+  for (let i = 0; i < candidateFields.length; i++) {
+    const getCandidate = candidateFields[i];
     const candidate = getCandidate();
+    console.info(`[Hydration] Checking candidate ${i}:`, { candidate, type: typeof candidate });
     if (candidate && typeof candidate === 'string' && candidate.trim()) {
       normalizedCompanyName = candidate.trim();
+      console.info(`[Hydration] Found company name at candidate ${i}:`, normalizedCompanyName);
       break;
     }
   }
 
   if (!normalizedCompanyName) {
+    console.error('[Hydration] No company name found in any candidate field!');
     throw new Error('Hydrated report is missing company_name — the saved strategy may be incomplete');
   }
 
