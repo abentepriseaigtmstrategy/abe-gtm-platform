@@ -640,6 +640,7 @@ function buildDemoStep1(company, industry) {
     employee_count: '120–180 employees',
     products_services: `Revenue intelligence, GTM execution orchestration, and demand signal automation for ${profile.industryLabel} businesses.`,
     tech_stack_hints: ['CRM automation tools', 'marketing attribution platform', 'BI dashboard integration'],
+    tech_stack_indicators: ['CRM automation tools', 'marketing attribution platform', 'BI dashboard integration'],
     growth_signals: [
       'Recurring commercial momentum observed in demo-mode account analogs.',
       `Industry demand is increasing for ${profile.industryLabel} efficiency and digital revenue coordination.`,
@@ -675,6 +676,17 @@ function buildDemoStep1(company, industry) {
 }
 
 function buildDemoStep2(company, industry) {
+  const demandPct = 67;
+  const timingPct = 63;
+  const icpPct = 70;
+  const dataPct = 58;
+  
+  const demandScore = Math.round((demandPct / 100) * 40);
+  const timingScore = Math.round((timingPct / 100) * 25);
+  const icpScore = Math.round((icpPct / 100) * 20);
+  const dataScore = Math.round((dataPct / 100) * 15);
+  const totalScore = demandScore + timingScore + icpScore + dataScore;
+  
   const output = {
     tam_size_estimate: 'USD 1.8B',
     growth_rate: '13% CAGR',
@@ -706,20 +718,20 @@ function buildDemoStep2(company, industry) {
       },
     ],
     priority_opportunities: 'Enterprise revenue operations teams seeking pipeline predictability.',
-    demand_score: { score: 67, rationale: 'Moderate demand signals balanced by an illustrative ICP and market positioning.' },
-    market_timing_score: { score: 63, rationale: 'Timing is favorable for revenue acceleration solutions in the current buying cycle.' },
-    icp_fit_score: { score: 70, rationale: 'The demo ICP shows a strong fit with the product value proposition.' },
-    data_completeness_score: { score: 58, rationale: 'Key market and customer signals are illustrative rather than validated.' },
-    total_score: 60,
+    demand_score: { score: demandScore, max: 40, rationale: 'Moderate demand signals balanced by an illustrative ICP and market positioning.' },
+    market_timing_score: { score: timingScore, max: 25, rationale: 'Timing is favorable for revenue acceleration solutions in the current buying cycle.' },
+    icp_fit_score: { score: icpScore, max: 20, rationale: 'The demo ICP shows a strong fit with the product value proposition.' },
+    data_completeness_score: { score: dataScore, max: 15, rationale: 'Key market and customer signals are illustrative rather than validated.' },
+    total_score: totalScore,
     score_breakdown: {
-      demand: 67,
-      market_timing: 63,
-      icp_fit: 70,
-      data_completeness: 58,
-      total: 60,
-      verification: 'Demo estimates only; confirm with live company intelligence.',
+      demand: demandScore,
+      market_timing: timingScore,
+      icp_fit: icpScore,
+      data_completeness: dataScore,
+      total: totalScore,
+      verification: `${demandScore} + ${timingScore} + ${icpScore} + ${dataScore} = ${totalScore}`,
     },
-    score_verification: 'Demo estimates only; confirm with live company intelligence.',
+    score_verification: `${demandScore} + ${timingScore} + ${icpScore} + ${dataScore} = ${totalScore}`,
     analyst_insight: `Demo mode TAM and market attractiveness point to a conditional $1.8B opportunity for ${company}. [DEMO MODE – illustrative only]`,
   };
   return applyDemoMetadata(output, 2);
