@@ -410,6 +410,10 @@ async function hydrateStrategyFromVault(reportId, authToken, requestUrl, env) {
   
   // Normalize company_name from all possible fields
   const candidateFields = [
+    () => report.company_name,
+    () => report.companyName,
+    () => report.company,
+    () => report.name,
     () => strategy.company_name,
     () => strategy.companyName,
     () => strategy.company,
