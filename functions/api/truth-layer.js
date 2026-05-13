@@ -2,8 +2,41 @@
  * truth-layer.js
  * 
  * Truth-Validation Layer for ABE GTM Platform
- * Hardens report claims by separating facts from inferences and estimates.
+ * 
+ * This file maintains backward compatibility with existing code while providing
+ * access to the enhanced verification engine.
+ * 
+ * LEGACY EXPORTS (preserved for backward compatibility):
+ * - classifyClaimType
+ * - normalizeSources
+ * - validateMarketClaim
+ * - validateTAMClaim
+ * - validateAccountClaims
+ * - buildAssumptionLedger
+ * - buildValidationWarnings
+ * - calculateTruthConfidence
+ * - generateTruthMetadata
+ * 
+ * NEW EXPORTS (enhanced engine):
+ * - verifyReport
+ * - verifyClaim
+ * - collectClaims
+ * - calculateTruthScore
  */
+
+// Import enhanced engine
+import { 
+  verifyReport as enhancedVerifyReport,
+  verifyClaim as enhancedVerifyClaim,
+  collectClaims as enhancedCollectClaims,
+  calculateTruthScore as enhancedCalculateTruthScore,
+  CLASSIFICATIONS,
+  SOURCE_TYPES
+} from './abe-truth-layer-enhanced.js';
+
+// ============================================================================
+// LEGACY EXPORTS - PRESERVED FOR BACKWARD COMPATIBILITY
+// ============================================================================
 
 /**
  * Classifies a specific data claim into a truth category.
@@ -148,6 +181,62 @@ export function generateTruthMetadata(strategy = {}) {
     }
   };
 }
+
+// ============================================================================
+// NEW EXPORTS - ENHANCED VERIFICATION ENGINE
+// ============================================================================
+
+/**
+ * Verify an entire GTM report against ground truth sources.
+ * 
+ * @param {Object} report - The GTM strategy/report to verify
+ * @param {Object} groundTruth - Available verification sources (GA4, RAG, Apollo, Serper, User)
+ * @param {Object} options - Verification options (verification_mode, demo_mode)
+ * @returns {Object} Verification result with truth_score, claims, warnings, data_gaps
+ */
+export function verifyReport(report = {}, groundTruth = {}, options = {}) {
+  return enhancedVerifyReport(report, groundTruth, options);
+}
+
+/**
+ * Verify a single claim against ground truth sources.
+ * 
+ * @param {Object} claim - The claim to verify
+ * @param {Object} groundTruth - Available verification sources
+ * @returns {Object} Verified claim with classification, confidence, source_type, reason
+ */
+export function verifyClaim(claim = {}, groundTruth = {}) {
+  return enhancedVerifyClaim(claim, groundTruth);
+}
+
+/**
+ * Extract all factual claims from a report.
+ * 
+ * @param {Object} report - The GTM strategy/report
+ * @returns {Array} Array of claim objects
+ */
+export function collectClaims(report = {}) {
+  return enhancedCollectClaims(report);
+}
+
+/**
+ * Calculate truth score from verified claims.
+ * 
+ * @param {Array} verifiedClaims - Array of verified claim objects
+ * @returns {Number} Truth score (0-100)
+ */
+export function calculateTruthScore(verifiedClaims = []) {
+  return enhancedCalculateTruthScore(verifiedClaims);
+}
+
+/**
+ * Export classification constants for external use
+ */
+export { CLASSIFICATIONS, SOURCE_TYPES };
+
+// ============================================================================
+// HELPER FUNCTIONS (INTERNAL)
+// ============================================================================
 
 function getStepName(i) {
   const names = ['', 'market', 'tam', 'icp', 'sourcing', 'keywords', 'messaging'];
