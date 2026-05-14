@@ -184,7 +184,7 @@ function buildDemoStepOutput(step, company, industry, priorSteps) {
     case 3: return buildDemoStep3(company, industry);
     case 4: return buildDemoStep4(company, industry);
     case 5: return buildDemoStep5(company, industry);
-    case 6: return buildDemoStep6(company, industry);
+    case 6: return buildDemoStep6(company, industry, priorSteps);
     case 7: return buildDemoStep7(company, industry, priorSteps);
     default: return {};
   }
@@ -510,7 +510,7 @@ function getDemoIndustryProfile(company, industry) {
   };
 }
 
-function applyDemoMetadata(output, step) {
+function applyDemoMetadata(output, step, priorSteps = {}) {
   const sourceText = 'demo_mode_simulated';
   const demoMeta = {
     demo_mode: true,
@@ -890,7 +890,7 @@ function buildDemoStep5(company, industry) {
   return applyDemoMetadata(output, 5);
 }
 
-function buildDemoStep6(company, industry) {
+function buildDemoStep6(company, industry, priorSteps = {}) {
   const profile = getDemoIndustryProfile(company, industry);
   const output = {
     email_1: {
@@ -935,7 +935,7 @@ function buildDemoStep6(company, industry) {
     recommended_next_action: 'Validate ICP and demand with customer conversations before investing in full GTM execution.',
     analyst_insight: `Demo mode summary is illustrative only. Do not use for live decisioning. [DEMO MODE – illustrative only]`,
   };
-  return applyDemoMetadata(output, 6);
+  return applyDemoMetadata(output, 6, priorSteps);
 }
 
 function buildDemoStep7(company, industry, priorSteps) {
