@@ -527,6 +527,41 @@ function applyDemoMetadata(output, step) {
   };
   Object.assign(output, demoMeta);
 
+  // ── Score normalisation (Phase 2): enforce total = exact arithmetic sum ──
+  if (step === 2) {
+    const d2 = typeof output.demand_score === 'object' ? (output.demand_score?.score ?? 0)
+                : (typeof output.demand_score === 'number' ? output.demand_score : 0);
+    const t2 = typeof output.market_timing_score === 'object' ? (output.market_timing_score?.score ?? 0)
+                : (typeof output.market_timing_score === 'number' ? output.market_timing_score : 0);
+    const i2 = typeof output.icp_fit_score === 'object' ? (output.icp_fit_score?.score ?? 0)
+                : (typeof output.icp_fit_score === 'number' ? output.icp_fit_score : 0);
+    const c2 = typeof output.data_completeness_score === 'object' ? (output.data_completeness_score?.score ?? 0)
+                : (typeof output.data_completeness_score === 'number' ? output.data_completeness_score : 0);
+    // Cap each sub-score to its declared max
+    const capped = {
+      d: Math.min(d2, 40),
+      t: Math.min(t2, 25),
+      i: Math.min(i2, 20),
+      c: Math.min(c2, 15),
+    };
+    const computedTotal = capped.d + capped.t + capped.i + capped.c;
+    // Enforce nested object shape so frontend scoreBlock always reads .score
+    if (typeof output.demand_score !== 'object' || output.demand_score === null) {
+      output.demand_score = { score: capped.d, max: 40, rationale: 'Score derived from signal extraction.' };
+    } else { output.demand_score.score = capped.d; }
+    if (typeof output.market_timing_score !== 'object' || output.market_timing_score === null) {
+      output.market_timing_score = { score: capped.t, max: 25, rationale: 'Score derived from market timing signals.' };
+    } else { output.market_timing_score.score = capped.t; }
+    if (typeof output.icp_fit_score !== 'object' || output.icp_fit_score === null) {
+      output.icp_fit_score = { score: capped.i, max: 20, rationale: 'Score derived from ICP fit analysis.' };
+    } else { output.icp_fit_score.score = capped.i; }
+    if (typeof output.data_completeness_score !== 'object' || output.data_completeness_score === null) {
+      output.data_completeness_score = { score: capped.c, max: 15, rationale: 'Score derived from data completeness check.' };
+    } else { output.data_completeness_score.score = capped.c; }
+    output.total_score = computedTotal;
+    output.score_verification = `${capped.d} + ${capped.t} + ${capped.i} + ${capped.c} = ${computedTotal}`;
+  }
+
   switch (step) {
     case 1:
       output._source_demand_signals = sourceText;
@@ -573,6 +608,22 @@ function applyDemoMetadata(output, step) {
       output._source_confidence_note = sourceText;
       output._source_executive_brief = sourceText;
       output._source_recommended_next_action = sourceText;
+      // Back-fill score_breakdown from Phase 2 so the summary panel is always accurate
+      if (priorSteps && priorSteps[2]) {
+        const p2 = priorSteps[2];
+        const p2d = typeof p2.demand_score === 'object' ? (p2.demand_score?.score ?? 0) : (p2.demand_score ?? 0);
+        const p2t = typeof p2.market_timing_score === 'object' ? (p2.market_timing_score?.score ?? 0) : (p2.market_timing_score ?? 0);
+        const p2i = typeof p2.icp_fit_score === 'object' ? (p2.icp_fit_score?.score ?? 0) : (p2.icp_fit_score ?? 0);
+        const p2c = typeof p2.data_completeness_score === 'object' ? (p2.data_completeness_score?.score ?? 0) : (p2.data_completeness_score ?? 0);
+        const p2total = p2.total_score ?? (p2d + p2t + p2i + p2c);
+        if (!output.score_breakdown || typeof output.score_breakdown !== 'object') output.score_breakdown = {};
+        output.score_breakdown.demand           = p2d;
+        output.score_breakdown.market_timing    = p2t;
+        output.score_breakdown.icp_fit          = p2i;
+        output.score_breakdown.data_completeness = p2c;
+        output.score_breakdown.total            = p2total;
+        output.score_breakdown.verification     = p2.score_verification || `${p2d} + ${p2t} + ${p2i} + ${p2c} = ${p2total}`;
+      }
       break;
     case 7:
       output._source_signal_summary = sourceText;
@@ -1995,9 +2046,10 @@ Rules:
 - Every signal must be a real, observable fact
 - If no evidence exists for a category, set to "missing data"
 - No scoring, no summaries, no conclusions
+- swot must be derived only from signals already extracted — no new invention
 
 Return exact JSON:
-{"demand_signals":[{"signal":"observable fact","type":"hiring|expansion|product_launch|partnership|funding","strength":"High|Medium|Low"}],"market_timing":[{"signal":"observable fact","category":"growth|competition|regulation|trend","strength":"High|Medium|Low"}],"icp_fit":{"target_description":"who they sell to, or missing data","fit_indicators":["evidence of fit"],"mismatches":["evidence of mismatch, or missing data"]},"data_completeness":{"available":["fields with real data"],"missing":["missing data: field name"]},"section_context":"one sentence on why signal extraction matters first","analyst_insight":"one specific observation about signal quality for this company"}`,
+{"demand_signals":[{"signal":"observable fact","type":"hiring|expansion|product_launch|partnership|funding","strength":"High|Medium|Low"}],"market_timing":[{"signal":"observable fact","category":"growth|competition|regulation|trend","strength":"High|Medium|Low"}],"icp_fit":{"target_description":"who they sell to, or missing data","fit_indicators":["evidence of fit"],"mismatches":["evidence of mismatch, or missing data"]},"data_completeness":{"available":["fields with real data"],"missing":["missing data: field name"]},"swot":{"strengths":["derive from high-strength demand signals and ICP fit indicators"],"weaknesses":["derive from data_completeness.missing and ICP mismatches"],"opportunities":["derive from high-strength market timing signals"],"threats":["derive from low ICP fit, competitive signals, or missing data gaps"]},"section_context":"one sentence on why signal extraction matters first","analyst_insight":"one specific observation about signal quality for this company"}`,
 
     // ════════════════════════════════════════════════
     // PHASE 2 — SCORING
@@ -2127,7 +2179,7 @@ function buildContext(step, steps) { return buildPhaseContext(step, steps); }
 function buildCompressedCtx(steps) { return buildPhaseContext(6, steps); }
 
 const SCHEMAS = {
-  1:['demand_signals','market_timing','icp_fit','data_completeness','section_context','analyst_insight'],
+  1:['demand_signals','market_timing','icp_fit','data_completeness','swot','section_context','analyst_insight'],
   2:['demand_score','market_timing_score','icp_fit_score','data_completeness_score','total_score','score_verification','section_context','analyst_insight'],
   3:['verdict','verdict_reasoning','score_basis','demand_assessment','icp_assessment','section_context','analyst_insight'],
   4:['target_roles','core_problem','solution_angle','solution_pitch','why_now','estimated_deal_size','sales_approach','section_context','analyst_insight'],
