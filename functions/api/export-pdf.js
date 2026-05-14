@@ -5058,4 +5058,3 @@ ${pageFtr('Data Quality Audit', 35)}
   const fullDocumentHtml = `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8">${styles}</head><body>${bodyContent}</body></html>`;
   return sanitizeVisibleHtml(fullDocumentHtml);
 }
-v
