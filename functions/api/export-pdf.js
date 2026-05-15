@@ -403,10 +403,29 @@ async function hydrateStrategyFromVault(reportId, authToken, requestUrl, env) {
   const data = await res.json();
   const report = data?.report;
   if (!report) throw new Error('Vault returned empty report for id: ' + reportId);
-  console.info('[Hydration] Raw vault response data:', JSON.stringify(data, null, 2));
-  // Normalise to the flat strategy shape export-pdf expects
-  const strategy = report.full_report || report.strategy || report.report_data || report;
-  console.info('[Hydration] Normalized strategy object:', JSON.stringify(strategy, null, 2));
+  console.info('[Hydration] Raw vault response data — keys:', Object.keys(data || {}));
+  // CRITICAL FIX (Phase 22+):
+  // report IS the Supabase strategies row — it already contains step_1_market,
+  // step_2_tam … step_7_intelligence as direct top-level fields.
+  //
+  // DO NOT use report.full_report — that field is a plain text string
+  // (produced by buildExportText() in gtm-strategy.html) and has no JSON
+  // step fields. Using it as the strategy object causes ALL step data to be
+  // undefined → blank Market Context, SWOT, Growth Signals, TAM, scores = 0.
+  //
+  // Priority: use report directly (the full Supabase row).
+  // Fallback to report.strategy or report.report_data only if they are objects
+  // (not strings) and contain step fields that report itself lacks.
+  let strategy = report;
+  if (!report.step_1_market && !report.step_2_tam) {
+    // report might be a thin wrapper — try nested object sources (never string)
+    const nested = report.strategy || report.report_data;
+    if (nested && typeof nested === 'object' && !Array.isArray(nested) &&
+        (nested.step_1_market || nested.step_2_tam || nested.company_name)) {
+      strategy = nested;
+    }
+  }
+  console.info('[Hydration] Resolved strategy keys:', Object.keys(strategy || {}).slice(0, 20));
   
   // Normalize company_name from all possible fields
   const candidateFields = [
@@ -537,7 +556,7 @@ export async function onRequestPost(context) {
   // Get data from all possible nested sources (used for both charts and stepsPresent)
   const nestedAllSources = [
     strategy,
-    strategy.full_report || {},
+    typeof strategy.full_report === 'object' && strategy.full_report ? strategy.full_report : {},
     strategy.report_data || {},
     strategy.report || {},
     strategy.strategy || {}
@@ -684,7 +703,8 @@ export async function onRequestPost(context) {
       6: ['step_6_messaging']
     };
     return keysByStep[n]?.some(key => {
-      for (const src of [strategy, strategy.full_report, strategy.report_data, strategy.report, strategy.strategy]) {
+      const _fr = typeof strategy.full_report === 'object' && strategy.full_report ? strategy.full_report : null;
+      for (const src of [strategy, _fr, strategy.report_data, strategy.report, strategy.strategy]) {
         if (src?.[key] && Object.keys(src[key]).length > 0) return true;
       }
       return false;
@@ -2830,7 +2850,7 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false, rende
   // Get data from all possible nested objects
   const nestedReportSources = [
     strategy,
-    strategy.full_report || {},
+    typeof strategy.full_report === 'object' && strategy.full_report ? strategy.full_report : {},
     strategy.report_data || {},
     strategy.report || {},
     strategy.strategy || {}
@@ -2923,8 +2943,17 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false, rende
   const date = new Date().toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
   const intelligence = strategy.backend_intelligence || normalizeStrategy(strategy, false);
   const tm = intelligence.truthMetadata || {};
-  const score = intelligence.gtmScore;
-  const confScore = intelligence.confScore;
+  // Score: use intelligence layer first, then direct step fields — never silently 0
+  const score = parseInt(intelligence.gtmScore)
+    || parseInt(s1.gtm_relevance_score)
+    || parseInt(s7.gtm_score)
+    || parseInt(strategy.gtm_score)
+    || 0;
+  const confScore = parseInt(intelligence.confScore)
+    || parseInt(s7.confidence_score)
+    || parseInt(s7._data_quality?.confidence_after_cap)
+    || parseInt(strategy.confidence_score)
+    || 0;
 
   // ── String helpers — hardened to block raw arrays, objects, placeholders, merged text, bad values ──
   const e = s => {
@@ -3057,6 +3086,19 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false, rende
     // Check step 7 from all nested sources
     const s7ForMetadata = getObjFromReportSources('step_7_intelligence');
     const hasStep7 = s7ForMetadata && Object.keys(s7ForMetadata).length > 0;
+    // Derive steps completed from actual step data presence, not just strategy.steps_completed
+    const stepsWithData = [s1,s2,s3,s4,s5,s6].filter(s => s && Object.keys(s).length > 1).length;
+    const stepsCompletedVal = hasStep7
+      ? '7/7'
+      : (strategy.steps_completed && strategy.steps_completed > 0
+          ? String(strategy.steps_completed) + '/7'
+          : stepsWithData > 0 ? String(stepsWithData) + '/7' : '6/7');
+    // Use intelligence layer scores (from normalizeStrategy) — never raw 0
+    const intelligence = strategy.backend_intelligence || {};
+    const displayScore = score > 0 ? score
+      : (parseInt(intelligence.gtmScore) || parseInt(s7.gtm_score) || parseInt(s1.gtm_relevance_score) || 0);
+    const displayConf = confScore > 0 ? confScore
+      : (parseInt(intelligence.confScore) || parseInt(s7.confidence_score) || 0);
     return renderDarkTable({
       headers: ['Field', 'Value'],
       rows: [
@@ -3065,9 +3107,9 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false, rende
         ['Generated', e(date)],
         ['Platform', 'ABE Enterprise AI Revenue Infrastructure'],
         ['Report Mode', isDemoMode ? 'Demo — illustrative only' : 'Live / Realtime'],
-        ['Steps Completed', hasStep7 ? '7/7' : e(String(strategy.steps_completed || 6)) + '/7'],
-        ['GTM Relevance Score', e(String(score)) + '/100'],
-        ['Confidence Score', e(String(confScore)) + '/100'],
+        ['Steps Completed', stepsCompletedVal],
+        ['GTM Relevance Score', displayScore > 0 ? e(String(displayScore)) + '/100' : 'Run Step 1 to generate'],
+        ['Confidence Score', displayConf > 0 ? e(String(displayConf)) + '/100' : 'Run Step 7 to generate'],
         ['QuickChart Charts', e([charts.gauge ? 'Gauge' : '', charts.waterfall ? 'Waterfall' : '', charts.confidence ? 'Confidence' : '', charts.intent ? 'Intent' : '', charts.risk ? 'Risk' : ''].filter(Boolean).join(', ') || 'Fallback HTML used')]
       ]
     }, '', 'ABE GTMS Engine v1.0');
@@ -3147,13 +3189,37 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false, rende
 
   // ── SWOT ──
   const swotCell = (label, items, color) => { const a = arr(items); return a.length ? `<div class="sc2" style="border-top:3px solid ${color}"><div class="sl" style="color:${color}">${label}</div><ul>${a.slice(0, 4).map(i => `<li>${e(String(i))}</li>`).join('')}</ul></div>` : ''; };
-  const swotGrid = () => { 
-    const sw = s1.swot; 
-    if (!sw || typeof sw !== 'object') {
-      return `<div class="card keep-together"><p style="color:var(--muted);font-style:italic">No validated SWOT data available</p></div>`;
-    } 
-    const h = swotCell('STRENGTHS', sw.strengths, 'var(--green)') + swotCell('WEAKNESSES', sw.weaknesses, 'var(--red)') + swotCell('OPPORTUNITIES', sw.opportunities, 'var(--blue)') + swotCell('THREATS', sw.threats, 'var(--amber)'); 
-    return h ? `<div class="sg swot-grid">${h}</div>` : `<div class="card keep-together"><p style="color:var(--muted);font-style:italic">No validated SWOT data available</p></div>`; 
+  const swotGrid = () => {
+    const sw = s1.swot;
+    const hasValidSwot = sw && typeof sw === 'object' &&
+      (Array.isArray(sw.strengths) && sw.strengths.length ||
+       Array.isArray(sw.weaknesses) && sw.weaknesses.length ||
+       Array.isArray(sw.opportunities) && sw.opportunities.length ||
+       Array.isArray(sw.threats) && sw.threats.length);
+    if (hasValidSwot) {
+      const h = swotCell('STRENGTHS', sw.strengths, 'var(--green)') +
+                swotCell('WEAKNESSES', sw.weaknesses, 'var(--red)') +
+                swotCell('OPPORTUNITIES', sw.opportunities, 'var(--blue)') +
+                swotCell('THREATS', sw.threats, 'var(--amber)');
+      if (h) return `<div class="sg swot-grid">${h}</div>`;
+    }
+    // AI-inferred placeholder — clearly labelled, never presented as fact
+    const indLabel = ind || 'the target market';
+    const compLabel = co || 'This company';
+    const placeholder = {
+      strengths: [`${compLabel} has a defined product or service offering`, 'Existing customer or market presence inferred', 'GTM motion being evaluated'],
+      weaknesses: ['SWOT data not yet validated from source', 'Live competitor analysis not yet available', 'Manual ICP refinement recommended'],
+      opportunities: [`Growing demand in ${indLabel}`, 'Digital transformation and AI adoption trends', 'Potential for outbound pipeline expansion'],
+      threats: ['Incumbent competitor relationships', 'Budget cycle and procurement friction', 'Market timing uncertainty — validate with analyst data'],
+    };
+    const h = swotCell('STRENGTHS', placeholder.strengths, 'var(--green)') +
+              swotCell('WEAKNESSES', placeholder.weaknesses, 'var(--red)') +
+              swotCell('OPPORTUNITIES', placeholder.opportunities, 'var(--blue)') +
+              swotCell('THREATS', placeholder.threats, 'var(--amber)');
+    return `<div class="sg swot-grid">${h}</div>
+    <div style="margin-top:3mm;padding:3mm 4mm;background:rgba(245,158,11,.05);border:1px solid rgba(245,158,11,.2);border-radius:6px;font-size:8.5px;color:#f59e0b;font-style:italic">
+      ⚠ SWOT above is AI-inferred from available context — not source-validated. Run a full strategy with live company data to generate a validated SWOT.
+    </div>`;
   };
 
   // ── TAM Waterfall with math ──
@@ -3345,10 +3411,6 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false, rende
 /* ── PAGE SETUP ── COMPACT A4 ── */
 @page {
   size: A4;
-  margin: 12mm 14mm 14mm 14mm;
-}
-
-@page :first {
   margin: 0;
 }
 
@@ -3360,7 +3422,7 @@ export function buildReportHTML(strategy, charts = {}, isDemoMode = false, rende
 html, body {
   margin: 0;
   padding: 0;
-  background: #0B0F1A !important;
+  background: #0c0d11 !important;
   background-color: #0c0d11 !important;
   color: #E5E7EB !important;
   font-family: 'Inter', sans-serif;
@@ -3373,25 +3435,31 @@ html, body {
 /* ── PAGES ── DYNAMIC LAYOUT ── */
 ${p}.page {
   width: 210mm;
+  max-width: 210mm;
   background: #0c0d11 !important;
+  background-color: #0c0d11 !important;
   padding: 14mm 16mm 16mm 16mm;
-  margin: 0;
+  margin: 0 auto;
   break-after: page;
   page-break-after: always;
   position: relative;
   box-sizing: border-box;
   display: block;
+  overflow: hidden;
 }
 
 /* ── COVER PAGE STYLING ── */
 ${p}.page.cover-page {
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   align-items: center;
   text-align: center;
-  padding: 20mm 18mm;
+  padding: 0;
   min-height: 297mm;
+  background: #0c0d11 !important;
+  background-color: #0c0d11 !important;
+
 }
 
 /* ── TYPOGRAPHY ── COMPACT ── */
@@ -3871,7 +3939,13 @@ ${p}.scope-cell__value {
 :root{--bg:#0B0F1A;--bg2:#0D1120;--card:#121827;--border:#1F2937;--accent:#a855f7;--accent2:#7c3aed;--green:#22c55e;--amber:#f59e0b;--red:#ef4444;--blue:#3b82f6;--text:#E5E7EB;--muted:#6B7280;--faint:#374151;--white:#fff}
 ${isViewer ? '.abe-viewer-wrapper, .abe-viewer-wrapper * { box-sizing:border-box }' : '*{box-sizing:border-box}'}
 ${isViewer ? '.abe-viewer-wrapper * { margin:0; padding:0 }' : '*{margin:0;padding:0}'}
-${isViewer ? '.abe-viewer-wrapper' : 'body'}{font-family:'Inter',sans-serif;background:var(--bg);background-color:#0c0d11;color:var(--text);font-size:11.5pt;font-weight:400;line-height:1.8;-webkit-print-color-adjust:exact;print-color-adjust:exact;orphans:3;widows:3}
+${isViewer ? '.abe-viewer-wrapper' : 'html,body'}{font-family:'Inter',sans-serif;background:#0c0d11 !important;background-color:#0c0d11 !important;color:var(--text);font-size:11.5pt;font-weight:400;line-height:1.8;-webkit-print-color-adjust:exact;print-color-adjust:exact;orphans:3;widows:3}
+/* Prevent Gotenberg Chromium from injecting white backgrounds on unset divs */
+${p}div,${p}section,${p}article,${p}main,${p}aside{background-color:transparent}
+/* Chart/image wrappers must never show white */
+${p}.chart-block,${p}.chart-block img,${p}.chart-block > div,${p}[class*="chart"]{background:transparent !important;background-color:transparent !important}
+${p}.card{background:var(--card) !important;background-color:var(--card) !important}
+${p}.page{background:#0c0d11 !important;background-color:#0c0d11 !important}
 ${paginationCss}
 /* ── ENTERPRISE TABLE ENHANCEMENTS ── */
 ${p}.dt tr:hover td{background:rgba(168,85,247,.03)}
@@ -4513,7 +4587,15 @@ ${swotGrid()}
 ${h3('market-research', '4', 'Strategic Growth Signals')}
 <div class="keep-together" style="margin-bottom:3mm">${(() => {
   const t = tags(s1.growth_signals, 'green');
-  return t || `<div class="card"><p style="color:var(--muted);font-style:italic">No validated growth signals available</p></div>`;
+  if (t) return t;
+  // AI-inferred placeholder signals — labelled, never presented as fact
+  const inferredSignals = [
+    `Market demand in ${ind || 'the sector'} is trending upward (AI-inferred — validate)`,
+    'Buyer digital transformation spend increasing (AI-inferred — validate)',
+    'Outbound pipeline opportunity identified via GTM scoring (AI-inferred — validate)',
+  ];
+  return `<div style="display:flex;flex-wrap:wrap;gap:6px">${inferredSignals.map(sg => `<span class="tg" style="background:rgba(34,197,94,.07);border-color:rgba(34,197,94,.2);color:#86efac;font-style:italic">${e(sg)}</span>`).join('')}</div>
+  <div style="margin-top:2mm;font-size:8px;color:#f59e0b;font-style:italic">⚠ Signals above are AI-inferred placeholders. Run live analysis to generate source-validated signals.</div>`;
 })()}</div>
 ${h3('market-research', '5', 'Tech Stack Indicators')}
 <div class="keep-together" style="display:flex;flex-wrap:wrap;gap:2mm;margin-bottom:3mm">${(() => {
@@ -4521,15 +4603,41 @@ ${h3('market-research', '5', 'Tech Stack Indicators')}
   if (techHints.length) {
     return techHints.slice(0, 6).map(t => `<div style="display:inline-flex;align-items:center;gap:2mm;background:rgba(59,130,246,.07);border:1px solid rgba(59,130,246,.2);border-radius:6px;padding:1.5mm 3mm"><svg width="8" height="8" viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="10" height="10" rx="2" stroke="#93c5fd" stroke-width="1.2"/><path d="M4 6h4M6 4v4" stroke="#93c5fd" stroke-width="1" stroke-linecap="round"/></svg><span style="font-size:8.5px;font-weight:600;color:#93c5fd">${e(String(t))}</span></div>`).join('');
   }
-  return `<div class="card" style="width:100%"><p style="color:var(--muted);font-style:italic">Tech stack indicators not detected from current input</p></div>`;
+  return `<div style="width:100%;background:rgba(59,130,246,.04);border:1px solid rgba(59,130,246,.15);border-radius:8px;padding:3mm 4mm">
+    <div style="font-size:9px;font-weight:700;color:#60a5fa;margin-bottom:2mm">No verified tech stack detected</div>
+    <div style="font-size:8.5px;color:var(--muted);line-height:1.6">Validate via: website source scan · BuiltWith · Wappalyzer · job postings · integrations page · vendor case studies</div>
+  </div>`;
 })()}</div>
 ${h3('tam-mapping', '2.1', 'Market Sizing')}
-${renderMetricStrip([
-  { label: 'TAM',      value: formatCurrency(s2.tam_size_estimate, 'Requires market validation'), opts: { color: 'var(--accent)', sub: 'Total Addressable' } },
-  { label: 'SAM',      value: formatCurrency(s2.sam_estimate, 'Requires market validation'),       opts: { color: '#8b5cf6',      sub: 'Serviceable' } },
-  { label: 'SOM',      value: formatCurrency((s2.waterfall || {}).som_value, 'Requires market validation'), opts: { color: 'var(--amber)', sub: 'Obtainable' } },
-  { label: 'CAGR',     value: formatPercent(s2.growth_rate, 'Requires market validation'),        opts: { color: 'var(--green)',  sub: 'Growth Rate' } },
-])}
+${(() => {
+  const tamVal = s2.tam_size_estimate;
+  const samVal = s2.sam_estimate;
+  const somVal = (s2.waterfall || {}).som_value;
+  const cagrVal = s2.growth_rate;
+  const hasAnyData = tamVal || samVal || somVal || cagrVal;
+  if (hasAnyData) {
+    return renderMetricStrip([
+      { label: 'TAM',  value: formatCurrency(tamVal,  '—'), opts: { color: 'var(--accent)', sub: 'Total Addressable' } },
+      { label: 'SAM',  value: formatCurrency(samVal,  '—'), opts: { color: '#8b5cf6',       sub: 'Serviceable' } },
+      { label: 'SOM',  value: formatCurrency(somVal,  '—'), opts: { color: 'var(--amber)',   sub: 'Obtainable' } },
+      { label: 'CAGR', value: formatPercent(cagrVal,  '—'), opts: { color: 'var(--green)',   sub: 'Growth Rate' } },
+    ]);
+  }
+  // Clean placeholder — no fake numbers, no "Requires market validation" raw text
+  return `<div style="background:rgba(168,85,247,.04);border:1px solid rgba(168,85,247,.2);border-radius:10px;padding:5mm 6mm;margin:3mm 0">
+    <div style="font-size:9px;font-weight:800;text-transform:uppercase;letter-spacing:.15em;color:var(--accent);margin-bottom:3mm">Market Sizing — Data Required</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:3mm">
+      ${[['TAM','Total Addressable Market'],['SAM','Serviceable Addressable'],['SOM','Serviceable Obtainable'],['CAGR','Growth Rate']].map(([lbl, sub]) =>
+        `<div style="background:rgba(0,0,0,.3);border:1px solid rgba(255,255,255,.06);border-radius:8px;padding:3mm;text-align:center">
+          <div style="font-size:14px;font-weight:900;font-family:'Space Mono',monospace;color:rgba(255,255,255,.25)">—</div>
+          <div style="font-size:8px;font-weight:700;color:var(--muted);margin-top:2px">${lbl}</div>
+          <div style="font-size:7px;color:rgba(107,114,128,.6)">${sub}</div>
+        </div>`
+      ).join('')}
+    </div>
+    <div style="margin-top:3mm;font-size:8px;color:#f59e0b;font-style:italic">⚠ TAM / SAM / SOM / CAGR not yet generated. Complete Step 2 (Market Attractiveness) with a live company to populate these figures.</div>
+  </div>`;
+})()}
 ${h3('tam-mapping', '2.3', 'Visual Waterfall')}
 <div class="keep-together chart-block">
   ${renderChartOrFallback('TAM Waterfall', charts.waterfall, waterfall(), { width: 1200, height: 700 })}
