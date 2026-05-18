@@ -205,7 +205,13 @@ async function callOpenAI({ systemPrompt, userPrompt, maxTokens, temperature, st
 }
 
 // ══════════════════════════════════════════════════════════════════
-// GEMINI CALLER
+// GEMINI CALLER  —  Free-tier compatible (Google AI Studio)
+//
+// Free-tier constraints we work around:
+//   ✗ system_instruction  — not supported; merged into user message instead
+//   ✗ responseMimeType    — not supported; we instruct JSON via prompt text
+//   ✓ contents[].parts    — standard, works on all tiers
+//   ✓ generationConfig    — temperature + maxOutputTokens are always allowed
 // ══════════════════════════════════════════════════════════════════
 
 async function callGemini({ systemPrompt, userPrompt, maxTokens, temperature, step }, env) {
@@ -217,6 +223,19 @@ async function callGemini({ systemPrompt, userPrompt, maxTokens, temperature, st
   const model = GEMINI_PRO_STEPS.includes(step) ? GEMINI_PRO_MODEL : GEMINI_FLASH_MODEL;
   const url   = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${key}`;
 
+  // Merge system prompt into the user message — free tier does not support
+  // the separate system_instruction field. Wrapping in clear delimiters ensures
+  // the model still treats it as an instruction rather than user content.
+  const combinedPrompt = [
+    '=== SYSTEM INSTRUCTIONS (follow exactly) ===',
+    systemPrompt,
+    '',
+    '=== REQUEST ===',
+    userPrompt,
+    '',
+    'IMPORTANT: Return ONLY a valid JSON object. No markdown, no code fences, no prose. Start with { and end with }.',
+  ].join('\n');
+
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
 
@@ -226,17 +245,15 @@ async function callGemini({ systemPrompt, userPrompt, maxTokens, temperature, st
       headers: { 'Content-Type': 'application/json' },
       signal: controller.signal,
       body: JSON.stringify({
-        system_instruction: {
-          parts: [{ text: systemPrompt }],
-        },
+        // No system_instruction — free tier rejects it
         contents: [{
-          role: 'user',
-          parts: [{ text: userPrompt }],
+          parts: [{ text: combinedPrompt }],
+          // No role field — avoids multi-turn validation on free tier
         }],
         generationConfig: {
           temperature,
-          maxOutputTokens:  maxTokens,
-          responseMimeType: 'application/json',  // enforces JSON output
+          maxOutputTokens: maxTokens,
+          // No responseMimeType — free tier rejects it; JSON enforced via prompt text above
         },
       }),
     });
@@ -249,6 +266,13 @@ async function callGemini({ systemPrompt, userPrompt, maxTokens, temperature, st
     }
 
     const d = await res.json();
+
+    // Handle finish reason — free tier may return SAFETY / RECITATION blocks
+    const finishReason = d.candidates?.[0]?.finishReason;
+    if (finishReason && finishReason !== 'STOP' && finishReason !== 'MAX_TOKENS') {
+      return { error: `Gemini blocked response: ${finishReason}`, statusCode: 422 };
+    }
+
     const rawText    = d.candidates?.[0]?.content?.parts?.[0]?.text || '';
     const tokensUsed = d.usageMetadata?.totalTokenCount || 0;
     return { rawText, tokensUsed, statusCode: 200 };
