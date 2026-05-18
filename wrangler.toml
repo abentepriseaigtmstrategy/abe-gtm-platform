@@ -23,6 +23,13 @@ ADOBE_API_BASE_URL = "https://pdf-services.adobe.io"
 # Gotenberg (Fallback)
 GOTENBERG_URL = "https://gotenberg-production-e409.up.railway.app"
 
+# ── AI Provider Configuration ──────────────────────────────────────
+# Controls provider failover behaviour (provider-router.js)
+# Set via Cloudflare Dashboard → Workers & Pages → Settings → Environment Variables
+PRIMARY_PROVIDER         = "openai"    # Primary AI provider (always openai)
+FALLBACK_PROVIDER        = "gemini"    # Fallback AI provider
+ENABLE_PROVIDER_FAILOVER = "true"      # Set "false" to disable Gemini fallback
+
 # ADOBE PDF SERVICES SECRETS (Required - add via Cloudflare Dashboard)
 # From your Adobe credentials JSON file, extract these plain string values:
 #
@@ -33,3 +40,17 @@ GOTENBERG_URL = "https://gotenberg-production-e409.up.railway.app"
 # Add these in Cloudflare Dashboard: Workers & Pages → abe-gtm-platform → Settings → Environment Variables
 # Set Type to "Secret" for both values.
 #
+# ── AI PROVIDER SECRETS ────────────────────────────────────────────
+# Add via Cloudflare Dashboard → Workers & Pages → abe-gtm-platform → Settings → Environment Variables
+# Set Type to "Secret" for ALL of the following:
+#
+# OPENAI_API_KEY  — Primary provider (OpenAI gpt-4o-mini)
+#   Get from: https://platform.openai.com/api-keys
+#
+# GEMINI_API_KEY  — Fallback provider (Google Gemini gemini-2.5-flash / gemini-2.5-pro)
+#   Get from: https://aistudio.google.com/app/apikey
+#
+# To add a secret via Wrangler CLI:
+#   npx wrangler pages secret put OPENAI_API_KEY
+#   npx wrangler pages secret put GEMINI_API_KEY
+
