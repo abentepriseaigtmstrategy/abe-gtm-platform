@@ -2,8 +2,10 @@
  * provider-router.js  —  AI Provider Failover Module
  * ABE GTM Platform  ·  Cloudflare Workers compatible
  *
+ * Provider chain    : OpenAI (primary) → Gemini (fallback 1) → Groq (fallback 2)
  * Primary provider  : OpenAI   (gpt-4o-mini)
- * Fallback provider : Google   (gemini-2.5-flash for steps 1-6, gemini-2.5-pro for step 7)
+ * Fallback 1        : Google   (gemini-2.5-flash steps 1-6 / gemini-2.5-pro step 7) — free tier
+ * Fallback 2        : Groq     (llama-3.3-70b-versatile) — free tier, OpenAI-compatible API
  *
  * Failover triggers:
  *   ✓ Network timeout / fetch throws
@@ -21,8 +23,9 @@
  *
  * Environment variables (Wrangler secrets):
  *   OPENAI_API_KEY           — required for primary
- *   GEMINI_API_KEY           — required for fallback
- *   ENABLE_PROVIDER_FAILOVER — optional, default "true"; set "false" to disable
+ *   GEMINI_API_KEY           — required for fallback 1  (free: aistudio.google.com/app/apikey)
+ *   GROQ_API_KEY             — required for fallback 2  (free: console.groq.com/keys)
+ *   ENABLE_PROVIDER_FAILOVER — optional, default "true"; set "false" to disable all fallbacks
  *
  * Exported API:
  *   routeProviderRequest(params, env)  → { rawText, parsed, tokensUsed, provider, fallbackTriggered, fallbackReason }
@@ -45,6 +48,14 @@ const GEMINI_PRO_MODEL   = 'gemini-2.5-pro';
 // Steps where higher Gemini reasoning is preferred for fallback
 // Step 7 = Revenue Intelligence — benefits from Pro reasoning when primary fails
 const GEMINI_PRO_STEPS = [7];
+
+// ── Groq (Fallback 2) ─────────────────────────────────────────────
+// Free tier: 14,400 req/day, 6,000 tokens/min — https://console.groq.com
+// API is OpenAI-compatible so only the base URL and model name differ.
+// llama-3.3-70b-versatile: best free model for structured JSON output.
+const GROQ_TIMEOUT_MS = 20_000;
+const GROQ_MODEL      = 'llama-3.3-70b-versatile';
+const GROQ_API_BASE   = 'https://api.groq.com/openai/v1';
 
 // ── Critical fields per step ──────────────────────────────────────
 // Missing ANY of these in a primary response triggers fallback.
@@ -282,6 +293,71 @@ async function callGemini({ systemPrompt, userPrompt, maxTokens, temperature, st
     const isTimeout = err.name === 'AbortError';
     return {
       error:      isTimeout ? 'gemini_timeout' : err.message,
+      statusCode: isTimeout ? 408 : 502,
+      fetchError: err.message,
+    };
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// GROQ CALLER  —  Fallback 2  (free, OpenAI-compatible API)
+//
+// Groq's API is a drop-in OpenAI replacement — same request/response shape.
+// Only differences: base URL + model name. No free-tier field restrictions.
+// Free tier limits: 14,400 req/day, 6,000 tokens/min, 500,000 tokens/day.
+// Get your key at: https://console.groq.com/keys  (no credit card required)
+// ══════════════════════════════════════════════════════════════════
+
+async function callGroq({ systemPrompt, userPrompt, maxTokens, temperature, step }, env) {
+  const key = env.GROQ_API_KEY;
+  if (!key) {
+    return { error: 'GROQ_API_KEY not set — add it in Cloudflare dashboard to enable third fallback', statusCode: 503 };
+  }
+
+  // Groq caps max_tokens at 8192 per call — clamp if needed
+  const safeMaxTokens = Math.min(maxTokens || 1800, 8192);
+
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), GROQ_TIMEOUT_MS);
+
+  try {
+    const res = await fetch(`${GROQ_API_BASE}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${key}`,
+      },
+      signal: controller.signal,
+      body: JSON.stringify({
+        model:       GROQ_MODEL,
+        temperature,
+        max_tokens:  safeMaxTokens,
+        // Groq supports response_format JSON mode — enforces valid JSON output
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user',   content: userPrompt   },
+        ],
+      }),
+    });
+    clearTimeout(timer);
+
+    const statusCode = res.status;
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({}));
+      return { error: e?.error?.message || `Groq HTTP ${statusCode}`, statusCode };
+    }
+
+    const d          = await res.json();
+    const rawText    = d.choices?.[0]?.message?.content || '';
+    const tokensUsed = d.usage?.total_tokens || 0;
+    return { rawText, tokensUsed, statusCode: 200 };
+
+  } catch (err) {
+    clearTimeout(timer);
+    const isTimeout = err.name === 'AbortError';
+    return {
+      error:      isTimeout ? 'groq_timeout' : err.message,
       statusCode: isTimeout ? 408 : 502,
       fetchError: err.message,
     };
@@ -605,50 +681,76 @@ export async function routeProviderRequest(params, env) {
     return { error: `OpenAI failed (failover disabled): ${reason}`, statusCode: primary.statusCode || 502 };
   }
 
-  // ── 2. Fallback: Gemini ─────────────────────────────────────────
+  // ── 2. Fallback 1: Gemini ──────────────────────────────────────
   console.warn(
-    `[provider-router] FALLBACK step=${step} reason=${reason} openai_status=${primary.statusCode} model=${GEMINI_PRO_STEPS.includes(step) ? GEMINI_PRO_MODEL : GEMINI_FLASH_MODEL}`,
+    `[provider-router] FALLBACK_1=gemini step=${step} reason=${reason} openai_status=${primary.statusCode} model=${GEMINI_PRO_STEPS.includes(step) ? GEMINI_PRO_MODEL : GEMINI_FLASH_MODEL}`,
   );
 
-  const fallbackResult = await callGemini({ systemPrompt, userPrompt, maxTokens, temperature, step }, env);
+  const geminiResult = await callGemini({ systemPrompt, userPrompt, maxTokens, temperature, step }, env);
 
-  if (fallbackResult.error) {
-    console.error(
-      `[provider-router] BOTH_FAILED step=${step} openai_reason=${reason} gemini_error=${fallbackResult.error}`,
+  // Gemini succeeded → normalize and return
+  if (!geminiResult.error) {
+    const geminiParsed = parseJSON(geminiResult.rawText || '');
+    const normalized   = normalizeStepOutput(step, geminiParsed || {}, 'gemini');
+    console.log(
+      `[provider-router] step=${step} provider=gemini tokens=${geminiResult.tokensUsed} openai_reason=${reason}`,
     );
-    // Both failed — if we have any partial primary data, return it normalized with placeholders
-    if (primaryParsed) {
-      const degraded = normalizeStepOutput(step, primaryParsed, 'openai_degraded');
-      return {
-        rawText:           primary.rawText,
-        parsed:            degraded,
-        tokensUsed:        primary.tokensUsed || 0,
-        provider:          'openai_degraded',
-        fallbackTriggered: true,
-        fallbackReason:    reason,
-        bothFailed:        true,
-      };
-    }
     return {
-      error:      `Both providers failed — OpenAI: ${reason} | Gemini: ${fallbackResult.error}`,
-      statusCode: 502,
+      rawText:           geminiResult.rawText,
+      parsed:            normalized,
+      tokensUsed:        geminiResult.tokensUsed || 0,
+      provider:          'gemini',
+      fallbackTriggered: true,
+      fallbackReason:    reason,
     };
   }
 
-  const geminiParsed = parseJSON(fallbackResult.rawText || '');
-  const normalized   = normalizeStepOutput(step, geminiParsed || {}, 'gemini');
-
-  console.log(
-    `[provider-router] step=${step} provider=gemini tokens=${fallbackResult.tokensUsed} fallback_reason=${reason}`,
+  // ── 3. Fallback 2: Groq (Llama 3.3 70B) — free, OpenAI-compatible ──
+  console.warn(
+    `[provider-router] FALLBACK_2=groq step=${step} gemini_error="${geminiResult.error}" model=${GROQ_MODEL}`,
   );
 
+  const groqResult = await callGroq({ systemPrompt, userPrompt, maxTokens, temperature, step }, env);
+
+  // Groq succeeded → normalize and return
+  if (!groqResult.error) {
+    const groqParsed = parseJSON(groqResult.rawText || '');
+    const normalized = normalizeStepOutput(step, groqParsed || {}, 'groq');
+    console.log(
+      `[provider-router] step=${step} provider=groq tokens=${groqResult.tokensUsed} all_previous_failed=true`,
+    );
+    return {
+      rawText:           groqResult.rawText,
+      parsed:            normalized,
+      tokensUsed:        groqResult.tokensUsed || 0,
+      provider:          'groq',
+      fallbackTriggered: true,
+      fallbackReason:    `openai:${reason} | gemini:${geminiResult.error}`,
+    };
+  }
+
+  // ── All three failed ────────────────────────────────────────────
+  console.error(
+    `[provider-router] ALL_FAILED step=${step} openai=${reason} gemini=${geminiResult.error} groq=${groqResult.error}`,
+  );
+
+  // Last resort: if OpenAI returned anything at all (even partial), normalize and return with placeholders
+  if (primaryParsed) {
+    const degraded = normalizeStepOutput(step, primaryParsed, 'openai_degraded');
+    return {
+      rawText:           primary.rawText,
+      parsed:            degraded,
+      tokensUsed:        primary.tokensUsed || 0,
+      provider:          'openai_degraded',
+      fallbackTriggered: true,
+      fallbackReason:    `openai:${reason} | gemini:${geminiResult.error} | groq:${groqResult.error}`,
+      allFailed:         true,
+    };
+  }
+
   return {
-    rawText:           fallbackResult.rawText,
-    parsed:            normalized,
-    tokensUsed:        fallbackResult.tokensUsed || 0,
-    provider:          'gemini',
-    fallbackTriggered: true,
-    fallbackReason:    reason,
+    error:      `All providers failed — OpenAI: ${reason} | Gemini: ${geminiResult.error} | Groq: ${groqResult.error}`,
+    statusCode: 502,
   };
 }
 
