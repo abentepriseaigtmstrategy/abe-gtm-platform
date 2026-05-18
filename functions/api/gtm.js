@@ -10,6 +10,7 @@
 import { verifyAuth, corsHeaders, validate, rateLimit, sanitise, errRes, okRes, kv } from './_middleware.js';
 import { normalizeStrategy } from './gtm-intelligence.js';
 import { getIntegrationStatus, buildIntegrationContext } from './integration-readiness.js';
+import { routeProviderRequest, normalizeStepOutput, validateStepSchema, retryWithProvider } from './provider-router.js';
 
 const COST_PER_TOKEN   = 0.0000002;
 const HOURLY_TOKEN_LIMIT = 200_000;
@@ -78,7 +79,8 @@ async function handleRunStep(body, userId, openaiKey, supabaseUrl, supabaseKey, 
   const integration = getIntegrationStatus(env);
   if (body.use_rag && !integration.features.rag.enabled) return errRes('RAG integration not configured', 503, cors);
   if (body.use_agents && !integration.features.agents.enabled) return errRes('Agents integration not configured', 503, cors);
-  if (!openaiKey) return errRes('OpenAI not configured', 503, cors);
+  // Provider guard: at least one AI provider must be configured
+  if (!env.OPENAI_API_KEY && !env.GEMINI_API_KEY) return errRes('No AI provider configured (OPENAI_API_KEY or GEMINI_API_KEY required)', 503, cors);
 
   const { step, company, industry, prior_steps, company_profile } = body;
   if (step < 1 || step > 6) return errRes('Step must be 1–6', 400, cors);
@@ -112,36 +114,46 @@ async function handleRunStep(body, userId, openaiKey, supabaseUrl, supabaseKey, 
   const prompt = buildStepPrompt(step, sanitise(company, 200), industry || '', prior_steps || {}, resolvedProfile);
   const t0     = Date.now();
 
-  let rawText, tokensUsed;
-  try {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
-      body: JSON.stringify({
-        model:       'gpt-4o-mini',
-        temperature: step === 6 ? 0.8 : 0.3,
-        max_tokens:  STEP_MAX_TOKENS[step],
-        messages: [
-          { role: 'system', content: 'You are a world-class B2B GTM strategist. Return ONLY valid JSON. No markdown, no prose.' },
-          { role: 'user',   content: prompt },
-        ],
-      }),
-    });
-    if (!res.ok) {
-      const e = await res.json().catch(() => ({}));
-      if (res.status === 429) return errRes('OpenAI rate limit reached. Please wait a moment.', 429, cors);
-      return errRes(`OpenAI error: ${e?.error?.message || res.status}`, res.status, cors);
-    }
-    const d  = await res.json();
-    rawText  = d.choices?.[0]?.message?.content || '{}';
-    tokensUsed = d.usage?.total_tokens || 0;
-  } catch (e) {
-    return errRes('Failed to reach OpenAI: ' + e.message, 502, cors);
+  // ── Provider-routed AI call (OpenAI primary → Gemini fallback) ──────────────
+  const providerResult = await routeProviderRequest({
+    step,
+    systemPrompt: 'You are a world-class B2B GTM strategist. Return ONLY valid JSON. No markdown, no prose.',
+    userPrompt:   prompt,
+    maxTokens:    STEP_MAX_TOKENS[step],
+    temperature:  step === 6 ? 0.8 : 0.3,
+  }, env);
+
+  if (providerResult.error) {
+    // Non-retriable error (client 4xx, or both providers failed)
+    const statusCode = providerResult.statusCode || 502;
+    const userMsg    = statusCode === 429
+      ? 'Rate limit reached. Please wait a moment before retrying.'
+      : `AI provider error: ${providerResult.error}`;
+    return errRes(userMsg, statusCode, cors);
   }
 
-  // Parse with retry
-  let parsed = await parseWithRetry(rawText, step, prompt, openaiKey);
-  if (!parsed) return errRes('AI returned unparseable response after retry', 422, cors);
+  let parsed     = providerResult.parsed;
+  let rawText    = providerResult.rawText;
+  let tokensUsed = providerResult.tokensUsed;
+
+  // Schema validation — fill any remaining non-critical gaps via retry if needed
+  const schemaCheck = validateStepSchema(step, parsed);
+  if (!schemaCheck.valid) {
+    // Critical fields still missing after normalization → attempt one cross-provider retry
+    const retryResult = await retryWithProvider(step, prompt, schemaCheck.missing, env);
+    if (!retryResult.error && retryResult.parsed) {
+      parsed     = retryResult.parsed;
+      rawText    = retryResult.rawText;
+      tokensUsed += (retryResult.tokensUsed || 0);
+    }
+    // If retry also failed, normalizeStepOutput placeholder-fills critical fields (safe fallback)
+    parsed = normalizeStepOutput(step, parsed || {}, parsed?._provider || 'openai');
+  }
+
+  // Backend logging: provider used + fallback state (non-blocking, backend only)
+  if (providerResult.fallbackTriggered) {
+    console.warn(`[gtm] step=${step} company="${company}" fallback_triggered reason=${providerResult.fallbackReason} provider=${providerResult.provider}`);
+  }
 
   // Attach safe RAG metadata without changing existing payload fields
   const stepData = augmentStepOutput(parsed, step, resolvedProfile, prior_steps || {});
@@ -1330,7 +1342,10 @@ async function handleCheckCache(body, userId, supabaseUrl, supabaseKey, env, cor
 async function handleScoreLeads(body, userId, openaiKey, cors) {
   const errors = validate({ leads: 'array|required' }, body);
   if (errors.length) return errRes(errors[0], 400, cors);
-  if (!openaiKey) return errRes('OpenAI not configured', 503, cors);
+  // scoreBatch has its own try/catch — if OpenAI key missing, leads get default scores (non-fatal)
+  if (!openaiKey) {
+    console.warn('[gtm] handleScoreLeads: OPENAI_API_KEY not set — leads will use default scores');
+  }
 
   const { leads, icp_context } = body;
   if (leads.length > 50) return errRes('Max 50 leads per request. Use /api/leads for batch scoring.', 400, cors);
@@ -1359,7 +1374,8 @@ async function handleRunStep7(body, userId, openaiKey, supabaseUrl, supabaseKey,
   const integration = getIntegrationStatus(env);
   if (body.use_rag && !integration.features.rag.enabled) return errRes('RAG integration not configured', 503, cors);
   if (body.use_agents && !integration.features.agents.enabled) return errRes('Agents integration not configured', 503, cors);
-  if (!openaiKey) return errRes('OpenAI not configured', 503, cors);
+  // Provider guard: at least one AI provider must be configured
+  if (!env.OPENAI_API_KEY && !env.GEMINI_API_KEY) return errRes('No AI provider configured (OPENAI_API_KEY or GEMINI_API_KEY required)', 503, cors);
 
   const { company, industry, steps } = body;
 
@@ -1391,48 +1407,44 @@ async function handleRunStep7(body, userId, openaiKey, supabaseUrl, supabaseKey,
   const prompt = buildStep7Prompt(sanitise(company, 200), industry || '', steps, evidenceManifest);
   const t0 = Date.now();
 
-  let rawText, tokensUsed;
-  try {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
-      body: JSON.stringify({
-        model:       'gpt-4o-mini',
-        temperature: 0.2,   // Lower temperature = less creative hallucination
-        max_tokens:  STEP_MAX_TOKENS[7],
-        messages: [
-          {
-            role: 'system',
-            content: [
-              'You are a senior revenue intelligence analyst.',
-              'CRITICAL ANTI-HALLUCINATION RULES — VIOLATION = INVALID OUTPUT:',
-              '1. You may ONLY reference facts that appear in the EVIDENCE MANIFEST provided. Do not invent company details, competitor names, funding amounts, or growth metrics.',
-              '2. signal_type MUST be one of exactly: hiring, funding, growth, tech_replacement, competitor_pressure, expansion, market_timing — no other values accepted.',
-              '3. go_no_go.recommendation MUST be exactly one of: Go, Watch, No-Go — no other values accepted.',
-              '4. signal strength MUST be exactly one of: High, Medium, Low — no other values accepted.',
-              '5. If you cannot find evidence for a signal, omit it entirely rather than inventing one.',
-              '6. Return ONLY valid JSON. No markdown, no prose, no code fences. Start with { end with }.',
-            ].join('\n'),
-          },
-          { role: 'user', content: prompt },
-        ],
-      }),
-    });
-    if (!res.ok) {
-      const e = await res.json().catch(() => ({}));
-      if (res.status === 429) return errRes('OpenAI rate limit reached. Please wait a moment.', 429, cors);
-      return errRes(`OpenAI error: ${e?.error?.message || res.status}`, res.status, cors);
-    }
-    const d  = await res.json();
-    rawText    = d.choices?.[0]?.message?.content || '{}';
-    tokensUsed = d.usage?.total_tokens || 0;
-  } catch (e) {
-    return errRes('Failed to reach OpenAI: ' + e.message, 502, cors);
+  // ── Provider-routed AI call — Step 7 anti-hallucination system prompt preserved ──
+  const step7SystemPrompt = [
+    'You are a senior revenue intelligence analyst.',
+    'CRITICAL ANTI-HALLUCINATION RULES — VIOLATION = INVALID OUTPUT:',
+    '1. You may ONLY reference facts that appear in the EVIDENCE MANIFEST provided. Do not invent company details, competitor names, funding amounts, or growth metrics.',
+    '2. signal_type MUST be one of exactly: hiring, funding, growth, tech_replacement, competitor_pressure, expansion, market_timing — no other values accepted.',
+    '3. go_no_go.recommendation MUST be exactly one of: Go, Watch, No-Go — no other values accepted.',
+    '4. signal strength MUST be exactly one of: High, Medium, Low — no other values accepted.',
+    '5. If you cannot find evidence for a signal, omit it entirely rather than inventing one.',
+    '6. Return ONLY valid JSON. No markdown, no prose, no code fences. Start with { end with }.',
+  ].join('\n');
+
+  const step7Result = await routeProviderRequest({
+    step:         7,
+    systemPrompt: step7SystemPrompt,
+    userPrompt:   prompt,
+    maxTokens:    STEP_MAX_TOKENS[7],
+    temperature:  0.2,  // low temperature = less creative hallucination
+  }, env);
+
+  if (step7Result.error) {
+    const statusCode = step7Result.statusCode || 502;
+    const userMsg    = statusCode === 429
+      ? 'Rate limit reached. Please wait a moment before retrying.'
+      : `AI provider error: ${step7Result.error}`;
+    return errRes(userMsg, statusCode, cors);
   }
 
-  // Parse Step 7 response
-  let parsed = parseStep7(rawText);
-  if (!parsed) return errRes('AI returned unparseable Step 7 response', 422, cors);
+  let rawText    = step7Result.rawText;
+  let tokensUsed = step7Result.tokensUsed;
+
+  // Backend logging: fallback state (non-blocking, backend only)
+  if (step7Result.fallbackTriggered) {
+    console.warn(`[gtm] step=7 company="${company}" fallback_triggered reason=${step7Result.fallbackReason} provider=${step7Result.provider}`);
+  }
+
+  // Parse Step 7 response (parseStep7 handles recovery; normalizeStepOutput fills any gaps)
+  let parsed = parseStep7(rawText) || step7Result.parsed || {};
 
   // ── HALLUCINATION GUARD STEP 3: Server-side output sanitisation ──────────────
   // Enforce every enum, clamp every number, strip any field that violates the schema.
@@ -2222,23 +2234,15 @@ async function parseWithRetry(rawText, step, originalPrompt, openaiKey) {
   const missing = (SCHEMAS[step]||[]).filter(k => !(k in parsed));
   if (missing.length === 0) return parsed;
 
-  // One retry with explicit field reminder
+  // One retry with explicit field reminder — routed through provider fallback chain
+  // (retryWithProvider will try OpenAI first, then Gemini if OpenAI fails again)
   try {
-    const retry = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini', temperature: 0.2, max_tokens: STEP_MAX_TOKENS[step],
-        messages: [
-          { role: 'system', content: 'Return ONLY valid JSON.' },
-          { role: 'user',   content: originalPrompt + `\n\nIMPORTANT: Your response was missing: ${missing.join(', ')}. Include ALL fields.` },
-        ],
-      }),
-    });
-    const d   = await retry.json();
-    const raw = d.choices?.[0]?.message?.content || '{}';
-    return parse(raw) || parsed;
-  } catch { return parsed; }
+    const retryResult = await retryWithProvider(step, originalPrompt, missing, { OPENAI_API_KEY: openaiKey });
+    if (!retryResult.error && retryResult.rawText) {
+      return parse(retryResult.rawText) || retryResult.parsed || parsed;
+    }
+  } catch { /* ignore retry failure — return best-effort parsed */ }
+  return parsed;
 }
 
 function augmentStepOutput(data, step, companyProfile, priorSteps) {
