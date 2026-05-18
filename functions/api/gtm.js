@@ -10,7 +10,7 @@
 import { verifyAuth, corsHeaders, validate, rateLimit, sanitise, errRes, okRes, kv } from './_middleware.js';
 import { normalizeStrategy } from './gtm-intelligence.js';
 import { getIntegrationStatus, buildIntegrationContext } from './integration-readiness.js';
-import { routeProviderRequest, normalizeStepOutput, validateStepSchema, retryWithProvider } from './provider-router.js';
+import { routeProviderRequest, normalizeStepOutput, validateStepSchema, retryWithProvider } from '../lib/provider-router.js';
 
 const COST_PER_TOKEN   = 0.0000002;
 const HOURLY_TOKEN_LIMIT = 200_000;
