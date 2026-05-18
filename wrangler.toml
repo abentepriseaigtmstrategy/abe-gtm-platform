@@ -48,9 +48,13 @@ GOTENBERG_URL = "https://gotenberg-production-e409.up.railway.app"
 # OPENAI_API_KEY  — Primary provider (OpenAI gpt-4o-mini)
 #   Get from: https://platform.openai.com/api-keys
 #
-# GEMINI_API_KEY  — Fallback provider (Google Gemini gemini-2.5-flash / gemini-2.5-pro)
+# GEMINI_API_KEY  — Fallback 1 (Google Gemini gemini-2.5-flash / gemini-2.5-pro — free)
 #   Get from: https://aistudio.google.com/app/apikey
 #
-# To add a secret via Wrangler CLI:
+# GROQ_API_KEY    — Fallback 2 (Groq llama-3.3-70b-versatile — free, 14,400 req/day)
+#   Get from: https://console.groq.com/keys  (no credit card required)
+#
+# To add secrets via Wrangler CLI:
 #   npx wrangler pages secret put OPENAI_API_KEY
 #   npx wrangler pages secret put GEMINI_API_KEY
+#   npx wrangler pages secret put GROQ_API_KEY
