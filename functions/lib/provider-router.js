@@ -3,7 +3,7 @@
  * ABE GTM Platform  ·  Cloudflare Workers compatible
  *
  * Primary provider  : OpenAI   (gpt-4o-mini)
- * Fallback provider : Google   (gemini-2.5-flash / gemini-2.5-pro for step 7)
+ * Fallback provider : Google   (gemini-2.5-flash for steps 1-6, gemini-2.5-pro for step 7)
  *
  * Failover triggers:
  *   ✓ Network timeout / fetch throws
@@ -37,8 +37,10 @@
 const OPENAI_TIMEOUT_MS  = 24_000;  // keep under Cloudflare Pages 30s wall
 const GEMINI_TIMEOUT_MS  = 24_000;
 const OPENAI_MODEL       = 'gpt-4o-mini';
-const GEMINI_FLASH_MODEL = 'gemini-2.5-flash-preview-05-20';
-const GEMINI_PRO_MODEL   = 'gemini-2.5-pro-preview-06-05';
+// Use stable model IDs — never use dated preview suffixes (they expire and break silently).
+// Flash: fast, cheap — used for steps 1-6. Pro: higher reasoning — used for step 7.
+const GEMINI_FLASH_MODEL = 'gemini-2.5-flash';
+const GEMINI_PRO_MODEL   = 'gemini-2.5-pro';
 
 // Steps where higher Gemini reasoning is preferred for fallback
 // Step 7 = Revenue Intelligence — benefits from Pro reasoning when primary fails
@@ -213,7 +215,7 @@ async function callGemini({ systemPrompt, userPrompt, maxTokens, temperature, st
   }
 
   const model = GEMINI_PRO_STEPS.includes(step) ? GEMINI_PRO_MODEL : GEMINI_FLASH_MODEL;
-  const url   = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+  const url   = `https://generativelanguage.googleapis.com/v1/models/${model}:generateContent?key=${key}`;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), GEMINI_TIMEOUT_MS);
