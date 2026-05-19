@@ -9,6 +9,8 @@
     href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap"
     rel="stylesheet" />
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Lucide Icons — free, MIT, tree-shakeable SVG icon library -->
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
   <!-- html2canvas and jsPDF removed in Phase 21F — PDF rendering is backend-only via Gotenberg -->
   <script src="auth-guard.js"></script>
   <script src="ga4-tag.js"></script>
@@ -391,11 +393,12 @@
       margin-bottom: 6px;
     }
 
+    /* ── Section number badge — upgraded to icon badge ── */
     .sec-num {
-      width: 28px;
-      height: 28px;
-      border-radius: 50%;
-      background: var(--accent);
+      width: 32px;
+      height: 32px;
+      border-radius: 9px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
       color: white;
       font-size: 10px;
       font-weight: 900;
@@ -403,6 +406,76 @@
       align-items: center;
       justify-content: center;
       flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(168, 85, 247, 0.35);
+      position: relative;
+      overflow: hidden;
+    }
+    .sec-num::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,.15) 0%, transparent 60%);
+      border-radius: inherit;
+    }
+    /* Icon inside the badge */
+    .sec-num svg {
+      width: 16px;
+      height: 16px;
+      stroke: white;
+      stroke-width: 2;
+      fill: none;
+      flex-shrink: 0;
+      position: relative;
+      z-index: 1;
+    }
+    /* Amber variant for section 07 */
+    .sec-num.amber-badge {
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      box-shadow: 0 2px 8px rgba(245, 158, 11, 0.35);
+    }
+    /* Green variant */
+    .sec-num.green-badge {
+      background: linear-gradient(135deg, #22c55e, #16a34a);
+      box-shadow: 0 2px 8px rgba(34, 197, 94, 0.35);
+    }
+    /* Blue variant */
+    .sec-num.blue-badge {
+      background: linear-gradient(135deg, #3b82f6, #1d4ed8);
+      box-shadow: 0 2px 8px rgba(59, 130, 246, 0.35);
+    }
+    /* Grey variant */
+    .sec-num.grey-badge {
+      background: linear-gradient(135deg, #4b5563, #374151);
+      box-shadow: 0 2px 8px rgba(75, 85, 99, 0.25);
+    }
+
+    /* ── Section header improved spacing ── */
+    .sec-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 6px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(168, 85, 247, 0.12);
+    }
+    .sec-title {
+      font-size: 15px;
+      font-weight: 800;
+      color: white;
+      letter-spacing: -0.01em;
+    }
+    /* Section label above title */
+    .sec-label {
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--accent);
+      margin-bottom: 2px;
+    }
+    .sec-header-text {
+      display: flex;
+      flex-direction: column;
     }
 
     .sec-title {
@@ -1127,6 +1200,114 @@
       }
     }
 
+    /* ══════════════════════════════════════════════════════════════
+       ALIGNMENT UPGRADE — v2
+       Fixes: uneven card heights, metric-box drift, score strip
+       label overflow, section padding rhythm, bar alignment,
+       email card internal spacing, tag wrapping.
+    ══════════════════════════════════════════════════════════════ */
+
+    /* Score strip — stretch cards to equal height */
+    .score-strip { align-items: stretch; }
+    .sc { display: flex; flex-direction: column; justify-content: space-between; min-height: 80px; }
+    .sv { line-height: 1.1; margin-bottom: 4px; }
+    .sl { margin-top: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+    /* Grid columns — equal-height stretch */
+    .grid2, .grid3 { align-items: stretch; }
+    .metric-box { display: flex; flex-direction: column; justify-content: center; min-height: 72px; }
+    .mv { font-size: 20px; font-weight: 800; color: white; font-family: 'Space Mono',monospace; letter-spacing: -.5px; line-height: 1.2; margin-bottom: 4px; }
+    .ml { font-size: 9px; text-transform: uppercase; letter-spacing: .14em; color: var(--muted); font-weight: 700; }
+
+    /* SWOT cells — equal-height, min-height */
+    .swot-grid { align-items: stretch; }
+    .swot-cell { display: flex; flex-direction: column; min-height: 80px; }
+    .swot-label { font-size: 9px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 8px; padding-bottom: 6px; border-bottom: 1px solid rgba(255,255,255,.06); }
+    .swot-cell ul { flex: 1; margin: 0; padding-left: 14px; }
+    .swot-s .swot-label { color: var(--green); }
+    .swot-w .swot-label { color: var(--red); }
+    .swot-o .swot-label { color: var(--blue); }
+    .swot-t .swot-label { color: var(--amber); }
+
+    /* Field rows — consistent vertical rhythm */
+    .field { margin-bottom: 14px; }
+    .fl { font-size: 9px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 5px; }
+    .fv { font-size: 13px; color: var(--text); line-height: 1.65; }
+
+    /* Tags — consistent gap wrap */
+    .tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+    .tag { font-size: 11px; line-height: 1; padding: 5px 10px; border-radius: 20px; border: 1px solid var(--border); background: rgba(0,0,0,.25); color: var(--text); white-space: nowrap; }
+    .tag.green { border-color: rgba(34,197,94,.4); color: var(--green); }
+    .tag.blue  { border-color: rgba(59,130,246,.4); color: var(--blue); }
+    .tag.amber { border-color: rgba(245,158,11,.4); color: var(--amber); }
+    .tag.red   { border-color: rgba(239,68,68,.4);  color: var(--red); }
+
+    /* Email cards — consistent internal layout */
+    .email-card { background: rgba(0,0,0,.25); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px; margin-bottom: 14px; display: flex; flex-direction: column; gap: 10px; }
+    .ea { font-size: 9px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+    .es { font-size: 13px; font-weight: 700; color: white; line-height: 1.4; }
+    .ec { font-size: 12px; color: var(--text); line-height: 1.7; white-space: pre-wrap; }
+
+    /* Section spacing rhythm */
+    .section { padding: 24px 28px; margin-bottom: 18px; }
+    .sec-context { font-size: 12px; color: var(--muted); line-height: 1.6; margin-bottom: 16px; padding-bottom: 12px; border-bottom: 1px solid rgba(255,255,255,.04); font-style: italic; }
+
+    /* Analyst callout alignment */
+    .analyst-callout { padding: 12px 16px; border-left: 3px solid var(--accent); background: rgba(168,85,247,.07); border-radius: 0 8px 8px 0; margin-top: 14px; font-size: 12px; color: var(--text); line-height: 1.65; }
+    .analyst-callout.amber { border-left-color: var(--amber); background: rgba(245,158,11,.07); }
+    .analyst-callout.green { border-left-color: var(--green); background: rgba(34,197,94,.07); }
+    .analyst-callout.red   { border-left-color: var(--red);   background: rgba(239,68,68,.07); }
+
+    /* Waterfall bar alignment */
+    .waterfall { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+    .wf-row { display: flex; align-items: center; gap: 10px; }
+    .wf-label { width: 130px; flex-shrink: 0; font-size: 11px; color: var(--muted); font-weight: 600; text-align: right; padding-right: 4px; }
+    .wf-bar-wrap { flex: 1; background: rgba(255,255,255,.06); border-radius: 4px; height: 12px; overflow: hidden; }
+    .wf-bar { height: 100%; border-radius: 4px; }
+    .wf-val { width: 64px; flex-shrink: 0; font-size: 11px; font-weight: 700; font-family: 'Space Mono',monospace; color: white; }
+
+    /* Decision badge centering */
+    .decision-badge { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 24px; border-radius: 12px; text-align: center; gap: 8px; }
+    .decision-badge .verdict { font-size: 28px; font-weight: 900; font-family: 'Space Mono',monospace; letter-spacing: 2px; }
+    .decision-badge .reason { font-size: 12px; color: var(--text); line-height: 1.6; max-width: 420px; }
+
+    /* Confidence bars */
+    .cm-bar-row { margin-bottom: 12px; }
+    .cm-bar-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 5px; }
+    .cm-bar-label { font-size: 11px; font-weight: 600; color: var(--text); }
+    .cm-bar-score { font-size: 13px; font-weight: 800; font-family: 'Space Mono',monospace; color: white; }
+    .cm-bar-track { height: 8px; background: rgba(255,255,255,.08); border-radius: 4px; overflow: hidden; }
+    .cm-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 4px; transition: width .6s ease; }
+    .cm-bar-overall .cm-bar-track { height: 12px; }
+    .cm-bar-overall .cm-bar-fill { background: linear-gradient(90deg, var(--amber), #ef4444); }
+    .cm-bar-overall .cm-bar-label { font-weight: 800; color: white; font-size: 12px; }
+    .cm-bar-overall .cm-bar-score { font-size: 16px; }
+
+    /* Pain table */
+    .pain-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    .pain-table th { text-align: left; padding: 8px 12px; font-size: 9px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--border); }
+    .pain-table td { padding: 10px 12px; color: var(--text); border-bottom: 1px solid rgba(31,41,55,.6); vertical-align: top; line-height: 1.55; }
+    .pain-table tr:last-child td { border-bottom: none; }
+
+    /* Source note */
+    .src-note { font-size: 9px; color: var(--muted); margin-top: 8px; font-style: italic; opacity: .7; }
+
+    /* Risk list */
+    .risk-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 8px; }
+    .risk-list li { font-size: 12px; color: var(--text); line-height: 1.6; padding: 10px 14px; background: rgba(0,0,0,.2); border-radius: 8px; border-left: 3px solid var(--border); }
+    .risk-list li strong { display: block; font-size: 11px; font-weight: 700; color: white; margin-bottom: 3px; }
+
+    /* Cover strip — even columns */
+    .cover-strip { display: flex; gap: 0; border-radius: 10px; overflow: hidden; border: 1px solid var(--border); margin-bottom: 24px; }
+    .cover-strip > * { flex: 1; padding: 14px 16px; border-right: 1px solid var(--border); display: flex; flex-direction: column; gap: 4px; }
+    .cover-strip > *:last-child { border-right: none; }
+    .cs-label { font-size: 8px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); }
+    .cs-text { font-size: 14px; font-weight: 800; color: white; font-family: 'Space Mono',monospace; }
+
+    /* Exec card spacing */
+    .exec-card { background: rgba(0,0,0,.2); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; margin-bottom: 12px; }
+    .exec-card p { font-size: 13px; color: var(--text); line-height: 1.7; margin: 0; }
+
     /* ═══════════════════════════════════════════════════════════════
        CONTEXTUAL FILLER SYSTEM — Educational Insights for PDF Export
        Sections shorter than 60% of A4 (~175mm) get a glossary box
@@ -1601,14 +1782,54 @@
   </div>`;
     }
 
-    // ── sectionWrap — now wraps in .report-section-wrapper ────────────
+    // ── Section icon map — Lucide SVG paths per section ─────────────
+    // Each value is the <path> / <polyline> / <circle> content for the 24x24 Lucide icon
+    const SECTION_ICONS = {
+      '01': `<circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/><path d="M11 8v6M8 11h6"/>`,                                                              // search-plus  → Market Research
+      '02': `<rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/><polyline points="7 10 12 5 17 10"/>`,                                    // trending-up on monitor → TAM
+      '03': `<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/>`,                                                                // user → ICP
+      '04': `<circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/><circle cx="11" cy="11" r="3"/>`,                                                          // search → Account Sourcing
+      '05': `<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>`,                                                                                                 // activity → Keywords & Intent
+      '06': `<path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22 6 12 13 2 6"/>`,                       // mail → Messaging
+      'ES': `<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>`, // file-text → Exec Summary
+      '07': `<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>`,                                  // star → Revenue Intel
+      'CM': `<line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>`,                                // bar-chart-2 → Confidence Matrix
+      'A':  `<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/>`,                                          // file → Appendix
+      'TV': `<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>`,                                                             // check-circle → Truth Validation
+    };
+
+    const SECTION_BADGE_COLORS = {
+      '01': '', '02': '', '03': '', '04': 'blue-badge', '05': '', '06': '',
+      '07': 'amber-badge', 'CM': 'amber-badge', 'ES': '', 'A': 'grey-badge', 'TV': 'green-badge',
+    };
+
+    const SECTION_LABELS = {
+      '01': 'Section 01', '02': 'Section 02', '03': 'Section 03',
+      '04': 'Section 04', '05': 'Section 05', '06': 'Section 06',
+      '07': 'Section 07', 'CM': 'Fidelity', 'ES': 'Executive', 'A': 'Appendix', 'TV': 'Audit',
+    };
+
+    function secIcon(num) {
+      const paths = SECTION_ICONS[num] || `<circle cx="12" cy="12" r="3"/>`;
+      const color = SECTION_BADGE_COLORS[num] || '';
+      return `<div class="sec-num ${color}"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">${paths}</svg></div>`;
+    }
+
+    // ── sectionWrap — icon badge + label + title ──────────────────────
     function sectionWrap(num, title, contextText, body) {
       const parts = body.filter(Boolean).join(''); if (!parts) return '';
       const insightKey = SECTION_INSIGHT_MAP[num] || null;
       const fillerHtml = insightKey ? buildFillerHtml(insightKey) : '';
+      const label = SECTION_LABELS[num] || '';
       return `<div class="report-section-wrapper" data-section="${num}">
     <div class="section">
-      <div class="sec-header"><div class="sec-num">${num}</div><div class="sec-title">${esc(title)}</div></div>
+      <div class="sec-header">
+        ${secIcon(num)}
+        <div class="sec-header-text">
+          ${label ? `<div class="sec-label">${label}</div>` : ''}
+          <div class="sec-title">${esc(title)}</div>
+        </div>
+      </div>
       ${contextText ? `<div class="sec-context">${esc(contextText)}</div>` : ''}
       ${parts}
     </div>${fillerHtml}
@@ -1872,7 +2093,10 @@
         const dms = Array.isArray(s3.decision_makers) ? s3.decision_makers : [];
 
         return `<div class="section" style="border:1px solid rgba(168,85,247,.3);background:rgba(168,85,247,.03)">
-      <div class="sec-header"><div class="sec-num" style="background:var(--amber);font-size:9px;">07</div><div class="sec-title">Revenue Intelligence — Decision Engine</div></div>
+      <div class="sec-header">
+        <div class="sec-num amber-badge"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+        <div class="sec-header-text"><div class="sec-label">Section 07</div><div class="sec-title">Revenue Intelligence — Decision Engine</div></div>
+      </div>
       <div class="sec-context">Boardroom-grade decision layer. Actionable verdict derived from enterprise intelligence.</div>
 
       ${s7.executive_brief ? `<div class="field"><div class="fl">Executive Brief</div><div class="fv" style="border-left-color:var(--blue);font-size:12px">${esc(s7.executive_brief)}</div></div>` : ''}
@@ -1949,7 +2173,10 @@
       const execTarget = dms[0] || icp;
 
       return `<div class="section" style="border:1px solid rgba(168,85,247,.3);background:rgba(168,85,247,.03)">
-    <div class="sec-header"><div class="sec-num" style="background:var(--amber);font-size:9px;">07</div><div class="sec-title">Revenue Intelligence — Decision Engine (Derived)</div></div>
+    <div class="sec-header">
+        <div class="sec-num amber-badge"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+        <div class="sec-header-text"><div class="sec-label">Section 07</div><div class="sec-title">Revenue Intelligence — Decision Engine (Derived)</div></div>
+      </div>
     <div class="sec-context">Boardroom-grade decision layer. Not a summary. Actionable verdict before entering this account.</div>
 
     <div class="field"><div class="fl">Why Now (Trigger Logic)</div>
@@ -2035,7 +2262,10 @@
         // Truth Validation Audit
         bi.truthMetadata?.validationWarnings?.length ? `
         <div class="section" style="border-color:rgba(245,158,11,0.3)">
-          <div class="sec-header"><div class="sec-num" style="background:var(--amber)">⚠️</div><div class="sec-title">Truth Validation Audit</div></div>
+          <div class="sec-header">
+        <div class="sec-num amber-badge"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div>
+        <div class="sec-header-text"><div class="sec-label">Audit</div><div class="sec-title">Truth Validation Audit</div></div>
+      </div>
           <div class="sec-context">The following claims require manual verification to ensure market data integrity.</div>
           <div class="card" style="border-left:3px solid var(--amber)">
             <ul style="margin:0; padding:0 0 0 20px; color:var(--text); font-size:12px;">
@@ -2046,7 +2276,10 @@
 
         // Executive Summary
         renderExecSummary(r, s1, s2) ? `<div class="section" style="border-color:rgba(168,85,247,.25)">
-      <div class="sec-header"><div class="sec-num">📋</div><div class="sec-title">Executive Summary</div></div>
+      <div class="sec-header">
+        <div class="sec-num"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
+        <div class="sec-header-text"><div class="sec-label">Executive</div><div class="sec-title">Executive Summary</div></div>
+      </div>
       <div class="sec-context">Macro-opportunity assessment and strategic positioning rationale.</div>
       ${renderExecSummary(r, s1, s2)}
     </div>` : '',
@@ -2151,7 +2384,10 @@
         <div class="cm-bar-track"><div class="cm-bar-fill" style="width:${Math.round((score / maxScore) * 100)}%"></div></div>
       </div>`;
           return `<div class="section">
-        <div class="sec-header"><div class="sec-num" style="background:var(--accent)">CM</div><div class="sec-title">Weighted Confidence Matrix</div></div>
+        <div class="sec-header">
+        <div class="sec-num amber-badge"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div>
+        <div class="sec-header-text"><div class="sec-label">Fidelity</div><div class="sec-title">Weighted Confidence Matrix</div></div>
+      </div>
         <div class="sec-context">Quantified fidelity assessment. Sub-scores derived from data richness, capped by server-side hallucination guard.</div>
         ${bar('Signal Veracity', v, 40)}
         ${bar('Market Timing', t, 25)}
@@ -2165,7 +2401,10 @@
 
         // Appendix
         `<div class="section">
-      <div class="sec-header"><div class="sec-num" style="background:var(--faint)">A</div><div class="sec-title">Appendix — Methodology & Data Quality</div></div>
+      <div class="sec-header">
+        <div class="sec-num grey-badge"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg></div>
+        <div class="sec-header-text"><div class="sec-label">Appendix</div><div class="sec-title">Appendix — Methodology & Data Quality</div></div>
+      </div>
       <div class="sec-context">${bi.methodology || 'Transparency layer. Documents data provenance, scoring methodology, and known limitations.'}</div>
       <div class="fl">Data Quality Audit</div>
       <div style="background:rgba(245,158,11,0.05);border-radius:6px;padding:12px;margin-bottom:14px;border:1px solid rgba(245,158,11,0.2)">
@@ -2662,35 +2901,96 @@
       background: rgba(18, 24, 39, .6); 
       border: 1px solid var(--border); 
       border-radius: 12px; 
-      padding: 12px 16px; 
+      padding: 14px 18px; 
       margin-bottom: 12px; 
     }
+    /* PDF Alignment fixes */
+    .score-strip { align-items: stretch; }
+    .sc { display: flex; flex-direction: column; justify-content: space-between; min-height: 52px; }
+    .sv { line-height: 1.1; margin-bottom: 2px; }
+    .sl { margin-top: auto; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .grid2, .grid3 { align-items: stretch; }
+    .metric-box { display: flex; flex-direction: column; justify-content: center; min-height: 52px; padding: 10px 12px; }
+    .mv { font-size: 16px; font-weight: 800; color: white; font-family: 'Space Mono',monospace; letter-spacing: -.5px; line-height: 1.2; margin-bottom: 2px; }
+    .ml { font-size: 7px; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); font-weight: 700; }
+    .swot-grid { align-items: stretch; }
+    .swot-cell { display: flex; flex-direction: column; min-height: 60px; }
+    .swot-cell ul { flex: 1; margin: 0; padding-left: 12px; }
+    .swot-label { font-size: 7px; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 6px; padding-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,.06); }
+    .swot-s .swot-label { color: var(--green); }
+    .swot-w .swot-label { color: var(--red); }
+    .swot-o .swot-label { color: var(--blue); }
+    .swot-t .swot-label { color: var(--amber); }
+    .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+    .tag { font-size: 8px; padding: 3px 8px; border-radius: 16px; border: 1px solid var(--border); background: rgba(0,0,0,.25); color: var(--text); white-space: nowrap; }
+    .tag.green { border-color: rgba(34,197,94,.4); color: var(--green); }
+    .tag.blue  { border-color: rgba(59,130,246,.4); color: var(--blue); }
+    .tag.amber { border-color: rgba(245,158,11,.4); color: var(--amber); }
+    .tag.red   { border-color: rgba(239,68,68,.4);  color: var(--red); }
+    .email-card { padding: 12px 14px; margin-bottom: 10px; display: flex; flex-direction: column; gap: 6px; }
+    .ea { font-size: 7px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
+    .es { font-size: 10px; font-weight: 700; color: white; line-height: 1.3; }
+    .ec { font-size: 8.5pt; color: var(--text); line-height: 1.6; }
+    .analyst-callout { padding: 8px 12px; border-left: 2px solid var(--accent); background: rgba(168,85,247,.07); border-radius: 0 6px 6px 0; margin-top: 8px; font-size: 8pt; line-height: 1.55; }
+    .waterfall { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+    .wf-row { display: flex; align-items: center; gap: 8px; }
+    .wf-label { width: 100px; flex-shrink: 0; font-size: 8px; color: var(--muted); font-weight: 600; text-align: right; }
+    .wf-bar-wrap { flex: 1; background: rgba(255,255,255,.06); border-radius: 3px; height: 10px; overflow: hidden; }
+    .wf-bar { height: 100%; border-radius: 3px; }
+    .wf-val { width: 50px; flex-shrink: 0; font-size: 8px; font-weight: 700; font-family: 'Space Mono',monospace; color: white; }
+    .decision-badge { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 16px; border-radius: 10px; text-align: center; gap: 6px; }
+    .decision-badge .verdict { font-size: 20px; font-weight: 900; font-family: 'Space Mono',monospace; letter-spacing: 2px; }
+    .decision-badge .reason { font-size: 8pt; color: var(--text); line-height: 1.5; max-width: 320px; }
+    .cm-bar-row { margin-bottom: 8px; }
+    .cm-bar-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 3px; }
+    .cm-bar-label { font-size: 8px; font-weight: 600; color: var(--text); }
+    .cm-bar-score { font-size: 10px; font-weight: 800; font-family: 'Space Mono',monospace; color: white; }
+    .cm-bar-track { height: 6px; background: rgba(255,255,255,.08); border-radius: 3px; overflow: hidden; }
+    .cm-bar-fill { height: 100%; background: linear-gradient(90deg, var(--accent), var(--accent2)); border-radius: 3px; }
+    .cm-bar-overall .cm-bar-track { height: 9px; }
+    .cm-bar-overall .cm-bar-fill { background: linear-gradient(90deg, var(--amber), #ef4444); }
+    .pain-table { width: 100%; border-collapse: collapse; font-size: 8pt; }
+    .pain-table th { text-align: left; padding: 5px 8px; font-size: 7px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--border); }
+    .pain-table td { padding: 7px 8px; color: var(--text); border-bottom: 1px solid rgba(31,41,55,.6); vertical-align: top; line-height: 1.45; }
+    .pain-table tr:last-child td { border-bottom: none; }
+    .field { margin-bottom: 10px; }
+    .fl { font-size: 7px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 3px; }
+    .fv { font-size: 9pt; color: var(--text); line-height: 1.55; }
+    .risk-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 5px; }
+    .risk-list li { font-size: 8pt; color: var(--text); line-height: 1.5; padding: 7px 10px; background: rgba(0,0,0,.2); border-radius: 6px; border-left: 2px solid var(--border); }
+    .risk-list li strong { display: block; font-size: 8px; font-weight: 700; color: white; margin-bottom: 2px; }
+    .src-note { font-size: 7px; color: var(--muted); margin-top: 6px; font-style: italic; opacity: .7; }
     .sec-header { 
       display: flex; 
       align-items: center; 
-      gap: 8px; 
-      margin-bottom: 4px; 
+      gap: 10px; 
+      margin-bottom: 6px;
+      padding-bottom: 8px;
+      border-bottom: 1px solid rgba(168,85,247,.12);
     }
+    .sec-header-text { display: flex; flex-direction: column; }
+    .sec-label { font-size: 7px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--accent); margin-bottom: 1px; }
     .sec-num { 
-      width: 24px; 
-      height: 24px; 
-      border-radius: 50%; 
-      background: var(--accent); 
-      color: white; 
-      font-size: 9px; 
-      font-weight: 900; 
-      display: flex; 
-      align-items: center; 
-      justify-content: center; 
-      flex-shrink: 0; 
+      width: 28px; height: 28px; border-radius: 8px;
+      background: linear-gradient(135deg, var(--accent), var(--accent2));
+      color: white; font-size: 9px; font-weight: 900;
+      display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+      position: relative; overflow: hidden;
     }
+    .sec-num svg { width: 14px; height: 14px; stroke: white; stroke-width: 2; fill: none; flex-shrink: 0; }
+    .sec-num.amber-badge { background: linear-gradient(135deg, #f59e0b, #d97706) !important; }
+    .sec-num.green-badge  { background: linear-gradient(135deg, #22c55e, #16a34a) !important; }
+    .sec-num.blue-badge   { background: linear-gradient(135deg, #3b82f6, #1d4ed8) !important; }
+    .sec-num.grey-badge   { background: linear-gradient(135deg, #4b5563, #374151) !important; }
     .sec-title { font-size: 13px; font-weight: 800; color: white; }
     .sec-context { 
       font-size: 9px; 
       color: var(--muted); 
-      margin-bottom: 8px; 
-      padding-bottom: 6px; 
-      border-bottom: 1px dashed var(--border); 
+      margin-bottom: 10px; 
+      padding-bottom: 8px; 
+      border-bottom: 1px solid rgba(255,255,255,.05); 
+      font-style: italic; 
+      line-height: 1.55; 
     }
     
     /* ════════════════════════════════════════════════════════════════════
