@@ -41,7 +41,9 @@
 
 import { routeProviderRequest, normalizeStepOutput, validateStepSchema, retryWithProvider } from './provider-router.js';
 import { validatePublicationReadiness, buildPublicationReport } from './publication-validator.js';
-import { normalizeStrategy } from '../api/gtm-intelligence.js';
+// NOTE: normalizeStrategy is intentionally NOT imported here.
+// publication-orchestrator.js is a lib/ module and must not import from api/.
+// The caller (gtm.js) passes a pre-normalized strategySnapshot instead.
 
 // ── Orchestration constants ───────────────────────────────────────
 const INTER_STEP_DELAY_MS    = 800;   // breathing time between provider calls
@@ -289,15 +291,7 @@ export async function orchestrateFullReport({
     step_5_keywords:       steps[5] || null,
     step_6_messaging:      steps[6] || null,
     step_7_intelligence:   steps[7] || null,
-    backend_intelligence:  normalizeStrategy({
-      step_1_market:       steps[1] || null,
-      step_2_tam:          steps[2] || null,
-      step_3_icp:          steps[3] || null,
-      step_4_sourcing:     steps[4] || null,
-      step_5_keywords:     steps[5] || null,
-      step_6_messaging:    steps[6] || null,
-      step_7_intelligence: steps[7] || null,
-    }, false),
+    backend_intelligence:  body.backend_intelligence || null,
     steps_completed:       Object.values(steps).filter(s => s && Object.keys(s).length > 0).length,
   };
 
