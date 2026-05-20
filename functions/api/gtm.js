@@ -12,6 +12,8 @@ import { normalizeStrategy } from './gtm-intelligence.js';
 import { getIntegrationStatus, buildIntegrationContext } from './integration-readiness.js';
 import { routeProviderRequest, normalizeStepOutput, validateStepSchema, retryWithProvider } from '../lib/provider-router.js';
 import { validatePublicationReadiness, buildPublicationReport } from '../lib/publication-validator.js';
+import { enrichCompany, formatEnrichmentForPrompt, formatBenchmarkOnlyPrompt, buildEnrichmentCacheKey } from '../lib/enrichment-pipeline.js';
+import { getMatchedBenchmarks } from '../lib/industry-benchmarks.js';
 
 const COST_PER_TOKEN   = 0.0000002;
 const HOURLY_TOKEN_LIMIT = 200_000;
@@ -53,6 +55,7 @@ export async function onRequestPost(context) {
   switch (body.action) {
     case 'run_step':        return handleRunStep(body, userId, openaiKey, supabaseUrl, supabaseKey, env, cors);
     case 'run_demo_step':   return handleRunDemoStep(body, userId, supabaseUrl, supabaseKey, env, cors);
+    case 'enrich_company':  return handleEnrichCompany(body, userId, supabaseUrl, supabaseKey, env, cors);
     case 'save_strategy':        return handleSaveStrategy(body, userId, supabaseUrl, supabaseKey, env, cors);
     case 'get_vault':            return handleGetVault(body, userId, supabaseUrl, supabaseKey, cors);
     case 'get_strategy':         return handleGetStrategy(body, userId, supabaseUrl, supabaseKey, env, cors);
@@ -113,7 +116,65 @@ async function handleRunStep(body, userId, openaiKey, supabaseUrl, supabaseKey, 
     return okRes({ data: stepCached, tokens: 0, duration_ms: 0, step, _cached: true }, cors);
   }
 
-  const prompt = buildStepPrompt(step, sanitise(company, 200), industry || '', prior_steps || {}, resolvedProfile);
+  // ── Layer 3: Load enrichment context ────────────────────────────
+  // Try to load cached enrichment from company_enrichment table.
+  // If not cached, run a lightweight enrichment now (benchmark + AI brief).
+  // This populates the EVIDENCE LAYER injected into buildStepPrompt.
+  let enrichmentContext = null;
+  const enrichCacheKey  = buildEnrichmentCacheKey(company, industry || '');
+
+  if (supabaseUrl && supabaseKey) {
+    try {
+      const enrichRes = await sbFetch(supabaseUrl, supabaseKey, 'company_enrichment', 'GET', null,
+        `?cache_key=eq.${enrichCacheKey}&limit=1`);
+      if (enrichRes.ok) {
+        const rows = await enrichRes.json();
+        const row  = rows[0];
+        if (row?.enrichment_data) {
+          // Check freshness — 24h TTL
+          const enrichedAt = new Date(row.enriched_at || 0).getTime();
+          const ageHours   = (Date.now() - enrichedAt) / 3_600_000;
+          if (ageHours < 24) {
+            enrichmentContext = row.enrichment_data;
+          }
+        }
+      }
+    } catch (e) {
+      console.warn(`[gtm] enrichment cache lookup failed: ${e.message}`);
+    }
+  }
+
+  // If no cached enrichment, run inline enrichment (non-blocking budget: 8s)
+  if (!enrichmentContext) {
+    try {
+      enrichmentContext = await enrichCompany({
+        company:        sanitise(company, 200),
+        industry:       industry || null,
+        companyUrl:     body.company_url || null,
+        scrapedProfile: resolvedProfile || null,
+        env,
+      });
+
+      // Cache result for subsequent steps (non-blocking)
+      if (supabaseUrl && supabaseKey && enrichmentContext) {
+        sbFetch(supabaseUrl, supabaseKey, 'company_enrichment', 'POST',
+          JSON.stringify({
+            cache_key:       enrichCacheKey,
+            company_name:    sanitise(company, 200),
+            industry:        industry || null,
+            enrichment_data: enrichmentContext,
+            enriched_at:     new Date().toISOString(),
+            user_id:         userId,
+          })
+        ).catch(e => console.warn('[gtm] enrichment cache save failed:', e.message));
+      }
+    } catch (e) {
+      console.warn(`[gtm] inline enrichment failed — proceeding without: ${e.message}`);
+      enrichmentContext = null;
+    }
+  }
+
+  const prompt = buildStepPrompt(step, sanitise(company, 200), industry || '', prior_steps || {}, resolvedProfile, enrichmentContext);
   const t0     = Date.now();
 
   // ── Provider-routed AI call (OpenAI primary → Gemini fallback) ──────────────
@@ -1107,6 +1168,106 @@ async function handleSaveStrategy(body, userId, supabaseUrl, supabaseKey, env, c
 
 async function handleGetIntegrationStatus(env, cors) {
   return okRes({ integration: getIntegrationStatus(env) }, cors);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ENRICH COMPANY  —  Layer 3 Pre-Generation Research Endpoint
+//
+// Called by the frontend BEFORE starting the step generation chain.
+// Runs the full enrichment waterfall (Brave → Serper → AI Research)
+// and caches the result in company_enrichment for 24h.
+//
+// Subsequent handleRunStep calls load from this cache — no repeat cost.
+//
+// Returns: EnrichmentResult
+// ══════════════════════════════════════════════════════════════════
+async function handleEnrichCompany(body, userId, supabaseUrl, supabaseKey, env, cors) {
+  const errors = validate({
+    company: 'string|required',
+  }, body);
+  if (errors.length) return errRes(errors[0], 400, cors);
+
+  const company    = sanitise(body.company, 200);
+  const industry   = body.industry ? sanitise(body.industry, 100) : null;
+  const companyUrl = body.company_url || null;
+  const cacheKey   = buildEnrichmentCacheKey(company, industry || '');
+
+  // ── Check existing cache ───────────────────────────────────────
+  if (supabaseUrl && supabaseKey) {
+    try {
+      const res  = await sbFetch(supabaseUrl, supabaseKey, 'company_enrichment', 'GET', null,
+        `?cache_key=eq.${cacheKey}&limit=1`);
+      if (res.ok) {
+        const rows = await res.json();
+        const row  = rows[0];
+        if (row?.enrichment_data) {
+          const ageHours = (Date.now() - new Date(row.enriched_at || 0).getTime()) / 3_600_000;
+          if (ageHours < 24) {
+            return okRes({ enrichment: row.enrichment_data, cached: true, cache_age_hours: Math.round(ageHours) }, cors);
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('[enrich_company] cache check failed:', e.message);
+    }
+  }
+
+  // ── Run full enrichment waterfall ──────────────────────────────
+  let enrichment;
+  try {
+    enrichment = await enrichCompany({
+      company,
+      industry,
+      companyUrl,
+      scrapedProfile: body.scraped_profile || null,
+      env,
+    });
+  } catch (e) {
+    console.error('[enrich_company] enrichment failed:', e.message);
+    return errRes(`Enrichment failed: ${e.message}`, 500, cors);
+  }
+
+  // ── Persist to company_enrichment table (upsert) ───────────────
+  if (supabaseUrl && supabaseKey) {
+    try {
+      const existing = await sbFetch(supabaseUrl, supabaseKey, 'company_enrichment', 'GET', null,
+        `?cache_key=eq.${cacheKey}&limit=1`);
+      const rows = existing.ok ? await existing.json() : [];
+
+      if (rows.length > 0) {
+        // Update existing row
+        await sbFetch(supabaseUrl, supabaseKey, 'company_enrichment', 'PATCH',
+          JSON.stringify({
+            enrichment_data: enrichment,
+            enriched_at:     new Date().toISOString(),
+            source_quality:  enrichment.sourceQuality,
+            sources_used:    enrichment.sourcesUsed,
+          }),
+          `?cache_key=eq.${cacheKey}&user_id=eq.${userId}`
+        );
+      } else {
+        // Insert new row
+        await sbFetch(supabaseUrl, supabaseKey, 'company_enrichment', 'POST',
+          JSON.stringify({
+            cache_key:       cacheKey,
+            company_name:    company,
+            industry,
+            enrichment_data: enrichment,
+            enriched_at:     new Date().toISOString(),
+            source_quality:  enrichment.sourceQuality,
+            sources_used:    enrichment.sourcesUsed,
+            user_id:         userId,
+          })
+        );
+      }
+    } catch (e) {
+      console.warn('[enrich_company] persist failed (non-blocking):', e.message);
+    }
+  }
+
+  console.info(`[enrich_company] company="${company}" quality=${enrichment.sourceQuality} sources=${enrichment.sourcesUsed.join(',')}`);
+
+  return okRes({ enrichment, cached: false }, cors);
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -2171,23 +2332,40 @@ function parseStep7(rawText) {
 }
 
 // ── Prompt builder ───────────────────────────────────────────────
-function buildStepPrompt(step, company, industry, priorSteps, companyProfile) {
+function buildStepPrompt(step, company, industry, priorSteps, companyProfile, enrichmentContext) {
   const ind  = industry ? ` in the ${industry} industry` : '';
   const sourceInstructions = `\nSOURCE ATTRIBUTION: include these metadata fields in your JSON output exactly as named: _source_context, _profile_source, _confidence_basis, _rag_enabled, _missing_evidence, _evidence_summary, _ai_estimate_fields, _verified_fields. If verified profile evidence is present, _profile_source must be "verified_company_profile". If verified evidence is missing, _profile_source must be "ai_estimate_validate_manually". When a value is derived from a prior phase, use "derived from Step X output". Add step-specific fields where relevant, such as _source_company_overview, _source_market_position, _source_growth_signals, _source_tam_size_estimate, _source_primary_icp, _source_filter_criteria, _source_primary_keywords, _source_email_angles, _source_go_no_go. Keep metadata compact and JSON-safe.`;
-  const base = `You are a B2B GTM opportunity qualification analyst. CRITICAL: Return ONLY a valid JSON object. No markdown. No code fences. Start with { end with }. Use verified TRUTH LAYER evidence first. If verified evidence is missing, mark the output as an AI estimate and do not invent source-backed facts.${sourceInstructions}`;
+  const base = `You are a B2B GTM opportunity qualification analyst. CRITICAL: Return ONLY a valid JSON object. No markdown. No code fences. Start with { end with }. Use verified EVIDENCE LAYER facts first. If verified evidence is missing for a field, write "missing data" — do NOT invent source-backed facts.${sourceInstructions}`;
 
-  // Inject verified profile if available and high confidence
-  const hasProfile = companyProfile && companyProfile.extraction_confidence !== 'LOW' && companyProfile.company_overview;
-  const profileBlock = hasProfile
-    ? `\nTRUTH LAYER: VERIFIED COMPANY PROFILE (use as ground truth — do not contradict):\n${JSON.stringify({
-        overview: companyProfile.company_overview,
-        services: companyProfile.services,
-        industry: companyProfile.industry,
-        target_market: companyProfile.target_market,
-        tech_stack: companyProfile.tech_stack_hints,
-        value_props: companyProfile.value_propositions,
-      }, null, 2)}\n`
-    : `\nTRUTH LAYER: NO VERIFIED COMPANY PROFILE AVAILABLE. This is an AI estimate and must be validated manually. Do not invent source-backed facts.\n`;
+  // ── EVIDENCE LAYER construction (Layer 3 grounding) ──────────
+  // Priority: enrichmentContext > scraped profile > benchmark-only fallback
+  let evidenceBlock;
+
+  if (enrichmentContext && enrichmentContext.sourceQuality !== 'none') {
+    // Full enrichment available — use structured EVIDENCE LAYER
+    evidenceBlock = `\n${formatEnrichmentForPrompt(enrichmentContext)}\n`;
+
+  } else if (companyProfile && companyProfile.extraction_confidence !== 'LOW' && companyProfile.company_overview) {
+    // Fallback: scraped profile only — supplement with benchmark for Step 2
+    const benchmarkSupplement = (step === 2)
+      ? `\n${formatBenchmarkOnlyPrompt(industry)}`
+      : '';
+    evidenceBlock = `\nEVIDENCE LAYER (source: scraped_profile · quality: scraped):
+Company overview: ${companyProfile.company_overview}
+Services: ${(companyProfile.services || []).join(', ') || 'unknown'}
+Target market: ${companyProfile.target_market || 'unknown'}
+Tech stack: ${(companyProfile.tech_stack_hints || []).join(', ') || 'unknown'}
+Value propositions: ${(companyProfile.value_propositions || []).join('; ') || 'unknown'}
+
+RULE: Use the EVIDENCE LAYER above as ground truth. Fields with no evidence must use "missing data".${benchmarkSupplement}\n`;
+
+  } else {
+    // No profile, no enrichment — inject benchmark reference at minimum
+    // so Step 2 TAM is grounded even in the worst case
+    const benchmark = step === 2 ? `\n${formatBenchmarkOnlyPrompt(industry)}` : '';
+    evidenceBlock = `\nEVIDENCE LAYER: No verified company profile available.${benchmark}
+RULE: All output is AI estimation. Mark _profile_source as "ai_estimate_validate_manually". Do not invent source-backed facts.\n`;
+  }
 
   // ── Build prior phase context for chaining ──
   const phaseCtx = buildPhaseContext(step, priorSteps);
@@ -2197,7 +2375,7 @@ function buildStepPrompt(step, company, industry, priorSteps, companyProfile) {
     // ════════════════════════════════════════════════
     // PHASE 1 — SIGNAL EXTRACTION
     // ════════════════════════════════════════════════
-    1:`${base}${profileBlock}
+    1:`${base}${evidenceBlock}
 PHASE 1 — SIGNAL EXTRACTION for "${company}"${ind}.
 
 Your ONLY job: extract real, observable business signals. Do NOT score. Do NOT conclude. Do NOT invent.
@@ -2221,7 +2399,7 @@ Return exact JSON:
     // ════════════════════════════════════════════════
     // PHASE 2 — SCORING
     // ════════════════════════════════════════════════
-    2:`${base}
+    2:`${base}${evidenceBlock}
 PHASE 2 — SCORING for "${company}"${ind}.
 
 Phase 1 extracted signals:
@@ -2333,12 +2511,58 @@ Return exact JSON:
 
 
 // ── Build compressed prior phase context for chaining ──────────
+// Layer 3: strips placeholder values before injection so contamination
+// cannot propagate from a weak step into subsequent steps' prompts.
 function buildPhaseContext(step, steps) {
-  const labels = {1:'PHASE 1 — Signal Extraction',2:'PHASE 2 — Scoring',3:'PHASE 3 — Verdict',4:'PHASE 4 — Deal Lens',5:'PHASE 5 — Risks'};
-  return Array.from({length:step-1},(_,i)=>i+1)
-    .filter(i=>steps[i])
-    .map(i=>`[${labels[i]}]\n${JSON.stringify(steps[i])}`)
-    .join('\n\n') || 'No prior phase data.';
+  const labels = {
+    1: 'PHASE 1 — Signal Extraction',
+    2: 'PHASE 2 — Scoring',
+    3: 'PHASE 3 — Verdict',
+    4: 'PHASE 4 — Deal Lens',
+    5: 'PHASE 5 — Risks',
+  };
+
+  const PLACEHOLDER_PATTERNS = [
+    /^AI-inferred — validate$/i,
+    /^Demo placeholder — requires validation$/i,
+    /^Source data missing$/i,
+    /^missing data$/i,
+  ];
+
+  // Recursively strip placeholder strings from any object/array
+  function stripPlaceholders(value) {
+    if (value === null || value === undefined) return '[no data]';
+    if (typeof value === 'string') {
+      const trimmed = value.trim();
+      if (PLACEHOLDER_PATTERNS.some(p => p.test(trimmed))) return '[no data]';
+      return value;
+    }
+    if (Array.isArray(value)) {
+      const clean = value
+        .map(stripPlaceholders)
+        .filter(v => v !== '[no data]' || value.length === 1); // keep [no data] only if it's the only entry
+      return clean.length > 0 ? clean : ['[no data — regenerate this step]'];
+    }
+    if (typeof value === 'object') {
+      const clean = {};
+      for (const [k, v] of Object.entries(value)) {
+        // Skip internal metadata fields (_source_*, _ai_estimate_*, etc.)
+        if (k.startsWith('_')) continue;
+        clean[k] = stripPlaceholders(v);
+      }
+      return clean;
+    }
+    return value;
+  }
+
+  return Array.from({ length: step - 1 }, (_, i) => i + 1)
+    .filter(i => steps[i] && Object.keys(steps[i]).length > 0)
+    .map(i => {
+      const cleaned = stripPlaceholders(steps[i]);
+      return `[${labels[i]}]\n${JSON.stringify(cleaned, null, 1)}`;
+    })
+    .join('\n\n') || 'No prior phase data available — this is Step 1.';
+}
 }
 
 // Kept for backward compat if referenced elsewhere
