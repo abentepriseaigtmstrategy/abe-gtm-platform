@@ -3627,6 +3627,27 @@ async function saveStep7ToVault(strategyId, step7Data) {
     const d = await res.json();
     if (d.saved) {
       addLog('OK', 7, 'Revenue Intelligence saved to Supabase');
+
+      // ── Publication readiness from save_step7 response ────────
+      // The backend runs validate_publication inline during save.
+      // If it already determined publication is ready, stamp it locally.
+      if (typeof d.publicationReady === 'boolean') {
+        window._publicationState = {
+          ...window._publicationState,
+          publicationReady: d.publicationReady,
+          score:            d.publicationScore   || window._publicationState?.score || 0,
+          incompleteSteps:  d.incompleteSteps    || [],
+          missingFields:    d.missingFields      || [],
+          warnings:         d.warnings           || [],
+          validatedAt:      new Date().toISOString(),
+        };
+        addLog(d.publicationReady ? 'OK' : 'WARN', 7,
+          `[Publication] save_step7 → ready=${d.publicationReady} score=${d.publicationScore}/100`);
+      }
+    } else if (d.error) {
+      // Backend rejected the save (corrupted data)
+      addLog('ERROR', 7, `Step 7 save rejected by backend: ${d.error}`);
+      showToast(`Step 7 save failed: ${d.error}`, 'error');
     }
   } catch(e) {
     addLog('WARN', 7, 'Could not persist Step 7 to vault: ' + e.message);
@@ -4518,6 +4539,425 @@ document.addEventListener('click', function(e) {
     drawer.classList.remove('open');
   }
 });
+</script>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     PUBLICATION ORCHESTRATOR
+     Phase 1–5 implementation per ABE Publication Pipeline spec.
+
+     Responsibilities:
+       1. Wraps runStep7 to trigger publication validation after completion
+       2. Runs validate_publication against the backend after all 7 steps
+       3. Gates openExportModal — export only enabled when publicationReady=true
+       4. Shows publication readiness panel with missing sections
+       5. Tracks provider telemetry per step (providerUsed, retries, fallbacks)
+       6. Prevents partial save states from counting as publication-ready
+     ═══════════════════════════════════════════════════════════════ -->
+<script>
+(function() {
+  'use strict';
+
+  // ── Publication state (client-side mirror) ─────────────────────
+  window._publicationState = {
+    publicationReady:  false,
+    score:             0,
+    missingFields:     [],
+    invalidCharts:     [],
+    failedProviders:   [],
+    incompleteSteps:   [],
+    warnings:          [],
+    validatedAt:       null,
+    telemetry:         {},    // per-step provider telemetry
+  };
+
+  // ── Breathing pause between provider calls ─────────────────────
+  const breathe = (ms) => new Promise(r => setTimeout(r, ms));
+  const INTER_STEP_DELAY_MS = 800;
+
+  // ── Client-side placeholder detector ──────────────────────────
+  const PLACEHOLDER_RE = [
+    /^AI-inferred — validate$/i,
+    /^Demo placeholder — requires validation$/i,
+    /^Source data missing$/i,
+    /^missing data$/i,
+  ];
+
+  function isPlaceholder(v) {
+    if (v === null || v === undefined) return true;
+    if (typeof v === 'string') return PLACEHOLDER_RE.some(p => p.test(v.trim()));
+    return false;
+  }
+
+  // ── Client-side step completeness check ───────────────────────
+  const CRITICAL_CLIENT = {
+    1: ['demand_signals', 'icp_fit', 'gtm_relevance_score'],
+    2: ['tam_size_estimate', 'growth_rate'],
+    3: ['verdict', 'verdict_reasoning'],
+    4: ['target_roles', 'core_problem'],
+    5: ['key_risks', 'confidence_score'],
+    6: ['verdict', 'executive_brief'],
+    7: ['signal_summary', 'go_no_go', 'executive_brief'],
+  };
+
+  function isStepPublicationReady(step, data) {
+    if (!data || typeof data !== 'object' || Object.keys(data).length === 0) return false;
+    const fields = CRITICAL_CLIENT[step] || [];
+    const missingOrPlaceholder = fields.filter(f => {
+      const v = data[f];
+      return v === undefined || v === null || isPlaceholder(v);
+    });
+    return missingOrPlaceholder.length === 0;
+  }
+
+  // ── Publication readiness panel ────────────────────────────────
+  function renderPublicationPanel(state) {
+    let panel = document.getElementById('pub-readiness-panel');
+    if (!panel) {
+      panel = document.createElement('div');
+      panel.id = 'pub-readiness-panel';
+      panel.style.cssText = [
+        'position:fixed', 'bottom:20px', 'right:20px', 'z-index:9999',
+        'max-width:340px', 'width:calc(100% - 40px)',
+        'background:#0d1120', 'border-radius:16px',
+        'padding:16px 18px', 'font-family:Inter,sans-serif',
+        'font-size:11px', 'color:#e5e7eb',
+        'box-shadow:0 20px 60px rgba(0,0,0,0.7)',
+        'border:1px solid rgba(168,85,247,0.2)',
+        'transition:all 0.3s ease',
+      ].join(';');
+      document.body.appendChild(panel);
+    }
+
+    const ps = state;
+    const scoreColor = ps.publicationReady ? '#22c55e' : ps.score >= 60 ? '#f59e0b' : '#ef4444';
+    const icon       = ps.publicationReady ? '✅' : ps.score >= 60 ? '⚠️' : '❌';
+
+    let html = `
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+        <div style="font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.12em;color:#a855f7">
+          Publication Status
+        </div>
+        <button onclick="document.getElementById('pub-readiness-panel').remove()"
+          style="background:transparent;border:none;color:#6b7280;cursor:pointer;font-size:14px;padding:0 2px">×</button>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px">
+        <span style="font-size:20px">${icon}</span>
+        <div>
+          <div style="font-size:12px;font-weight:700;color:${scoreColor}">
+            ${ps.publicationReady ? 'PUBLICATION READY' : 'NOT READY FOR EXPORT'}
+          </div>
+          <div style="font-size:10px;color:#6b7280">Score: ${ps.score}/100</div>
+        </div>
+      </div>`;
+
+    if (ps.incompleteSteps.length > 0) {
+      html += `<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:8px 10px;margin-bottom:8px">
+        <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#ef4444;margin-bottom:4px">Incomplete Steps</div>
+        <div style="color:#fca5a5;font-size:10px">${ps.incompleteSteps.map(s => `Step ${s}`).join(', ')}</div>
+      </div>`;
+    }
+
+    if (ps.missingFields.length > 0) {
+      html += `<div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.2);border-radius:8px;padding:8px 10px;margin-bottom:8px">
+        <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#f59e0b;margin-bottom:4px">Missing Critical Fields (${ps.missingFields.length})</div>
+        ${ps.missingFields.slice(0, 4).map(f => `<div style="color:#fde68a;font-size:9px;margin-top:2px">• ${f}</div>`).join('')}
+        ${ps.missingFields.length > 4 ? `<div style="color:#6b7280;font-size:9px;margin-top:2px">…+${ps.missingFields.length - 4} more</div>` : ''}
+      </div>`;
+    }
+
+    if (ps.invalidCharts.length > 0) {
+      html += `<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:8px;padding:8px 10px;margin-bottom:8px">
+        <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#ef4444;margin-bottom:4px">Invalid Chart Data</div>
+        ${ps.invalidCharts.slice(0, 3).map(c => `<div style="color:#fca5a5;font-size:9px;margin-top:2px">• ${c}</div>`).join('')}
+      </div>`;
+    }
+
+    if (ps.warnings.length > 0 && ps.publicationReady) {
+      html += `<div style="background:rgba(245,158,11,0.05);border:1px solid rgba(245,158,11,0.15);border-radius:8px;padding:8px 10px;margin-bottom:8px">
+        <div style="font-size:9px;font-weight:700;text-transform:uppercase;color:#f59e0b;margin-bottom:4px">Warnings</div>
+        ${ps.warnings.slice(0, 3).map(w => `<div style="color:#fde68a;font-size:9px;margin-top:2px">⚠ ${w}</div>`).join('')}
+      </div>`;
+    }
+
+    if (ps.publicationReady) {
+      html += `<div style="background:rgba(34,197,94,0.08);border:1px solid rgba(34,197,94,0.2);border-radius:8px;padding:8px 10px;margin-bottom:8px;text-align:center">
+        <div style="color:#86efac;font-size:10px;font-weight:700">All 7 steps validated · Export enabled</div>
+      </div>`;
+    }
+
+    if (ps.validatedAt) {
+      html += `<div style="color:#374151;font-size:9px;text-align:right;margin-top:4px">Validated: ${new Date(ps.validatedAt).toLocaleTimeString()}</div>`;
+    }
+
+    panel.innerHTML = html;
+  }
+
+  // ── Backend publication validation call ───────────────────────
+  async function runBackendPublicationValidation(strategyId, inlineStrategy) {
+    try {
+      const token = await getAuthToken();
+      const body  = strategyId
+        ? { action: 'validate_publication', strategy_id: strategyId }
+        : { action: 'validate_publication', strategy: inlineStrategy };
+
+      const res = await fetch('/api/gtm', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body:    JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        const e = await res.json().catch(() => ({}));
+        console.warn('[publication] Backend validation call failed:', e.error || res.status);
+        return null;
+      }
+
+      const data = await res.json();
+      return data;
+    } catch (err) {
+      console.warn('[publication] Backend validation error:', err.message);
+      return null;
+    }
+  }
+
+  // ── Client-side publication readiness check ───────────────────
+  // Fast pre-check before calling backend (avoids round-trip on obvious failures)
+  function clientSidePublicationCheck() {
+    const s = window.state;
+    if (!s) return { publicationReady: false, incompleteSteps: [1,2,3,4,5,6,7], score: 0, missingFields: [], invalidCharts: [], failedProviders: [], warnings: [], validatedAt: null };
+
+    const incompleteSteps = [];
+    const missingFields   = [];
+
+    for (let i = 1; i <= 7; i++) {
+      const data = i <= 6 ? s.steps[i]?.data : s.step7;
+      if (!data || Object.keys(data).length === 0) {
+        incompleteSteps.push(i);
+        continue;
+      }
+      if (!isStepPublicationReady(i, data)) {
+        incompleteSteps.push(i);
+        const fields = CRITICAL_CLIENT[i] || [];
+        fields.forEach(f => {
+          if (!data[f] || isPlaceholder(data[f])) {
+            missingFields.push(`step_${i}.${f}`);
+          }
+        });
+      }
+    }
+
+    const score = Math.max(0, 100 - (incompleteSteps.length * 12) - (missingFields.length * 3));
+
+    return {
+      publicationReady:  incompleteSteps.length === 0 && missingFields.length === 0,
+      incompleteSteps,
+      missingFields,
+      invalidCharts:     [],
+      failedProviders:   [],
+      warnings:          [],
+      score,
+      validatedAt:       null,
+    };
+  }
+
+  // ── Main: trigger full publication validation ─────────────────
+  // Called after all 7 steps complete (step 7 save triggers this)
+  async function triggerPublicationValidation() {
+    addLog('INFO', 0, '[Publication] Running publication readiness validation…');
+
+    // 1. Client-side pre-check
+    const clientCheck = clientSidePublicationCheck();
+    window._publicationState = { ...clientCheck };
+
+    if (!clientCheck.publicationReady) {
+      addLog('WARN', 0, `[Publication] Client-side check failed — ${clientCheck.incompleteSteps.length} incomplete steps`);
+      disableExport('Publication validation failed — not all steps complete');
+      renderPublicationPanel(window._publicationState);
+      return;
+    }
+
+    // 2. Backend validation (authoritative)
+    const sid = window.state?.strategyId || null;
+    const inlineStrategy = sid ? null : buildInlineStrategyForValidation();
+    const backendResult  = await runBackendPublicationValidation(sid, inlineStrategy);
+
+    if (backendResult) {
+      window._publicationState = {
+        ...backendResult,
+        validatedAt: new Date().toISOString(),
+      };
+    }
+
+    const ps = window._publicationState;
+
+    if (ps.publicationReady) {
+      enableExport();
+      addLog('OK', 0, `[Publication] ✅ PUBLICATION READY — score ${ps.score}/100 · Export enabled`);
+      showToast('✅ Report publication-ready — export enabled!', 'success');
+    } else {
+      disableExport('Publication validation failed');
+      addLog('WARN', 0, `[Publication] ❌ NOT READY — score ${ps.score}/100 · ${ps.incompleteSteps.length} incomplete steps`);
+      showToast(`Publication validation failed: ${ps.incompleteSteps.length} step(s) incomplete`, 'error');
+    }
+
+    renderPublicationPanel(ps);
+  }
+
+  // ── Build inline strategy for validation (no strategy ID yet) ─
+  function buildInlineStrategyForValidation() {
+    const s = window.state;
+    if (!s) return null;
+    return {
+      company_name:        s.company || '',
+      industry:            s.industry || null,
+      step_1_market:       s.steps[1]?.data || null,
+      step_2_tam:          s.steps[2]?.data || null,
+      step_3_icp:          s.steps[3]?.data || null,
+      step_4_sourcing:     s.steps[4]?.data || null,
+      step_5_keywords:     s.steps[5]?.data || null,
+      step_6_messaging:    s.steps[6]?.data || null,
+      step_7_intelligence: s.step7 || null,
+      steps_completed:     Object.values(s.steps).filter(x => x.status === 'complete').length + (s.step7 ? 1 : 0),
+    };
+  }
+
+  // ── Export gate controls ───────────────────────────────────────
+  function enableExport() {
+    window._publicationState.publicationReady = true;
+    // Export button in nav bar
+    const exportBtns = document.querySelectorAll('[onclick="openExportModal()"], #export-btn');
+    exportBtns.forEach(btn => {
+      btn.disabled = false;
+      btn.title    = 'Report is publication-ready — click to export';
+      btn.style.opacity = '1';
+    });
+  }
+
+  function disableExport(reason) {
+    window._publicationState.publicationReady = false;
+    const exportBtns = document.querySelectorAll('[onclick="openExportModal()"], #export-btn');
+    exportBtns.forEach(btn => {
+      btn.disabled = true;
+      btn.title    = `Export disabled: ${reason}`;
+      btn.style.opacity = '0.4';
+    });
+  }
+
+  // ── Gate: openExportModal must check publication state ─────────
+  // Wrap the existing openExportModal to enforce the publication gate
+  const _origOpenExportModal = window.openExportModal;
+  window.openExportModal = function() {
+    const ps = window._publicationState;
+    if (!ps.publicationReady) {
+      const msg = ps.incompleteSteps.length > 0
+        ? `Export requires all 7 steps to be complete. Missing: Step(s) ${ps.incompleteSteps.join(', ')}.`
+        : `Export is not available — publication validation failed (score: ${ps.score}/100).`;
+      showToast(msg, 'error');
+      renderPublicationPanel(ps);
+      return;
+    }
+    _origOpenExportModal();
+  };
+
+  // ── Step telemetry recording ───────────────────────────────────
+  // Tracks per-step provider information for debugging
+  function recordStepTelemetry(step, result) {
+    if (!window._publicationState.telemetry) window._publicationState.telemetry = {};
+    window._publicationState.telemetry[step] = {
+      status:            result?.status    || 'unknown',
+      providerUsed:      result?.provider  || 'unknown',
+      fallbackTriggered: !!result?.fallbackTriggered,
+      tokens:            result?.tokens    || 0,
+      recordedAt:        new Date().toISOString(),
+    };
+  }
+
+  // ── Breathing time wrapper for runStep ─────────────────────────
+  // Ensures INTER_STEP_DELAY_MS breathing time between consecutive step calls.
+  // This prevents overlapping provider requests from corrupting state.
+  let _lastStepCompletedAt = 0;
+  const _origRunStepForBreathing = window.runStep;
+  window.runStep = async function(n) {
+    const now     = Date.now();
+    const elapsed = now - _lastStepCompletedAt;
+    if (elapsed < INTER_STEP_DELAY_MS && _lastStepCompletedAt > 0) {
+      await breathe(INTER_STEP_DELAY_MS - elapsed);
+    }
+    await _origRunStepForBreathing(n);
+    _lastStepCompletedAt = Date.now();
+
+    // Record telemetry for completed step
+    const stepData = window.state?.steps[n];
+    if (stepData?.status === 'complete' && stepData?.data) {
+      recordStepTelemetry(n, { status: 'complete', tokens: 0 });
+    }
+
+    // After each step, do a quick client-side check to update export state
+    const check = clientSidePublicationCheck();
+    if (!check.publicationReady) {
+      // Keep export disabled with current reason
+      const stillMissing = check.incompleteSteps;
+      disableExport(`${stillMissing.length} step(s) still incomplete: ${stillMissing.map(s=>`Step ${s}`).join(', ')}`);
+    }
+  };
+
+  // ── Wrap runStep7 to trigger publication validation on success ─
+  const _origRunStep7ForPublication = window.runStep7;
+  window.runStep7 = async function() {
+    await _origRunStep7ForPublication();
+
+    // Give the UI a moment to settle before validating
+    await breathe(1200);
+
+    // If step 7 completed successfully, trigger full publication validation
+    const step7Data = window.state?.step7;
+    if (step7Data && Object.keys(step7Data).length > 0) {
+      recordStepTelemetry(7, { status: 'complete' });
+      addLog('INFO', 7, '[Publication] Step 7 complete — triggering publication validation');
+      await triggerPublicationValidation();
+    } else {
+      addLog('WARN', 7, '[Publication] Step 7 appears incomplete — publication not triggered');
+      disableExport('Step 7 (Revenue Intelligence) did not produce valid output');
+    }
+  };
+
+  // ── Wrap saveStep7ToVault to also trigger validation ──────────
+  const _origSaveStep7ToVault = window.saveStep7ToVault;
+  window.saveStep7ToVault = async function(strategyId, step7Data) {
+    await _origSaveStep7ToVault(strategyId, step7Data);
+    // After Step 7 is saved, re-run backend publication validation
+    // with the strategy ID so the backend stamps publication_ready
+    if (strategyId) {
+      await breathe(500);
+      addLog('INFO', 0, '[Publication] Re-running backend validation after Step 7 save…');
+      const result = await runBackendPublicationValidation(strategyId, null);
+      if (result) {
+        window._publicationState = { ...result, validatedAt: new Date().toISOString() };
+        if (result.publicationReady) {
+          enableExport();
+        }
+        renderPublicationPanel(window._publicationState);
+      }
+    }
+  };
+
+  // ── Initial state: disable export until all steps validated ───
+  // Export is disabled by default on page load and only enabled
+  // after validate_publication passes.
+  document.addEventListener('DOMContentLoaded', function() {
+    disableExport('Complete all 7 steps to enable export');
+    addLog('INFO', 0, '[Publication] Orchestrator initialized — export gated until all 7 steps validated');
+  });
+
+  // ── Expose for debugging ───────────────────────────────────────
+  window._publication = {
+    getState:   () => window._publicationState,
+    validate:   triggerPublicationValidation,
+    clientCheck: clientSidePublicationCheck,
+    renderPanel: () => renderPublicationPanel(window._publicationState),
+  };
+
+})();
 </script>
 </body>
 </html>
