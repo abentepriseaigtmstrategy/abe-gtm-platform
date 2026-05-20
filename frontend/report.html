@@ -2443,16 +2443,11 @@
 
       document.getElementById('loading-state').style.display = 'none';
       document.getElementById('report-content').style.display = 'block';
-      document.getElementById('btn-export').disabled = false;
-      document.getElementById('btn-export2').disabled = false;
-      document.getElementById('btn-export-html').disabled = false;
-      document.getElementById('btn-export-html2').disabled = false;
-      
-      // Enable mobile export buttons
-      const mobilePdfBtn = document.getElementById('mobile-export-pdf');
-      const mobileHtmlBtn = document.getElementById('mobile-export-html');
-      if (mobilePdfBtn) mobilePdfBtn.disabled = false;
-      if (mobileHtmlBtn) mobileHtmlBtn.disabled = false;
+
+      // ── PUBLICATION GATE ──────────────────────────────────────
+      // Export is only enabled after validatePublicationReadiness() passes.
+      // This prevents exporting partial/corrupted reports.
+      validateAndEnableExport(r);
 
       // Cover positioning strip
       const positioningText = safe(s1.company_overview) || safe(r.company_name) + ' — GTM intelligence report.';
@@ -2484,6 +2479,204 @@
       delete safeStrategy._raw_prompts;
       delete safeStrategy._api_logs;
       return safeStrategy;
+    }
+
+    // ── Publication Gate ──────────────────────────────────────────────
+    // validateAndEnableExport(strategy)
+    //
+    // Runs the full publication readiness check against the rendered strategy
+    // before enabling PDF and HTML export buttons. This is the CANONICAL gate.
+    //
+    // Rules:
+    //   • publicationReady = true  → all export buttons enabled
+    //   • publicationReady = false → export disabled, banner shown
+    //   • Backend validation is attempted via validate_publication action
+    //   • Falls back to client-side check if backend is unavailable
+    //
+    // This function is the SINGLE point that enables export in report.html.
+    // Do NOT add any other code path that enables export buttons directly.
+    async function validateAndEnableExport(strategy) {
+      const PLACEHOLDER_RE = [
+        /^AI-inferred — validate$/i,
+        /^Demo placeholder — requires validation$/i,
+        /^Source data missing$/i,
+        /^missing data$/i,
+      ];
+      const isPlaceholder = v =>
+        (v === null || v === undefined) ||
+        (typeof v === 'string' && PLACEHOLDER_RE.some(p => p.test(v.trim())));
+
+      // ── Step data extraction ────────────────────────────────────
+      const s1 = strategy.step_1_market       || null;
+      const s2 = strategy.step_2_tam          || null;
+      const s3 = strategy.step_3_icp          || null;
+      const s4 = strategy.step_4_sourcing     || null;
+      const s5 = strategy.step_5_keywords     || null;
+      const s6 = strategy.step_6_messaging    || null;
+      const s7 = strategy.step_7_intelligence || null;
+
+      // ── Critical fields per step ────────────────────────────────
+      const CRITICAL = {
+        1: ['demand_signals', 'icp_fit', 'gtm_relevance_score'],
+        2: ['tam_size_estimate', 'growth_rate'],
+        3: ['verdict', 'verdict_reasoning'],
+        4: ['target_roles', 'core_problem'],
+        5: ['key_risks', 'confidence_score'],
+        6: ['verdict', 'executive_brief'],
+        7: ['signal_summary', 'go_no_go', 'executive_brief'],
+      };
+
+      const stepData     = { 1: s1, 2: s2, 3: s3, 4: s4, 5: s5, 6: s6, 7: s7 };
+      const incompleteSteps = [];
+      const missingFields   = [];
+      const invalidCharts   = [];
+      const warnings        = [];
+
+      // Validate each step
+      for (let i = 1; i <= 7; i++) {
+        const data   = stepData[i];
+        const fields = CRITICAL[i] || [];
+
+        if (!data || typeof data !== 'object' || Object.keys(data).length === 0) {
+          incompleteSteps.push(i);
+          missingFields.push(`Step ${i}: no data`);
+          continue;
+        }
+
+        let stepFailed = false;
+        for (const field of fields) {
+          const val = data[field];
+          if (val === undefined || val === null || isPlaceholder(val)) {
+            missingFields.push(`Step ${i} › ${field}`);
+            stepFailed = true;
+          }
+        }
+        if (stepFailed && !incompleteSteps.includes(i)) incompleteSteps.push(i);
+      }
+
+      // Validate TAM (must contain a digit)
+      if (s2?.tam_size_estimate) {
+        if (!/\d/.test(String(s2.tam_size_estimate))) {
+          invalidCharts.push('TAM chart: tam_size_estimate contains no numeric value');
+          warnings.push('TAM/SAM/SOM chart may not render correctly');
+        }
+      }
+
+      // Validate GTM score
+      const gtmScore = parseInt(s1?.gtm_relevance_score, 10);
+      if (isNaN(gtmScore) || gtmScore < 0 || gtmScore > 100) {
+        invalidCharts.push(`GTM Score: "${s1?.gtm_relevance_score}" is not in range 0–100`);
+      }
+
+      // steps_completed consistency check
+      const dbCount     = strategy.steps_completed || 0;
+      const actualCount = Object.values(stepData).filter(d => d && Object.keys(d).length > 0).length;
+      if (dbCount !== actualCount) {
+        warnings.push(`Steps completed mismatch: DB=${dbCount}, actual=${actualCount}`);
+      }
+
+      const score = Math.max(0, 100
+        - incompleteSteps.length * 12
+        - missingFields.length   * 3
+        - invalidCharts.length   * 4);
+
+      const publicationReady = (
+        incompleteSteps.length === 0 &&
+        missingFields.length    === 0 &&
+        invalidCharts.length    === 0
+      );
+
+      window._reportPublicationState = {
+        publicationReady, score, incompleteSteps, missingFields,
+        invalidCharts, warnings, validatedAt: new Date().toISOString(),
+      };
+
+      // ── Attempt backend validation (authoritative stamp) ─────────
+      try {
+        const strategyId = new URLSearchParams(location.search).get('id');
+        if (strategyId && window.APP) {
+          const bv = await window.APP.api('/api/gtm', {
+            action:      'validate_publication',
+            strategy_id: strategyId,
+          });
+          if (bv && typeof bv.publicationReady === 'boolean') {
+            window._reportPublicationState = {
+              ...bv,
+              validatedAt: new Date().toISOString(),
+            };
+            // Use backend result as authoritative
+            Object.assign({ publicationReady: bv.publicationReady,
+              score: bv.score, incompleteSteps: bv.incompleteSteps || incompleteSteps,
+              missingFields: bv.missingFields || missingFields,
+              invalidCharts: bv.invalidCharts || invalidCharts,
+              warnings: bv.warnings || warnings },
+              window._reportPublicationState);
+          }
+        }
+      } catch (bvErr) {
+        console.warn('[report] Backend publication validation failed (using client-side result):', bvErr.message);
+      }
+
+      const ps = window._reportPublicationState;
+
+      if (ps.publicationReady) {
+        // ── Enable all export buttons ─────────────────────────────
+        const exportBtns = [
+          'btn-export', 'btn-export2',
+          'btn-export-html', 'btn-export-html2',
+          'mobile-export-pdf', 'mobile-export-html',
+        ];
+        exportBtns.forEach(id => {
+          const el = document.getElementById(id);
+          if (el) { el.disabled = false; el.title = 'Report is publication-ready'; }
+        });
+        console.info('%c[Publication] ✅ READY — score ' + ps.score + '/100 · export enabled', 'color:#22c55e;font-weight:bold');
+        showPublicationBanner(ps);
+      } else {
+        // ── Keep export disabled + show blocking banner ────────────
+        console.warn('[Publication] ❌ NOT READY — score ' + ps.score + '/100', {
+          incompleteSteps: ps.incompleteSteps,
+          missingFields:   ps.missingFields,
+          invalidCharts:   ps.invalidCharts,
+        });
+        showPublicationBanner(ps);
+      }
+    }
+
+    // ── Publication status banner ─────────────────────────────────
+    function showPublicationBanner(ps) {
+      let banner = document.getElementById('pub-validation-banner');
+      if (!banner) {
+        banner = document.createElement('div');
+        banner.id = 'pub-validation-banner';
+        banner.style.cssText = [
+          'position:fixed', 'top:0', 'left:0', 'right:0', 'z-index:99999',
+          'font-family:Inter,sans-serif', 'font-size:11px', 'font-weight:700',
+          'padding:8px 20px', 'display:flex', 'align-items:center', 'gap:12px',
+          'justify-content:center', 'letter-spacing:.02em',
+        ].join(';');
+        document.body.appendChild(banner);
+      }
+
+      if (ps.publicationReady) {
+        banner.style.background = 'rgba(34,197,94,0.9)';
+        banner.style.color      = '#052e16';
+        banner.innerHTML = `<span>✅ Publication Ready — Score ${ps.score}/100 — All 7 steps validated — Export enabled</span>
+          <button onclick="this.parentElement.remove()" style="background:transparent;border:none;cursor:pointer;color:inherit;font-size:14px;padding:0 4px">×</button>`;
+      } else {
+        banner.style.background = 'rgba(239,68,68,0.92)';
+        banner.style.color      = 'white';
+        const detail = ps.incompleteSteps.length > 0
+          ? `Steps incomplete: ${ps.incompleteSteps.map(s => `#${s}`).join(', ')}`
+          : ps.missingFields.slice(0, 2).join(' · ');
+        banner.innerHTML = `<span>❌ Export disabled — Not publication-ready (score ${ps.score}/100) · ${detail}</span>
+          <button onclick="this.parentElement.remove()" style="background:transparent;border:none;cursor:pointer;color:white;font-size:14px;padding:0 4px">×</button>`;
+      }
+
+      // Auto-hide success banner after 8s
+      if (ps.publicationReady) {
+        setTimeout(() => { if (banner.parentElement) banner.remove(); }, 8000);
+      }
     }
 
     // ── Load Report ───────────────────────────────────────────────────
@@ -2549,6 +2742,17 @@
     //   X-ABE-PDF-Engine   → "gotenberg" | "gotenberg_failed" | "none"
     //   X-ABE-Export-Path  → active path + hydration source
     async function exportPDF() {
+      // ── PUBLICATION GATE ──────────────────────────────────────────
+      const ps = window._reportPublicationState;
+      if (!ps || !ps.publicationReady) {
+        const reason = ps
+          ? `Score ${ps.score}/100 — ${ps.incompleteSteps?.length ? `Steps incomplete: ${ps.incompleteSteps.map(s=>`#${s}`).join(', ')}` : ps.missingFields?.[0] || 'validation failed'}`
+          : 'Publication validation has not run yet';
+        showPublicationBanner(ps || { publicationReady: false, score: 0, incompleteSteps: [], missingFields: [reason], invalidCharts: [], warnings: [] });
+        alert(`PDF export is disabled.\n\n${reason}\n\nPlease regenerate missing steps before exporting.`);
+        return;
+      }
+
       const btn1 = document.getElementById('btn-export');
       const btn2 = document.getElementById('btn-export2');
       if (btn1) { btn1.disabled = true; btn1.textContent = 'Generating…'; }
@@ -2664,6 +2868,17 @@
     // Captures complete report with all visual elements, converts canvas to images,
     // and provides print CSS for exact PDF conversion
     async function exportHTML() {
+      // ── PUBLICATION GATE ──────────────────────────────────────────
+      const ps = window._reportPublicationState;
+      if (!ps || !ps.publicationReady) {
+        const reason = ps
+          ? `Score ${ps.score}/100 — ${ps.incompleteSteps?.length ? `Steps incomplete: ${ps.incompleteSteps.map(s=>`#${s}`).join(', ')}` : ps.missingFields?.[0] || 'validation failed'}`
+          : 'Publication validation has not run yet';
+        showPublicationBanner(ps || { publicationReady: false, score: 0, incompleteSteps: [], missingFields: [reason], invalidCharts: [], warnings: [] });
+        alert(`HTML export is disabled.\n\n${reason}\n\nPlease regenerate missing steps before exporting.`);
+        return;
+      }
+
       const btn1 = document.getElementById('btn-export-html');
       const btn2 = document.getElementById('btn-export-html2');
       if (btn1) { btn1.disabled = true; btn1.textContent = 'Preparing…'; }
