@@ -2,8 +2,8 @@
  * publication-validator.js  —  Publication Readiness Gate
  * ABE GTM Platform  ·  Cloudflare Workers compatible
  *
- * Validates a complete strategy object for publication readiness BEFORE
- * PDF export or HTML export is permitted.
+ * Layer 1 (Gates 1–10): structural presence — field exists and is non-null
+ * Layer 2 (Gates 11–17): semantic depth — content is meaningful, coherent, non-hallucinated
  *
  * Contract:
  *   validatePublicationReadiness(strategy) → PublicationState
@@ -11,22 +11,24 @@
  * PublicationState:
  *   {
  *     publicationReady: boolean,
- *     missingFields:    string[],   // render-critical undefined/null fields
- *     invalidCharts:    string[],   // chart sections with non-numeric data
- *     failedProviders:  string[],   // steps with only placeholder/fallback data
- *     incompleteSteps:  number[],   // step numbers that did not complete
- *     warnings:         string[],   // non-blocking quality warnings
- *     score:            number,     // 0–100 publication score
+ *     missingFields:    string[],   // render-critical undefined/null fields (Layer 1)
+ *     invalidCharts:    string[],   // chart sections with non-numeric data (Layer 1)
+ *     failedProviders:  string[],   // steps with only placeholder/fallback data (Layer 1)
+ *     incompleteSteps:  number[],   // step numbers that did not complete (Layer 1)
+ *     warnings:         string[],   // non-blocking quality warnings (both layers)
+ *     semanticIssues:   string[],   // blocking semantic failures (Layer 2)
+ *     hallucinations:   string[],   // detected AI hallucinations (Layer 2)
+ *     incoherence:      string[],   // cross-step logic conflicts (Layer 2)
+ *     score:            number,     // 0–100 combined structural + semantic score
+ *     semanticScore:    number,     // 0–100 semantic quality score alone
  *   }
  *
  * Rules:
- *   - publicationReady = true  →  all gates pass, export enabled
+ *   - publicationReady = true  →  ALL Layer 1 + Layer 2 blocking gates pass
  *   - publicationReady = false →  export disabled; retry eligible for failed sections
- *
- * This module is the SOLE authority on publication readiness.
- * It is called by both the backend (validate_publication action) and
- * imported by the frontend orchestrator for client-side pre-checks.
  */
+
+import { runSemanticValidation } from './semantic-validator.js';
 
 // ── Render-critical fields per step ──────────────────────────────
 // ANY undefined/null value in these fields blocks publication.
@@ -280,21 +282,63 @@ export function validatePublicationReadiness(strategy) {
     warnings.push('Step 7: go_no_go.recommendation missing — verdict banner cannot render');
   }
 
-  // ── Publication score (0–100) ─────────────────────────────────
-  // Score = 100 minus deductions for each failure
-  let score = 100;
-  score -= incompleteSteps.length * 12;   // 12 pts per incomplete step (7 steps = max 84 pts)
-  score -= missingFields.length   * 3;    // 3 pts per missing critical field
-  score -= invalidCharts.length   * 4;    // 4 pts per invalid chart
-  score -= failedProviders.length * 5;    // 5 pts per failed provider step
-  score  = Math.max(0, Math.min(100, score));
+  // ── LAYER 2: Semantic depth validation ───────────────────────
+  // Only runs when Layer 1 structural gates pass for all steps
+  // (no point running semantic checks on absent data)
+  let semanticResult = {
+    semanticReady:  true,
+    blockingIssues: [],
+    qualityIssues:  [],
+    hallucinations: [],
+    incoherence:    [],
+    semanticScore:  100,
+  };
+
+  if (incompleteSteps.length === 0 && missingFields.length === 0) {
+    // All 7 steps structurally present — run full semantic validation
+    semanticResult = runSemanticValidation(strategy);
+
+    // Semantic blocking issues → join missingFields (block publication)
+    for (const issue of semanticResult.blockingIssues) {
+      missingFields.push(`[semantic] ${issue}`);
+    }
+
+    // Hallucinations → join missingFields (blocking)
+    for (const h of semanticResult.hallucinations) {
+      missingFields.push(`[hallucination] ${h}`);
+    }
+
+    // Cross-step incoherence → join missingFields (blocking)
+    for (const ic of semanticResult.incoherence) {
+      missingFields.push(`[incoherence] ${ic}`);
+    }
+
+    // Quality issues → warnings only (non-blocking)
+    warnings.push(...semanticResult.qualityIssues);
+  } else {
+    // Skip semantic validation — structural issues take priority
+    semanticResult.semanticScore = 0;
+    semanticResult.semanticReady = false;
+  }
+
+  // ── Combined publication score (0–100) ────────────────────────
+  // Weighted: Layer 1 structural (60%) + Layer 2 semantic (40%)
+  let structuralScore = 100;
+  structuralScore -= incompleteSteps.length * 12;
+  structuralScore -= missingFields.filter(f => !f.startsWith('[semantic]') && !f.startsWith('[hallucination]') && !f.startsWith('[incoherence]')).length * 3;
+  structuralScore -= invalidCharts.length  * 4;
+  structuralScore -= failedProviders.length * 5;
+  structuralScore  = Math.max(0, Math.min(100, structuralScore));
+
+  const score = Math.round(structuralScore * 0.6 + semanticResult.semanticScore * 0.4);
 
   // ── Final gate ────────────────────────────────────────────────
   const publicationReady = (
     incompleteSteps.length === 0 &&
-    missingFields.length    === 0 &&
+    missingFields.length    === 0 &&   // includes semantic blocking issues
     invalidCharts.length    === 0 &&
-    failedProviders.length  === 0
+    failedProviders.length  === 0 &&
+    semanticResult.semanticReady
   );
 
   return {
@@ -304,7 +348,11 @@ export function validatePublicationReadiness(strategy) {
     failedProviders,
     incompleteSteps,
     warnings,
+    semanticIssues:  semanticResult.blockingIssues,
+    hallucinations:  semanticResult.hallucinations,
+    incoherence:     semanticResult.incoherence,
     score,
+    semanticScore:   semanticResult.semanticScore,
   };
 }
 
@@ -314,17 +362,25 @@ export function validatePublicationReadiness(strategy) {
  */
 export function buildPublicationReport(state) {
   if (state.publicationReady) {
-    return `✅ Publication Ready (score: ${state.score}/100) — all 7 steps complete, all critical fields validated.`;
+    return `✅ Publication Ready (score: ${state.score}/100, semantic: ${state.semanticScore}/100) — all 7 steps complete, all critical fields validated, semantic quality confirmed.`;
   }
 
-  const lines = [`❌ NOT Publication Ready (score: ${state.score}/100)`];
+  const lines = [`❌ NOT Publication Ready (score: ${state.score}/100, semantic: ${state.semanticScore ?? '?'}/100)`];
 
   if (state.incompleteSteps.length > 0) {
     lines.push(`  Incomplete steps: ${state.incompleteSteps.map(s => `Step ${s}`).join(', ')}`);
   }
   if (state.missingFields.length > 0) {
-    lines.push(`  Missing critical fields (${state.missingFields.length}):`);
+    lines.push(`  Missing/blocking fields (${state.missingFields.length}):`);
     state.missingFields.forEach(f => lines.push(`    • ${f}`));
+  }
+  if (state.hallucinations?.length > 0) {
+    lines.push(`  Detected hallucinations (${state.hallucinations.length}):`);
+    state.hallucinations.forEach(h => lines.push(`    🚨 ${h}`));
+  }
+  if (state.incoherence?.length > 0) {
+    lines.push(`  Cross-step incoherence (${state.incoherence.length}):`);
+    state.incoherence.forEach(i => lines.push(`    ⚡ ${i}`));
   }
   if (state.invalidCharts.length > 0) {
     lines.push(`  Invalid chart data (${state.invalidCharts.length}):`);
