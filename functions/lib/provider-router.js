@@ -33,6 +33,8 @@
  *   validateStepSchema(step, data)             → { valid, missing, provider, fallback_used }
  */
 
+import { lightSemanticScan } from './semantic-validator.js';
+
 // ══════════════════════════════════════════════════════════════════
 // CONSTANTS
 // ══════════════════════════════════════════════════════════════════
@@ -649,6 +651,34 @@ export async function routeProviderRequest(params, env) {
   // Primary succeeded and no critical issues → normalize and return
   if (!fallback && !primary.error) {
     const normalized = normalizeStepOutput(step, primaryParsed || {}, 'openai');
+    // ── Layer 2: light semantic scan (catches hallucinations before DB write) ──
+    const scan = lightSemanticScan(step, normalized);
+    if (scan.suspicious) {
+      console.warn(`[provider-router] step=${step} provider=openai SEMANTIC_FLAGS:`, scan.flags);
+      normalized._semantic_flags  = scan.flags;
+      normalized._semantic_suspect = true;
+      // Semantic suspicion triggers fallback — same as missing critical fields
+      // Re-route to Gemini which may produce a cleaner result
+      const semanticFallbackReason = `semantic_suspect:${scan.flags[0]}`;
+      console.warn(`[provider-router] FALLBACK_1=gemini step=${step} reason=${semanticFallbackReason}`);
+      const gemFallback = await callGemini({ systemPrompt, userPrompt, maxTokens, temperature, step }, env);
+      if (!gemFallback.error) {
+        const gemParsed   = parseJSON(gemFallback.rawText || '');
+        const gemNorm     = normalizeStepOutput(step, gemParsed || {}, 'gemini');
+        const gemScan     = lightSemanticScan(step, gemNorm);
+        // Use Gemini result if it has fewer semantic flags than OpenAI
+        if (!gemScan.suspicious || gemScan.flags.length < scan.flags.length) {
+          console.log(`[provider-router] step=${step} provider=gemini(semantic_upgrade) flags=${gemScan.flags.length}`);
+          return {
+            rawText: gemFallback.rawText, parsed: gemNorm,
+            tokensUsed: (primary.tokensUsed || 0) + (gemFallback.tokensUsed || 0),
+            provider: 'gemini', fallbackTriggered: true, fallbackReason: semanticFallbackReason,
+          };
+        }
+      }
+      // Gemini also suspect or failed — return OpenAI result with flags attached
+      // Caller (orchestrator) sees _semantic_flags and can decide whether to block
+    }
     console.log(`[provider-router] step=${step} provider=openai tokens=${primary.tokensUsed} status=${primary.statusCode}`);
     return {
       rawText:           primary.rawText,
@@ -692,6 +722,12 @@ export async function routeProviderRequest(params, env) {
   if (!geminiResult.error) {
     const geminiParsed = parseJSON(geminiResult.rawText || '');
     const normalized   = normalizeStepOutput(step, geminiParsed || {}, 'gemini');
+    const scan         = lightSemanticScan(step, normalized);
+    if (scan.suspicious) {
+      console.warn(`[provider-router] step=${step} provider=gemini SEMANTIC_FLAGS:`, scan.flags);
+      normalized._semantic_flags   = scan.flags;
+      normalized._semantic_suspect = true;
+    }
     console.log(
       `[provider-router] step=${step} provider=gemini tokens=${geminiResult.tokensUsed} openai_reason=${reason}`,
     );
@@ -716,6 +752,12 @@ export async function routeProviderRequest(params, env) {
   if (!groqResult.error) {
     const groqParsed = parseJSON(groqResult.rawText || '');
     const normalized = normalizeStepOutput(step, groqParsed || {}, 'groq');
+    const scan       = lightSemanticScan(step, normalized);
+    if (scan.suspicious) {
+      console.warn(`[provider-router] step=${step} provider=groq SEMANTIC_FLAGS:`, scan.flags);
+      normalized._semantic_flags   = scan.flags;
+      normalized._semantic_suspect = true;
+    }
     console.log(
       `[provider-router] step=${step} provider=groq tokens=${groqResult.tokensUsed} all_previous_failed=true`,
     );
