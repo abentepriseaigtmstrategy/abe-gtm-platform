@@ -11,6 +11,7 @@ import { verifyAuth, corsHeaders, validate, rateLimit, sanitise, errRes, okRes, 
 import { normalizeStrategy } from './gtm-intelligence.js';
 import { getIntegrationStatus, buildIntegrationContext } from './integration-readiness.js';
 import { routeProviderRequest, normalizeStepOutput, validateStepSchema, retryWithProvider } from '../lib/provider-router.js';
+import { validatePublicationReadiness, buildPublicationReport } from '../lib/publication-validator.js';
 
 const COST_PER_TOKEN   = 0.0000002;
 const HOURLY_TOKEN_LIMIT = 200_000;
@@ -62,6 +63,7 @@ export async function onRequestPost(context) {
     case 'score_leads':          return handleScoreLeads(body, userId, openaiKey, cors);
     case 'run_step7':            return handleRunStep7(body, userId, openaiKey, supabaseUrl, supabaseKey, env, cors);
     case 'save_step7':           return handleSaveStep7(body, userId, supabaseUrl, supabaseKey, env, cors);
+    case 'validate_publication': return handleValidatePublication(body, userId, supabaseUrl, supabaseKey, env, cors);
     case 'get_integration_status': return handleGetIntegrationStatus(env, cors);
     default:                     return errRes(`Unknown action: ${body.action}`, 400, cors);
   }
@@ -998,6 +1000,38 @@ async function handleSaveStrategy(body, userId, supabaseUrl, supabaseKey, env, c
   const stepsCompleted = Object.values(steps || {}).filter(Boolean).length;
   const status = stepsCompleted === 6 ? 'complete' : 'in_progress';
 
+  // ── PUBLICATION CONTRACT ENFORCEMENT ───────────────────────────
+  // Reject any step data where ALL values are null/undefined — these are
+  // corrupted save states and must not overwrite valid existing data.
+  const PLACEHOLDER_PATTERNS_RE = [
+    /^AI-inferred — validate$/i,
+    /^Demo placeholder — requires validation$/i,
+    /^Source data missing$/i,
+    /^missing data$/i,
+  ];
+  const isCorruptedStep = (stepData) => {
+    if (!stepData || typeof stepData !== 'object') return true;
+    const values = Object.values(stepData).filter(v => v !== undefined);
+    if (values.length === 0) return true;
+    // Corrupted = every non-null value is a placeholder string
+    const nonNull = values.filter(v => v !== null && v !== undefined && v !== '' && !Array.isArray(v) || (Array.isArray(v) && v.length > 0));
+    return nonNull.length === 0;
+  };
+
+  // Strip corrupted steps — do NOT persist null/placeholder-only step data
+  const sanitizedSteps = {};
+  for (let i = 1; i <= 6; i++) {
+    const stepData = steps?.[i];
+    if (stepData && !isCorruptedStep(stepData)) {
+      sanitizedSteps[i] = stepData;
+    } else if (stepData) {
+      console.warn(`[save_strategy] Rejecting corrupted step ${i} data for company="${company_name}"`);
+    }
+  }
+
+  const sanitizedStepsCompleted = Object.values(sanitizedSteps).filter(Boolean).length;
+  const sanitizedStatus = sanitizedStepsCompleted === 7 ? 'complete' : sanitizedStepsCompleted === 6 ? 'ready_for_step7' : 'in_progress';
+
   let sanitizedScrapedProfile = scraped_profile && typeof scraped_profile === 'object' ? { ...scraped_profile } : {};
   let sanitizedFullReport = full_report;
   const isDemo = detectDemoStrategyMarker(steps, sanitizedScrapedProfile, full_report, step_7_intelligence);
@@ -1013,26 +1047,28 @@ async function handleSaveStrategy(body, userId, supabaseUrl, supabaseKey, env, c
     industry:         industry ? sanitise(industry, 100) : null,
     company_url:      company_url || null,
     scraped_profile:  sanitizedScrapedProfile,
-    step_1_market:    steps?.[1] || null,
-    step_2_tam:       steps?.[2] || null,
-    step_3_icp:       steps?.[3] || null,
-    step_4_sourcing:  steps?.[4] || null,
-    step_5_keywords:  steps?.[5] || null,
-    step_6_messaging: steps?.[6] || null,
+    step_1_market:    sanitizedSteps[1] || null,
+    step_2_tam:       sanitizedSteps[2] || null,
+    step_3_icp:       sanitizedSteps[3] || null,
+    step_4_sourcing:  sanitizedSteps[4] || null,
+    step_5_keywords:  sanitizedSteps[5] || null,
+    step_6_messaging: sanitizedSteps[6] || null,
     step_7_intelligence: step_7_intelligence || null,
-    steps_completed:  stepsCompleted,
+    steps_completed:  sanitizedStepsCompleted,
     total_tokens:     total_tokens || 0,
-    status,
+    status:           sanitizedStatus,
     cache_key:        cacheKey,
     updated_at:       new Date().toISOString(),
     full_report:      sanitizedFullReport || null,
+    // publication_ready: false by default — only set to true after validate_publication passes
+    publication_ready: false,
     backend_intelligence: body.backend_intelligence || normalizeStrategy({
-      step_1_market:    steps?.[1] || null,
-      step_2_tam:       steps?.[2] || null,
-      step_3_icp:       steps?.[3] || null,
-      step_4_sourcing:  steps?.[4] || null,
-      step_5_keywords:  steps?.[5] || null,
-      step_6_messaging: steps?.[6] || null,
+      step_1_market:    sanitizedSteps[1] || null,
+      step_2_tam:       sanitizedSteps[2] || null,
+      step_3_icp:       sanitizedSteps[3] || null,
+      step_4_sourcing:  sanitizedSteps[4] || null,
+      step_5_keywords:  sanitizedSteps[5] || null,
+      step_6_messaging: sanitizedSteps[6] || null,
       step_7_intelligence: step_7_intelligence || null
     }, isDemo)
   };
@@ -1066,11 +1102,67 @@ async function handleSaveStrategy(body, userId, supabaseUrl, supabaseKey, env, c
   // Add integration context as additive metadata (no persistence required)
   const integrationContext = await buildIntegrationContext({}, env);
 
-  return okRes({ strategy_id: strategyId, cache_key: cacheKey, status, steps_completed: stepsCompleted, integration_context: integrationContext }, cors);
+  return okRes({ strategy_id: strategyId, cache_key: cacheKey, status: sanitizedStatus, steps_completed: sanitizedStepsCompleted, integration_context: integrationContext }, cors);
 }
 
 async function handleGetIntegrationStatus(env, cors) {
   return okRes({ integration: getIntegrationStatus(env) }, cors);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// VALIDATE PUBLICATION
+// Backend publication readiness gate.
+// Called by the frontend BEFORE enabling export buttons.
+// Also called after save_step7 to confirm full publication state.
+//
+// Accepts:
+//   { strategy_id }   → fetch strategy from DB and validate
+//   { strategy }      → validate inline strategy object (avoids DB round-trip)
+//
+// Returns:
+//   PublicationState { publicationReady, missingFields, invalidCharts,
+//                      failedProviders, incompleteSteps, warnings, score }
+// ══════════════════════════════════════════════════════════════════
+async function handleValidatePublication(body, userId, supabaseUrl, supabaseKey, env, cors) {
+  let strategy = body.strategy || null;
+
+  // If no inline strategy, fetch from DB
+  if (!strategy && body.strategy_id) {
+    if (!supabaseUrl || !supabaseKey) return errRes('Database not configured', 503, cors);
+    const sid = sanitise(body.strategy_id, 36);
+    const res = await sbFetch(supabaseUrl, supabaseKey, 'strategies', 'GET', null,
+      `?id=eq.${sid}&user_id=eq.${userId}&limit=1`);
+    if (!res.ok) return errRes('Failed to fetch strategy for validation', 500, cors);
+    const rows = await res.json();
+    strategy = rows[0] || null;
+  }
+
+  if (!strategy) return errRes('No strategy provided or found for validation', 400, cors);
+
+  const publicationState = validatePublicationReadiness(strategy);
+  const report           = buildPublicationReport(publicationState);
+
+  // Log result (backend only)
+  console.info(`[validate_publication] user=${userId} strategy=${body.strategy_id || 'inline'} ready=${publicationState.publicationReady} score=${publicationState.score}`);
+
+  // If publication is ready and strategy_id is provided, stamp publication_ready flag
+  if (publicationState.publicationReady && body.strategy_id && supabaseUrl && supabaseKey) {
+    const sid = sanitise(body.strategy_id, 36);
+    // Stamp publication_ready=true + publication_validated_at timestamp (best-effort, non-blocking)
+    sbFetch(supabaseUrl, supabaseKey, 'strategies', 'PATCH',
+      JSON.stringify({
+        publication_ready:        true,
+        publication_validated_at: new Date().toISOString(),
+        publication_score:        publicationState.score,
+      }),
+      `?id=eq.${sid}&user_id=eq.${userId}`
+    ).catch(e => console.warn('[validate_publication] stamp failed:', e.message));
+  }
+
+  return okRes({
+    ...publicationState,
+    report,
+  }, cors);
 }
 
 async function resolveCompanyProfile(company, providedProfile, userId, supabaseUrl, supabaseKey) {
@@ -1864,21 +1956,64 @@ async function handleSaveStep7(body, userId, supabaseUrl, supabaseKey, env, cors
   const { strategy_id, step_7_intelligence } = body;
   const sid = sanitise(strategy_id, 36);
 
-  // Fix 2: Fetch existing strategy context to ensure normalizeStrategy has full data (Steps 1-6)
+  // ── PUBLICATION CONTRACT: validate step 7 before saving ──────────
+  // Step 7 is the final gate — if it is corrupted, do NOT overwrite
+  // a valid existing step 7 in the database.
+  const S7_CRITICAL = ['signal_summary', 'go_no_go', 'executive_brief'];
+  const PLACEHOLDER_RE = [
+    /^AI-inferred — validate$/i,
+    /^Demo placeholder — requires validation$/i,
+    /^Source data missing$/i,
+    /^missing data$/i,
+  ];
+  const isPlaceholder = v =>
+    (v === null || v === undefined) ||
+    (typeof v === 'string' && PLACEHOLDER_RE.some(p => p.test(v.trim())));
+
+  const s7CriticalMissing = S7_CRITICAL.filter(f => {
+    const val = step_7_intelligence[f];
+    if (isPlaceholder(val)) return true;
+    if (Array.isArray(val) && val.length === 0) return false; // empty array OK
+    return false;
+  });
+
+  const s7IsEmpty = Object.keys(step_7_intelligence).length === 0;
+  const s7IsAllNull = Object.values(step_7_intelligence).every(v => v === null || v === undefined);
+
+  if (s7IsEmpty || s7IsAllNull) {
+    console.error(`[save_step7] Rejected: step_7_intelligence is empty or all-null for strategy=${sid}`);
+    return errRes('Step 7 data is empty — not persisted. Regenerate Step 7 before saving.', 422, cors);
+  }
+
+  // Fetch existing strategy context for normalizeStrategy (Steps 1–6 needed)
   const getRes = await sbFetch(supabaseUrl, supabaseKey, 'strategies', 'GET', null,
     `?id=eq.${sid}&user_id=eq.${userId}&limit=1`);
   const existingData = getRes.ok ? await getRes.json() : [];
   const existing = existingData[0] || {};
-  
+
   const fullStrategy = { ...existing, step_7_intelligence };
   const flags = deriveDemoModeState(fullStrategy);
   const backend_intelligence = normalizeStrategy(fullStrategy, flags.demo_mode);
 
+  // ── Run publication validation inline ────────────────────────────
+  // This gives the immediate publication state as part of the save response.
+  const publicationState = validatePublicationReadiness({
+    ...existing,
+    step_7_intelligence,
+    backend_intelligence,
+    steps_completed: (existing.steps_completed || 0),
+  });
+
   const res = await sbFetch(supabaseUrl, supabaseKey, 'strategies', 'PATCH',
-    JSON.stringify({ 
-      step_7_intelligence, 
+    JSON.stringify({
+      step_7_intelligence,
       backend_intelligence,
-      updated_at: new Date().toISOString() 
+      // Reset publication_ready — validate_publication action is the sole authority
+      // to stamp it true. Set to false here; frontend must call validate_publication.
+      publication_ready:        false,
+      publication_validated_at: null,
+      steps_completed:          Math.max(existing.steps_completed || 0, 7),
+      updated_at:               new Date().toISOString(),
     }),
     `?id=eq.${sid}&user_id=eq.${userId}`);
 
@@ -1887,7 +2022,27 @@ async function handleSaveStep7(body, userId, supabaseUrl, supabaseKey, env, cors
     return errRes('Failed to save Step 7: ' + e, 500, cors);
   }
 
-  return okRes({ saved: true, strategy_id }, cors);
+  // If publication is already ready (all 7 steps valid), stamp it now
+  if (publicationState.publicationReady) {
+    sbFetch(supabaseUrl, supabaseKey, 'strategies', 'PATCH',
+      JSON.stringify({
+        publication_ready:        true,
+        publication_validated_at: new Date().toISOString(),
+        publication_score:        publicationState.score,
+      }),
+      `?id=eq.${sid}&user_id=eq.${userId}`
+    ).catch(e => console.warn('[save_step7] publication stamp failed:', e.message));
+  }
+
+  return okRes({
+    saved:            true,
+    strategy_id,
+    publicationReady: publicationState.publicationReady,
+    publicationScore: publicationState.score,
+    incompleteSteps:  publicationState.incompleteSteps,
+    missingFields:    publicationState.missingFields,
+    warnings:         publicationState.warnings,
+  }, cors);
 }
 
 // ══════════════════════════════════════════════════════════════════
