@@ -43,9 +43,11 @@ export async function onRequestPost(context) {
   }
 
   const openaiKey   = env.OPENAI_API_KEY;
+  const geminiKey   = env.GEMINI_API_KEY;
+  const groqKey     = env.GROQ_API_KEY;
   const supabaseUrl = env.SUPABASE_URL;
   const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!openaiKey) return errRes('OpenAI not configured', 503, cors);
+  if (!openaiKey && !geminiKey && !groqKey) return errRes('No AI provider configured', 503, cors);
 
   let body;
   try { body = await request.json(); }
@@ -174,28 +176,118 @@ Return ONLY this JSON with nulls for unresolvable fields:
   "extraction_notes": "${fetchErr || 'No content extracted'}"
 }`;
 
-  // ── STEP 5: AI analysis ─────────────────────────────────────────
+  // ── STEP 5: AI analysis — provider waterfall ────────────────────
+  // OpenAI → Gemini → Groq. Each failure advances to the next.
+  // A 429 (rate limit) on OpenAI no longer kills the request.
   let profile;
-  try {
-    const aiRes = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini', temperature: 0.05, max_tokens: 1000,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user',   content: userPrompt },
-        ],
-      }),
-    });
-    if (!aiRes.ok) return errRes(`OpenAI error ${aiRes.status}`, aiRes.status, cors);
-    const d     = await aiRes.json();
-    const raw   = d.choices?.[0]?.message?.content || '{}';
-    const clean = raw.replace(/```json|```/g, '').trim();
-    const m     = clean.match(/\{[\s\S]*\}/);
-    profile     = JSON.parse(m ? m[0] : clean);
-  } catch (e) {
-    return errRes('AI extraction failed: ' + e.message, 500, cors);
+  const TIMEOUT_MS = 15_000;
+
+  async function callWithTimeout(url, options) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+    try {
+      return await fetch(url, { ...options, signal: controller.signal });
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  function parseAIResponse(raw) {
+    const clean = (raw || '{}').replace(/```json|```/g, '').trim();
+    const m = clean.match(/\{[\s\S]*\}/);
+    try { return JSON.parse(m ? m[0] : clean); } catch { return null; }
+  }
+
+  const providers = [
+    {
+      name: 'openai',
+      available: !!openaiKey,
+      call: async () => {
+        const res = await callWithTimeout('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
+          body: JSON.stringify({ model: 'gpt-4o-mini', temperature: 0.05, max_tokens: 1000,
+            messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }] }),
+        });
+        if (!res.ok) throw new Error(`OpenAI ${res.status}`);
+        const d = await res.json();
+        return d.choices?.[0]?.message?.content;
+      },
+    },
+    {
+      name: 'gemini',
+      available: !!geminiKey,
+      call: async () => {
+        const res = await callWithTimeout(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${geminiKey}`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              contents: [{ parts: [{ text: systemPrompt + '\n\n' + userPrompt }] }],
+              generationConfig: { temperature: 0.05, maxOutputTokens: 1000 },
+            }),
+          }
+        );
+        if (!res.ok) throw new Error(`Gemini ${res.status}`);
+        const d = await res.json();
+        return d?.candidates?.[0]?.content?.parts?.[0]?.text;
+      },
+    },
+    {
+      name: 'groq',
+      available: !!groqKey,
+      call: async () => {
+        const res = await callWithTimeout('https://api.groq.com/openai/v1/chat/completions', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${groqKey}` },
+          body: JSON.stringify({ model: 'llama3-8b-8192', temperature: 0.05, max_tokens: 1000,
+            messages: [{ role: 'system', content: systemPrompt }, { role: 'user', content: userPrompt }] }),
+        });
+        if (!res.ok) throw new Error(`Groq ${res.status}`);
+        const d = await res.json();
+        return d.choices?.[0]?.message?.content;
+      },
+    },
+  ];
+
+  let providerUsed = null;
+  for (const provider of providers) {
+    if (!provider.available) continue;
+    try {
+      const raw = await provider.call();
+      const parsed = parseAIResponse(raw);
+      if (parsed && typeof parsed === 'object') {
+        profile = parsed;
+        providerUsed = provider.name;
+        break;
+      }
+      console.warn(`[analyze-website] ${provider.name} returned unparseable output — trying next`);
+    } catch (e) {
+      console.warn(`[analyze-website] ${provider.name} failed (${e.message}) — trying next provider`);
+    }
+  }
+
+  if (!profile) {
+    // All providers failed — return safe fallback profile so the rest of the pipeline still runs
+    console.error('[analyze-website] All AI providers failed — using extraction-only fallback');
+    profile = {
+      company_name:          company_name || entities.tech_stack[0] || null,
+      company_overview:      extraction.text.slice(0, 300) || null,
+      services:              [],
+      industry:              null,
+      target_market:         null,
+      geography:             null,
+      employee_range:        null,
+      tech_stack_hints:      entities.tech_stack,
+      competitors_mentioned: entities.competitors,
+      value_propositions:    [],
+      founded_year:          entities.founded_year,
+      social_links:          entities.social_links,
+      extraction_confidence: 'LOW',
+      extraction_notes:      'All AI providers failed — extraction-only fallback used',
+    };
+    providerUsed = 'fallback';
   }
 
   const result = {
@@ -207,6 +299,7 @@ Return ONLY this JSON with nulls for unresolvable fields:
       fetch_error:     fetchErr,
       chars_extracted: extraction.text.length,
       duration_ms:     Date.now() - t0,
+      provider_used:   providerUsed,
       _cached_at:      Date.now(),
     },
   };
