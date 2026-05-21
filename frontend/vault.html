@@ -1,0 +1,1648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Strategy Vault · ABE AI Revenue Infrastructure</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- html2canvas and jsPDF removed — PDF rendering is backend-only via /api/export-pdf -->
+  <script src="auth-guard.js"></script>
+  <script src="tour.js"></script>
+
+  <script src="ga4-tag.js"></script>
+
+  <style>
+    :root {
+      --bg: #0B0F1A; --bg-alt: #0D1120; --card: #121827;
+      --border: #1F2937; --accent: #a855f7; --accent2: #7c3aed;
+      --green: #22c55e; --amber: #f59e0b; --red: #ef4444; --blue: #3b82f6;
+      --text: #E5E7EB; --muted: #6B7280; --white: #ffffff;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+    body::before {
+      content: ''; position: fixed; inset: 0; z-index: 0; pointer-events: none;
+      background-image: linear-gradient(rgba(168,85,247,0.02) 1px, transparent 1px), linear-gradient(90deg, rgba(168,85,247,0.02) 1px, transparent 1px);
+      background-size: 48px 48px;
+    }
+
+    /* NAV */
+    /* ── MOBILE NAV ── */
+    #mobile-menu-btn {
+      display: none;
+      flex-direction: column;
+      gap: 5px;
+      cursor: pointer;
+      padding: 8px;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 8px;
+    }
+    #mobile-menu-btn span {
+      width: 20px; height: 2px;
+      background: #9ca3af;
+      border-radius: 2px;
+      transition: all 0.3s;
+      display: block;
+    }
+    #mobile-menu-btn.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+    #mobile-menu-btn.open span:nth-child(2) { opacity: 0; }
+    #mobile-menu-btn.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+    #mobile-nav-drawer {
+      display: none;
+      position: fixed;
+      top: 58px; left: 0; right: 0;
+      background: rgba(11,15,26,0.98);
+      backdrop-filter: blur(24px);
+      border-bottom: 1px solid rgba(31,41,55,0.8);
+      padding: 16px 20px;
+      z-index: 99;
+      flex-direction: column;
+      gap: 4px;
+    }
+    #mobile-nav-drawer.open { display: flex; }
+    #mobile-nav-drawer a,
+    #mobile-nav-drawer button {
+      display: block; width: 100%;
+      padding: 12px 16px;
+      font-size: 11px; font-weight: 800;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      color: #9ca3af; text-decoration: none;
+      border-radius: 10px; border: none;
+      background: transparent; cursor: pointer;
+      text-align: left; transition: all 0.15s;
+    }
+    #mobile-nav-drawer a:hover,
+    #mobile-nav-drawer button:hover { background: rgba(168,85,247,0.1); color: white; }
+    #mobile-nav-drawer a.active-mobile { color: #a855f7; background: rgba(168,85,247,0.1); }
+    @media (max-width: 768px) {
+      #mobile-menu-btn { display: flex !important; }
+      .nav-center { display: none !important; }
+      .nav-right .status-label { display: none; }
+    }
+
+    /* ── TOAST NOTIFICATIONS ── */
+    #abe-toast {
+      position: fixed; bottom: 28px; right: 28px; z-index: 99998;
+      background: rgba(13,17,32,0.97);
+      border: 1px solid rgba(168,85,247,0.4);
+      border-radius: 14px; padding: 13px 18px;
+      font-size: 12px; font-weight: 700;
+      color: white; font-family: 'Inter', sans-serif;
+      display: flex; align-items: center; gap: 10px;
+      transform: translateY(16px) scale(0.96); opacity: 0;
+      transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+      backdrop-filter: blur(12px);
+      box-shadow: 0 8px 32px rgba(0,0,0,0.4);
+      max-width: 340px; pointer-events: none;
+    }
+    #abe-toast.show { transform: none; opacity: 1; pointer-events: auto; }
+    #abe-toast.toast-success { border-color: rgba(34,197,94,0.5); }
+    #abe-toast.toast-error   { border-color: rgba(239,68,68,0.5); }
+    #abe-toast.toast-info    { border-color: rgba(99,102,241,0.5); }
+
+    /* ── SKELETON LOADING ── */
+    .abe-skeleton {
+      background: linear-gradient(90deg,
+        rgba(31,41,55,0.6) 0%,
+        rgba(55,65,81,0.4) 50%,
+        rgba(31,41,55,0.6) 100%);
+      background-size: 200% 100%;
+      animation: abe-shimmer 1.5s infinite;
+      border-radius: 8px;
+    }
+    @keyframes abe-shimmer {
+      0%   { background-position: 200% 0; }
+      100% { background-position: -200% 0; }
+    }
+    .abe-skeleton-line {
+      height: 10px; border-radius: 5px; margin-bottom: 8px;
+    }
+    .abe-skeleton-card {
+      background: rgba(18,24,39,0.7);
+      border: 1px solid rgba(31,41,55,0.5);
+      border-radius: 20px; padding: 20px;
+    }
+
+    #topnav { position: sticky; top: 0; z-index: 100; background: rgba(11,15,26,0.95); backdrop-filter: blur(24px); border-bottom: 1px solid rgba(31,41,55,0.6); padding: 0 16px; display: flex; align-items: center; justify-content: space-between; height: 54px; gap: 8px; min-width: 0; overflow: hidden; }
+    .nav-brand { display: flex; align-items: center; gap: 6px; text-decoration: none; flex-shrink: 0; min-width: 0; }
+    .nav-mark { width: 32px; height: 32px; background: linear-gradient(135deg, var(--accent), var(--accent2)); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-family: 'Space Mono', monospace; font-size: 11px; font-weight: 700; color: white; }
+    .nav-brand-name { font-size: 11px; font-weight: 800; color: white; }
+    .nav-brand-sub { font-size: 7px; color: var(--muted); letter-spacing: 0.1em; text-transform: uppercase; display: none; }
+    .nav-tabs { display: flex; align-items: center; gap: 0; flex-shrink: 1; min-width: 0; overflow: visible; background: none; border: none; }
+    .nav-tab { font-size: 9px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); padding: 6px 10px; cursor: pointer; text-decoration: none; transition: all 0.15s; border: none; background: none; white-space: nowrap; border-bottom: 2px solid transparent; }
+    .nav-tab:hover { color: white; background: rgba(255,255,255,0.04); }
+    .nav-tab.active { color: white; background: none; border-bottom: 2px solid var(--accent); }
+    .nav-right { display: flex; align-items: center; gap: 5px; flex-shrink: 0; }
+    .btn { display: inline-flex; align-items: center; gap: 7px; padding: 8px 18px; font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; border-radius: 8px; cursor: pointer; border: none; transition: all 0.15s; text-decoration: none; }
+    .btn-primary { background: linear-gradient(135deg, var(--accent), var(--accent2)); color: white; }
+    .btn-primary:hover { opacity: .9; transform: translateY(-1px); }
+    .btn-outline { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+    .btn-outline:hover { border-color: var(--accent); color: white; }
+    .btn-sm { padding: 5px 12px; font-size: 9px; }
+    .btn-ghost { background: transparent; color: var(--muted); border: none; font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em; cursor: pointer; }
+    .btn-ghost:hover { color: white; }
+
+    /* PAGE LAYOUT */
+    .page-wrap { position: relative; z-index: 1; max-width: 1400px; margin: 0 auto; padding: 40px 32px; }
+    .page-header { display: flex; align-items: flex-end; justify-content: space-between; margin-bottom: 32px; }
+    .page-title { font-size: 28px; font-weight: 900; color: white; letter-spacing: -0.8px; }
+    .page-sub { font-size: 10px; text-transform: uppercase; letter-spacing: 0.25em; color: var(--accent); font-weight: 700; margin-bottom: 6px; }
+
+    /* STATS ROW */
+    .stats-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+    .stat-card { background: rgba(18,24,39,0.7); border: 1px solid var(--border); border-radius: 16px; padding: 22px 24px; }
+    .stat-value { font-size: 28px; font-weight: 900; color: white; font-family: 'Space Mono', monospace; letter-spacing: -1px; }
+    .stat-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.18em; color: var(--muted); font-weight: 700; margin-top: 4px; }
+
+    /* TOOLBAR */
+    .toolbar { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; }
+    .search-wrap { flex: 1; position: relative; }
+    .search-input { width: 100%; background: rgba(18,24,39,0.8); border: 1px solid var(--border); color: var(--text); font-size: 11px; padding: 10px 14px 10px 38px; border-radius: 10px; font-family: 'Inter', sans-serif; outline: none; transition: border-color 0.15s; }
+    .search-input:focus { border-color: var(--accent); }
+    .search-input::placeholder { color: var(--muted); }
+    .search-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); font-size: 14px; color: var(--muted); pointer-events: none; }
+    .filter-select { background: rgba(18,24,39,0.8); border: 1px solid var(--border); color: var(--text); font-size: 10px; font-weight: 700; padding: 10px 14px; border-radius: 10px; font-family: 'Inter', sans-serif; outline: none; cursor: pointer; text-transform: uppercase; letter-spacing: 0.08em; }
+    .filter-select:focus { border-color: var(--accent); }
+    .filter-select option { background: #121827; }
+
+    /* VAULT GRID */
+    .vault-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+    @media (max-width: 1100px) { .vault-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 700px)  { .vault-grid { grid-template-columns: 1fr; } }
+
+    .vault-card { background: rgba(18,24,39,0.7); border: 1px solid var(--border); border-radius: 16px; padding: 22px 24px; cursor: pointer; transition: all 0.2s; position: relative; }
+    .vault-card:hover { border-color: rgba(168,85,247,0.4); background: rgba(168,85,247,0.04); transform: translateY(-2px); }
+    .vault-card.selected { border-color: rgba(168,85,247,0.7); background: rgba(168,85,247,0.08); transform: none; }
+    .vault-card-checkbox { position:absolute;top:14px;left:14px;width:16px;height:16px;accent-color:var(--accent);cursor:pointer;z-index:5; }
+
+    /* ── Account Intelligence badge on vault card ── */
+    .vault-in-intel {
+      display:inline-flex;align-items:center;gap:4px;margin-top:4px;
+      font-size:9px;font-weight:800;color:#06b6d4;text-transform:uppercase;
+      letter-spacing:.1em;
+    }
+
+    /* ── Intelligence alert banner ── */
+    #intel-alert-bar {
+      display:none;position:fixed;top:64px;left:50%;transform:translateX(-50%);
+      z-index:500;min-width:420px;max-width:680px;
+      background:rgba(6,182,212,.1);border:1px solid rgba(6,182,212,.4);
+      border-radius:12px;padding:12px 18px;
+      backdrop-filter:blur(20px);box-shadow:0 8px 32px rgba(0,0,0,.4);
+      animation:slideDown .3s ease;
+    }
+    #intel-alert-bar.show { display:flex;align-items:center;gap:12px; }
+    .intel-alert-icon { font-size:20px;flex-shrink:0; }
+    .intel-alert-body { flex:1 }
+    .intel-alert-title { font-size:12px;font-weight:800;color:#06b6d4;margin-bottom:2px; }
+    .intel-alert-sub { font-size:11px;color:#94A3B8;line-height:1.4; }
+    .intel-alert-actions { display:flex;gap:6px;margin-top:6px; }
+    .intel-alert-btn { padding:4px 12px;border-radius:6px;font-size:10px;font-weight:800;
+      text-transform:uppercase;letter-spacing:.08em;cursor:pointer;border:none;font-family:inherit;
+      transition:all .15s; }
+    .intel-alert-btn.primary { background:linear-gradient(135deg,#06b6d4,#0891b2);color:white; }
+    .intel-alert-btn.dismiss { background:rgba(31,41,55,.6);color:#6B7280;
+      border:1px solid rgba(31,41,55,.8); }
+    .intel-alert-close { font-size:14px;color:#6B7280;cursor:pointer;background:none;
+      border:none;font-family:inherit;padding:2px 4px;flex-shrink:0; }
+    .intel-alert-close:hover { color:white; }
+    .vault-card-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 14px; padding-left: 24px; }
+    .vault-in-lm { display:inline-flex;align-items:center;gap:4px;font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.1em;color:#22c55e;background:rgba(34,197,94,.1);border:1px solid rgba(34,197,94,.2);border-radius:4px;padding:2px 7px;margin-top:4px; }
+    /* Vault bulk bar */
+    #vault-bulk-bar { display:none;background:linear-gradient(135deg,rgba(168,85,247,.12),rgba(99,102,241,.08));border:1px solid rgba(168,85,247,.25);border-radius:14px;padding:10px 18px;align-items:center;gap:10px;margin-bottom:16px;animation:slideDown .2s ease }
+    #vault-bulk-bar.active { display:flex }
+    @keyframes slideDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+    .vault-company { font-size: 15px; font-weight: 800; color: white; letter-spacing: -0.3px; }
+    .vault-industry { font-size: 9px; text-transform: uppercase; letter-spacing: 0.15em; color: var(--muted); font-weight: 700; margin-top: 3px; }
+    .vault-score { font-size: 22px; font-weight: 900; font-family: 'Space Mono', monospace; }
+    .vault-score.high { color: var(--green); }
+    .vault-score.med  { color: var(--amber); }
+    .vault-score.low  { color: var(--red); }
+    .vault-score-label { font-size: 8px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); text-align: right; }
+
+    .vault-meta { display: flex; gap: 12px; margin-bottom: 14px; }
+    .vault-meta-item { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); }
+    .vault-meta-item span { color: var(--text); }
+
+    .vault-icp { font-size: 10px; color: var(--muted); line-height: 1.5; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin-bottom: 8px; }
+    .vault-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 16px; padding-top: 14px; border-top: 1px solid rgba(31,41,55,0.5); }
+    .vault-steps { display: flex; gap: 4px; }
+    .step-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--border); }
+    .step-dot.done { background: var(--green); }
+    .vault-date { font-size: 9px; color: var(--muted); font-family: 'Space Mono', monospace; }
+    .vault-actions { display: flex; gap: 6px; opacity: 0; transition: opacity 0.15s; margin-top: 14px; }
+    .vault-card:hover .vault-actions { opacity: 1; }
+
+    .status-badge { font-size: 8px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.1em; padding: 3px 9px; border-radius: 5px; }
+    .status-complete    { background: rgba(34,197,94,0.1); color: var(--green); border: 1px solid rgba(34,197,94,0.2); }
+    .status-in_progress { background: rgba(245,158,11,0.1); color: var(--amber); border: 1px solid rgba(245,158,11,0.2); }
+    .status-archived    { background: rgba(107,114,128,0.1); color: var(--muted); border: 1px solid rgba(107,114,128,0.2); }
+    .status-demo        { background: rgba(168,85,247,0.12); color: #a855f7; border: 1px solid rgba(168,85,247,0.25); }
+    .status-live        { background: rgba(34,197,94,0.12); color: #22c55e; border: 1px solid rgba(34,197,94,0.2); }
+
+    /* LOADING / EMPTY */
+    #loading-grid { text-align: center; padding: 80px 20px; }
+    .spinner { width: 36px; height: 36px; border: 3px solid rgba(168,85,247,0.2); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; margin: 0 auto 16px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    #empty-state { display: none; text-align: center; padding: 80px 20px; }
+    .empty-icon { font-size: 48px; margin-bottom: 16px; }
+
+    /* STRATEGY DRAWER */
+    .drawer-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); backdrop-filter: blur(4px); z-index: 200; opacity: 0; pointer-events: none; transition: opacity 0.25s; }
+    .drawer-overlay.show { opacity: 1; pointer-events: all; }
+    #strategy-drawer { position: fixed; top: 0; right: -680px; width: 680px; height: 100vh; background: var(--bg-alt); border-left: 1px solid var(--border); z-index: 201; transition: right 0.3s cubic-bezier(0.4,0,0.2,1); display: flex; flex-direction: column; overflow: hidden; }
+    #strategy-drawer.open { right: 0; }
+    .drawer-header { padding: 28px 32px 20px; border-bottom: 1px solid var(--border); flex-shrink: 0; }
+    .drawer-company { font-size: 20px; font-weight: 900; color: white; letter-spacing: -0.5px; margin-bottom: 4px; }
+    .drawer-meta { font-size: 10px; color: var(--muted); margin-bottom: 16px; line-height: 1.6; }
+    .drawer-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+    .drawer-body { flex: 1; overflow-y: auto; padding: 20px 32px 32px; }
+    .drawer-close { position: absolute; top: 20px; right: 20px; width: 32px; height: 32px; border-radius: 8px; background: rgba(255,255,255,0.05); border: 1px solid var(--border); color: var(--muted); font-size: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s; }
+    .drawer-close:hover { color: white; border-color: var(--accent); }
+
+    /* DRAWER STEPS */
+    .drawer-step { border: 1px solid var(--border); border-radius: 12px; margin-bottom: 10px; overflow: hidden; }
+    .drawer-step-header { display: flex; align-items: center; gap: 10px; padding: 14px 16px; cursor: pointer; background: rgba(18,24,39,0.5); transition: background 0.15s; user-select: none; }
+    .drawer-step-header:hover { background: rgba(168,85,247,0.05); }
+    .drawer-step-num { width: 24px; height: 24px; border-radius: 50%; background: var(--accent); color: white; font-size: 10px; font-weight: 900; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .drawer-step-title { font-size: 12px; font-weight: 800; color: white; }
+    .drawer-step-body { display: none; padding: 16px; background: rgba(0,0,0,0.2); }
+    .drawer-step-body.open { display: block; }
+
+    /* DRAWER FIELDS */
+    .dfield { margin-bottom: 12px; }
+    .dfield-label { font-size: 8px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.18em; color: var(--muted); margin-bottom: 4px; }
+    .dfield-value { font-size: 11px; color: #D1D5DB; line-height: 1.7; background: rgba(0,0,0,0.3); border-radius: 6px; padding: 10px 12px; border-left: 3px solid var(--accent); }
+    .dtag-row { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 4px; }
+    .dtag { font-size: 9px; font-weight: 600; padding: 3px 9px; border-radius: 5px; background: rgba(168,85,247,0.1); color: var(--accent); border: 1px solid rgba(168,85,247,0.2); }
+    .dtag.green { background: rgba(34,197,94,0.1); color: var(--green); border-color: rgba(34,197,94,0.2); }
+    .email-card { background: rgba(168,85,247,0.05); border: 1px solid rgba(168,85,247,0.2); border-radius: 8px; padding: 12px 14px; margin-bottom: 10px; }
+    .email-card-angle { font-size: 8px; font-weight: 900; text-transform: uppercase; letter-spacing: 0.15em; color: var(--accent); margin-bottom: 6px; }
+    .email-card-subj  { font-size: 11px; font-weight: 800; color: white; margin-bottom: 8px; }
+    .email-card-body  { font-size: 11px; color: #D1D5DB; line-height: 1.6; white-space: pre-wrap; margin-bottom: 8px; }
+    .email-card-cta   { font-size: 10px; font-weight: 700; color: var(--accent); padding-top: 8px; border-top: 1px solid rgba(168,85,247,0.15); }
+
+    /* PDF SECTION SELECTOR MODAL */
+    .pdf-modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.75); backdrop-filter: blur(6px); z-index: 300; display: flex; align-items: center; justify-content: center; padding: 24px; }
+    .pdf-modal { background: #0D1120; border: 1px solid var(--border); border-radius: 20px; padding: 32px; width: 100%; max-width: 480px; }
+    .pdf-modal-title { font-size: 18px; font-weight: 900; color: white; letter-spacing: -.4px; margin-bottom: 4px; }
+    .pdf-modal-sub { font-size: 10px; text-transform: uppercase; letter-spacing: .2em; color: var(--accent); font-weight: 700; margin-bottom: 24px; }
+    .pdf-section-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 24px; }
+    .pdf-section-item { display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid var(--border); border-radius: 10px; cursor: pointer; transition: all .15s; }
+    .pdf-section-item:hover { border-color: rgba(168,85,247,.4); background: rgba(168,85,247,.04); }
+    .pdf-section-item input[type=checkbox] { accent-color: var(--accent); width: 15px; height: 15px; flex-shrink: 0; cursor: pointer; }
+    .pdf-section-item label { font-size: 11px; font-weight: 700; color: var(--text); cursor: pointer; flex: 1; }
+    .pdf-section-item .pdf-step-num { width: 22px; height: 22px; border-radius: 50%; background: linear-gradient(135deg, var(--accent), var(--accent2)); color: white; font-size: 9px; font-weight: 900; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+    .pdf-section-item.checked { border-color: rgba(168,85,247,.35); background: rgba(168,85,247,.06); }
+    .pdf-modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+    .pdf-progress { margin-top: 16px; font-size: 11px; color: var(--muted); text-align: center; display: none; }
+
+    /* TOAST */
+    #toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(80px); background: rgba(18,24,39,0.95); border: 1px solid var(--border); color: var(--text); font-size: 11px; font-weight: 700; padding: 12px 24px; border-radius: 10px; backdrop-filter: blur(16px); z-index: 999; transition: transform 0.3s; white-space: nowrap; }
+    #toast.show { transform: translateX(-50%) translateY(0); }
+    #toast.success { border-color: rgba(34,197,94,0.4); color: var(--green); }
+    #toast.error   { border-color: rgba(239,68,68,0.4);  color: var(--red); }
+  </style>
+</head>
+<body>
+
+<nav id="topnav">
+  <a href="dashboard.html" class="nav-brand">
+    <div class="nav-mark">ABE</div>
+    <div>
+      <div class="nav-brand-name">ABE</div>
+      <div class="nav-brand-sub">Enterprise AI Revenue Infrastructure</div>
+    </div>
+  </a>
+  <div class="nav-tabs">
+    <a href="dashboard.html"     class="nav-tab">Command Centre</a>
+    <a href="gtm-strategy.html"  class="nav-tab">GTM Strategy</a>
+    <a href="vault.html"         class="nav-tab active">Strategy Vault</a>
+    <a href="accounts.html"      class="nav-tab">Account Intelligence</a>
+    <a href="leads.html"         class="nav-tab">Lead Manager</a>
+  </div>
+  <div class="nav-right">
+    <button onclick="exportAllCSV()" class="btn btn-outline btn-sm">Export CSV</button>
+    <button onclick="refreshVault()" class="btn btn-outline btn-sm">↻ Refresh</button>
+    <a href="gtm-strategy.html" class="btn btn-primary btn-sm">+ New Strategy</a>
+    <button onclick="handleSignOut()" class="btn btn-outline btn-sm">Sign Out</button>
+  </div>
+
+  <button id="mobile-menu-btn" onclick="toggleMobileNav()" aria-label="Menu">
+    <span></span><span></span><span></span>
+  </button>
+</nav>
+<div id="mobile-nav-drawer">
+  <a href="index.html">Home</a>
+  <a href="dashboard.html">Command Centre</a>
+  <a href="gtm-strategy.html">GTM Strategy</a>
+  <button class="active-mobile" style="color:#a855f7;background:rgba(168,85,247,0.1)">Strategy Vault</button>
+  <a href="dashboard.html">Repository</a>
+  <button onclick="handleSignOut()" style="color:#ef4444;">Sign Out</button>
+</div>
+
+<div class="page-wrap">
+  <div class="page-header">
+    <div style="display:flex;align-items:center;gap:12px">
+      <button onclick="history.back()" style="background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);color:#6b7280;border-radius:8px;padding:6px 12px;font-size:10px;cursor:pointer;font-weight:700">← Back</button>
+      <div>
+        <div class="page-sub">Strategy Vault</div>
+        <div class="page-title">All GTM Reports</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Stats — click to filter -->
+  <div class="stats-row">
+    <div class="stat-card" onclick="filterVault('')" style="cursor:pointer" title="Show all strategies">
+      <div class="stat-value" id="stat-total">—</div><div class="stat-label">Total Strategies</div>
+    </div>
+    <div class="stat-card" onclick="filterVault('complete')" style="cursor:pointer" title="Show complete only">
+      <div class="stat-value" id="stat-complete">—</div><div class="stat-label">Complete</div>
+    </div>
+    <div class="stat-card" style="cursor:default">
+      <div class="stat-value" id="stat-avg-score">—</div><div class="stat-label">Avg GTM Score</div>
+    </div>
+    <div class="stat-card" style="cursor:default">
+      <div class="stat-value" id="stat-tokens">—</div><div class="stat-label">Total Tokens Used</div>
+    </div>
+  </div>
+
+  <!-- Bulk action bar -->
+  <div id="vault-bulk-bar">
+    <span id="vault-bulk-count" style="font-size:10px;font-weight:900;color:#c4b5fd;text-transform:uppercase;letter-spacing:.1em"></span>
+    <div style="flex:1"></div>
+    <button class="btn btn-sm" style="background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.3);border-radius:8px;padding:6px 14px;font-size:10px;font-weight:900;cursor:pointer" onclick="bulkSendToLeadManager()">→ Lead Manager</button>
+    <button id="btn-bulk-monitor" class="btn btn-sm" style="background:rgba(6,182,212,.12);color:#06b6d4;border:1px solid rgba(6,182,212,.3);border-radius:8px;padding:6px 14px;font-size:10px;font-weight:900;cursor:pointer" onclick="bulkMonitorIntelligence()">📡 Monitor in Account Intelligence</button>
+    <button class="btn btn-sm" style="background:rgba(239,68,68,.1);color:var(--red);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:6px 14px;font-size:10px;font-weight:900;cursor:pointer" onclick="bulkDeleteStrategies()">🗑 Delete</button>
+    <button class="btn btn-sm" style="background:rgba(107,114,128,.1);color:var(--muted);border:1px solid var(--border);border-radius:8px;padding:6px 14px;font-size:10px;font-weight:900;cursor:pointer" onclick="clearVaultSelection()">✕ Clear</button>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input class="search-input" id="search-input" placeholder="Search by company or industry…" oninput="debounceSearch()" />
+    </div>
+    <select class="filter-select" id="filter-status" onchange="applyFilters()">
+      <option value="">All Statuses</option>
+      <option value="complete">Complete</option>
+      <option value="in_progress">In Progress</option>
+      <option value="archived">Archived</option>
+    </select>
+    <button id="vault-select-all-btn" class="btn btn-outline btn-sm" onclick="toggleSelectAll()" style="font-size:10px;white-space:nowrap">☐ Select All</button>
+  </div>
+
+  <!-- Loading -->
+  <div id="loading-grid">
+    <div class="spinner"></div>
+    <p style="color:var(--muted);font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.2em">Loading vault…</p>
+  </div>
+
+  <!-- Empty -->
+  <div id="empty-state">
+    <div class="empty-icon">🗄</div>
+    <p style="color:var(--muted);font-size:14px;margin-bottom:20px">No strategies saved yet.</p>
+    <a href="gtm-strategy.html" class="btn btn-primary">Generate Your First GTM Strategy</a>
+  </div>
+
+  <!-- Grid -->
+  <div id="vault-grid" class="vault-grid" style="display:none"></div>
+</div>
+
+<!-- Drawer overlay -->
+<div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
+
+<!-- Strategy drawer -->
+<div id="strategy-drawer">
+  <button class="drawer-close" onclick="closeDrawer()">✕</button>
+  <div class="drawer-header">
+    <div class="drawer-company" id="drawer-company">—</div>
+    <div class="drawer-meta"    id="drawer-meta">—</div>
+    <div class="drawer-actions" id="drawer-actions"></div>
+  </div>
+  <div class="drawer-body" id="drawer-body"></div>
+</div>
+
+<!-- PDF Section Selector Modal -->
+<div id="pdf-modal" style="display:none" class="pdf-modal-overlay">
+  <div class="pdf-modal">
+    <div class="pdf-modal-title">Export PDF Report</div>
+    <div class="pdf-modal-sub">Select sections to include</div>
+    <div class="pdf-section-list" id="pdf-section-list">
+      <div class="pdf-section-item checked" onclick="togglePdfSection(this,1)">
+        <input type="checkbox" id="ps1" checked>
+        <div class="pdf-step-num">1</div>
+        <label for="ps1">Market Research & Company Overview</label>
+      </div>
+      <div class="pdf-section-item checked" onclick="togglePdfSection(this,2)">
+        <input type="checkbox" id="ps2" checked>
+        <div class="pdf-step-num">2</div>
+        <label for="ps2">TAM Mapping & Market Sizing</label>
+      </div>
+      <div class="pdf-section-item checked" onclick="togglePdfSection(this,3)">
+        <input type="checkbox" id="ps3" checked>
+        <div class="pdf-step-num">3</div>
+        <label for="ps3">Ideal Customer Profile (ICP)</label>
+      </div>
+      <div class="pdf-section-item checked" onclick="togglePdfSection(this,4)">
+        <input type="checkbox" id="ps4" checked>
+        <div class="pdf-step-num">4</div>
+        <label for="ps4">Account Sourcing Strategy</label>
+      </div>
+      <div class="pdf-section-item checked" onclick="togglePdfSection(this,5)">
+        <input type="checkbox" id="ps5" checked>
+        <div class="pdf-step-num">5</div>
+        <label for="ps5">Intent Keywords & Boolean Search</label>
+      </div>
+      <div class="pdf-section-item checked" onclick="togglePdfSection(this,6)">
+        <input type="checkbox" id="ps6" checked>
+        <div class="pdf-step-num">6</div>
+        <label for="ps6">Outreach Messaging & Email Sequences</label>
+      </div>
+    </div>
+    <div class="pdf-modal-actions">
+      <button class="btn btn-outline" onclick="closePdfModal()">Cancel</button>
+      <button class="btn btn-primary" id="pdf-generate-btn" onclick="confirmPdfExport()">⬇ Generate PDF</button>
+    </div>
+    <div class="pdf-progress" id="pdf-progress">⏳ Building your report… this takes 10–20 seconds</div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast">✓ <span id="toast-msg">Done</span></div>
+
+<!-- ── Account Intelligence Alert Bar ── -->
+<div id="intel-alert-bar">
+  <div class="intel-alert-icon">📡</div>
+  <div class="intel-alert-body">
+    <div class="intel-alert-title" id="intel-alert-title">Intent signal detected</div>
+    <div class="intel-alert-sub" id="intel-alert-sub">A monitored company has a new buying signal.</div>
+    <div class="intel-alert-actions">
+      <button class="intel-alert-btn primary" onclick="goToIntelligence()">View Account Intelligence →</button>
+      <button class="intel-alert-btn dismiss" onclick="dismissIntelAlert()">Dismiss</button>
+    </div>
+  </div>
+  <button class="intel-alert-close" onclick="dismissIntelAlert()">✕</button>
+</div>
+
+<script>
+/* ─────────────────────────────────────────────────────────────────
+   VAULT STATE
+───────────────────────────────────────────────────────────────── */
+let allStrategies  = [];
+let _searchTimer   = null;
+let _vaultSelected = new Set();
+
+/* ─────────────────────────────────────────────────────────────────
+   HELPER: authenticated API call (always includes Bearer token)
+───────────────────────────────────────────────────────────────── */
+async function apiCall(endpoint, body) {
+  const token = await window.APP.token();
+  const res = await fetch(endpoint, {
+    method:  'POST',
+    headers: {
+      'Content-Type':  'application/json',
+      'Authorization': `Bearer ${token}`,
+    },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+  return data;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   INIT — wait for auth-guard then load
+───────────────────────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', () => {
+  const interval = setInterval(() => {
+    if (window.APP?.user) {
+      clearInterval(interval);
+      loadVault();
+    }
+  }, 100);
+});
+
+async function loadVault() {
+  try {
+    const data = await apiCall('/api/gtm', { action: 'get_vault', limit: 100, offset: 0 });
+    allStrategies = data.strategies || [];
+    // Verify which companies are ACTUALLY in Account Intelligence
+    // by checking against the live API (background, non-blocking)
+    syncIntelBadgesFromAPI();
+    renderVault(allStrategies);
+    updateStats(allStrategies);
+  } catch(e) {
+    document.getElementById('loading-grid').style.display = 'none';
+    document.getElementById('empty-state').style.display  = 'block';
+    showToast('Failed to load vault: ' + e.message, 'error');
+  }
+}
+
+function getStrategyModeBadge(s) {
+  const isDemo = !!(
+    s?.report_mode === 'demo' ||
+    s?.demo_mode === true ||
+    s?.full_report?.demo_mode === true ||
+    s?.scraped_profile?.demo_mode === true ||
+    s?.step_1_market?.demo_mode === true ||
+    s?.step_2_tam?.demo_mode === true ||
+    s?.step_3_icp?.demo_mode === true ||
+    s?.step_4_sourcing?.demo_mode === true ||
+    s?.step_5_keywords?.demo_mode === true ||
+    s?.step_6_messaging?.demo_mode === true ||
+    s?.step_7_intelligence?.demo_mode === true
+  );
+  if (isDemo) return { label: 'DEMO', class: 'status-demo' };
+  const isLive = !!(
+    s?.report_mode === 'live' ||
+    s?.demo_mode === false ||
+    s?.scraped_profile?.report_mode === 'live' ||
+    s?.full_report?.report_mode === 'live' ||
+    (s?.steps_completed >= 6 && s?.status === 'complete')
+  );
+  if (isLive) return { label: 'LIVE', class: 'status-live' };
+  return null;
+}
+
+function refreshVault() { loadVault(); showToast('Refreshing…'); }
+
+/* ─────────────────────────────────────────────────────────────────
+   RENDER VAULT GRID
+───────────────────────────────────────────────────────────────── */
+function renderVault(strategies) {
+  document.getElementById('loading-grid').style.display = 'none';
+  const grid  = document.getElementById('vault-grid');
+  const empty = document.getElementById('empty-state');
+
+  if (!strategies.length) {
+    grid.style.display  = 'none';
+    empty.style.display = 'block';
+    return;
+  }
+
+  empty.style.display = 'none';
+  grid.style.display  = 'grid';
+
+  grid.innerHTML = strategies.map(s => {
+    const score      = s.gtm_score;
+    const scoreClass = score >= 80 ? 'high' : score >= 60 ? 'med' : 'low';
+    const steps      = s.steps_completed || 0;
+    const date       = new Date(s.updated_at).toLocaleDateString('en-GB', { day:'2-digit', month:'short', year:'numeric' });
+    const statusKey  = (s.status || 'in_progress').replace(' ', '_');
+    const inLM       = localStorage.getItem('vault_in_lm_' + s.id) === '1';
+    const isSelected = _vaultSelected.has(s.id);
+    const modeBadge  = getStrategyModeBadge(s);
+
+    return `
+    <div class="vault-card${isSelected ? ' selected' : ''}" id="vcard-${s.id}" onclick="openDrawer('${s.id}')">
+      <input type="checkbox" class="vault-card-checkbox" id="vck-${s.id}"
+        ${isSelected ? 'checked' : ''}
+        onchange="toggleVaultCard('${s.id}',this.checked)"
+        onclick="event.stopPropagation()" />
+      <div class="vault-card-header">
+        <div>
+          <div class="vault-company">${esc(s.company_name)}</div>
+          <div class="vault-industry">${esc(s.industry || 'General Market')}</div>
+          ${modeBadge ? `<div style="margin-top:6px;"><span class="status-badge ${modeBadge.class}">${modeBadge.label}</span></div>` : ''}
+          ${inLM ? `<div class="vault-in-lm">✓ In Lead Manager</div>` : ''}
+        </div>
+        <div style="text-align:right;">
+          ${score
+            ? `<div class="vault-score ${scoreClass}">${score}</div><div class="vault-score-label">GTM Score</div>`
+            : `<span class="status-badge status-${statusKey}">${s.status || 'in progress'}</span>`
+          }
+        </div>
+      </div>
+      <div class="vault-meta">
+        <div class="vault-meta-item"><span>${steps}/6</span> Steps</div>
+        ${s.tam_size ? `<div class="vault-meta-item">TAM <span>${esc(s.tam_size)}</span></div>` : ''}
+        <div class="vault-meta-item"><span>${(s.total_tokens || 0).toLocaleString()}</span> Tokens</div>
+      </div>
+      ${s.primary_icp ? `<div class="vault-icp">${esc(s.primary_icp)}</div>` : ''}
+      <div class="vault-footer">
+        <div class="vault-steps">
+          ${[1,2,3,4,5,6].map(i => `<div class="step-dot ${i <= steps ? 'done' : ''}"></div>`).join('')}
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <span class="status-badge status-${statusKey}">${(s.status||'in progress').replace('_',' ')}</span>
+          <span class="vault-date">${date}</span>
+        </div>
+      </div>
+      <div class="vault-actions" onclick="event.stopPropagation()">
+        <button class="btn btn-primary btn-sm" onclick="openDrawer('${s.id}')">Open</button>
+        <a href="report.html?id=${s.id}" class="btn btn-primary btn-sm" onclick="event.stopPropagation()" style="background:linear-gradient(135deg,#a855f7,#7c3aed);font-weight:800">📄 Full Report</a>
+        <button class="btn btn-outline btn-sm" data-send-id="${s.id}" onclick="sendToLeadManager('${s.id}','${escDQ(s.company_name)}','${escDQ(s.industry||'')}','${escDQ(s.primary_icp||'')}','${escDQ(s.company_url||'')}',${s.gtm_score||0});event.stopPropagation()" style="color:#22c55e;border-color:rgba(34,197,94,.3)">→ LM</button>
+        <button class="btn btn-ghost btn-sm" style="color:var(--red)" onclick="deleteStrategy('${s.id}','${escDQ(s.company_name)}');event.stopPropagation()" title="Delete">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function updateStats(strategies) {
+  document.getElementById('stat-total').textContent    = strategies.length;
+  document.getElementById('stat-complete').textContent = strategies.filter(s => s.status === 'complete').length;
+  const scores = strategies.map(s => s.gtm_score).filter(Boolean);
+  document.getElementById('stat-avg-score').textContent = scores.length
+    ? Math.round(scores.reduce((a,b) => a+b, 0) / scores.length)
+    : '—';
+  const tok = strategies.reduce((sum, s) => sum + (s.total_tokens || 0), 0);
+  document.getElementById('stat-tokens').textContent = tok > 1000 ? (tok / 1000).toFixed(1) + 'k' : tok;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   SEARCH + FILTER
+───────────────────────────────────────────────────────────────── */
+function debounceSearch() {
+  clearTimeout(_searchTimer);
+  _searchTimer = setTimeout(applyFilters, 300);
+}
+
+function filterVault(status) {
+  document.getElementById('filter-status').value = status;
+  applyFilters();
+}
+
+function applyFilters() {
+  const q      = document.getElementById('search-input').value.toLowerCase().trim();
+  const status = document.getElementById('filter-status').value;
+  const filtered = allStrategies.filter(s => {
+    const matchQ = !q || s.company_name.toLowerCase().includes(q) || (s.industry || '').toLowerCase().includes(q);
+    const matchS = !status || s.status === status;
+    return matchQ && matchS;
+  });
+  renderVault(filtered);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   STRATEGY DRAWER
+───────────────────────────────────────────────────────────────── */
+let _openStrategyId = null;
+
+async function openDrawer(strategyId) {
+  _openStrategyId = strategyId;
+  document.getElementById('strategy-drawer').classList.add('open');
+  document.getElementById('drawer-overlay').classList.add('show');
+  document.getElementById('drawer-company').textContent = 'Loading…';
+  document.getElementById('drawer-meta').textContent    = '';
+  document.getElementById('drawer-body').innerHTML      = '<div style="padding:40px;color:var(--muted);text-align:center;">Loading strategy…</div>';
+
+  try {
+    const data = await apiCall('/api/gtm', { action: 'get_strategy', strategy_id: strategyId });
+    if (data.error) throw new Error(data.error);
+    renderDrawer(data.strategy);
+  } catch(e) {
+    document.getElementById('drawer-body').innerHTML = `<div style="padding:20px;color:var(--red);">Failed to load: ${e.message}</div>`;
+  }
+}
+
+async function deleteStrategy(strategyId, companyName) {
+  if (!confirm(`Delete the GTM strategy for "${companyName}"?\nThis cannot be undone.`)) return;
+  try {
+    const res = await apiCall('/api/gtm', { action: 'delete_strategy', strategy_id: strategyId });
+    if (res.error) throw new Error(res.error);
+    closeDrawer();
+    showVaultToast(`"${companyName}" deleted from vault`);
+    setTimeout(() => loadVault(), 500);
+  } catch(e) {
+    showVaultToast('Delete failed: ' + e.message, true);
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   VAULT BULK SELECTION
+───────────────────────────────────────────────────────────────── */
+function toggleVaultCard(id, checked) {
+  if (checked) {
+    _vaultSelected.add(id);
+  } else {
+    _vaultSelected.delete(id);
+  }
+  const card = document.getElementById('vcard-' + id);
+  if (card) card.classList.toggle('selected', checked);
+  updateVaultBulkBar();
+}
+
+function updateVaultBulkBar() {
+  const bar   = document.getElementById('vault-bulk-bar');
+  const count = document.getElementById('vault-bulk-count');
+  const n     = _vaultSelected.size;
+  if (n > 0) {
+    bar.classList.add('active');
+    count.textContent = `${n} selected`;
+  } else {
+    bar.classList.remove('active');
+  }
+}
+
+function clearVaultSelection() {
+  _vaultSelected.clear();
+  document.querySelectorAll('.vault-card-checkbox').forEach(cb => { cb.checked = false; });
+  document.querySelectorAll('.vault-card').forEach(c => c.classList.remove('selected'));
+  const btn = document.getElementById('vault-select-all-btn');
+  if (btn) btn.textContent = '☐ Select All';
+  updateVaultBulkBar();
+}
+
+function toggleSelectAll() {
+  const all  = Array.from(document.querySelectorAll('.vault-card-checkbox'));
+  const btn  = document.getElementById('vault-select-all-btn');
+  const allChecked = all.every(cb => cb.checked);
+  all.forEach(cb => {
+    cb.checked = !allChecked;
+    const id = cb.id.replace('vck-', '');
+    toggleVaultCard(id, !allChecked);
+  });
+  if (btn) btn.textContent = allChecked ? '☐ Select All' : '☑ Deselect All';
+}
+
+async function bulkSendToLeadManager() {
+  if (!_vaultSelected.size) return;
+  const ids = Array.from(_vaultSelected);
+  const strategies = allStrategies.filter(s => ids.includes(s.id));
+  const btn = document.querySelector('#vault-bulk-bar button');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Sending…'; }
+
+  let sent = 0, dupes = 0, failed = 0;
+  for (const s of strategies) {
+    try {
+      const token = await window.APP.token();
+      const res = await fetch('/api/leads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({
+          action: 'import', source_type: 'csv',
+          source_file: 'Strategy Vault — ' + s.company_name,
+          vault_import: true,
+          field_mapping: { name:'name', company:'company', website:'website', industry:'industry', title:'title' },
+          leads: [{
+            name: s.company_name, company: s.company_name,
+            website: s.company_url || '', industry: s.industry || '',
+            title: 'Account (from GTM Strategy)',
+            notes: s.primary_icp ? 'ICP: ' + s.primary_icp : '',
+            icp_score: s.gtm_score || null,
+            priority: (s.gtm_score >= 75) ? 'HIGH' : (s.gtm_score >= 50) ? 'MEDIUM' : 'LOW',
+            status: 'analyzed',
+          }],
+        }),
+      });
+      const data = await res.json();
+      if (data.duplicate) { dupes++; }
+      else if (res.ok) {
+        sent++;
+        // Mark card with "In Lead Manager" badge
+        localStorage.setItem('vault_in_lm_' + s.id, '1');
+        const card = document.getElementById('vcard-' + s.id);
+        if (card && !card.querySelector('.vault-in-lm')) {
+          const nameEl = card.querySelector('.vault-company');
+          if (nameEl) {
+            const badge = document.createElement('div');
+            badge.className = 'vault-in-lm';
+            badge.textContent = '✓ In Lead Manager';
+            nameEl.parentNode.insertBefore(badge, nameEl.nextSibling.nextSibling);
+          }
+        }
+        // Update card's send button
+        const sendBtn = card?.querySelector('[data-send-id]');
+        if (sendBtn) {
+          sendBtn.textContent = '✓ Sent';
+          sendBtn.style.color = '#22c55e';
+          sendBtn.disabled = true;
+        }
+      } else { failed++; }
+    } catch(_) { failed++; }
+  }
+
+  clearVaultSelection();
+  if (btn) { btn.disabled = false; btn.textContent = '→ Lead Manager'; }
+
+  const parts = [];
+  if (sent)  parts.push(`${sent} added`);
+  if (dupes) parts.push(`${dupes} already exist`);
+  if (failed) parts.push(`${failed} failed`);
+  showVaultToast(
+    parts.join(', ') + ` — <a href="leads.html" style="color:#a855f7;font-weight:900">View Lead Manager →</a>`
+  );
+}
+
+async function bulkDeleteStrategies() {
+  const ids = Array.from(_vaultSelected);
+  if (!ids.length) return;
+  if (!confirm(`Delete ${ids.length} selected strategies? This cannot be undone.`)) return;
+
+  let deleted = 0;
+  for (const id of ids) {
+    try {
+      await apiCall('/api/gtm', { action: 'delete_strategy', strategy_id: id });
+      deleted++;
+      allStrategies = allStrategies.filter(s => s.id !== id);
+    } catch(_) {}
+  }
+  clearVaultSelection();
+  showVaultToast(`${deleted} strategies deleted`);
+  renderVault(allStrategies);
+  updateStats(allStrategies);
+}
+
+function showVaultToast(msg, isError) {
+  let t = document.getElementById('vault-toast');
+  if (!t) {
+    t = document.createElement('div');
+    t.id = 'vault-toast';
+    t.style.cssText = 'position:fixed;bottom:24px;right:24px;background:rgba(18,24,39,.97);border:1px solid rgba(168,85,247,.4);border-radius:10px;padding:12px 18px;font-size:11px;color:white;font-weight:700;z-index:999;transition:opacity .3s;max-width:320px;line-height:1.5';
+    document.body.appendChild(t);
+  }
+  t.innerHTML = msg;
+  t.style.borderColor = isError ? 'rgba(239,68,68,.4)' : 'rgba(168,85,247,.4)';
+  t.style.opacity = '1';
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => { t.style.opacity = '0'; }, 4000);
+}
+
+function escDQ(str) {
+  return String(str || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+}
+
+function formatAction(val) {
+  const map = {
+    email_sent: 'Email Sent', linkedin_sent: 'LinkedIn Outreach Sent',
+    call_done: 'Call Done', meeting_booked: 'Meeting Booked',
+    proposal_sent: 'Proposal Sent', deal_closed: 'Deal Closed',
+    not_interested: 'Not Interested', follow_up: 'Follow-up Scheduled',
+  };
+  return map[val] || val;
+}
+
+function saveVaultAction(strategyId, action) {
+  localStorage.setItem('vault_action_' + strategyId, action);
+  const el = document.getElementById('action-saved-' + strategyId);
+  if (el) {
+    el.style.display  = action ? 'block' : 'none';
+    el.textContent    = action ? '✓ Action recorded: ' + formatAction(action) : '';
+  }
+}
+
+async function sendToLeadManager(strategyId, companyName, industry, primaryIcp, website, gtmScore) {
+  // Use the button that triggered this — find it reliably via strategyId
+  const btn = document.querySelector(`[data-send-id="${strategyId}"]`) || event?.currentTarget || event?.target;
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Sending…'; }
+
+  try {
+    const token = await window.APP.token();
+    const res   = await fetch('/api/leads', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({
+        action:      'import',
+        source_type: 'csv',
+        source_file: 'Strategy Vault — ' + companyName,
+        // Flag so backend skips deterministicScore and uses gtm_score directly
+        vault_import: true,
+        // Pass field_mapping explicitly so AI detection is skipped — we know the field names
+        field_mapping: { name: 'name', company: 'company', website: 'website', industry: 'industry', title: 'title' },
+        leads: [{
+          name:      companyName,
+          company:   companyName,
+          website:   website   || '',
+          industry:  industry  || '',
+          title:     'Account (from GTM Strategy)',
+          notes:     primaryIcp ? 'ICP: ' + primaryIcp : '',
+          // Wire the vault's GTM Score directly as the ICP score so Lead Manager shows real data
+          icp_score: gtmScore || null,
+          priority:  gtmScore >= 75 ? 'HIGH' : gtmScore >= 50 ? 'MEDIUM' : 'LOW',
+          status:    'analyzed',
+        }],
+      }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+    if (data.duplicate) {
+      // Already in Lead Manager — update button but don't show error
+      if (btn) {
+        btn.textContent      = '✓ Already in Lead Manager';
+        btn.style.color      = '#f59e0b';
+        btn.style.background = 'rgba(245,158,11,.1)';
+        btn.style.borderColor = 'rgba(245,158,11,.4)';
+      }
+      showVaultToast(
+        `"${companyName}" is already in Lead Manager — <a href="leads.html" style="color:#a855f7;font-weight:900">View →</a>`
+      );
+      return;
+    }
+
+    if (btn) {
+      btn.textContent      = '✓ Saved to Lead Manager';
+      btn.style.color      = '#22c55e';
+      btn.style.background = 'rgba(34,197,94,.1)';
+      btn.style.borderColor = 'rgba(34,197,94,.4)';
+    }
+
+    // Mark card with "In Lead Manager" badge and persist in localStorage
+    localStorage.setItem('vault_in_lm_' + strategyId, '1');
+    const card = document.getElementById('vcard-' + strategyId);
+    if (card && !card.querySelector('.vault-in-lm')) {
+      const nameEl = card.querySelector('.vault-company');
+      if (nameEl) {
+        const badge = document.createElement('div');
+        badge.className = 'vault-in-lm';
+        badge.textContent = '✓ In Lead Manager';
+        nameEl.parentNode.insertBefore(badge, nameEl.nextSibling?.nextSibling || null);
+      }
+    }
+
+    // Show non-blocking toast with link — no confirm() dialog
+    showVaultToast(
+      `"${companyName}" added to Lead Manager — <a href="leads.html" style="color:#a855f7;font-weight:900">View now →</a>`
+    );
+
+  } catch(e) {
+    console.error('sendToLeadManager error:', e);
+    if (btn) {
+      btn.disabled    = false;
+      btn.textContent = '→ Lead Manager';
+      btn.style.color = '';
+      btn.style.background = '';
+    }
+    showVaultToast('Failed: ' + e.message, true);
+  }
+}
+
+
+
+function closeDrawer() {
+  document.getElementById('strategy-drawer').classList.remove('open');
+  document.getElementById('drawer-overlay').classList.remove('show');
+  _openStrategyId = null;
+}
+
+function renderDrawer(s) {
+  document.getElementById('drawer-company').textContent = s.company_name;
+  document.getElementById('drawer-meta').textContent    =
+    `${s.industry || 'General Market'} · ${s.steps_completed}/6 Steps · ${(s.total_tokens||0).toLocaleString()} tokens · ${new Date(s.updated_at).toLocaleDateString('en-GB')}`;
+
+  document.getElementById('drawer-actions').innerHTML = `
+    <a href="report.html?id=${s.id}" class="btn btn-primary btn-sm">📄 Full Report</a>
+    <button class="btn btn-outline btn-sm" onclick="exportStrategy('${s.id}')">⬇ PDF</button>
+    <button class="btn btn-outline btn-sm" onclick="copyStrategyText('${s.id}')">📋 Copy</button>
+    <a href="gtm-strategy.html?resume=${s.id}" class="btn btn-outline btn-sm">↻ Re-run</a>
+    <button class="btn btn-outline btn-sm" data-send-id="${s.id}" onclick="sendToLeadManager('${s.id}','${escDQ(s.company_name)}','${escDQ(s.industry||'')}','${escDQ(s.primary_icp||'')}','${escDQ(s.company_url||'')}',${s.gtm_score||0})" style="color:#22c55e;border-color:rgba(34,197,94,.4)">→ Lead Manager</button>
+    <button class="btn btn-ghost btn-sm" onclick="deleteStrategy('${s.id}','${escDQ(s.company_name)}')" style="color:var(--red)" title="Delete strategy">🗑</button>
+  `;
+
+  // Action tracking section
+  const actionKey = 'vault_action_' + s.id;
+  const savedAction = localStorage.getItem(actionKey) || '';
+  document.getElementById('drawer-body').innerHTML += `
+    <div style="margin-top:20px;padding-top:16px;border-top:1px solid rgba(255,255,255,.06)">
+      <div style="font-size:8px;font-weight:900;text-transform:uppercase;letter-spacing:.2em;color:#6b7280;margin-bottom:10px">Action Taken</div>
+      <select id="action-select-${s.id}" onchange="saveVaultAction('${s.id}',this.value)"
+        style="width:100%;background:rgba(0,0,0,.4);border:1px solid rgba(255,255,255,.1);color:white;border-radius:8px;padding:8px 12px;font-size:10px;font-weight:700;cursor:pointer;margin-bottom:8px">
+        <option value="">— Select action taken —</option>
+        <option value="email_sent" ${savedAction==='email_sent'?'selected':''}>✉ Email Sent</option>
+        <option value="linkedin_sent" ${savedAction==='linkedin_sent'?'selected':''}>💼 LinkedIn Outreach Sent</option>
+        <option value="call_done" ${savedAction==='call_done'?'selected':''}>📞 Call Done</option>
+        <option value="meeting_booked" ${savedAction==='meeting_booked'?'selected':''}>📅 Meeting Booked</option>
+        <option value="proposal_sent" ${savedAction==='proposal_sent'?'selected':''}>📋 Proposal Sent</option>
+        <option value="deal_closed" ${savedAction==='deal_closed'?'selected':''}>🏆 Deal Closed</option>
+        <option value="not_interested" ${savedAction==='not_interested'?'selected':''}>✗ Not Interested</option>
+        <option value="follow_up" ${savedAction==='follow_up'?'selected':''}>🔄 Follow-up Scheduled</option>
+      </select>
+      <div id="action-saved-${s.id}" style="font-size:9px;color:#22c55e;font-weight:700;display:${savedAction?'block':'none'}">
+        ✓ Action recorded: ${formatAction(savedAction)}
+      </div>
+    </div>
+  `;
+
+  const steps = [
+    { n:1, label:'Market Research',  data: s.step_1_market    },
+    { n:2, label:'TAM Mapping',      data: s.step_2_tam       },
+    { n:3, label:'ICP Modeling',     data: s.step_3_icp       },
+    { n:4, label:'Account Sourcing', data: s.step_4_sourcing  },
+    { n:5, label:'Keywords',         data: s.step_5_keywords  },
+    { n:6, label:'Messaging',        data: s.step_6_messaging },
+  ];
+
+  document.getElementById('drawer-body').innerHTML = steps.map(({ n, label, data }) => `
+    <div class="drawer-step">
+      <div class="drawer-step-header" onclick="toggleDrawerStep(${n})">
+        <div class="drawer-step-num">${n}</div>
+        <div class="drawer-step-title">${label}</div>
+        <div style="margin-left:auto;font-size:10px;color:${data ? 'var(--green)' : 'var(--muted)'}">
+          ${data ? '✓ Complete' : '— Not run'}
+        </div>
+        <span style="margin-left:8px;color:var(--muted);font-size:12px;" id="chevron-${n}">▼</span>
+      </div>
+      <div class="drawer-step-body" id="step-body-${n}">
+        ${data ? renderStepContent(n, data) : '<div style="padding:10px 0;font-size:11px;color:var(--muted);">This step has not been run yet.</div>'}
+      </div>
+    </div>
+  `).join('');
+}
+
+function toggleDrawerStep(n) {
+  const body = document.getElementById(`step-body-${n}`);
+  const chev = document.getElementById(`chevron-${n}`);
+  const isOpen = body.classList.contains('open');
+  body.classList.toggle('open', !isOpen);
+  if (chev) chev.textContent = isOpen ? '▼' : '▲';
+}
+
+function renderStepContent(n, d) {
+  if (!d) return '';
+  const field  = (lbl, val) => val ? `<div class="dfield"><div class="dfield-label">${lbl}</div><div class="dfield-value">${esc(String(val))}</div></div>` : '';
+  const tags   = (lbl, arr) => arr?.length ? `<div class="dfield"><div class="dfield-label">${lbl}</div><div class="dtag-row">${arr.map(t=>`<span class="dtag">${esc(t)}</span>`).join('')}</div></div>` : '';
+  const tagsG  = (lbl, arr) => arr?.length ? `<div class="dfield"><div class="dfield-label">${lbl}</div><div class="dtag-row">${arr.map(t=>`<span class="dtag green">${esc(t)}</span>`).join('')}</div></div>` : '';
+
+  switch(n) {
+    case 1: return field('Overview', d.company_overview) + field('Market Position', d.market_position) + field('Products/Services', d.products_services) + field('GTM Score', d.gtm_relevance_score ? `${d.gtm_relevance_score}/100 — ${d.gtm_relevance_reasoning||''}` : null) + tags('Growth Signals', d.growth_signals) + tags('Tech Stack', d.tech_stack_hints);
+    case 2: return field('TAM Overview', d.tam_overview) + `<div class="dfield"><div class="dfield-label">Key Metrics</div><div class="dtag-row"><span class="dtag green">${esc(d.tam_size_estimate||'—')}</span><span class="dtag">${esc(d.growth_rate||'—')}</span></div></div>` + field('Priority Opportunities', d.priority_opportunities);
+    case 3: return field('Primary ICP', d.primary_icp) + field('Firmographics', d.firmographics) + field('Core Pain Points', d.core_pain_points) + tags('Buying Triggers', d.buying_triggers) + tags('Decision Makers', d.decision_makers) + tags('Objections', d.objections);
+    case 4: return tagsG('Recommended Databases', d.recommended_databases) + field('Filter Criteria', d.filter_criteria) + field('Sourcing Playbook', d.sourcing_playbook) + field('Exclusion Criteria', d.exclusion_criteria);
+    case 5: return tagsG('Primary Keywords', d.primary_keywords) + tags('Secondary Keywords', d.secondary_keywords) + field('Boolean Query', d.boolean_query) + field('LinkedIn String', d.linkedin_search_strings);
+    case 6: return ['email_1','email_2','email_3'].map(k => {
+      const em = d[k]; if (!em) return '';
+      return `<div class="email-card"><div class="email-card-angle">${esc(em.angle||k)}</div><div class="email-card-subj">Subject: ${esc(em.subject||'—')}</div><div class="email-card-body">${esc(em.body||'—')}</div><div class="email-card-cta">→ ${esc(em.cta||'—')}</div></div>`;
+    }).join('') + field('Follow-up Sequence', d.follow_up_sequence) + field('LinkedIn Message', d.linkedin_message);
+    default: return `<pre style="font-size:10px;color:var(--muted);white-space:pre-wrap;">${JSON.stringify(d,null,2)}</pre>`;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   PDF EXPORT — handles both pdf_base64 and html2pdf fallback
+───────────────────────────────────────────────────────────────── */
+/* ─────────────────────────────────────────────────────────────────
+   PDF EXPORT — section selector + fixed html2pdf rendering
+───────────────────────────────────────────────────────────────── */
+let _pdfStrategyId = null;
+
+// Step 1: open the section selector modal
+function exportStrategy(strategyId) {
+  _pdfStrategyId = strategyId;
+  // Reset all checkboxes to checked
+  [1,2,3,4,5,6].forEach(n => {
+    const cb   = document.getElementById(`ps${n}`);
+    const item = cb?.closest('.pdf-section-item');
+    if (cb)   cb.checked = true;
+    if (item) item.classList.add('checked');
+  });
+  document.getElementById('pdf-progress').style.display = 'none';
+  document.getElementById('pdf-generate-btn').disabled  = false;
+  document.getElementById('pdf-generate-btn').textContent = '⬇ Generate PDF';
+  document.getElementById('pdf-modal').style.display = 'flex';
+}
+
+function togglePdfSection(item, n) {
+  const cb = document.getElementById(`ps${n}`);
+  if (!cb) return;
+  // Only toggle if click wasn't directly on checkbox (checkbox handles itself)
+  if (event.target !== cb) cb.checked = !cb.checked;
+  item.classList.toggle('checked', cb.checked);
+}
+
+function closePdfModal() {
+  document.getElementById('pdf-modal').style.display = 'none';
+  _pdfStrategyId = null;
+}
+
+// Step 2: user confirms — build filtered PDF via backend renderer
+// ARCHITECTURE: vault.html NEVER does client-side canvas rendering.
+// All PDF generation goes through POST /api/export-pdf.
+// Path A: Gotenberg active → backend returns application/pdf binary → download
+// Path B: Gotenberg not configured → backend returns JSON with html → offer HTML download
+async function confirmPdfExport() {
+  if (!_pdfStrategyId) return;
+
+  const selectedSteps = [1,2,3,4,5,6].filter(n =>
+    document.getElementById(`ps${n}`)?.checked
+  );
+  if (!selectedSteps.length) {
+    showToast('Select at least one section', 'error');
+    return;
+  }
+
+  const allSelected = selectedSteps.length === 6;
+
+  const btn  = document.getElementById('pdf-generate-btn');
+  const prog = document.getElementById('pdf-progress');
+  btn.disabled    = true;
+  btn.textContent = 'Building…';
+  prog.style.display = 'block';
+
+  try {
+    const token = await window.APP.token();
+    let postBody;
+
+    if (allSelected) {
+      // Prefer reportId when all sections selected
+      postBody = { reportId: _pdfStrategyId };
+    } else {
+      // Fetch and filter only when user selects specific sections
+      const { strategy } = await apiCall('/api/gtm', { action: 'get_strategy', strategy_id: _pdfStrategyId });
+      if (!strategy) throw new Error('Strategy not found');
+
+      // Zero out steps the user did not select so export-pdf skips them
+      const filtered = { ...strategy };
+      if (!selectedSteps.includes(1)) filtered.step_1_market    = null;
+      if (!selectedSteps.includes(2)) filtered.step_2_tam       = null;
+      if (!selectedSteps.includes(3)) filtered.step_3_icp       = null;
+      if (!selectedSteps.includes(4)) filtered.step_4_sourcing  = null;
+      if (!selectedSteps.includes(5)) filtered.step_5_keywords  = null;
+      if (!selectedSteps.includes(6)) filtered.step_6_messaging = null;
+
+      postBody = { strategy: filtered };
+    }
+
+    const pRes  = await fetch('/api/export-pdf', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body:    JSON.stringify(postBody),
+    });
+
+    // Log diagnostic headers
+    console.info(
+      '[vault/exportPDF] Engine:', pRes.headers.get('X-ABE-PDF-Engine') || 'unknown',
+      '| Path:', pRes.headers.get('X-ABE-Export-Path') || 'unknown',
+      '| Status:', pRes.status,
+    );
+
+    if (!pRes.ok) {
+      let errMsg = 'Export failed: HTTP ' + pRes.status;
+      try {
+        const ct = pRes.headers.get('Content-Type') || '';
+        const errBody = ct.includes('application/json') ? await pRes.json() : await pRes.text();
+        errMsg = errBody?.error || errBody?.message || String(errBody) || errMsg;
+      } catch (_) {}
+      throw new Error(errMsg);
+    }
+
+    const contentType = pRes.headers.get('Content-Type') || '';
+
+    // ── Path A: Gotenberg returned a real PDF binary ──────────────────
+    if (contentType.includes('application/pdf')) {
+      console.info('[vault/exportPDF] ✅ PDF binary received — triggering download');
+      const blob = await pRes.blob();
+      const disposition = pRes.headers.get('Content-Disposition') || '';
+      let filename = 'GTM_Report.pdf';
+      const fnMatch = disposition.match(/filename="([^"]+)"/);
+      if (fnMatch) {
+        filename = fnMatch[1];
+      } else if (typeof strategy !== 'undefined' && strategy.company_name) {
+        filename = strategy.company_name.replace(/[^a-zA-Z0-9]/g, '_') + '_GTM_Report.pdf';
+      }
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); a.remove();
+      window.URL.revokeObjectURL(url);
+      closePdfModal();
+      showToast('PDF downloaded ✓', 'success');
+      return;
+    }
+
+    // ── Path B: JSON fallback (Gotenberg not configured) ─────────────
+    const pData = await pRes.json();
+    if (pData.html) {
+      console.warn('[vault/exportPDF] Gotenberg not active — offering HTML download');
+      const blob = new Blob([pData.html], { type: 'text/html' });
+      const url  = window.URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = (pData.filename || 'GTM_Report').replace(/\.pdf$/, '.html');
+      document.body.appendChild(a); a.click(); a.remove();
+      window.URL.revokeObjectURL(url);
+      closePdfModal();
+      showToast('Saved as HTML — open in Chrome → Print → Save as PDF', 'info');
+      return;
+    }
+
+    throw new Error(pData.error || 'No content returned from server');
+
+  } catch(e) {
+    console.error('[vault/exportPDF]', e);
+    showToast('Export failed: ' + e.message, 'error');
+    if (e.message.includes('401') || e.message.includes('Unauthorized')) window.APP.signOut();
+    btn.disabled    = false;
+    btn.textContent = '⬇ Generate PDF';
+    prog.style.display = 'none';
+  }
+}
+
+// ── renderHtmlToPdf — REMOVED (Phase 22 architecture)
+// All PDF generation must go through POST /api/export-pdf (Gotenberg backend).
+async function renderHtmlToPdf(_html, _filename) {
+  throw new Error('renderHtmlToPdf removed; use /api/export-pdf');
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   ARCHIVE — via API (not direct Supabase SDK)
+───────────────────────────────────────────────────────────────── */
+async function archiveStrategy(strategyId) {
+  if (!confirm('Archive this strategy? You can restore it later.')) return;
+  try {
+    await apiCall('/api/gtm', { action: 'archive_strategy', strategy_id: strategyId });
+    allStrategies = allStrategies.filter(s => s.id !== strategyId);
+    renderVault(allStrategies);
+    updateStats(allStrategies);
+    closeDrawer();
+    showToast('Strategy archived', 'success');
+  } catch(e) {
+    showToast('Archive failed: ' + e.message, 'error');
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   EXPORT CSV LIST
+───────────────────────────────────────────────────────────────── */
+function exportAllCSV() {
+  if (!allStrategies.length) { showToast('No strategies to export', 'error'); return; }
+  const headers = ['Company','Industry','GTM Score','TAM Size','Steps Complete','Status','Tokens','Updated'];
+  const rows = allStrategies.map(s => [
+    s.company_name, s.industry || '', s.gtm_score || '', s.tam_size || '',
+    `${s.steps_completed || 0}/6`, s.status || '', s.total_tokens || 0,
+    new Date(s.updated_at).toLocaleDateString('en-GB'),
+  ]);
+  const csv  = [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\r\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a    = document.createElement('a');
+  a.href     = URL.createObjectURL(blob);
+  a.download = `strategy_vault_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  showToast(`Exported ${allStrategies.length} strategies ✓`, 'success');
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   COPY STRATEGY TEXT
+───────────────────────────────────────────────────────────────── */
+async function copyStrategyText(strategyId) {
+  try {
+    const { strategy: s } = await apiCall('/api/gtm', { action: 'get_strategy', strategy_id: strategyId });
+    let text = `GTM STRATEGY — ${s.company_name}\n${'='.repeat(50)}\n\n`;
+    const names = {
+      step_1_market:    'MARKET RESEARCH',
+      step_2_tam:       'TAM MAPPING',
+      step_3_icp:       'ICP MODELING',
+      step_4_sourcing:  'ACCOUNT SOURCING',
+      step_5_keywords:  'KEYWORDS',
+      step_6_messaging: 'MESSAGING',
+    };
+    for (const [k, label] of Object.entries(names)) {
+      if (s[k]) text += `${label}\n${'-'.repeat(30)}\n${JSON.stringify(s[k], null, 2)}\n\n`;
+    }
+    await navigator.clipboard.writeText(text);
+    showToast('Copied to clipboard ✓', 'success');
+  } catch(e) {
+    showToast('Copy failed: ' + e.message, 'error');
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   SIGN OUT
+───────────────────────────────────────────────────────────────── */
+async function handleSignOut() {
+  try { await window.APP.sb?.auth.signOut({ scope: 'local' }); } catch(_) {}
+  Object.keys(localStorage).forEach(k => {
+    if (k.startsWith('sb-') || k.includes('supabase')) localStorage.removeItem(k);
+  });
+  sessionStorage.clear();
+  window.location.replace('login.html');
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   UTILS
+───────────────────────────────────────────────────────────────── */
+function showToast(msg, type = '') {
+  const t = document.getElementById('toast');
+  t.className = type;
+  document.getElementById('toast-msg').textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 3200);
+}
+
+function esc(str) {
+  if (typeof str !== 'string') return String(str || '');
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   ACCOUNT INTELLIGENCE — BULK MONITOR
+   Sends selected companies to Account Intelligence (account-graph)
+   Identical pattern to bulkSendToLeadManager
+═══════════════════════════════════════════════════════════════ */
+/* ── Sync monitoring badges against live Account Intelligence data ── */
+async function syncIntelBadgesFromAPI() {
+  try {
+    const token = await window.APP.token();
+    const res = await fetch('/api/account-graph', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ action: 'get_hot_accounts', limit: 100, min_score: 0 }),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    const inIntel = new Set((data.accounts || []).map(a => (a.company_name || '').toLowerCase().trim()));
+
+    // Update localStorage to reflect reality
+    allStrategies.forEach(s => {
+      const key = 'vault_in_intel_' + s.id;
+      const nameMatch = inIntel.has((s.company_name || '').toLowerCase().trim());
+      if (nameMatch) {
+        localStorage.setItem(key, '1');
+      } else {
+        // Remove stale badge if company is NOT in Account Intelligence
+        localStorage.removeItem(key);
+      }
+    });
+  } catch(e) {
+    // Fail silently — badges stay as-is if API unreachable
+  }
+}
+
+async function bulkMonitorIntelligence() {
+  if (!_vaultSelected.size) return;
+  const ids = Array.from(_vaultSelected);
+  const strategies = allStrategies.filter(s => ids.includes(s.id));
+  const btn = document.getElementById('btn-bulk-monitor');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Adding…'; }
+
+  let added = 0, dupes = 0, failed = 0;
+  const errors = [];
+
+  for (const s of strategies) {
+    try {
+      const token = await window.APP.token();
+
+      const payload = {
+        action:   'add_company',
+        name:     (s.company_name || '').trim(),
+        domain:   s.company_url ? extractDomain(s.company_url) : '',
+        industry: s.industry || '',
+        size:     null,
+      };
+      console.log('[Monitor] Sending:', payload.name, '| domain:', payload.domain || '(none)');
+
+      const res = await fetch('/api/account-graph', {
+        method:  'POST',
+        headers: {
+          'Content-Type':  'application/json',
+          'Authorization': `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      let data = {};
+      try { data = await res.json(); } catch(_) {}
+
+      // Log full response for debugging
+      console.log('[Monitor] ' + s.company_name, res.status, data);
+
+      if (res.ok) {
+        added++;
+        localStorage.setItem('vault_in_intel_' + s.id, '1');
+        const card = document.getElementById('vcard-' + s.id);
+        if (card && !card.querySelector('.vault-in-intel')) {
+          const nameEl = card.querySelector('.vault-company');
+          if (nameEl) {
+            const badge = document.createElement('div');
+            badge.className = 'vault-in-intel';
+            badge.innerHTML = '📡 Monitoring';
+            nameEl.parentNode.insertBefore(badge, nameEl.nextSibling);
+          }
+        }
+      } else {
+        const errMsg = data.error || ('HTTP ' + res.status);
+        if (errMsg.toLowerCase().includes('duplicate') ||
+            errMsg.toLowerCase().includes('already') ||
+            res.status === 409) {
+          dupes++;
+          // Still mark as monitoring since it already exists
+          localStorage.setItem('vault_in_intel_' + s.id, '1');
+        } else {
+          failed++;
+          errors.push(s.company_name + ': ' + errMsg);
+          console.error('[Monitor FAIL] ' + s.company_name, res.status, data);
+        }
+      }
+    } catch (e) {
+      failed++;
+      errors.push(s.company_name + ': ' + e.message);
+      console.error('[Monitor ERROR] ' + s.company_name, e);
+    }
+  }
+
+  clearVaultSelection();
+  if (btn) { btn.disabled = false; btn.textContent = '📡 Monitor in Account Intelligence'; }
+
+  // Build result message
+  const parts = [];
+  if (added)  parts.push(added + ' added ✓');
+  if (dupes)  parts.push(dupes + ' already monitored');
+  if (failed) parts.push(failed + ' failed');
+
+  const msg = parts.join(' · ');
+
+  if (failed > 0 && errors.length) {
+    // Show persistent error so user can see what went wrong
+    const detail = errors.join('\n');
+    showVaultToast('⚠ ' + msg + ' — check console for details', true);
+    console.error('[Monitor] Failures:\n' + detail);
+  } else if (added > 0) {
+    showVaultToast(
+      '✓ ' + msg +
+      ' — <a href="accounts.html" style="color:#06b6d4;font-weight:900;text-decoration:underline">View Account Intelligence →</a>'
+    );
+  } else if (dupes > 0) {
+    showVaultToast(
+      msg +
+      ' — <a href="accounts.html" style="color:#06b6d4;font-weight:900;text-decoration:underline">View Account Intelligence →</a>'
+    );
+  } else {
+    showVaultToast('Nothing was added. Check the browser console (F12) for details.', true);
+  }
+}
+
+/* ── Domain extractor helper ── */
+function extractDomain(url) {
+  if (!url) return '';
+  try {
+    const u = url.startsWith('http') ? url : 'https://' + url;
+    return new URL(u).hostname.replace(/^www\./, '');
+  } catch (_) {
+    return url.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split('/')[0];
+  }
+}
+
+/* ── Restore "Monitoring" badges on page load ── */
+function restoreIntelBadges() {
+  if (!allStrategies) return;
+  allStrategies.forEach(s => {
+    if (localStorage.getItem('vault_in_intel_' + s.id)) {
+      const card = document.getElementById('vcard-' + s.id);
+      if (card && !card.querySelector('.vault-in-intel')) {
+        const nameEl = card.querySelector('.vault-company');
+        if (nameEl) {
+          const badge = document.createElement('div');
+          badge.className = 'vault-in-intel';
+          badge.innerHTML = '📡 Monitoring';
+          nameEl.parentNode.insertBefore(badge, nameEl.nextSibling);
+        }
+      }
+    }
+  });
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   INTELLIGENCE ALERT SYSTEM
+   Polls for intent score changes on monitored companies
+   Shows a non-intrusive banner when something changes
+═══════════════════════════════════════════════════════════════ */
+var _intelAlertShown = false;
+var _intelPollInterval = null;
+
+async function checkIntelligenceAlerts() {
+  // Only check if user has companies being monitored
+  const monitoredKeys = Object.keys(localStorage).filter(k => k.startsWith('vault_in_intel_'));
+  if (!monitoredKeys.length) return;
+
+  try {
+    const token = await window.APP.token();
+    const res = await fetch('/api/account-graph', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+      body: JSON.stringify({ action: 'get_hot_accounts', limit: 50, min_score: 1 }),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    const accounts = data.accounts || [];
+
+    // Find any HOT accounts that were recently added from vault
+    const monitoredIds = monitoredKeys.map(k => k.replace('vault_in_intel_', ''));
+    const hotMonitored = accounts.filter(a =>
+      a.intent_tier === 'HOT' &&
+      allStrategies.some(s =>
+        monitoredIds.includes(s.id) &&
+        s.company_name.toLowerCase() === (a.company_name || '').toLowerCase()
+      )
+    );
+
+    if (hotMonitored.length > 0 && !_intelAlertShown) {
+      const co = hotMonitored[0];
+      showIntelAlert(
+        `🔥 ${co.company_name} is now HOT intent (score: ${co.total_intent_score})`,
+        `A new buying signal was detected. This is a good time to reach out.`
+      );
+    }
+
+    // Check for any signals in last 7 days
+    const withSignals = accounts.filter(a =>
+      (a.recent_signal_count || 0) > 0 &&
+      allStrategies.some(s =>
+        monitoredIds.includes(s.id) &&
+        s.company_name.toLowerCase() === (a.company_name || '').toLowerCase()
+      )
+    );
+
+    if (withSignals.length > 0 && !_intelAlertShown) {
+      const co = withSignals[0];
+      showIntelAlert(
+        `📡 ${co.company_name} has ${co.recent_signal_count} new signal${co.recent_signal_count > 1 ? 's' : ''}`,
+        `Intent signals detected in the last 7 days. Check Account Intelligence for details.`
+      );
+    }
+
+  } catch (e) {
+    console.error('Intelligence alert check failed:', e);
+  }
+}
+
+function showIntelAlert(title, subtitle) {
+  _intelAlertShown = true;
+  document.getElementById('intel-alert-title').textContent = title;
+  document.getElementById('intel-alert-sub').textContent = subtitle;
+  document.getElementById('intel-alert-bar').classList.add('show');
+  // Auto-dismiss after 12 seconds
+  setTimeout(dismissIntelAlert, 12000);
+}
+
+function dismissIntelAlert() {
+  document.getElementById('intel-alert-bar').classList.remove('show');
+}
+
+function goToIntelligence() {
+  window.location.href = 'accounts.html';
+}
+
+/* ── Start polling for intelligence alerts every 5 minutes ── */
+function startIntelPolling() {
+  // Initial check after 3s (give page time to load)
+  setTimeout(checkIntelligenceAlerts, 3000);
+  // Then every 5 minutes
+  _intelPollInterval = setInterval(checkIntelligenceAlerts, 5 * 60 * 1000);
+}
+
+/* ── Hook into existing vault load to restore badges + start polling ── */
+const _origRenderVault = typeof renderVault !== 'undefined' ? renderVault : null;
+// We patch via the existing renderVault — after render, restore badges
+document.addEventListener('DOMContentLoaded', function() {
+  // Patch renderVault to also restore intel badges
+  const origRV = window.renderVault;
+  if (origRV) {
+    window.renderVault = function(strategies) {
+      origRV(strategies);
+      setTimeout(restoreIntelBadges, 100);
+    };
+  }
+  // Start polling
+  startIntelPolling();
+});
+
+</script>
+  <script src="faq-chat.js"></script>
+<script>
+// ── Mobile nav toggle ──────────────────────────────────────────
+function toggleMobileNav() {
+  const btn    = document.getElementById('mobile-menu-btn');
+  const drawer = document.getElementById('mobile-nav-drawer');
+  if (!btn || !drawer) return;
+  btn.classList.toggle('open');
+  drawer.classList.toggle('open');
+}
+document.addEventListener('click', function(e) {
+  const btn    = document.getElementById('mobile-menu-btn');
+  const drawer = document.getElementById('mobile-nav-drawer');
+  if (!btn || !drawer) return;
+  if (!btn.contains(e.target) && !drawer.contains(e.target)) {
+    btn.classList.remove('open');
+    drawer.classList.remove('open');
+  }
+});
+
+
+// ── Toast notification system ──────────────────────────────────
+function abeToast(msg, type, duration) {
+  type = type || 'success';
+  duration = duration || 3200;
+  var toast = document.getElementById('abe-toast');
+  if (!toast) {
+    toast = document.createElement('div');
+    toast.id = 'abe-toast';
+    toast.innerHTML = '<span id="abe-toast-icon"></span><span id="abe-toast-msg"></span>';
+    document.body.appendChild(toast);
+  }
+  var icon   = document.getElementById('abe-toast-icon');
+  var msgEl  = document.getElementById('abe-toast-msg');
+  var icons  = {success:'✓', error:'✕', info:'ℹ'};
+  toast.className = '';
+  if (icon)  icon.textContent  = icons[type] || '✓';
+  if (msgEl) msgEl.textContent = msg;
+  toast.classList.add('show', 'toast-' + type);
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(function(){ toast.classList.remove('show'); }, duration);
+}
+</script>
+</body>
+</html>

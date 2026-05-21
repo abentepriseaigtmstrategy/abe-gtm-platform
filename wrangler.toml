@@ -1,0 +1,60 @@
+name = "abe-gtm-platform"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+pages_build_output_dir = "frontend"
+
+# Your KV namespace (cache layer)
+[[kv_namespaces]]
+binding = "STRATEGY_CACHE"
+id = "61d9ea1ad72b49658b1ab2fac175bbb9"
+
+# Backend environment variables
+# These are read ONLY by your backend Worker functions (functions/api/*.js).
+# They are NOT injected into HTML pages. The browser never sees them.
+[vars]
+ALLOWED_ORIGIN = "*"
+SUPABASE_URL = "https://cwcvneluhlimhlzowabv.supabase.co"
+SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN3Y3ZuZWx1aGxpbWhsem93YWJ2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM2MzAxMjAsImV4cCI6MjA4OTIwNjEyMH0.SZDS-svU-kFh_OkUq3AjQY64F-71MpbBsFd6Iin5DlQ"
+
+# Adobe PDF Services (Fallback)
+PDF_RENDER_ENGINE = "gotenberg"
+ADOBE_API_BASE_URL = "https://pdf-services.adobe.io"
+
+# Gotenberg (Fallback)
+GOTENBERG_URL = "https://gotenberg-production-e409.up.railway.app"
+
+# ── AI Provider Configuration ──────────────────────────────────────
+# PRIMARY_PROVIDER, FALLBACK_PROVIDER, ENABLE_PROVIDER_FAILOVER must be set
+# ONLY via the Cloudflare Dashboard — NOT here — to avoid binding name conflicts.
+# Dashboard path: Workers & Pages → abe-gtm-platform → Settings → Environment Variables
+#   PRIMARY_PROVIDER         = openai
+#   FALLBACK_PROVIDER        = gemini
+#   ENABLE_PROVIDER_FAILOVER = true    (set "false" to disable Gemini fallback)
+
+# ADOBE PDF SERVICES SECRETS (Required - add via Cloudflare Dashboard)
+# From your Adobe credentials JSON file, extract these plain string values:
+#
+# ADOBE_CLIENT_ID = client_credentials.client_id (e.g., "b908c317efae4cf79a7141db2021d755")
+# ADOBE_CLIENT_SECRET = client_credentials.client_secret (e.g., "p8e-LMERm8F8rI9SH89N4rvdtoXDeYJ_b5mw")
+#
+# DO NOT paste the entire JSON - only the individual string values.
+# Add these in Cloudflare Dashboard: Workers & Pages → abe-gtm-platform → Settings → Environment Variables
+# Set Type to "Secret" for both values.
+#
+# ── AI PROVIDER SECRETS ────────────────────────────────────────────
+# Add via Cloudflare Dashboard → Workers & Pages → abe-gtm-platform → Settings → Environment Variables
+# Set Type to "Secret" for ALL of the following:
+#
+# OPENAI_API_KEY  — Primary provider (OpenAI gpt-4o-mini)
+#   Get from: https://platform.openai.com/api-keys
+#
+# GEMINI_API_KEY  — Fallback 1 (Google Gemini gemini-2.5-flash / gemini-2.5-pro — free)
+#   Get from: https://aistudio.google.com/app/apikey
+#
+# GROQ_API_KEY    — Fallback 2 (Groq llama-3.3-70b-versatile — free, 14,400 req/day)
+#   Get from: https://console.groq.com/keys  (no credit card required)
+#
+# To add secrets via Wrangler CLI:
+#   npx wrangler pages secret put OPENAI_API_KEY
+#   npx wrangler pages secret put GEMINI_API_KEY
+#   npx wrangler pages secret put GROQ_API_KEY

@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>ABE · AI Revenue Infrastructure</title>
+  <style>
+    body{background:#050508;display:flex;align-items:center;justify-content:center;height:100vh;margin:0}
+    .spin{width:32px;height:32px;border:3px solid rgba(123,94,167,.2);border-top-color:#7B5EA7;
+      border-radius:50%;animation:sp .7s linear infinite}
+    @keyframes sp{to{transform:rotate(360deg)}}
+  </style>
+  <script src="ga4-tag.js"></script>
+</head>
+<body>
+  <div class="spin"></div>
+  <!-- auth-guard checks session via /api/session and redirects accordingly -->
+  <script src="auth-guard.js"></script>
+  <script>
+    window.APP.getSession().then(function(s) {
+      window.location.replace(s ? '/dashboard.html' : '/login');
+    }).catch(function() {
+      window.location.replace('/login');
+    });
+  </script>
+</body>
+</html>

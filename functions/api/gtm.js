@@ -1,0 +1,2670 @@
+/**
+ * /api/gtm  (v2)
+ * Cloudflare Pages Function — GTM Strategy Engine
+ *
+ * All routes require JWT.
+ * KV caching layer added for completed strategies.
+ * Vault routes now support pagination, deletion, archive, resume.
+ */
+
+import { verifyAuth, corsHeaders, validate, rateLimit, sanitise, errRes, okRes, kv } from './_middleware.js';
+import { normalizeStrategy } from './gtm-intelligence.js';
+import { getIntegrationStatus, buildIntegrationContext } from './integration-readiness.js';
+import { routeProviderRequest, normalizeStepOutput, validateStepSchema, retryWithProvider } from '../lib/provider-router.js';
+import { validatePublicationReadiness, buildPublicationReport } from '../lib/publication-validator.js';
+import { enrichCompany, formatEnrichmentForPrompt, formatBenchmarkOnlyPrompt, buildEnrichmentCacheKey } from '../lib/enrichment-pipeline.js';
+import { getMatchedBenchmarks } from '../lib/industry-benchmarks.js';
+
+const COST_PER_TOKEN   = 0.0000002;
+const HOURLY_TOKEN_LIMIT = 200_000;
+// Phase token budgets:
+// P1=Signal Extraction, P2=Scoring, P3=Verdict, P4=Deal Lens, P5=Risks, P6=Final
+const STEP_MAX_TOKENS = { 1:1800, 2:1500, 3:1200, 4:1500, 5:1500, 6:2000, 7:2500 };
+
+export async function onRequestPost(context) {
+  const { request, env } = context;
+  const cors = corsHeaders(env);
+
+  if (request.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors });
+
+  // ── Auth — required on every action ────────────────────────────
+  const { user, error: authErr } = await verifyAuth(request, env);
+  if (!user) return errRes(authErr || 'Unauthorized', 401, cors);
+
+  const openaiKey   = env.OPENAI_API_KEY;
+  const supabaseUrl = env.SUPABASE_URL      || 'https://cwcvneluhlimhlzowabv.supabase.co';
+  // Service role key from Cloudflare env secrets
+  const supabaseKey = env.SUPABASE_SERVICE_ROLE_KEY || env.SUPABASE_ANON_KEY;
+
+  let body;
+  try { body = await request.json(); }
+  catch { return errRes('Invalid request body', 400, cors); }
+
+  const errors = validate({ action: 'string|required' }, body);
+  if (errors.length) return errRes(errors[0], 400, cors);
+
+  // ── Per-user rate limiting ──────────────────────────────────────
+  if (body.action !== 'run_demo_step') {
+    if (!await rateLimit(`gtm:${user.id}`, env, 60, 60_000)) {
+      return errRes('Rate limit reached. Please wait before making more requests.', 429, cors);
+    }
+  }
+
+  const userId = user.id;
+
+  switch (body.action) {
+    case 'run_step':        return handleRunStep(body, userId, openaiKey, supabaseUrl, supabaseKey, env, cors);
+    case 'run_demo_step':   return handleRunDemoStep(body, userId, supabaseUrl, supabaseKey, env, cors);
+    case 'enrich_company':  return handleEnrichCompany(body, userId, supabaseUrl, supabaseKey, env, cors);
+    case 'save_strategy':        return handleSaveStrategy(body, userId, supabaseUrl, supabaseKey, env, cors);
+    case 'get_vault':            return handleGetVault(body, userId, supabaseUrl, supabaseKey, cors);
+    case 'get_strategy':         return handleGetStrategy(body, userId, supabaseUrl, supabaseKey, env, cors);
+    case 'delete_strategy':      return handleDeleteStrategy(body, userId, supabaseUrl, supabaseKey, env, cors);
+    case 'archive_strategy':     return handleArchiveStrategy(body, userId, supabaseUrl, supabaseKey, env, cors);
+    case 'resume_strategy':      return handleResumeStrategy(body, userId, supabaseUrl, supabaseKey, cors);
+    case 'check_cache':          return handleCheckCache(body, userId, supabaseUrl, supabaseKey, env, cors);
+    case 'score_leads':          return handleScoreLeads(body, userId, openaiKey, cors);
+    case 'run_step7':            return handleRunStep7(body, userId, openaiKey, supabaseUrl, supabaseKey, env, cors);
+    case 'save_step7':           return handleSaveStep7(body, userId, supabaseUrl, supabaseKey, env, cors);
+    case 'validate_publication': return handleValidatePublication(body, userId, supabaseUrl, supabaseKey, env, cors);
+    case 'get_integration_status': return handleGetIntegrationStatus(env, cors);
+    default:                     return errRes(`Unknown action: ${body.action}`, 400, cors);
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// RUN STEP
+// ══════════════════════════════════════════════════════════════════
+async function handleRunStep(body, userId, openaiKey, supabaseUrl, supabaseKey, env, cors) {
+  const errors = validate({
+    step:    'number|required',
+    company: 'string|required',
+  }, body);
+  if (errors.length) return errRes(errors[0], 400, cors);
+  const integration = getIntegrationStatus(env);
+  if (body.use_rag && !integration.features.rag.enabled) return errRes('RAG integration not configured', 503, cors);
+  if (body.use_agents && !integration.features.agents.enabled) return errRes('Agents integration not configured', 503, cors);
+  // Provider guard: at least one AI provider must be configured
+  if (!env.OPENAI_API_KEY && !env.GEMINI_API_KEY) return errRes('No AI provider configured (OPENAI_API_KEY or GEMINI_API_KEY required)', 503, cors);
+
+  const { step, company, industry, prior_steps, company_profile } = body;
+  if (step < 1 || step > 6) return errRes('Step must be 1–6', 400, cors);
+
+  // Hourly token limit check
+  if (supabaseUrl && supabaseKey) {
+    if (await isHourlyLimitExceeded(userId, supabaseUrl, supabaseKey)) {
+      return errRes('Hourly token limit reached. Resets at the top of the hour.', 429, cors);
+    }
+  }
+
+  // Attempt to resolve a trusted company profile from the request or historical enrichment data.
+  const resolvedProfile = await resolveCompanyProfile(
+    sanitise(company, 200),
+    company_profile || null,
+    userId,
+    supabaseUrl,
+    supabaseKey
+  );
+
+  // Check KV step cache (company+step+evidence)
+  const evidenceFingerprint = resolvedProfile
+    ? await hash(JSON.stringify({ name: resolvedProfile.company_name || '', url: resolvedProfile._meta?.website_url || '' }))
+    : 'none';
+  const stepCacheKey = `step:${await hash(company.toLowerCase())}:${step}:${evidenceFingerprint}`;
+  const stepCached   = await kv.get(env, stepCacheKey);
+  if (stepCached) {
+    return okRes({ data: stepCached, tokens: 0, duration_ms: 0, step, _cached: true }, cors);
+  }
+
+  // ── Layer 3: Load or generate enrichment context ──────────────
+  let enrichmentContext = null;
+  const enrichCacheKey  = buildEnrichmentCacheKey(sanitise(company,200), industry || '');
+  if (supabaseUrl && supabaseKey) {
+    try {
+      const eRes = await sbFetch(supabaseUrl, supabaseKey, 'company_enrichment', 'GET', null, `?cache_key=eq.${enrichCacheKey}&limit=1`);
+      if (eRes.ok) {
+        const rows = await eRes.json();
+        if (rows[0]?.enrichment_data) {
+          const ageHours = (Date.now() - new Date(rows[0].enriched_at||0).getTime()) / 3_600_000;
+          if (ageHours < 24) enrichmentContext = rows[0].enrichment_data;
+        }
+      }
+    } catch(e) { console.warn('[gtm] enrichment cache lookup failed:', e.message); }
+  }
+  if (!enrichmentContext) {
+    try {
+      enrichmentContext = await enrichCompany({ company: sanitise(company,200), industry: industry||null, companyUrl: body.company_url||null, scrapedProfile: resolvedProfile||null, env });
+      if (supabaseUrl && supabaseKey && enrichmentContext) {
+        sbFetch(supabaseUrl, supabaseKey, 'company_enrichment', 'POST',
+          JSON.stringify({ cache_key: enrichCacheKey, company_name: sanitise(company,200), industry: industry||null, enrichment_data: enrichmentContext, enriched_at: new Date().toISOString(), source_quality: enrichmentContext.sourceQuality, sources_used: enrichmentContext.sourcesUsed, user_id: userId })
+        ).catch(e => console.warn('[gtm] enrichment cache save failed:', e.message));
+      }
+    } catch(e) { console.warn('[gtm] inline enrichment failed — proceeding without:', e.message); enrichmentContext = null; }
+  }
+
+  const prompt = buildStepPrompt(step, sanitise(company, 200), industry || '', prior_steps || {}, resolvedProfile, enrichmentContext);
+  const t0     = Date.now();
+
+  // ── Provider-routed AI call (OpenAI primary → Gemini fallback) ──────────────
+  const providerResult = await routeProviderRequest({
+    step,
+    systemPrompt: 'You are a world-class B2B GTM strategist. Return ONLY valid JSON. No markdown, no prose.',
+    userPrompt:   prompt,
+    maxTokens:    STEP_MAX_TOKENS[step],
+    temperature:  step === 6 ? 0.8 : 0.3,
+  }, env);
+
+  if (providerResult.error) {
+    // Non-retriable error (client 4xx, or both providers failed)
+    const statusCode = providerResult.statusCode || 502;
+    const userMsg    = statusCode === 429
+      ? 'Rate limit reached. Please wait a moment before retrying.'
+      : `AI provider error: ${providerResult.error}`;
+    return errRes(userMsg, statusCode, cors);
+  }
+
+  let parsed     = providerResult.parsed;
+  let rawText    = providerResult.rawText;
+  let tokensUsed = providerResult.tokensUsed;
+
+  // Schema validation — fill any remaining non-critical gaps via retry if needed
+  const schemaCheck = validateStepSchema(step, parsed);
+  if (!schemaCheck.valid) {
+    // Critical fields still missing after normalization → attempt one cross-provider retry
+    const retryResult = await retryWithProvider(step, prompt, schemaCheck.missing, env);
+    if (!retryResult.error && retryResult.parsed) {
+      parsed     = retryResult.parsed;
+      rawText    = retryResult.rawText;
+      tokensUsed += (retryResult.tokensUsed || 0);
+    }
+    // If retry also failed, normalizeStepOutput placeholder-fills critical fields (safe fallback)
+    parsed = normalizeStepOutput(step, parsed || {}, parsed?._provider || 'openai');
+  }
+
+  // Backend logging: provider used + fallback state (non-blocking, backend only)
+  if (providerResult.fallbackTriggered) {
+    console.warn(`[gtm] step=${step} company="${company}" fallback_triggered reason=${providerResult.fallbackReason} provider=${providerResult.provider}`);
+  }
+
+  // Attach safe RAG metadata without changing existing payload fields
+  const stepData = augmentStepOutput(parsed, step, resolvedProfile, prior_steps || {});
+
+  const duration = Date.now() - t0;
+
+  // Cache in KV (1hr TTL for steps)
+  await kv.put(env, stepCacheKey, stepData, 3600);
+
+  // Log + rate limit update (non-blocking)
+  if (supabaseUrl && supabaseKey) {
+    logRun(userId, null, 'gtm_step', step, company, tokensUsed, duration, false, supabaseUrl, supabaseKey);
+    bumpHourlyTokens(userId, tokensUsed, supabaseUrl, supabaseKey);
+  }
+
+  return okRes({ data: stepData, tokens: tokensUsed, duration_ms: duration, step }, cors);
+}
+
+async function handleRunDemoStep(body, userId, supabaseUrl, supabaseKey, env, cors) {
+  const errors = validate({
+    step:    'number|required',
+    company: 'string|required',
+  }, body);
+  if (errors.length) return errRes(errors[0], 400, cors);
+
+  const { step, company, industry, prior_steps } = body;
+  if (step < 1 || step > 7) return errRes('Step must be 1–7', 400, cors);
+  if (step === 7 && (!prior_steps || !prior_steps[1] || !prior_steps[6])) {
+    return errRes('Demo Step 7 requires completed Steps 1 and 6.', 400, cors);
+  }
+
+  const data = buildDemoStepOutput(step, sanitise(company, 200), sanitise(industry || '', 100), prior_steps || {});
+  return okRes({ data, tokens: 0, duration_ms: 0, step }, cors);
+}
+
+function buildDemoStepOutput(step, company, industry, priorSteps) {
+  switch (step) {
+    case 1: return buildDemoStep1(company, industry);
+    case 2: return buildDemoStep2(company, industry);
+    case 3: return buildDemoStep3(company, industry);
+    case 4: return buildDemoStep4(company, industry);
+    case 5: return buildDemoStep5(company, industry);
+    case 6: return buildDemoStep6(company, industry, priorSteps);
+    case 7: return buildDemoStep7(company, industry, priorSteps);
+    default: return {};
+  }
+}
+
+function makeDemoAnchorText(company, industry) {
+  const name = company ? company.trim().split(/\s+/)[0] : 'Company';
+  const sector = industry ? industry.trim() : 'B2B market';
+  return `${name} ${sector}`;
+}
+
+function getDemoIndustryProfile(company, industry) {
+  const source = `${company || ''} ${industry || ''}`.toLowerCase();
+  const saas = /(saas|software as a service|b2b software|enterprise software|cloud app|cloud software|subscription software)/;
+  const itServices = /(it services|system integrator|si|managed service|msps|consulting|technology services|digital transformation)/;
+  const fintech = /(fintech|payment|payments|banking|digital banking|card|issuer|acquirer|crypto|wallet|risk|transaction)/;
+  const travel = /(travel|ota|hospitality|hotel|airline|consumer internet|tourism|vacation|lodging|resort|booking)/;
+  const healthcare = /(healthcare|pharma|biotech|medical|life sciences|health tech|clinical|medtech)/;
+  const manufacturing = /(manufactur|factory|textile|apparel|garment|industrial|production|distribution)/;
+  const retail = /(retail|ecommerce|e-commerce|consumer brand|consumer goods|direct-to-consumer|d2c|shop|store)/;
+  const logistics = /(logistics|supply chain|freight|shipping|transportation|warehouse|fulfillment|distribution)/;
+  const education = /(education|edtech|e-learning|learning platform|training platform|school|university|academy)/;
+  const realEstate = /(real estate|construction|proptech|property management|residential|commercial building|developer)/;
+  const energy = /(energy|renewable|renewables|clean tech|cleantech|solar|wind|utilities|power|energy transition)/;
+  const media = /(media|entertainment|streaming|content platform|publishing|broadcast|creative agency|gaming|music)/;
+  const insurance = /(insurance|bfs|bfsi|insurer|broking|underwriting|claims|risk transfer)/;
+
+  if (/(bank of america|banking|financial services|bfsi|bfs|digital banking|retail banking|corporate banking|commercial banking|consumer banking|payment modernization|financial services firm)/.test(source)) {
+    return {
+      category: 'financial_services',
+      industryLabel: 'Banking and Financial Services',
+      primary_icp: 'Chief Digital Officer, Head of Retail Banking, or Head of Payments at banks and financial services firms',
+      secondary_icp: 'VP Risk & Compliance, Digital Banking Product Lead, or Fraud Operations Leader',
+      decision_makers: ['Chief Digital Officer', 'Head of Retail Banking', 'Head of Payments'],
+      firmographics: 'Large banking and financial services organizations with digital banking, payments modernization, and regulatory compliance priorities.',
+      buying_triggers: ['Digital banking adoption', 'fraud and risk control pressure', 'regulatory compliance demands'],
+      core_pain_points: 'The business needs to accelerate digital banking experiences while managing fraud, risk, compliance and legacy core modernization.',
+      common_objections: ['Legacy core banking systems', 'regulatory complexity', 'existing banking IT vendors'],
+      sourcing_filters: 'Banks and financial services firms focused on digital transformation, payments modernization, fraud analytics, and customer retention.',
+      keywords: 'digital banking transformation, payment modernization, fraud analytics, banking customer experience, regulatory compliance automation, core banking modernization',
+      messaging_angle: 'Position the solution as the execution layer that makes banking digital, secure, and compliant.',
+      risks: ['Operational risk from legacy core systems', 'regulatory program complexity', 'integration risk with banking platforms'],
+      strategic_hook: 'Position the solution as the secure and compliant digital banking layer that accelerates customer journeys and reduces friction.',
+      why_now: 'Banks are under pressure to modernize payments, strengthen fraud controls and improve customer digital experiences.',
+      account_analogs: ['Digital banking division', 'Payments modernization program', 'Fraud analytics center of excellence'],
+      target_roles: ['Chief Digital Officer', 'Head of Retail Banking', 'Head of Payments', 'VP Risk & Compliance', 'Digital Banking Product Lead', 'Fraud Operations Leader'],
+      keyword_focus: 'digital banking transformation, payment modernization, fraud analytics, regulatory compliance automation',
+      outreach_language: 'digital banking modernization and risk-controlled payments',
+      primary_role_title: 'Chief Digital Officer',
+      primary_role_responsibility: 'Lead digital banking transformation, payments modernization, and customer experience innovation',
+    };
+  }
+
+  if (saas.test(source)) {
+    return {
+      category: 'saas',
+      industryLabel: 'SaaS and B2B software',
+      primary_icp: 'VP Product, Head of Revenue, or Director of Customer Success at high-growth SaaS businesses',
+      secondary_icp: 'Sales operations and growth leaders at subscription software companies',
+      decision_makers: ['VP Product', 'Head of Revenue', 'Chief Customer Officer'],
+      firmographics: 'Mid-market to growth-stage software firms with recurring revenue and international GTM plans.',
+      buying_triggers: ['Churn reduction pressure', 'need for faster expansion motions', 'subscription revenue optimization'],
+      core_pain_points: 'The business needs better feature adoption, churn prevention and predictable recurring revenue growth.',
+      common_objections: ['Need proof of product-led impact', 'already using point solutions', 'unclear ROI overlay'],
+      sourcing_filters: 'Subscription software, ARR $10M–$100M, rapid customer acquisition, modern GTM stack.',
+      keywords: 'SaaS growth, product adoption, subscription revenue, churn reduction',
+      messaging_angle: 'Help software teams turn product usage into reliable revenue and reduce churn.',
+      risks: ['Overreliance on product-led growth signals', 'complex customer onboarding outcomes', 'integration friction'],
+      strategic_hook: 'Position the solution as the missing layer between product engagement and recurring revenue predictability.',
+      why_now: 'SaaS buyers are focused on retention and efficient growth as enterprise budgets tighten.',
+      account_analogs: ['High-growth SaaS platform', 'Mid-market cloud app vendor', 'Subscription software leader'],
+    };
+  }
+
+  if (itServices.test(source)) {
+    return {
+      category: 'it_services',
+      industryLabel: 'IT services and system integration',
+      primary_icp: 'Engagement Directors, Head of Delivery, or VP Technology at IT services firms',
+      secondary_icp: 'Sales leaders focused on large transformation deals and managed services',
+      decision_makers: ['Engagement Director', 'Head of Delivery', 'VP Technology'],
+      firmographics: 'System integrators and digital services providers serving enterprise IT transformation programs.',
+      buying_triggers: ['complex transformation demand', 'need for repeatable services delivery', 'client retention risk'],
+      core_pain_points: 'The business needs more predictable deal flow, lower delivery risk and stronger account expansion.',
+      common_objections: ['Existing partner relationships', 'project-based budgeting', 'client risk aversion'],
+      sourcing_filters: 'Organizations with active transformation programs, multi-year engagements, and strong partner ecosystems.',
+      keywords: 'systems integration, digital transformation, managed services, enterprise IT delivery',
+      messaging_angle: 'Help services teams win larger, higher-margin transformation engagements with repeatable deal design.',
+      risks: ['Deal-specific scope creep', 'capture challenges in conservative procurement', 'dependency on incumbent vendors'],
+      strategic_hook: 'Frame the opportunity around predictable, repeatable growth for complex IT services portfolios.',
+      why_now: 'Enterprise digital transformation budgets are expanding amid pressure to modernize legacy systems.',
+      account_analogs: ['Global systems integrator', 'Regional SI with enterprise accounts', 'Managed services provider'],
+    };
+  }
+
+  if (insurance.test(source) && !fintech.test(source)) {
+    return {
+      category: 'insurance',
+      industryLabel: 'insurance and BFSI',
+      primary_icp: 'Chief Insurance Officer, Head of Underwriting, or Director of Digital Insurance at insurers',
+      secondary_icp: 'Claims, underwriting and risk leaders focused on customer experience',
+      decision_makers: ['Chief Insurance Officer', 'Head of Underwriting', 'Director of Digital Insurance'],
+      firmographics: 'Established insurers and insurtech firms with digital transformation agendas.',
+      buying_triggers: ['pressure to reduce loss ratios', 'policyholder experience improvement', 'digital claims acceleration'],
+      core_pain_points: 'The business needs to lower underwriting risk, speed claims workflows and improve customer retention.',
+      common_objections: ['Regulatory complexity', 'legacy core systems', 'risk of vendor disruption'],
+      sourcing_filters: 'Insurers with digital transformation programs, embedded insurance products, or claims modernization initiatives.',
+      keywords: 'insurance automation, claims digitization, underwriting efficiency, risk intelligence',
+      messaging_angle: 'Help insurers modernize underwriting and claims while preserving compliance and risk control.',
+      risks: ['Regulatory scrutiny', 'legacy integration complexity', 'data quality concerns'],
+      strategic_hook: 'Position the solution as a compliance-safe revenue and claims efficiency engine for insurers.',
+      why_now: 'Insurance carriers are under pressure to digitize customer journeys and reduce operating costs.',
+      account_analogs: ['Regional insurer', 'Insurtech platform', 'embedded insurance provider'],
+    };
+  }
+
+  if (healthcare.test(source)) {
+    return {
+      category: 'healthcare',
+      industryLabel: 'healthcare, pharma and biotech',
+      primary_icp: 'Head of Commercial Growth, Director of Market Access, or Chief Innovation Officer at healthcare firms',
+      secondary_icp: 'Pharma marketing and biotech commercial operations leads',
+      decision_makers: ['Head of Commercial Growth', 'Director of Market Access', 'Chief Innovation Officer'],
+      firmographics: 'Health, life sciences and biotech organizations with commercial or go-to-market innovation priorities.',
+      buying_triggers: ['new product launch', 'commercial model shifts', 'regulatory and market access pressure'],
+      core_pain_points: 'The business needs stronger commercial execution, faster go-to-market for new therapies and better stakeholder alignment.',
+      common_objections: ['Regulatory risk', 'long validation cycles', 'incumbent provider relationships'],
+      sourcing_filters: 'Medical, biotech or pharma firms with product launches, digital commercialization programs, or specialty channels.',
+      keywords: 'market access, digital commercialization, healthcare revenue, biotech launch',
+      messaging_angle: 'Help life sciences teams accelerate commercial readiness and stakeholder engagement.',
+      risks: ['Regulatory review cycles', 'complex stakeholder approval', 'evidence requirements'],
+      strategic_hook: 'Present the solution as a way to align clinical innovation with commercial launch certainty.',
+      why_now: 'Health and biotech buyers are prioritizing faster commercialization and operational resilience.',
+      account_analogs: ['Specialty pharma commercial team', 'Biotech launch operations team', 'Healthtech commercialization partner'],
+    };
+  }
+
+  if (travel.test(source)) {
+    return {
+      category: 'travel',
+      industryLabel: 'travel and hospitality',
+      primary_icp: 'VP Growth, Head of Partnerships, Revenue Strategy Lead or Digital Transformation Leader at travel or OTA platforms',
+      secondary_icp: 'Partnerships and revenue strategy stakeholders at hospitality and consumer travel businesses',
+      decision_makers: ['VP Growth', 'Head of Partnerships', 'Revenue Strategy Lead', 'Digital Transformation Leader'],
+      firmographics: 'OTA platforms, hotel groups and hospitality brands with digital commerce ambitions.',
+      buying_triggers: ['distribution gap', 'ancillary revenue pressure', 'channel performance concerns'],
+      core_pain_points: 'The business needs better distribution partnerships, ancillary revenue coordination and digital channel growth.',
+      common_objections: ['legacy channel deals', 'settlement complexity', 'high partner onboarding costs'],
+      sourcing_filters: 'Travel and hospitality companies with active partnership programs and digital channel investments.',
+      keywords: 'travel distribution, OTA partnerships, hospitality revenue, ancillary growth',
+      messaging_angle: 'Help travel teams improve partnership monetization and digital commerce coordination.',
+      risks: ['Seasonal demand swings', 'channel conflict', 'partner contract friction'],
+      strategic_hook: 'Frame the opportunity around predictable revenue from aligned distribution and partnership models.',
+      why_now: 'Travel businesses are rebuilding commercial models after market recovery and need reliable channel growth.',
+      account_analogs: ['OTA platform', 'Hotel chain digital team', 'travel partnership operator'],
+    };
+  }
+
+  if (manufacturing.test(source)) {
+    return {
+      category: 'manufacturing',
+      industryLabel: 'manufacturing and industrial operations',
+      primary_icp: 'COO, Head of Operations, Export Sales Head or Procurement/Distribution Head at manufacturing firms',
+      secondary_icp: 'Supply chain and operations leaders in textiles, apparel and industrial production',
+      decision_makers: ['COO', 'Head of Operations', 'Export Sales Head', 'Procurement/Distribution Head'],
+      firmographics: 'Manufacturing and industrial businesses with complex production, export and distribution networks.',
+      buying_triggers: ['supply chain strain', 'operational cost pressure', 'capacity utilization gaps'],
+      core_pain_points: 'The business needs to tighten throughput, improve export readiness and increase supply chain visibility.',
+      common_objections: ['capital-intensive upgrade concerns', 'process disruption risk', 'legacy plant systems'],
+      sourcing_filters: 'Textile, apparel, and industrial manufacturers with export exposure and digital operations goals.',
+      keywords: 'manufacturing efficiency, supply chain visibility, export readiness, production planning',
+      messaging_angle: 'Help operations teams make output more predictable and supply chains more resilient.',
+      risks: ['factory downtime', 'supplier disruptions', 'system integration complexity'],
+      strategic_hook: 'Position the solution as the connective layer between production execution and customer delivery.',
+      why_now: 'Manufacturers are looking to stabilize supply chains and capture demand amid economic uncertainty.',
+      account_analogs: ['Textile exporter', 'Industrial manufacturer', 'distribution-centric factory'],
+    };
+  }
+
+  if (retail.test(source)) {
+    return {
+      category: 'retail',
+      industryLabel: 'retail, ecommerce and consumer brands',
+      primary_icp: 'Head of Ecommerce, VP Brand, or Director of Digital Commerce at retail and consumer brands',
+      secondary_icp: 'Customer experience and commerce operations leaders',
+      decision_makers: ['Head of Ecommerce', 'VP Brand', 'Director of Digital Commerce'],
+      firmographics: 'Consumer brands and retail merchants with digital sales channels and omnichannel ambitions.',
+      buying_triggers: ['margin pressure', 'conversion rate challenges', 'inventory performance concerns'],
+      core_pain_points: 'The business needs better demand forecasting, channel efficiency and customer retention.',
+      common_objections: ['high marketing cost', 'brand consistency risk', 'legacy merchandising systems'],
+      sourcing_filters: 'Retailers with ecommerce growth plans, DTC models, or complex channel distribution.',
+      keywords: 'ecommerce conversion, retail performance, customer retention, omnichannel growth',
+      messaging_angle: 'Help retail teams improve digital revenue and reduce channel waste through better demand intelligence.',
+      risks: ['inventory imbalance', 'seasonal volatility', 'channel fragmentation'],
+      strategic_hook: 'Position the solution as the commercial intelligence layer that bridges brand strategy and customer conversion.',
+      why_now: 'Retailers need stronger demand certainty and inventory today as channels shift online.',
+      account_analogs: ['DTC brand', 'omnichannel retailer', 'consumer goods platform'],
+    };
+  }
+
+  if (logistics.test(source) && !manufacturing.test(source)) {
+    return {
+      category: 'logistics',
+      industryLabel: 'logistics and supply chain',
+      primary_icp: 'Head of Supply Chain, VP Logistics, or Director of Fulfillment at logistics organizations',
+      secondary_icp: 'Operations and distribution leaders focused on transportation and inventory flow',
+      decision_makers: ['Head of Supply Chain', 'VP Logistics', 'Director of Fulfillment'],
+      firmographics: 'Freight, 3PL, warehouse, and supply chain organizations optimizing operational velocity.',
+      buying_triggers: ['capacity constraints', 'transportation cost pressure', 'inventory delays'],
+      core_pain_points: 'The business needs more reliable order flow, lower transportation costs and greater operational visibility.',
+      common_objections: ['infrastructure constraints', 'legacy TMS/WMS systems', 'seasonal volume risk'],
+      sourcing_filters: 'Logistics providers with distributed operations, freight networks, or modern fulfillment initiatives.',
+      keywords: 'supply chain visibility, logistics execution, fulfillment efficiency, freight optimization',
+      messaging_angle: 'Help logistics teams make supply chain execution more predictable and cost-efficient.',
+      risks: ['carrier capacity volatility', 'demand spikes', 'network fragmentation'],
+      strategic_hook: 'Frame the solution as the execution intelligence system that synchronizes transport and inventory.',
+      why_now: 'Supply chain executives are under pressure to cut delay risk and improve delivery predictability.',
+      account_analogs: ['Third-party logistics provider', 'warehouse operator', 'freight network leader'],
+    };
+  }
+
+  if (education.test(source)) {
+    return {
+      category: 'education',
+      industryLabel: 'education and edtech',
+      primary_icp: 'Head of Learning, Director of Education Programs, or VP Growth at edtech companies',
+      secondary_icp: 'Academic operations and digital learning leaders',
+      decision_makers: ['Head of Learning', 'Director of Education Programs', 'VP Growth'],
+      firmographics: 'Education technology platforms, online learning providers and academic services firms.',
+      buying_triggers: ['demand for remote learning', 'course completion issues', 'student engagement gaps'],
+      core_pain_points: 'The business needs better learner acquisition, engagement analytics and revenue predictability.',
+      common_objections: ['content quality concerns', 'integration with LMS', 'institutional procurement cycles'],
+      sourcing_filters: 'Edtech and training companies with digital enrollment programs and scalable learning solutions.',
+      keywords: 'edtech growth, learner engagement, education revenue, digital learning',
+      messaging_angle: 'Help education teams improve learner conversion and course execution with clearer demand signals.',
+      risks: ['policy and funding changes', 'seasonal enrollment swings', 'platform adoption challenges'],
+      strategic_hook: 'Position the solution as the insight layer that connects learner demand with program delivery.',
+      why_now: 'Education providers are accelerating digital enrollment and outcomes measurement.',
+      account_analogs: ['Online learning platform', 'corporate training provider', 'education publisher'],
+    };
+  }
+
+  if (realEstate.test(source)) {
+    return {
+      category: 'real_estate',
+      industryLabel: 'real estate and construction',
+      primary_icp: 'Head of Development, Director of Sales, or VP Commercial at real estate and construction firms',
+      secondary_icp: 'Property operations and development planning leaders',
+      decision_makers: ['Head of Development', 'Director of Sales', 'VP Commercial'],
+      firmographics: 'Property developers, construction project firms and proptech services with commercial growth needs.',
+      buying_triggers: ['project pipeline shortfall', 'pre-sales gaps', 'construction cost pressure'],
+      core_pain_points: 'The business needs more predictable project demand, better prospect qualification and stronger deal certainty.',
+      common_objections: ['planning cycle length', 'market volatility', 'capital allocation risk'],
+      sourcing_filters: 'Developers, brokers and construction firms with active project pipelines and commercial sales targets.',
+      keywords: 'real estate demand, construction pipeline, property sales, development execution',
+      messaging_angle: 'Help real estate teams turn project demand into reliable sales and execution visibility.',
+      risks: ['market cyclicality', 'planning delays', 'cost escalation'],
+      strategic_hook: 'Frame the solution as the commercial intelligence layer for project-led development portfolios.',
+      why_now: 'Real estate teams need stronger demand certainty as construction markets recover.',
+      account_analogs: ['Commercial developer', 'proptech platform', 'construction services firm'],
+    };
+  }
+
+  if (energy.test(source)) {
+    return {
+      category: 'energy',
+      industryLabel: 'energy and renewables',
+      primary_icp: 'Head of Commercial, Director of Renewables, or VP Energy Transition at energy firms',
+      secondary_icp: 'Project development and operations leaders in renewables and utilities',
+      decision_makers: ['Head of Commercial', 'Director of Renewables', 'VP Energy Transition'],
+      firmographics: 'Energy producers, renewable developers and utility innovators with sustainability ambitions.',
+      buying_triggers: ['carbon reduction targets', 'renewable project financing', 'grid modernization needs'],
+      core_pain_points: 'The business needs reliable off-take, better project commercialization and stronger market signals.',
+      common_objections: ['regulatory complexity', 'project finance risk', 'commodity price volatility'],
+      sourcing_filters: 'Renewable energy developers, utility innovation teams, and energy transition service providers.',
+      keywords: 'renewable energy, power transition, energy commercialization, grid modernization',
+      messaging_angle: 'Help energy teams connect project economics with market demand and commercial outcomes.',
+      risks: ['policy uncertainty', 'grid integration issues', 'financing delays'],
+      strategic_hook: 'Position the solution as the decision support layer for renewable and energy transition initiatives.',
+      why_now: 'Energy buyers are moving quickly to de-risk renewables and capture transition incentives.',
+      account_analogs: ['Solar developer', 'utility innovation team', 'renewables investor'],
+    };
+  }
+
+  if (media.test(source)) {
+    return {
+      category: 'media',
+      industryLabel: 'media and entertainment',
+      primary_icp: 'Head of Content, Director of Audience Growth, or VP Digital at media brands',
+      secondary_icp: 'Publishing and streaming commercial leaders',
+      decision_makers: ['Head of Content', 'Director of Audience Growth', 'VP Digital'],
+      firmographics: 'Media owners, entertainment platforms and content publishers with audience monetization goals.',
+      buying_triggers: ['audience growth pressure', 'monetization gaps', 'distribution channel shifts'],
+      core_pain_points: 'The business needs better content economics, audience engagement and revenue diversification.',
+      common_objections: ['creative team autonomy', 'platform dependency', 'measurement complexity'],
+      sourcing_filters: 'Media and entertainment brands with digital distribution, subscription models, or audience-first content strategies.',
+      keywords: 'audience growth, content monetization, digital publishing, entertainment distribution',
+      messaging_angle: 'Help media teams turn audience insight into more reliable commercial yield.',
+      risks: ['platform algorithm changes', 'content performance uncertainty', 'advertising spend shifts'],
+      strategic_hook: 'Frame the solution as the commercial engine behind audience and content revenue.',
+      why_now: 'Media companies need clearer demand signals as consumption shifts across digital channels.',
+      account_analogs: ['Streaming publisher', 'digital media brand', 'content distribution platform'],
+    };
+  }
+
+  return {
+    category: 'generic',
+    industryLabel: industry || 'B2B revenue operations',
+    primary_icp: 'Revenue Operations Leader at $30M+ ARR software or services companies',
+    secondary_icp: 'VP of Sales in fast-scaling B2B teams',
+    decision_makers: ['Head of Revenue', 'VP of Sales', 'Revenue Operations Director'],
+    firmographics: 'Mid-market B2B companies with business-critical revenue operations needs.',
+    buying_triggers: ['pipeline unpredictability', 'forecast misses', 'sales execution gaps'],
+    core_pain_points: 'Unpredictable pipeline, long sales cycles, and poor lead prioritization.',
+    common_objections: ['need for validated use cases', 'limited budget for new systems', 'internal alignment gaps'],
+    sourcing_filters: 'Companies with revenue operations teams, CRM investments, and growth targets.',
+    keywords: 'revenue operations, pipeline efficiency, forecast reliability, sales execution',
+    messaging_angle: 'Offer a unified revenue execution layer that connects intent signals to sales motion.',
+    risks: ['data fragmentation', 'stakeholder misalignment', 'tool consolidation challenges'],
+    strategic_hook: 'Position the solution as the connective tissue between commercial strategy and execution.',
+    why_now: 'Business leaders need more predictable revenue as market conditions remain uncertain.',
+    account_analogs: ['High-fit enterprise prospect', 'Strategic market account', 'Growth-ready target account'],
+  };
+}
+
+function applyDemoMetadata(output, step, priorSteps = {}) {
+  const sourceText = 'demo_mode_simulated';
+  const demoMeta = {
+    demo_mode: true,
+    _do_not_use_for_decisioning: true,
+    _rag_enabled: false,
+    _profile_source: sourceText,
+    _source_context: 'Demo mode – simulated. No live data used.',
+    _confidence_basis: 'Demo estimate only. Validate with live mode.',
+    _missing_evidence: 'Live website/company/source evidence not used.',
+    _evidence_summary: 'Demo mode output generated from deterministic templates.',
+    _ai_estimate_fields: ['all fields'],
+    _verified_fields: [],
+    _demo_footer: 'This report was generated in demo mode. No live data was used. For production reports, enable live AI mode.',
+  };
+  Object.assign(output, demoMeta);
+
+  // ── Score normalisation (Phase 2): enforce total = exact arithmetic sum ──
+  if (step === 2) {
+    const d2 = typeof output.demand_score === 'object' ? (output.demand_score?.score ?? 0)
+                : (typeof output.demand_score === 'number' ? output.demand_score : 0);
+    const t2 = typeof output.market_timing_score === 'object' ? (output.market_timing_score?.score ?? 0)
+                : (typeof output.market_timing_score === 'number' ? output.market_timing_score : 0);
+    const i2 = typeof output.icp_fit_score === 'object' ? (output.icp_fit_score?.score ?? 0)
+                : (typeof output.icp_fit_score === 'number' ? output.icp_fit_score : 0);
+    const c2 = typeof output.data_completeness_score === 'object' ? (output.data_completeness_score?.score ?? 0)
+                : (typeof output.data_completeness_score === 'number' ? output.data_completeness_score : 0);
+    // Cap each sub-score to its declared max
+    const capped = {
+      d: Math.min(d2, 40),
+      t: Math.min(t2, 25),
+      i: Math.min(i2, 20),
+      c: Math.min(c2, 15),
+    };
+    const computedTotal = capped.d + capped.t + capped.i + capped.c;
+    // Enforce nested object shape so frontend scoreBlock always reads .score
+    if (typeof output.demand_score !== 'object' || output.demand_score === null) {
+      output.demand_score = { score: capped.d, max: 40, rationale: 'Score derived from signal extraction.' };
+    } else { output.demand_score.score = capped.d; }
+    if (typeof output.market_timing_score !== 'object' || output.market_timing_score === null) {
+      output.market_timing_score = { score: capped.t, max: 25, rationale: 'Score derived from market timing signals.' };
+    } else { output.market_timing_score.score = capped.t; }
+    if (typeof output.icp_fit_score !== 'object' || output.icp_fit_score === null) {
+      output.icp_fit_score = { score: capped.i, max: 20, rationale: 'Score derived from ICP fit analysis.' };
+    } else { output.icp_fit_score.score = capped.i; }
+    if (typeof output.data_completeness_score !== 'object' || output.data_completeness_score === null) {
+      output.data_completeness_score = { score: capped.c, max: 15, rationale: 'Score derived from data completeness check.' };
+    } else { output.data_completeness_score.score = capped.c; }
+    output.total_score = computedTotal;
+    output.score_verification = `${capped.d} + ${capped.t} + ${capped.i} + ${capped.c} = ${computedTotal}`;
+  }
+
+  switch (step) {
+    case 1:
+      output._source_demand_signals = sourceText;
+      output._source_market_timing = sourceText;
+      output._source_icp_fit = sourceText;
+      output._source_data_completeness = sourceText;
+      break;
+    case 2:
+      output._source_demand_score = sourceText;
+      output._source_market_timing_score = sourceText;
+      output._source_icp_fit_score = sourceText;
+      output._source_data_completeness_score = sourceText;
+      output._source_total_score = sourceText;
+      output._source_score_verification = sourceText;
+      break;
+    case 3:
+      output._source_verdict = sourceText;
+      output._source_verdict_reasoning = sourceText;
+      output._source_score_basis = sourceText;
+      output._source_demand_assessment = sourceText;
+      output._source_icp_assessment = sourceText;
+      break;
+    case 4:
+      output._source_target_roles = sourceText;
+      output._source_core_problem = sourceText;
+      output._source_solution_angle = sourceText;
+      output._source_solution_pitch = sourceText;
+      output._source_why_now = sourceText;
+      output._source_estimated_deal_size = sourceText;
+      output._source_sales_approach = sourceText;
+      break;
+    case 5:
+      output._source_key_risks = sourceText;
+      output._source_confidence_level = sourceText;
+      output._source_confidence_score = sourceText;
+      output._source_validation_needed = sourceText;
+      break;
+    case 6:
+      output._source_signal_highlights = sourceText;
+      output._source_score_breakdown = sourceText;
+      output._source_verdict = sourceText;
+      output._source_deal_lens_summary = sourceText;
+      output._source_risks_summary = sourceText;
+      output._source_confidence_note = sourceText;
+      output._source_executive_brief = sourceText;
+      output._source_recommended_next_action = sourceText;
+      // Back-fill score_breakdown from Phase 2 so the summary panel is always accurate
+      if (priorSteps && priorSteps[2]) {
+        const p2 = priorSteps[2];
+        const p2d = typeof p2.demand_score === 'object' ? (p2.demand_score?.score ?? 0) : (p2.demand_score ?? 0);
+        const p2t = typeof p2.market_timing_score === 'object' ? (p2.market_timing_score?.score ?? 0) : (p2.market_timing_score ?? 0);
+        const p2i = typeof p2.icp_fit_score === 'object' ? (p2.icp_fit_score?.score ?? 0) : (p2.icp_fit_score ?? 0);
+        const p2c = typeof p2.data_completeness_score === 'object' ? (p2.data_completeness_score?.score ?? 0) : (p2.data_completeness_score ?? 0);
+        const p2total = p2.total_score ?? (p2d + p2t + p2i + p2c);
+        if (!output.score_breakdown || typeof output.score_breakdown !== 'object') output.score_breakdown = {};
+        output.score_breakdown.demand           = p2d;
+        output.score_breakdown.market_timing    = p2t;
+        output.score_breakdown.icp_fit          = p2i;
+        output.score_breakdown.data_completeness = p2c;
+        output.score_breakdown.total            = p2total;
+        output.score_breakdown.verification     = p2.score_verification || `${p2d} + ${p2t} + ${p2i} + ${p2c} = ${p2total}`;
+      }
+      break;
+    case 7:
+      output._source_signal_summary = sourceText;
+      output._source_why_now_analysis = sourceText;
+      output._source_mcc_view = sourceText;
+      output._source_strategic_hook = sourceText;
+      output._source_persona_priority = sourceText;
+      output._source_go_no_go = sourceText;
+      output._source_confidence_score = sourceText;
+      output._source_executive_brief = sourceText;
+      break;
+    default:
+      break;
+  }
+  return output;
+}
+
+function detectDemoStrategyMarker(steps, scrapedProfile, fullReport, step7Intelligence) {
+  const hasDemoStep = Object.values(steps || {}).some(step => step && step.demo_mode === true);
+  const scrapedIsDemo = scrapedProfile && scrapedProfile.demo_mode === true;
+  const fullReportIsDemo = fullReport && typeof fullReport === 'object' && fullReport.demo_mode === true;
+  const step7IsDemo = step7Intelligence && step7Intelligence.demo_mode === true;
+  return hasDemoStep || scrapedIsDemo || fullReportIsDemo || step7IsDemo;
+}
+
+function deriveDemoModeState(record) {
+  const steps = {
+    1: record.step_1_market,
+    2: record.step_2_tam,
+    3: record.step_3_icp,
+    4: record.step_4_sourcing,
+    5: record.step_5_keywords,
+    6: record.step_6_messaging,
+  };
+  const isDemo = detectDemoStrategyMarker(steps, record.scraped_profile, record.full_report, record.step_7_intelligence);
+  return {
+    demo_mode: isDemo,
+    report_mode: isDemo ? 'demo' : 'live',
+  };
+}
+
+function applyDemoSaveMarkers(scrapedProfile, fullReport) {
+  const sourceText = 'demo_mode_simulated';
+  if (!scrapedProfile || typeof scrapedProfile !== 'object') scrapedProfile = {};
+  scrapedProfile.demo_mode = true;
+  scrapedProfile.report_mode = 'demo';
+  scrapedProfile._profile_source = scrapedProfile._profile_source || sourceText;
+
+  if (fullReport && typeof fullReport === 'object') {
+    fullReport.demo_mode = true;
+    fullReport.report_mode = 'demo';
+    fullReport._profile_source = fullReport._profile_source || sourceText;
+  }
+
+  return { scrapedProfile, fullReport };
+}
+
+function buildDemoStep1(company, industry) {
+  const anchor = makeDemoAnchorText(company, industry);
+  const profile = getDemoIndustryProfile(company, industry);
+  const output = {
+    company_overview: `${company} is a demo-stage provider helping ${profile.industryLabel} teams improve revenue, partnerships and execution.`,
+    market_position: `Positioned as a revenue acceleration partner for ${profile.industryLabel} with a focus on predictable pipeline and revenue coordination.`,
+    revenue_stage: 'Growth-stage',
+    employee_count: '120–180 employees',
+    products_services: `Revenue intelligence, GTM execution orchestration, and demand signal automation for ${profile.industryLabel} businesses.`,
+    tech_stack_hints: ['CRM automation tools', 'marketing attribution platform', 'BI dashboard integration'],
+    tech_stack_indicators: ['CRM automation tools', 'marketing attribution platform', 'BI dashboard integration'],
+    growth_signals: [
+      'Recurring commercial momentum observed in demo-mode account analogs.',
+      `Industry demand is increasing for ${profile.industryLabel} efficiency and digital revenue coordination.`,
+      'High correlation between GTM execution and predictable commercial outcomes.',
+    ],
+    demand_signals: [
+      `Inbound interest is moderate for ${anchor}.`,
+      `Target buyers are actively researching ${profile.keyword_focus}.`,
+    ],
+    market_timing: [
+      'Market timing is favorable as buyers prioritize pipeline predictability.',
+      'Economic pressure is creating urgency for revenue growth tools.',
+    ],
+    icp_fit: {
+      target_description: profile.primary_icp,
+      product_fit: `Strong fit for companies with ${profile.industryLabel} business models and recurring revenue or digital monetization strategies.`,
+    },
+    data_completeness: {
+      completeness: 'partial',
+      missing: ['real website extraction', 'live customer evidence', 'verified buyer intent data'],
+    },
+    gtm_relevance_score: 60,
+    gtm_relevance_reasoning: `Demo mode score reflects moderate fit from TAM, ICP alignment, and product-market positioning for ${company}.`,
+    swot: {
+      strengths: ['Clear revenue operations value proposition', 'Strong market timing for pipeline predictability', 'Well-defined ICP for enterprise revenue teams'],
+      weaknesses: ['Demo assumptions lack live customer evidence', 'Limited verified buyer intent signals', 'Potential execution risk in tech integration'],
+      opportunities: ['Growing demand for AI-driven revenue orchestration', 'Expansion into adjacent mid-market GTM segments', 'Alignment with modern sales operations agendas'],
+      threats: ['Competitive pressure from incumbent revenue intelligence vendors', 'Buyer skepticism of AI-derived GTM claims', 'Funding and economic cycle uncertainty'],
+    },
+    analyst_insight: `Demo mode indicates ${company} has a promising GTM position, but live evidence is required before business decisions. [DEMO MODE – illustrative only]`,
+  };
+  return applyDemoMetadata(output, 1);
+}
+
+function buildDemoStep2(company, industry) {
+  const demandPct = 67;
+  const timingPct = 63;
+  const icpPct = 70;
+  const dataPct = 58;
+  
+  const demandScore = Math.round((demandPct / 100) * 40);
+  const timingScore = Math.round((timingPct / 100) * 25);
+  const icpScore = Math.round((icpPct / 100) * 20);
+  const dataScore = Math.round((dataPct / 100) * 15);
+  const totalScore = demandScore + timingScore + icpScore + dataScore;
+  
+  const output = {
+    tam_size_estimate: 'USD 1.8B',
+    growth_rate: '13% CAGR',
+    market_maturity: 'Emerging with accelerating buyer demand',
+    market_segments: [
+      {
+        name: 'Enterprise Revenue Operations',
+        est_size: 'USD 620M',
+        size: 'USD 620M',
+        priority: 'High',
+        growth: '14%',
+        rationale: 'Revenue teams seeking pipeline predictability and improved sales execution.',
+      },
+      {
+        name: 'Mid-Market SaaS GTM Teams',
+        est_size: 'USD 480M',
+        size: 'USD 480M',
+        priority: 'Medium',
+        growth: '11%',
+        rationale: 'High need for outbound efficiency and account prioritisation.',
+      },
+      {
+        name: 'Professional Services Automation',
+        est_size: 'USD 240M',
+        size: 'USD 240M',
+        priority: 'Medium',
+        growth: '10%',
+        rationale: 'Professional services buyers prioritise predictable revenue forecasting.',
+      },
+    ],
+    priority_opportunities: 'Enterprise revenue operations teams seeking pipeline predictability.',
+    demand_score: { score: demandScore, max: 40, rationale: 'Moderate demand signals balanced by an illustrative ICP and market positioning.' },
+    market_timing_score: { score: timingScore, max: 25, rationale: 'Timing is favorable for revenue acceleration solutions in the current buying cycle.' },
+    icp_fit_score: { score: icpScore, max: 20, rationale: 'The demo ICP shows a strong fit with the product value proposition.' },
+    data_completeness_score: { score: dataScore, max: 15, rationale: 'Key market and customer signals are illustrative rather than validated.' },
+    total_score: totalScore,
+    score_breakdown: {
+      demand: demandScore,
+      market_timing: timingScore,
+      icp_fit: icpScore,
+      data_completeness: dataScore,
+      total: totalScore,
+      verification: `${demandScore} + ${timingScore} + ${icpScore} + ${dataScore} = ${totalScore}`,
+    },
+    score_verification: `${demandScore} + ${timingScore} + ${icpScore} + ${dataScore} = ${totalScore}`,
+    analyst_insight: `Demo mode TAM and market attractiveness point to a conditional $1.8B opportunity for ${company}. [DEMO MODE – illustrative only]`,
+  };
+  return applyDemoMetadata(output, 2);
+}
+
+function buildDemoStep3(company, industry) {
+  const profile = getDemoIndustryProfile(company, industry);
+  const output = {
+    primary_icp: profile.primary_icp,
+    secondary_icp: profile.secondary_icp,
+    firmographics: `Target accounts: 200–800 employees, $25M–$120M ARR, US/EMEA, with ${profile.industryLabel} commercial operations focus.`,
+    core_pain_points: profile.core_problem,
+    buying_triggers: profile.buying_triggers || ['Pipeline underperformance', 'CRM data fragmentation', 'quarterly revenue pressure'],
+    objections: ['Need proof of ROI', 'Prefer incumbent systems', 'Skepticism about AI-derived insights'],
+    deal_cycle: '90–120 days for enterprise adoption',
+    decision_makers: profile.decision_makers,
+    persona_map: {
+      primary_role: { title: profile.primary_role_title, key_responsibility: profile.primary_role_responsibility },
+      economic_buyer: { title: profile.economic_buyer_title, key_responsibility: profile.economic_buyer_responsibility },
+      champion: { title: profile.champion_title, key_responsibility: profile.champion_responsibility },
+    },
+    verdict: 'CONDITIONAL GO',
+    score_basis: 'Based on demo-mode market signals, ICP alignment, and demand thresholds.',
+    demand_assessment: 'Demand appears present for mid-market revenue enablement, but requires validation.',
+    icp_assessment: 'The ICP is plausible for enterprise GTM teams pending live buyer interviews.',
+    analyst_insight: `Demo mode recommendation is conditional and should not be used for final decisions without live verification. [DEMO MODE – illustrative only]`,
+  };
+  return applyDemoMetadata(output, 3);
+}
+
+function buildDemoStep4(company, industry) {
+  const profile = getDemoIndustryProfile(company, industry);
+  const output = {
+    recommended_databases: profile.recommended_databases || ['Crunchbase', 'LinkedIn Sales Navigator', 'ZoomInfo'],
+    filter_criteria: `Company size 200–800 employees, ${profile.industryLabel} commercial operations focus, modern digitization and distribution capacity.`,
+    exclusion_criteria: 'Pre-revenue startups, non-core distribution businesses, and accounts outside North America/EMEA.',
+    sourcing_playbook: `Target high-fit ${profile.industryLabel} accounts with curated outreach to partnerships and revenue leaders.`,
+    data_enrichment: 'Append firmographics, technographics, funding status, and hiring signals to each account profile.',
+    high_fit_account_analogs: profile.account_analogs,
+    target_roles: Array.isArray(profile.target_roles) ? profile.target_roles : [profile.target_roles].filter(Boolean),
+    core_problem: profile.core_problem,
+    solution_angle: profile.solution_angle,
+    solution_pitch: `Use ${company} to shorten cycles and improve ${profile.industryLabel} revenue coordination.`,
+    why_now: 'Market pressure is driving buyers to fix pipeline efficiency and forecast predictability now.',
+    estimated_deal_size: {
+      range: 'USD 120k–220k ARR per account',
+      basis: 'Derived from similar GTM motions in comparable accounts and buyer intent velocity.',
+      is_estimate: true,
+    },
+    sales_approach: 'Land with one reference account, then expand through account-based marketing and sales enablement.',
+    approach_rationale: `Prioritise high-fit buyers with clear commercial pain, then use a reference-led expansion motion to accelerate pipeline conversion.`,
+    analyst_insight: `Demo mode account sourcing is illustrative only; validate with real prospect data and market intent. [DEMO MODE – illustrative only]`,
+  };
+  return applyDemoMetadata(output, 4);
+}
+
+function buildDemoStep5(company, industry) {
+  const profile = getDemoIndustryProfile(company, industry);
+  const keywordFocusRaw = profile.keyword_focus || profile.keywords || profile.industryLabel || 'commercial growth';
+  const keywordFocus = String(keywordFocusRaw).trim() || 'commercial growth';
+  const keywordParts = keywordFocus.split(',').map(k => String(k || '').trim()).filter(Boolean);
+  const primaryKeyword = keywordParts[0] || 'commercial growth';
+  const secondaryKeyword = keywordParts[1] || primaryKeyword;
+  const targetRoles = Array.isArray(profile.target_roles)
+    ? profile.target_roles.filter(Boolean)
+    : profile.target_roles
+    ? [String(profile.target_roles).trim()]
+    : [];
+  const firstTargetRole = targetRoles[0] || 'Revenue Operations Leader';
+
+  const output = {
+    primary_keywords: [keywordFocus],
+    secondary_keywords: ['commercial growth strategy', 'customer conversion intelligence'],
+    intent_signals: ['High buyer research activity', 'Increase in decision-maker outreach', 'Improving funnel velocity'],
+    funnel_taxonomy: 'Awareness → consideration → decision → expansion',
+    boolean_query: `("${primaryKeyword}" OR "${secondaryKeyword}") AND (revenue OR growth OR operations)`,
+    linkedin_search_string: `"${firstTargetRole}" AND "${primaryKeyword}"`,
+    content_topics: [keywordFocus, 'commercial performance', 'strategy-to-execution alignment'],
+    key_risks: [
+      {
+        risk: 'Demo keywords may not reflect actual customer language in this vertical.',
+        source: 'Assumed keyword trends from analogous GTM plays',
+        impact: 'medium',
+        mitigation: 'Validate with live customer discovery and search query analysis.',
+      },
+      {
+        risk: 'Intent signals are illustrative and require live validation.',
+        source: 'Demo-mode signal synthesis',
+        impact: 'high',
+        mitigation: 'Confirm with real buyer intent data and sales activity metrics.',
+      },
+      {
+        risk: 'Performance could differ if buyer priorities shift rapidly.',
+        source: 'Market volatility assumptions',
+        impact: 'medium',
+        mitigation: 'Monitor buyer feedback and adjust messaging weekly.',
+      },
+    ],
+    validation_needed: ['Customer interviews', 'CRO alignment', 'Pipeline health review'],
+    confidence_level: 'medium',
+    confidence_score: 62,
+    confidence_reasoning: 'Demo confidence is driven by moderate data completeness assumptions and illustrative signal strength.',
+    analyst_insight: `Demo mode keyword and intent guidance is illustrative and should be validated with live account data. [DEMO MODE – illustrative only]`,
+  };
+  return applyDemoMetadata(output, 5);
+}
+
+function buildDemoStep6(company, industry, priorSteps = {}) {
+  const profile = getDemoIndustryProfile(company, industry);
+  const output = {
+    email_1: {
+      subject: `Unlock predictable growth for ${company}`,
+      body: `Hi [Name],\n\nI noticed ${company} is focused on ${profile.outreach_language}. We help teams like yours reduce execution friction and improve forecast or partnership revenue accuracy. I’d love to share a quick framework for more predictable commercial outcomes.\n\nBest,\n[Your Name]`,
+      angle: `${profile.outreach_language} and revenue predictability`,
+      cta: 'Request a short briefing to discuss current revenue or partnership gaps.',
+    },
+    email_2: {
+      subject: `Proof of performance for ${profile.industryLabel} leaders`,
+      body: `Hi [Name],\n\nFollowing up on my note about operational efficiency: our clients usually see a 15–20% uplift in commercial conversion or partnership yield within 90 days. Can we connect to explore if this matches your current priorities?\n\nThanks,\n[Your Name]`,
+      angle: `ROI and operational performance evidence`,
+      cta: 'Book a quick call to review a short case study.',
+    },
+    email_3: {
+      subject: `Last check — ${profile.industryLabel} signal readiness`,
+      body: `Hi [Name],\n\nI wanted to leave you with one key observation: teams that align intent signals and execution close more revenue and partnership opportunities. If you’re open, I’d be happy to share a short plan tailored to ${company}.\n\nRegards,\n[Your Name]`,
+      angle: 'Final validation with commercial urgency',
+      cta: 'Reply with a time for a brief executive summary.',
+    },
+    follow_up_sequence: 'Send Email 1 → wait 3 days → Email 2 → reach out on LinkedIn → follow-up call attempt.',
+    linkedin_message: `Hi [Name], I’m researching ${profile.industryLabel} leaders at companies like ${company}. If you’re open, I’d love to share an outline of a GTM approach that shortens your pipeline handoff and improves commercial reliability.`,
+    linkedin_followup: `Following up on my message — are you available for a brief 10-minute conversation this week?`,
+    signal_highlights: [
+      { signal: 'Buyer interest is moderate', type: 'demand', strength: 'Medium' },
+      { signal: 'Market timing is improving', type: 'timing', strength: 'Medium' },
+      { signal: 'ICP fit appears reasonable', type: 'icp', strength: 'Medium' },
+    ],
+    score_breakdown: {
+      demand: 62,
+      market_timing: 60,
+      icp_fit: 65,
+      data_completeness: 55,
+      total: 60,
+      verification: 'Balanced strengths in ICP fit and timing, tempered by incomplete evidence.',
+    },
+    verdict: 'CONDITIONAL GO',
+    deal_lens_summary: 'The opportunity is viable with selective account focus and a stronger evidence base.',
+    risks_summary: 'Main risks are missing live buyer validation and incomplete competitive intelligence.',
+    confidence_note: 'Demo mode confidence is illustrative only and should be validated live.',
+    executive_brief: `Demo summary for ${company}: conditional market opportunity with a need for live validation and stronger evidence before committing resources. [DEMO MODE – illustrative only]`,
+    recommended_next_action: 'Validate ICP and demand with customer conversations before investing in full GTM execution.',
+    analyst_insight: `Demo mode summary is illustrative only. Do not use for live decisioning. [DEMO MODE – illustrative only]`,
+  };
+  return applyDemoMetadata(output, 6, priorSteps);
+}
+
+function buildDemoStep7(company, industry, priorSteps) {
+  const profile = getDemoIndustryProfile(company, industry);
+  const output = {
+    signal_summary: [
+      { signal_type: 'market_timing', description: `Timing for ${profile.industryLabel} is cautious yet opportunistic.`, signal_description: `Timing for ${profile.industryLabel} is cautious yet opportunistic.`, strength: 'Medium' },
+      { signal_type: 'growth', description: `${profile.industryLabel} growth is steady but requires validation.`, signal_description: `${profile.industryLabel} growth is steady but requires validation.`, strength: 'Medium' },
+    ],
+    why_now_analysis: `Market conditions are moving toward ${profile.industryLabel} revenue acceleration, but proof points remain illustrative.`,
+    mcc_view: {
+      market: `Market is maturing with stronger ${profile.industryLabel} buyer scrutiny.`,
+      client: `Client priorities center on predictable ${profile.industryLabel} revenue growth.`,
+      competitor: 'Competitor activity is moderate and centered on differentiation.',
+    },
+    strategic_hook: `Use ${company} to position for more predictable revenue outcomes in ${profile.industryLabel}.`,
+    persona_priority: { persona: profile.primary_icp.split(',')[0] || 'Revenue Operations Leader', reason: profile.primary_role_responsibility },
+    go_no_go: { recommendation: 'Watch', reason: 'Requires live evidence and customer validation before a full go decision.' },
+    confidence_score: 60,
+    risk_constraint: 'Requires live customer validation and a stronger evidence base before scaling investments.',
+    execution_priority: 'Medium — validate hypothesis before scaling the GTM motion.',
+    executive_brief: `Demo mode revenue intelligence suggests a Watch recommendation. Validate with live data before taking action. [DEMO MODE – illustrative only]`,
+    analyst_insight: `Demo mode intelligence is illustrative only. [DEMO MODE – illustrative only]`,
+    _data_quality: {
+      richness_score: 45,
+      warning: 'Demo mode – no live evidence',
+      confidence_ai_claimed: 60,
+      confidence_after_cap: 45,
+      signals_before_filter: 3,
+      signals_after_filter: 3,
+    },
+  };
+  return applyDemoMetadata(output, 7);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// SAVE STRATEGY
+// ══════════════════════════════════════════════════════════════════
+async function handleSaveStrategy(body, userId, supabaseUrl, supabaseKey, env, cors) {
+  if (!supabaseUrl || !supabaseKey) return errRes('Database not configured', 503, cors);
+
+  const errors = validate({ company_name: 'string|required' }, body);
+  if (errors.length) return errRes(errors[0], 400, cors);
+
+  const { company_name, industry, steps, total_tokens, company_url, scraped_profile, full_report, step_7_intelligence } = body;
+  const cacheKey = await hash(company_name.toLowerCase().trim());
+
+  const stepsCompleted = Object.values(steps || {}).filter(Boolean).length;
+  const status = stepsCompleted === 6 ? 'complete' : 'in_progress';
+
+  // ── PUBLICATION CONTRACT ENFORCEMENT ───────────────────────────
+  // Reject any step data where ALL values are null/undefined — these are
+  // corrupted save states and must not overwrite valid existing data.
+  const PLACEHOLDER_PATTERNS_RE = [
+    /^AI-inferred — validate$/i,
+    /^Demo placeholder — requires validation$/i,
+    /^Source data missing$/i,
+    /^missing data$/i,
+  ];
+  const isCorruptedStep = (stepData) => {
+    if (!stepData || typeof stepData !== 'object') return true;
+    const values = Object.values(stepData).filter(v => v !== undefined);
+    if (values.length === 0) return true;
+    // Corrupted = every non-null value is a placeholder string
+    const nonNull = values.filter(v => v !== null && v !== undefined && v !== '' && !Array.isArray(v) || (Array.isArray(v) && v.length > 0));
+    return nonNull.length === 0;
+  };
+
+  // Strip corrupted steps — do NOT persist null/placeholder-only step data
+  const sanitizedSteps = {};
+  for (let i = 1; i <= 6; i++) {
+    const stepData = steps?.[i];
+    if (stepData && !isCorruptedStep(stepData)) {
+      sanitizedSteps[i] = stepData;
+    } else if (stepData) {
+      console.warn(`[save_strategy] Rejecting corrupted step ${i} data for company="${company_name}"`);
+    }
+  }
+
+  const sanitizedStepsCompleted = Object.values(sanitizedSteps).filter(Boolean).length;
+  const sanitizedStatus = sanitizedStepsCompleted === 7 ? 'complete' : sanitizedStepsCompleted === 6 ? 'ready_for_step7' : 'in_progress';
+
+  let sanitizedScrapedProfile = scraped_profile && typeof scraped_profile === 'object' ? { ...scraped_profile } : {};
+  let sanitizedFullReport = full_report;
+  const isDemo = detectDemoStrategyMarker(steps, sanitizedScrapedProfile, full_report, step_7_intelligence);
+  if (isDemo) {
+    const marked = applyDemoSaveMarkers(sanitizedScrapedProfile, full_report);
+    sanitizedScrapedProfile = marked.scrapedProfile;
+    sanitizedFullReport = marked.fullReport;
+  }
+
+  const payload = {
+    user_id:          userId,
+    company_name:     sanitise(company_name, 200),
+    industry:         industry ? sanitise(industry, 100) : null,
+    company_url:      company_url || null,
+    scraped_profile:  sanitizedScrapedProfile,
+    step_1_market:    sanitizedSteps[1] || null,
+    step_2_tam:       sanitizedSteps[2] || null,
+    step_3_icp:       sanitizedSteps[3] || null,
+    step_4_sourcing:  sanitizedSteps[4] || null,
+    step_5_keywords:  sanitizedSteps[5] || null,
+    step_6_messaging: sanitizedSteps[6] || null,
+    step_7_intelligence: step_7_intelligence || null,
+    steps_completed:  sanitizedStepsCompleted,
+    total_tokens:     total_tokens || 0,
+    status:           sanitizedStatus,
+    cache_key:        cacheKey,
+    updated_at:       new Date().toISOString(),
+    full_report:      sanitizedFullReport || null,
+    // publication_ready: false by default — only set to true after validate_publication passes
+    publication_ready: false,
+    backend_intelligence: body.backend_intelligence || normalizeStrategy({
+      step_1_market:    sanitizedSteps[1] || null,
+      step_2_tam:       sanitizedSteps[2] || null,
+      step_3_icp:       sanitizedSteps[3] || null,
+      step_4_sourcing:  sanitizedSteps[4] || null,
+      step_5_keywords:  sanitizedSteps[5] || null,
+      step_6_messaging: sanitizedSteps[6] || null,
+      step_7_intelligence: step_7_intelligence || null
+    }, isDemo)
+  };
+
+  // FIX: Must pass resolution=merge-duplicates so subsequent step saves UPDATE the row
+  // instead of being silently ignored. Without this, steps 2-6 never persisted.
+  const res = await sbFetch(supabaseUrl, supabaseKey, 'strategies', 'POST',
+    JSON.stringify(payload), '?on_conflict=cache_key',
+    'return=representation,resolution=merge-duplicates');
+
+  if (!res.ok) {
+    const e = await res.text();
+    return errRes('Failed to save strategy: ' + e, 500, cors);
+  }
+
+  const saved = await res.json();
+  const strategyId = Array.isArray(saved) ? saved[0]?.id : saved?.id;
+
+  // Cache complete strategy in KV
+  if (status === 'complete' && strategyId) {
+    await kv.put(env, `strategy:${cacheKey}`, payload, 86400);
+  }
+
+  // Save sub-tables (non-blocking)
+  if (strategyId) {
+    if (steps?.[3]) saveICP(strategyId, userId, company_name, steps[3], supabaseUrl, supabaseKey);
+    if (steps?.[5]) saveKeywords(strategyId, userId, company_name, steps[5], supabaseUrl, supabaseKey);
+    if (steps?.[6]) saveMessaging(strategyId, userId, company_name, steps[6], supabaseUrl, supabaseKey);
+  }
+
+  // Add integration context as additive metadata (no persistence required)
+  const integrationContext = await buildIntegrationContext({}, env);
+
+  return okRes({ strategy_id: strategyId, cache_key: cacheKey, status: sanitizedStatus, steps_completed: sanitizedStepsCompleted, integration_context: integrationContext }, cors);
+}
+
+async function handleGetIntegrationStatus(env, cors) {
+  return okRes({ integration: getIntegrationStatus(env) }, cors);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ENRICH COMPANY  —  Layer 3 Pre-Generation Research Endpoint
+// ══════════════════════════════════════════════════════════════════
+async function handleEnrichCompany(body, userId, supabaseUrl, supabaseKey, env, cors) {
+  const errors = validate({ company: 'string|required' }, body);
+  if (errors.length) return errRes(errors[0], 400, cors);
+  const company    = sanitise(body.company, 200);
+  const industry   = body.industry ? sanitise(body.industry, 100) : null;
+  const cacheKey   = buildEnrichmentCacheKey(company, industry || '');
+  // Check cache first
+  if (supabaseUrl && supabaseKey) {
+    try {
+      const res = await sbFetch(supabaseUrl, supabaseKey, 'company_enrichment', 'GET', null, `?cache_key=eq.${cacheKey}&limit=1`);
+      if (res.ok) {
+        const rows = await res.json();
+        if (rows[0]?.enrichment_data) {
+          const ageHours = (Date.now() - new Date(rows[0].enriched_at||0).getTime()) / 3_600_000;
+          if (ageHours < 24) return okRes({ enrichment: rows[0].enrichment_data, cached: true, cache_age_hours: Math.round(ageHours) }, cors);
+        }
+      }
+    } catch(e) { console.warn('[enrich_company] cache check failed:', e.message); }
+  }
+  let enrichment;
+  try {
+    enrichment = await enrichCompany({ company, industry, companyUrl: body.company_url||null, scrapedProfile: body.scraped_profile||null, env });
+  } catch(e) { return errRes(`Enrichment failed: ${e.message}`, 500, cors); }
+  // Persist result
+  if (supabaseUrl && supabaseKey) {
+    try {
+      const existing = await sbFetch(supabaseUrl, supabaseKey, 'company_enrichment', 'GET', null, `?cache_key=eq.${cacheKey}&limit=1`);
+      const rows = existing.ok ? await existing.json() : [];
+      const payload = JSON.stringify({ cache_key: cacheKey, company_name: company, industry, enrichment_data: enrichment, enriched_at: new Date().toISOString(), source_quality: enrichment.sourceQuality, sources_used: enrichment.sourcesUsed, user_id: userId });
+      if (rows.length > 0) {
+        await sbFetch(supabaseUrl, supabaseKey, 'company_enrichment', 'PATCH', JSON.stringify({ enrichment_data: enrichment, enriched_at: new Date().toISOString(), source_quality: enrichment.sourceQuality, sources_used: enrichment.sourcesUsed }), `?cache_key=eq.${cacheKey}&user_id=eq.${userId}`);
+      } else {
+        await sbFetch(supabaseUrl, supabaseKey, 'company_enrichment', 'POST', payload);
+      }
+    } catch(e) { console.warn('[enrich_company] persist failed:', e.message); }
+  }
+  return okRes({ enrichment, cached: false }, cors);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// VALIDATE PUBLICATION
+// Backend publication readiness gate.
+// Called by the frontend BEFORE enabling export buttons.
+// Also called after save_step7 to confirm full publication state.
+//
+// Accepts:
+//   { strategy_id }   → fetch strategy from DB and validate
+//   { strategy }      → validate inline strategy object (avoids DB round-trip)
+//
+// Returns:
+//   PublicationState { publicationReady, missingFields, invalidCharts,
+//                      failedProviders, incompleteSteps, warnings, score }
+// ══════════════════════════════════════════════════════════════════
+async function handleValidatePublication(body, userId, supabaseUrl, supabaseKey, env, cors) {
+  let strategy = body.strategy || null;
+
+  // If no inline strategy, fetch from DB
+  if (!strategy && body.strategy_id) {
+    if (!supabaseUrl || !supabaseKey) return errRes('Database not configured', 503, cors);
+    const sid = sanitise(body.strategy_id, 36);
+    const res = await sbFetch(supabaseUrl, supabaseKey, 'strategies', 'GET', null,
+      `?id=eq.${sid}&user_id=eq.${userId}&limit=1`);
+    if (!res.ok) return errRes('Failed to fetch strategy for validation', 500, cors);
+    const rows = await res.json();
+    strategy = rows[0] || null;
+  }
+
+  if (!strategy) return errRes('No strategy provided or found for validation', 400, cors);
+
+  const publicationState = validatePublicationReadiness(strategy);
+  const report           = buildPublicationReport(publicationState);
+
+  // Log result (backend only)
+  console.info(`[validate_publication] user=${userId} strategy=${body.strategy_id || 'inline'} ready=${publicationState.publicationReady} score=${publicationState.score}`);
+
+  // If publication is ready and strategy_id is provided, stamp publication_ready flag
+  if (publicationState.publicationReady && body.strategy_id && supabaseUrl && supabaseKey) {
+    const sid = sanitise(body.strategy_id, 36);
+    // Stamp publication_ready=true + publication_validated_at timestamp (best-effort, non-blocking)
+    sbFetch(supabaseUrl, supabaseKey, 'strategies', 'PATCH',
+      JSON.stringify({
+        publication_ready:        true,
+        publication_validated_at: new Date().toISOString(),
+        publication_score:        publicationState.score,
+      }),
+      `?id=eq.${sid}&user_id=eq.${userId}`
+    ).catch(e => console.warn('[validate_publication] stamp failed:', e.message));
+  }
+
+  return okRes({
+    ...publicationState,
+    report,
+  }, cors);
+}
+
+async function resolveCompanyProfile(company, providedProfile, userId, supabaseUrl, supabaseKey) {
+  const hasProvided = providedProfile && providedProfile.extraction_confidence !== 'LOW' && providedProfile.company_overview;
+  if (hasProvided) return providedProfile;
+
+  if (!company || !supabaseUrl || !supabaseKey) return providedProfile || null;
+
+  try {
+    const encodedName = encodeURIComponent(company).replace(/%2A/g, '*');
+    const enrichmentQuery = `?user_id=eq.${userId}&company_name=ilike.*${encodedName}*&source=eq.website&limit=1`;
+    const enrichmentRes = await sbFetch(supabaseUrl, supabaseKey, 'company_enrichment', 'GET', null, enrichmentQuery);
+    if (enrichmentRes.ok) {
+      const rows = await enrichmentRes.json();
+      if (Array.isArray(rows) && rows.length > 0) {
+        const payload = rows[0]?.payload;
+        if (payload && typeof payload === 'object') return payload;
+      }
+    }
+
+    const strategyQuery = `?user_id=eq.${userId}&company_name=ilike.*${encodedName}*&select=scraped_profile&limit=1`;
+    const strategyRes = await sbFetch(supabaseUrl, supabaseKey, 'strategies', 'GET', null, strategyQuery);
+    if (!strategyRes.ok) return providedProfile || null;
+    const strategyRows = await strategyRes.json();
+    if (Array.isArray(strategyRows) && strategyRows.length > 0) {
+      const scraped = strategyRows[0]?.scraped_profile;
+      if (scraped && typeof scraped === 'object') return scraped;
+    }
+
+    return providedProfile || null;
+  } catch (e) {
+    console.error('[resolveCompanyProfile]', e.message);
+    return providedProfile || null;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+// GET VAULT — paginated with filters, sorting
+// ══════════════════════════════════════════════════════════════════
+async function handleGetVault(body, userId, supabaseUrl, supabaseKey, cors) {
+  if (!supabaseUrl || !supabaseKey) return errRes('Database not configured', 503, cors);
+
+  const { search, status, sort = 'updated_at', limit = 24, offset = 0 } = body;
+  const validSort   = ['updated_at','created_at','company_name','total_tokens'];
+  const sortField   = validSort.includes(sort) ? sort : 'updated_at';
+
+  let query = `?user_id=eq.${userId}&order=${sortField}.desc&limit=${limit}&offset=${offset}`;
+  if (status && ['complete','in_progress','archived'].includes(status)) {
+    query += `&status=eq.${status}`;
+  } else {
+    // Default: exclude archived
+    query += `&status=neq.archived`;
+  }
+  if (search) {
+    query += `&company_name=ilike.*${encodeURIComponent(sanitise(search, 100))}*`;
+  }
+
+  // Use summary view — lighter payload
+  const res = await sbFetch(supabaseUrl, supabaseKey, 'strategy_summary', 'GET', null, query);
+  if (!res.ok) {
+    const errBody = await res.text().catch(() => 'unreadable');
+    console.error('VAULT_ERROR:', res.status, errBody);
+    return errRes('Failed to fetch vault: ' + errBody, 500, cors);
+  }
+  const data = await res.json();
+
+  // Enrich demo/live flags for summary rows with a lightweight secondary lookup
+  if (Array.isArray(data) && data.length > 0) {
+    const ids = data.filter(row => row && row.id).map(row => row.id);
+    if (ids.length > 0) {
+      const idList = ids.map(id => encodeURIComponent(id)).join(',');
+      const detailsRes = await sbFetch(supabaseUrl, supabaseKey, 'strategies', 'GET', null,
+        `?user_id=eq.${userId}&id=in.(${idList})&select=id,scraped_profile,full_report,step_1_market,step_2_tam,step_3_icp,step_4_sourcing,step_5_keywords,step_6_messaging,step_7_intelligence,backend_intelligence`);
+      if (detailsRes.ok) {
+        const details = await detailsRes.json();
+        const detailsById = (Array.isArray(details) ? details : []).reduce((acc, item) => {
+          if (item?.id) acc[item.id] = item;
+          return acc;
+        }, {});
+        data.forEach(strategy => {
+          const detail = detailsById[strategy.id];
+          if (!detail) return;
+          
+          // Decouple formula logic: Use persisted intelligence or recalculate if missing
+          const flags = deriveDemoModeState(detail);
+          const intelligence = detail.backend_intelligence || normalizeStrategy(detail, flags.demo_mode);
+
+          if (typeof strategy.demo_mode !== 'boolean') strategy.demo_mode = flags.demo_mode;
+          if (!strategy.report_mode) strategy.report_mode = flags.report_mode;
+          
+          strategy.gtm_score = intelligence.gtmScore;
+          strategy.verdict = intelligence.verdict;
+          strategy.backend_intelligence = intelligence;
+        });
+      }
+    }
+  }
+
+  // Get total count (for pagination UI)
+  let totalQuery = `?user_id=eq.${userId}&select=id&status=neq.archived`;
+  if (status) totalQuery = `?user_id=eq.${userId}&select=id&status=eq.${status}`;
+  const countRes = await sbFetch(supabaseUrl, supabaseKey, 'strategies', 'GET', null, totalQuery);
+  const countData = countRes.ok ? await countRes.json() : [];
+
+  return okRes({
+    strategies:  data,
+    total:       countData.length,
+    limit,
+    offset,
+    has_more:    offset + data.length < countData.length,
+  }, cors);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// GET STRATEGY — full record
+// ══════════════════════════════════════════════════════════════════
+async function handleGetStrategy(body, userId, supabaseUrl, supabaseKey, env, cors) {
+  if (!supabaseUrl || !supabaseKey) return errRes('Database not configured', 503, cors);
+
+  const errors = validate({ strategy_id: 'string|required' }, body);
+  if (errors.length) return errRes(errors[0], 400, cors);
+
+  const res = await sbFetch(supabaseUrl, supabaseKey, 'strategies', 'GET', null,
+    `?id=eq.${sanitise(body.strategy_id, 36)}&user_id=eq.${userId}&limit=1`);
+  if (!res.ok) return errRes('Failed to fetch strategy', 500, cors);
+
+  const data = await res.json();
+  if (!data.length) return errRes('Strategy not found', 404, cors);
+
+  const strategy = data[0];
+  
+  // Decouple formula logic: Use persisted intelligence or recalculate if missing (legacy compatibility)
+  const flags = deriveDemoModeState(strategy);
+  const intelligence = strategy.backend_intelligence || normalizeStrategy(strategy, flags.demo_mode);
+  
+  strategy.gtm_score = intelligence.gtmScore;
+  strategy.verdict = intelligence.verdict;
+  strategy.backend_intelligence = intelligence;
+  
+  if (strategy.step_7_intelligence) {
+    strategy.step_7_intelligence.confidence_score = intelligence.confScore;
+    strategy.step_7_intelligence.confidence_breakdown = intelligence.confidenceMatrix;
+    strategy.step_7_intelligence.backend_intelligence = intelligence;
+  }
+
+  // Update last_viewed_at (non-blocking)
+  sbFetch(supabaseUrl, supabaseKey, 'strategies', 'PATCH',
+    JSON.stringify({ last_viewed_at: new Date().toISOString() }),
+    `?id=eq.${body.strategy_id}&user_id=eq.${userId}`);
+
+  // Add integration context as additive metadata (no persistence required)
+  const integrationContext = await buildIntegrationContext(strategy, env);
+
+  return okRes({ strategy, integration_context: integrationContext }, cors);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// DELETE STRATEGY
+// ══════════════════════════════════════════════════════════════════
+async function handleDeleteStrategy(body, userId, supabaseUrl, supabaseKey, env, cors) {
+  if (!supabaseUrl || !supabaseKey) return errRes('Database not configured', 503, cors);
+
+  const errors = validate({ strategy_id: 'string|required' }, body);
+  if (errors.length) return errRes(errors[0], 400, cors);
+
+  const id = sanitise(body.strategy_id, 36);
+
+  // Get cache_key before deleting (to bust KV)
+  const getRes = await sbFetch(supabaseUrl, supabaseKey, 'strategies', 'GET', null,
+    `?id=eq.${id}&user_id=eq.${userId}&select=cache_key&limit=1`);
+  if (getRes.ok) {
+    const rows = await getRes.json();
+    if (rows[0]?.cache_key) {
+      await kv.del(env, `strategy:${rows[0].cache_key}`);
+    }
+  }
+
+  const res = await sbFetch(supabaseUrl, supabaseKey, 'strategies', 'DELETE', null,
+    `?id=eq.${id}&user_id=eq.${userId}`);
+  if (!res.ok) return errRes('Failed to delete strategy', 500, cors);
+  return okRes({ deleted: true }, cors);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// ARCHIVE / RESTORE STRATEGY
+// ══════════════════════════════════════════════════════════════════
+async function handleArchiveStrategy(body, userId, supabaseUrl, supabaseKey, env, cors) {
+  if (!supabaseUrl || !supabaseKey) return errRes('Database not configured', 503, cors);
+  const errors = validate({ strategy_id: 'string|required' }, body);
+  if (errors.length) return errRes(errors[0], 400, cors);
+
+  const newStatus = body.restore ? 'complete' : 'archived';
+  const res = await sbFetch(supabaseUrl, supabaseKey, 'strategies', 'PATCH',
+    JSON.stringify({ status: newStatus, updated_at: new Date().toISOString() }),
+    `?id=eq.${sanitise(body.strategy_id, 36)}&user_id=eq.${userId}`);
+  if (!res.ok) return errRes('Failed to update strategy', 500, cors);
+  return okRes({ status: newStatus }, cors);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// RESUME STRATEGY — get incomplete step context
+// ══════════════════════════════════════════════════════════════════
+async function handleResumeStrategy(body, userId, supabaseUrl, supabaseKey, cors) {
+  if (!supabaseUrl || !supabaseKey) return errRes('Database not configured', 503, cors);
+  const errors = validate({ strategy_id: 'string|required' }, body);
+  if (errors.length) return errRes(errors[0], 400, cors);
+
+  const res = await sbFetch(supabaseUrl, supabaseKey, 'strategies', 'GET', null,
+    `?id=eq.${sanitise(body.strategy_id, 36)}&user_id=eq.${userId}&limit=1`);
+  if (!res.ok) return errRes('Failed to fetch strategy', 500, cors);
+  const data = await res.json();
+  if (!data.length) return errRes('Strategy not found', 404, cors);
+
+  const s = data[0];
+  const steps = {
+    1: s.step_1_market,
+    2: s.step_2_tam,
+    3: s.step_3_icp,
+    4: s.step_4_sourcing,
+    5: s.step_5_keywords,
+    6: s.step_6_messaging,
+  };
+
+  const nextStep = [1,2,3,4,5,6].find(i => !steps[i]) || 6;
+
+  return okRes({
+    strategy_id:    s.id,
+    company_name:   s.company_name,
+    industry:       s.industry,
+    company_url:    s.company_url,
+    scraped_profile: s.scraped_profile,
+    steps,
+    steps_completed: s.steps_completed,
+    next_step:       nextStep,
+    total_tokens:    s.total_tokens,
+    step_7_intelligence: s.step_7_intelligence || null,
+  }, cors);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// CHECK CACHE — returns existing complete strategy if found
+// ══════════════════════════════════════════════════════════════════
+async function handleCheckCache(body, userId, supabaseUrl, supabaseKey, env, cors) {
+  const errors = validate({ company_name: 'string|required' }, body);
+  if (errors.length) return errRes(errors[0], 400, cors);
+
+  const cacheKey = await hash(body.company_name.toLowerCase().trim());
+
+  // Check KV first (fastest)
+  const kvHit = await kv.get(env, `strategy:${cacheKey}`);
+  if (kvHit) return okRes({ cached: true, source: 'kv', strategy: kvHit }, cors);
+
+  // Check Supabase
+  if (supabaseUrl && supabaseKey) {
+    const res = await sbFetch(supabaseUrl, supabaseKey, 'strategies', 'GET', null,
+      `?cache_key=eq.${cacheKey}&user_id=eq.${userId}&status=eq.complete&limit=1`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.length) return okRes({ cached: true, source: 'db', strategy: data[0], updated_at: data[0].updated_at }, cors);
+    }
+  }
+
+  return okRes({ cached: false, strategy: null }, cors);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// SCORE LEADS (simple action — deterministic scoring only)
+// ══════════════════════════════════════════════════════════════════
+async function handleScoreLeads(body, userId, openaiKey, cors) {
+  const errors = validate({ leads: 'array|required' }, body);
+  if (errors.length) return errRes(errors[0], 400, cors);
+  // scoreBatch has its own try/catch — if OpenAI key missing, leads get default scores (non-fatal)
+  if (!openaiKey) {
+    console.warn('[gtm] handleScoreLeads: OPENAI_API_KEY not set — leads will use default scores');
+  }
+
+  const { leads, icp_context } = body;
+  if (leads.length > 50) return errRes('Max 50 leads per request. Use /api/leads for batch scoring.', 400, cors);
+
+  const BATCH = 10;
+  const results = [];
+
+  for (let i = 0; i < leads.length; i += BATCH) {
+    const batch  = leads.slice(i, i + BATCH);
+    const scored = await scoreBatch(batch, icp_context || '', openaiKey);
+    results.push(...scored);
+  }
+
+  return okRes({ scored_leads: results, total: results.length }, cors);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// RUN STEP 7 — Revenue Intelligence Enhancement (optional post-processing)
+// ══════════════════════════════════════════════════════════════════
+async function handleRunStep7(body, userId, openaiKey, supabaseUrl, supabaseKey, env, cors) {
+  const errors = validate({
+    company: 'string|required',
+    steps:   'object|required',
+  }, body);
+  if (errors.length) return errRes(errors[0], 400, cors);
+  const integration = getIntegrationStatus(env);
+  if (body.use_rag && !integration.features.rag.enabled) return errRes('RAG integration not configured', 503, cors);
+  if (body.use_agents && !integration.features.agents.enabled) return errRes('Agents integration not configured', 503, cors);
+  // Provider guard: at least one AI provider must be configured
+  if (!env.OPENAI_API_KEY && !env.GEMINI_API_KEY) return errRes('No AI provider configured (OPENAI_API_KEY or GEMINI_API_KEY required)', 503, cors);
+
+  const { company, industry, steps } = body;
+
+  // Require at least Step 1 & 6 to be present — otherwise there's nothing to analyse
+  if (!steps[1] || !steps[6]) {
+    return errRes('Step 7 requires completed Steps 1–6. Run the full GTM flow first.', 400, cors);
+  }
+
+  // Hourly token limit check (non-blocking on failure)
+  if (supabaseUrl && supabaseKey) {
+    if (await isHourlyLimitExceeded(userId, supabaseUrl, supabaseKey)) {
+      return errRes('Hourly token limit reached. Resets at the top of the hour.', 429, cors);
+    }
+  }
+
+  // ── HALLUCINATION GUARD STEP 1: Measure actual data richness BEFORE calling AI ──
+  // We calculate a "data richness score" purely from what exists in Steps 1-6.
+  // This score is used to:
+  //   a) Cap the AI's confidence_score (AI cannot claim higher confidence than data supports)
+  //   b) Build an "evidence manifest" injected into the prompt so AI only references real fields
+  const richness = measureDataRichness(steps);
+
+  // ── HALLUCINATION GUARD STEP 2: Build evidence manifest ──────────────────────
+  // Extract only the concrete facts that actually exist in the step data.
+  // This manifest is injected into the prompt as the ONLY facts the AI may reference.
+  // AI is explicitly told: if a fact is not in this manifest, do not mention it.
+  const evidenceManifest = buildEvidenceManifest(steps);
+
+  const prompt = buildStep7Prompt(sanitise(company, 200), industry || '', steps, evidenceManifest);
+  const t0 = Date.now();
+
+  // ── Provider-routed AI call — Step 7 anti-hallucination system prompt preserved ──
+  const step7SystemPrompt = [
+    'You are a senior revenue intelligence analyst.',
+    'CRITICAL ANTI-HALLUCINATION RULES — VIOLATION = INVALID OUTPUT:',
+    '1. You may ONLY reference facts that appear in the EVIDENCE MANIFEST provided. Do not invent company details, competitor names, funding amounts, or growth metrics.',
+    '2. signal_type MUST be one of exactly: hiring, funding, growth, tech_replacement, competitor_pressure, expansion, market_timing — no other values accepted.',
+    '3. go_no_go.recommendation MUST be exactly one of: Go, Watch, No-Go — no other values accepted.',
+    '4. signal strength MUST be exactly one of: High, Medium, Low — no other values accepted.',
+    '5. If you cannot find evidence for a signal, omit it entirely rather than inventing one.',
+    '6. Return ONLY valid JSON. No markdown, no prose, no code fences. Start with { end with }.',
+  ].join('\n');
+
+  const step7Result = await routeProviderRequest({
+    step:         7,
+    systemPrompt: step7SystemPrompt,
+    userPrompt:   prompt,
+    maxTokens:    STEP_MAX_TOKENS[7],
+    temperature:  0.2,  // low temperature = less creative hallucination
+  }, env);
+
+  if (step7Result.error) {
+    const statusCode = step7Result.statusCode || 502;
+    const userMsg    = statusCode === 429
+      ? 'Rate limit reached. Please wait a moment before retrying.'
+      : `AI provider error: ${step7Result.error}`;
+    return errRes(userMsg, statusCode, cors);
+  }
+
+  let rawText    = step7Result.rawText;
+  let tokensUsed = step7Result.tokensUsed;
+
+  // Backend logging: fallback state (non-blocking, backend only)
+  if (step7Result.fallbackTriggered) {
+    console.warn(`[gtm] step=7 company="${company}" fallback_triggered reason=${step7Result.fallbackReason} provider=${step7Result.provider}`);
+  }
+
+  // Parse Step 7 response (parseStep7 handles recovery; normalizeStepOutput fills any gaps)
+  let parsed = parseStep7(rawText) || step7Result.parsed || {};
+
+  // ── HALLUCINATION GUARD STEP 3: Server-side output sanitisation ──────────────
+  // Enforce every enum, clamp every number, strip any field that violates the schema.
+  // This runs AFTER the AI response — nothing untrusted reaches the frontend.
+  parsed = sanitiseStep7Output(parsed, richness);
+  
+  // Decouple formula logic: Inject backend-owned intelligence directly into the AI response payload
+  const intelligence = normalizeStrategy({ step_1_market: steps[1], step_2_tam: steps[2], step_7_intelligence: parsed }, false);
+  parsed.gtm_score = intelligence.gtmScore;
+  parsed.confidence_score = intelligence.confScore;
+  parsed.verdict = intelligence.verdict;
+  parsed.confidence_breakdown = intelligence.confidenceMatrix;
+  parsed.backend_intelligence = intelligence;
+
+  const duration = Date.now() - t0;
+
+  // Log usage (non-blocking)
+  if (supabaseUrl && supabaseKey) {
+    logRun(userId, null, 'gtm_step7', 7, company, tokensUsed, duration, false, supabaseUrl, supabaseKey);
+    bumpHourlyTokens(userId, tokensUsed, supabaseUrl, supabaseKey);
+  }
+
+  return okRes({ data: parsed, tokens: tokensUsed, duration_ms: duration, step: 7 }, cors);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// DATA RICHNESS MEASUREMENT — Phase-based
+// Measures how much real phase data exists for Step 7 intelligence.
+// Returns 0–100 based on phase completeness.
+// ══════════════════════════════════════════════════════════════════
+function measureDataRichness(steps) {
+  // Phase weights for Step 7 (must sum to 100)
+  // P1(signals)=20, P2(scores)=20, P3(verdict)=20, P4(deal)=15, P5(risks)=15, P6(final)=10
+  const weights = { 1: 20, 2: 20, 3: 20, 4: 15, 5: 15, 6: 10 };
+  let score = 0;
+
+  // Phase 1 — Signal Extraction (weight 20)
+  if (steps[1]) {
+    const p1 = steps[1];
+    let pts = 0;
+    if (p1.demand_signals?.length)   pts += 7;
+    if (p1.market_timing?.length)    pts += 7;
+    if (p1.icp_fit?.target_description && p1.icp_fit.target_description !== 'missing data') pts += 6;
+    score += Math.min(weights[1], pts);
+  }
+
+  // Phase 2 — Scoring (weight 20)
+  if (steps[2]) {
+    const p2 = steps[2];
+    let pts = 0;
+    if (typeof p2.demand_score?.score === 'number')           pts += 5;
+    if (typeof p2.market_timing_score?.score === 'number')    pts += 5;
+    if (typeof p2.icp_fit_score?.score === 'number')          pts += 5;
+    if (typeof p2.data_completeness_score?.score === 'number')pts += 5;
+    score += Math.min(weights[2], pts);
+  }
+
+  // Phase 3 — Verdict (weight 20)
+  if (steps[3]) {
+    const p3 = steps[3];
+    let pts = 0;
+    if (p3.verdict)          pts += 8;
+    if (p3.verdict_reasoning)pts += 7;
+    if (p3.score_basis)      pts += 5;
+    score += Math.min(weights[3], pts);
+  }
+
+  // Phase 4 — Deal Lens (weight 15)
+  if (steps[4]) {
+    const p4 = steps[4];
+    let pts = 0;
+    if (p4.target_roles?.length)  pts += 5;
+    if (p4.core_problem)          pts += 5;
+    if (p4.why_now)               pts += 5;
+    score += Math.min(weights[4], pts);
+  }
+
+  // Phase 5 — Risks (weight 15)
+  if (steps[5]) {
+    const p5 = steps[5];
+    let pts = 0;
+    if (p5.key_risks?.length)      pts += 7;
+    if (typeof p5.confidence_score === 'number') pts += 8;
+    score += Math.min(weights[5], pts);
+  }
+
+  // Phase 6 — Final Output (weight 10)
+  if (steps[6]) {
+    const p6 = steps[6];
+    let pts = 0;
+    if (p6.executive_brief)        pts += 5;
+    if (p6.recommended_next_action)pts += 5;
+    score += Math.min(weights[6], pts);
+  }
+
+  return Math.round(score);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// HALLUCINATION GUARD — EVIDENCE MANIFEST BUILDER
+// Extracts only concrete facts that ACTUALLY exist in the step data.
+// This manifest is passed to the AI — it can ONLY reference these facts.
+// ══════════════════════════════════════════════════════════════════
+function buildEvidenceManifest(steps) {
+  const facts = [];
+
+  const add = (label, value) => {
+    if (!value) return;
+    if (Array.isArray(value) && value.length === 0) return;
+    const v = Array.isArray(value) ? value.slice(0, 5).join(', ') : String(value).slice(0, 300);
+    if (v.trim()) facts.push(`${label}: ${v}`);
+  };
+
+  // Phase 1 — Signal Extraction
+  if (steps[1]) {
+    (steps[1].demand_signals||[]).slice(0,5).forEach((s,i)=>add(`Demand signal ${i+1}`, `[${s.type}/${s.strength}] ${s.signal}`));
+    (steps[1].market_timing||[]).slice(0,3).forEach((s,i)=>add(`Market timing signal ${i+1}`, `[${s.category}/${s.strength}] ${s.signal}`));
+    add('ICP target',       steps[1].icp_fit?.target_description);
+    add('ICP fit indicators', (steps[1].icp_fit?.fit_indicators||[]).slice(0,3));
+    add('Missing data',     (steps[1].data_completeness?.missing||[]).slice(0,5));
+  }
+  // Phase 2 — Scoring
+  if (steps[2]) {
+    add('Demand score',          `${steps[2].demand_score?.score??0}/40 — ${steps[2].demand_score?.rationale||''}`);
+    add('Market timing score',   `${steps[2].market_timing_score?.score??0}/25`);
+    add('ICP fit score',         `${steps[2].icp_fit_score?.score??0}/20`);
+    add('Data completeness score',`${steps[2].data_completeness_score?.score??0}/15`);
+    add('Total score',           `${steps[2].total_score??0}/100 (${steps[2].score_verification||''})`);
+  }
+  // Phase 3 — Verdict
+  if (steps[3]) {
+    add('Verdict',          steps[3].verdict);
+    add('Verdict reasoning',steps[3].verdict_reasoning);
+    add('Score basis',      steps[3].score_basis);
+    add('Demand assessment',steps[3].demand_assessment);
+    add('ICP assessment',   steps[3].icp_assessment);
+    if (steps[3].conditions?.length) add('Conditions', steps[3].conditions);
+  }
+  // Phase 4 — Deal Lens
+  if (steps[4]) {
+    add('Target roles',     (steps[4].target_roles||[]).join(', '));
+    add('Core problem',     steps[4].core_problem);
+    add('Solution angle',   steps[4].solution_angle);
+    add('Why now',          steps[4].why_now);
+    add('Deal size',        steps[4].estimated_deal_size?.range);
+    add('Sales approach',   steps[4].sales_approach);
+  }
+  // Phase 5 — Risks
+  if (steps[5]) {
+    (steps[5].key_risks||[]).slice(0,3).forEach((r,i)=>add(`Risk ${i+1}`, `[${r.impact}] ${r.risk}`));
+    add('Confidence score', steps[5].confidence_score);
+    add('Validation needed',(steps[5].validation_needed||[]).slice(0,3));
+  }
+  // Phase 6 — Final Output
+  if (steps[6]) {
+    add('Executive brief',  steps[6].executive_brief);
+    add('Deal summary',     steps[6].deal_lens_summary);
+    add('Next action',      steps[6].recommended_next_action);
+  }
+
+  return facts.length > 0
+    ? 'EVIDENCE MANIFEST (you may ONLY reference these facts):\n' + facts.map(f => `- ${f}`).join('\n')
+    : 'EVIDENCE MANIFEST: Limited data available. Reflect this in a low confidence_score.';
+}
+
+// ══════════════════════════════════════════════════════════════════
+// HALLUCINATION GUARD — SERVER-SIDE OUTPUT SANITISATION
+// Enforces all enums, clamps all numbers, caps confidence by data richness.
+// Runs after AI response. Nothing untrusted reaches the frontend.
+// ══════════════════════════════════════════════════════════════════
+const VALID_SIGNAL_TYPES  = new Set(['hiring','funding','growth','tech_replacement','competitor_pressure','expansion','market_timing']);
+const VALID_STRENGTHS     = new Set(['High','Medium','Low']);
+const VALID_GNG           = new Set(['Go','Watch','No-Go']);
+const VALID_PERSONAS      = new Set(['CEO','Founder','CTO','CFO','COO','Head of Sales','Head of Marketing','VP Sales','VP Marketing','CMO','CRO','Director of Sales','Director of Marketing','Head of Growth','Head of Product','Head of Operations']);
+
+function sanitizeReportPages(pages, warnings = []) {
+  const canonicalTitles = {
+    1: 'Strategic Positioning',
+    2: 'Executive Summary',
+    3: 'Market Research',
+    4: 'TAM Mapping',
+    5: 'ICP Modeling',
+    6: 'Account Sourcing',
+    7: 'Keywords & Intent',
+    8: 'Engagement Playbook',
+    9: 'Engagement Playbook',
+    10: 'Revenue Intelligence + Appendix / Methodology / Data Quality',
+  };
+
+  const makeFallbackPage = (pageNumber) => ({
+    page_number: pageNumber,
+    page_title: canonicalTitles[pageNumber] || 'Revenue Intelligence + Appendix / Methodology / Data Quality',
+    sections: [{
+      section_number: `${pageNumber}.1`,
+      heading: `Validation Notice — ${canonicalTitles[pageNumber] || `Page ${pageNumber}`}`,
+      content: 'This page was not produced by the AI generator. Review structure and rerun Step 7 to recover missing content.',
+    }],
+  });
+
+  if (!Array.isArray(pages) || pages.length === 0) {
+    warnings.push('No report pages were generated. Inserted validation fallback page.');
+    return [makeFallbackPage(1)];
+  }
+
+  const pageMap = new Map();
+  const duplicatePageNumbers = new Set();
+
+  for (const page of pages) {
+    if (!page || typeof page !== 'object') continue;
+    const rawPageNumber = Number(page.page_number);
+    if (!Number.isInteger(rawPageNumber) || rawPageNumber < 1) continue;
+    const pageNumber = rawPageNumber;
+
+    const pageTitle = typeof page.page_title === 'string' && page.page_title.trim()
+      ? page.page_title.trim().slice(0, 100)
+      : '';
+
+    const sections = [];
+    let fallbackIndex = 1;
+    if (Array.isArray(page.sections)) {
+      for (const sec of page.sections) {
+        if (!sec || typeof sec !== 'object') continue;
+        const rawSectionNumber = typeof sec.section_number === 'string' ? sec.section_number.trim() : '';
+        const sectionNumber = rawSectionNumber.match(/^\d+(\.\d+)*$/)
+          ? rawSectionNumber
+          : `${pageNumber}.${fallbackIndex++}`;
+        const heading = typeof sec.heading === 'string' ? sec.heading.trim().slice(0, 80) : '';
+        const content = typeof sec.content === 'string' ? sec.content.trim().slice(0, 1600) : '';
+        if (!heading && !content) continue;
+        sections.push({
+          section_number: sectionNumber,
+          heading: heading || 'Section',
+          content: content || 'Limited evidence available for this section.',
+        });
+      }
+    }
+
+    if (sections.length === 0) continue;
+
+    if (pageMap.has(pageNumber)) {
+      duplicatePageNumbers.add(pageNumber);
+      const existing = pageMap.get(pageNumber);
+      existing.sections.push(...sections);
+      if (!existing.page_title && pageTitle) existing.page_title = pageTitle;
+    } else {
+      pageMap.set(pageNumber, {
+        page_number: pageNumber,
+        page_title: pageTitle,
+        sections,
+      });
+    }
+  }
+
+  if (duplicatePageNumbers.size) {
+    warnings.push(`Duplicate page numbers detected and merged: ${[...duplicatePageNumbers].sort((a, b) => a - b).join(', ')}.`);
+  }
+
+  const validPages = [...pageMap.values()].filter(page => page.sections.length > 0);
+  if (validPages.length === 0) {
+    warnings.push('No valid report pages remained after sanitization. Inserted fallback page.');
+    return [makeFallbackPage(1)];
+  }
+
+  const sortedPages = validPages.map((page) => {
+    const uniqueSections = [];
+    const seenSectionNumbers = new Set();
+    page.sections.forEach((section) => {
+      const key = `${section.section_number}|${section.heading}`;
+      if (seenSectionNumbers.has(key)) return;
+      seenSectionNumbers.add(key);
+      uniqueSections.push(section);
+    });
+
+    uniqueSections.sort((a, b) => {
+      const aParts = a.section_number.split('.').map(Number);
+      const bParts = b.section_number.split('.').map(Number);
+      for (let i = 0; i < Math.max(aParts.length, bParts.length); i += 1) {
+        const ai = aParts[i] || 0;
+        const bi = bParts[i] || 0;
+        if (ai !== bi) return ai - bi;
+      }
+      return 0;
+    });
+
+    const canonicalTitle = canonicalTitles[page.page_number] || (page.page_number >= 10 ? canonicalTitles[10] : `Page ${page.page_number}`);
+    return {
+      page_number: page.page_number,
+      page_title: page.page_title || canonicalTitle,
+      sections: uniqueSections,
+    };
+  }).sort((a, b) => a.page_number - b.page_number);
+
+  const normalizedPages = new Map();
+  const maxPage = sortedPages.reduce((max, page) => Math.max(max, page.page_number), 1);
+  for (let i = 1; i <= maxPage; i += 1) {
+    if (sortedPages.some((page) => page.page_number === i)) {
+      normalizedPages.set(i, sortedPages.find((page) => page.page_number === i));
+    } else {
+      normalizedPages.set(i, makeFallbackPage(i));
+      warnings.push(`Missing page ${i}: inserted safe validation fallback page.`);
+    }
+  }
+
+  const outputPages = [...normalizedPages.values()].sort((a, b) => a.page_number - b.page_number);
+  if (outputPages.length > 14) {
+    const warning = `Report contains ${outputPages.length} pages, which is allowed if the structure is valid. Review density above 14 pages.`;
+    warnings.push(warning);
+    console.warn('sanitizeReportPages warning:', warning);
+  }
+
+  return outputPages;
+}
+
+function sanitiseStep7Output(d, richnessScore) {
+  const pageWarnings = [];
+  const out = {};
+
+  // ── signal_summary: filter out invalid enums, keep max 5 ─────────
+  const rawSignals = Array.isArray(d.signal_summary) ? d.signal_summary : [];
+  out.signal_summary = rawSignals
+    .filter(s => s && typeof s === 'object')
+    .map(s => ({
+      signal_type:        VALID_SIGNAL_TYPES.has(s.signal_type)  ? s.signal_type  : 'growth',
+      signal_description: typeof s.signal_description === 'string' ? s.signal_description.slice(0, 400) : '',
+      strength:           VALID_STRENGTHS.has(s.strength)        ? s.strength     : 'Medium',
+    }))
+    .filter(s => s.signal_description.length > 5)   // drop empty or nearly-empty
+    .slice(0, 5);
+
+  // ── why_now_analysis ──────────────────────────────────────────────
+  out.why_now_analysis = typeof d.why_now_analysis === 'string'
+    ? d.why_now_analysis.slice(0, 800)
+    : 'Insufficient data to determine timing urgency.';
+
+  // ── mcc_view ─────────────────────────────────────────────────────
+  const mcc = d.mcc_view && typeof d.mcc_view === 'object' ? d.mcc_view : {};
+  out.mcc_view = {
+    market:     typeof mcc.market     === 'string' ? mcc.market.slice(0,400)     : 'No market data available.',
+    client:     typeof mcc.client     === 'string' ? mcc.client.slice(0,400)     : 'No client data available.',
+    competitor: typeof mcc.competitor === 'string' ? mcc.competitor.slice(0,400) : 'No competitor data available.',
+  };
+
+  // ── strategic_hook ────────────────────────────────────────────────
+  out.strategic_hook = typeof d.strategic_hook === 'string'
+    ? d.strategic_hook.slice(0, 300)
+    : '';
+
+  // ── persona_priority ─────────────────────────────────────────────
+  const pp = d.persona_priority && typeof d.persona_priority === 'object' ? d.persona_priority : {};
+  const rawPersona = typeof pp.persona === 'string' ? pp.persona.trim() : 'CEO';
+  // Accept AI persona if it's in our valid list, otherwise fall back to nearest match or CEO
+  const matchedPersona = [...VALID_PERSONAS].find(p => p.toLowerCase() === rawPersona.toLowerCase()) || rawPersona;
+  out.persona_priority = {
+    persona: matchedPersona.slice(0, 80),
+    reason:  typeof pp.reason === 'string' ? pp.reason.slice(0, 400) : '',
+  };
+
+  // ── go_no_go ──────────────────────────────────────────────────────
+  const gng = d.go_no_go && typeof d.go_no_go === 'object' ? d.go_no_go : {};
+  const rawRec = typeof gng.recommendation === 'string' ? gng.recommendation.trim() : 'Watch';
+  // Normalise common variations like "No Go" → "No-Go", "no-go" → "No-Go"
+  const normRec = rawRec.replace(/\s+/g, '-').replace(/^no-go$/i,'No-Go').replace(/^watch$/i,'Watch').replace(/^go$/i,'Go');
+  out.go_no_go = {
+    recommendation: VALID_GNG.has(normRec) ? normRec : 'Watch',
+    reason:         typeof gng.reason === 'string' ? gng.reason.slice(0, 400) : '',
+  };
+
+  // ── confidence_score: AI value is capped by measured data richness ─
+  // The AI cannot claim higher confidence than the data supports.
+  // Example: AI says 85, but data richness = 40 → capped at 40.
+  // This prevents the AI from expressing false certainty on thin data.
+  const aiScore = typeof d.confidence_score === 'number'
+    ? d.confidence_score
+    : parseInt(d.confidence_score) || 50;
+  const clampedAI  = Math.max(0, Math.min(100, aiScore));
+  const maxAllowed = richnessScore; // data richness is the hard ceiling
+  out.confidence_score = Math.min(clampedAI, maxAllowed);
+
+  // ── executive_brief ───────────────────────────────────────────────
+  out.executive_brief = typeof d.executive_brief === 'string'
+    ? d.executive_brief.slice(0, 800)
+    : '';
+
+  // ── report_pages ──────────────────────────────────────────────────
+  out.report_pages = sanitizeReportPages(d.report_pages || d.report_outline, pageWarnings);
+
+  // ── full_report_text ─────────────────────────────────────────────
+  out.full_report_text = typeof d.full_report_text === 'string'
+    ? d.full_report_text.slice(0, 4000)
+    : '';
+
+  // ── Attach data quality metadata (shown in UI as audit trail) ─────
+  out._data_quality = {
+    richness_score:          richnessScore,
+    signals_before_filter:   rawSignals.length,
+    signals_after_filter:    out.signal_summary.length,
+    confidence_ai_claimed:   clampedAI,
+    confidence_after_cap:    out.confidence_score,
+    page_warnings:           pageWarnings,
+  };
+
+  return out;
+}
+
+// ══════════════════════════════════════════════════════════════════
+// SAVE STEP 7 — persist intelligence to existing strategy row
+// ══════════════════════════════════════════════════════════════════
+async function handleSaveStep7(body, userId, supabaseUrl, supabaseKey, env, cors) {
+  if (!supabaseUrl || !supabaseKey) return errRes('Database not configured', 503, cors);
+
+  const errors = validate({
+    strategy_id:         'string|required',
+    step_7_intelligence: 'object|required',
+  }, body);
+  if (errors.length) return errRes(errors[0], 400, cors);
+
+  const { strategy_id, step_7_intelligence } = body;
+  const sid = sanitise(strategy_id, 36);
+
+  // ── PUBLICATION CONTRACT: validate step 7 before saving ──────────
+  // Step 7 is the final gate — if it is corrupted, do NOT overwrite
+  // a valid existing step 7 in the database.
+  const S7_CRITICAL = ['signal_summary', 'go_no_go', 'executive_brief'];
+  const PLACEHOLDER_RE = [
+    /^AI-inferred — validate$/i,
+    /^Demo placeholder — requires validation$/i,
+    /^Source data missing$/i,
+    /^missing data$/i,
+  ];
+  const isPlaceholder = v =>
+    (v === null || v === undefined) ||
+    (typeof v === 'string' && PLACEHOLDER_RE.some(p => p.test(v.trim())));
+
+  const s7CriticalMissing = S7_CRITICAL.filter(f => {
+    const val = step_7_intelligence[f];
+    if (isPlaceholder(val)) return true;
+    if (Array.isArray(val) && val.length === 0) return false; // empty array OK
+    return false;
+  });
+
+  const s7IsEmpty = Object.keys(step_7_intelligence).length === 0;
+  const s7IsAllNull = Object.values(step_7_intelligence).every(v => v === null || v === undefined);
+
+  if (s7IsEmpty || s7IsAllNull) {
+    console.error(`[save_step7] Rejected: step_7_intelligence is empty or all-null for strategy=${sid}`);
+    return errRes('Step 7 data is empty — not persisted. Regenerate Step 7 before saving.', 422, cors);
+  }
+
+  // Fetch existing strategy context for normalizeStrategy (Steps 1–6 needed)
+  const getRes = await sbFetch(supabaseUrl, supabaseKey, 'strategies', 'GET', null,
+    `?id=eq.${sid}&user_id=eq.${userId}&limit=1`);
+  const existingData = getRes.ok ? await getRes.json() : [];
+  const existing = existingData[0] || {};
+
+  const fullStrategy = { ...existing, step_7_intelligence };
+  const flags = deriveDemoModeState(fullStrategy);
+  const backend_intelligence = normalizeStrategy(fullStrategy, flags.demo_mode);
+
+  // ── Run publication validation inline ────────────────────────────
+  // This gives the immediate publication state as part of the save response.
+  const publicationState = validatePublicationReadiness({
+    ...existing,
+    step_7_intelligence,
+    backend_intelligence,
+    steps_completed: (existing.steps_completed || 0),
+  });
+
+  const res = await sbFetch(supabaseUrl, supabaseKey, 'strategies', 'PATCH',
+    JSON.stringify({
+      step_7_intelligence,
+      backend_intelligence,
+      // Reset publication_ready — validate_publication action is the sole authority
+      // to stamp it true. Set to false here; frontend must call validate_publication.
+      publication_ready:        false,
+      publication_validated_at: null,
+      steps_completed:          Math.max(existing.steps_completed || 0, 7),
+      updated_at:               new Date().toISOString(),
+    }),
+    `?id=eq.${sid}&user_id=eq.${userId}`);
+
+  if (!res.ok) {
+    const e = await res.text();
+    return errRes('Failed to save Step 7: ' + e, 500, cors);
+  }
+
+  // If publication is already ready (all 7 steps valid), stamp it now
+  if (publicationState.publicationReady) {
+    sbFetch(supabaseUrl, supabaseKey, 'strategies', 'PATCH',
+      JSON.stringify({
+        publication_ready:        true,
+        publication_validated_at: new Date().toISOString(),
+        publication_score:        publicationState.score,
+      }),
+      `?id=eq.${sid}&user_id=eq.${userId}`
+    ).catch(e => console.warn('[save_step7] publication stamp failed:', e.message));
+  }
+
+  return okRes({
+    saved:            true,
+    strategy_id,
+    publicationReady: publicationState.publicationReady,
+    publicationScore: publicationState.score,
+    incompleteSteps:  publicationState.incompleteSteps,
+    missingFields:    publicationState.missingFields,
+    warnings:         publicationState.warnings,
+  }, cors);
+}
+
+// ══════════════════════════════════════════════════════════════════
+// STEP 7 PROMPT BUILDER
+// ══════════════════════════════════════════════════════════════════
+function buildStep7Prompt(company, industry, steps, evidenceManifest) {
+  const ind = industry ? ` (${industry})` : '';
+
+  // Compress each step into a concise block to stay within token limits
+  const s1 = steps[1] ? {
+    overview:     steps[1].company_overview,
+    gtm_score:    steps[1].gtm_relevance_score,
+    growth:       steps[1].growth_signals,
+    revenue_stage:steps[1].revenue_stage,
+    tech_stack:   steps[1].tech_stack_hints,
+    market_pos:   steps[1].market_position,
+  } : null;
+
+  const s2 = steps[2] ? {
+    tam:           steps[2].tam_size_estimate,
+    growth_rate:   steps[2].growth_rate,
+    segments:      (steps[2].market_segments || []).slice(0, 3).map(s => s.name),
+    opportunities: steps[2].priority_opportunities,
+    maturity:      steps[2].market_maturity,
+  } : null;
+
+  const s3 = steps[3] ? {
+    primary_icp:   steps[3].primary_icp,
+    pains:         steps[3].core_pain_points,
+    triggers:      steps[3].buying_triggers,
+    decision_makers: steps[3].decision_makers,
+    objections:    steps[3].objections,
+    deal_cycle:    steps[3].deal_cycle,
+  } : null;
+
+  const s4 = steps[4] ? {
+    databases:     (steps[4].recommended_databases || []).slice(0, 3),
+    playbook:      steps[4].sourcing_playbook,
+  } : null;
+
+  const s5 = steps[5] ? {
+    primary_kw:    steps[5].primary_keywords,
+    intent_signals: steps[5].intent_signals,
+  } : null;
+
+  const s6 = steps[6] ? {
+    email_angles:  [steps[6].email_1?.angle, steps[6].email_2?.angle, steps[6].email_3?.angle].filter(Boolean),
+    hook_subject:  steps[6].email_1?.subject,
+    linkedin_msg:  steps[6].linkedin_message,
+  } : null;
+
+  const inputBlock = JSON.stringify({ company, industry, s1, s2, s3, s4, s5, s6 }, null, 2);
+
+  return `You are the Enterprise GTM Architect. Produce a flexible GTM Intelligence Report for "${company}"${ind}, with soft page governance.
+
+EVIDENCE MANIFEST:
+${evidenceManifest || 'No evidence manifest provided.'}
+
+INPUT DATA (compressed):
+${inputBlock}
+
+REPORT INSTRUCTIONS:
+- Use ONLY facts from the EVIDENCE MANIFEST. Do not invent company names, revenue figures, competitors, or funding details.
+- If evidence is missing, omit the claim and keep the language conservative.
+- signal_type MUST be exactly one of: hiring, funding, growth, tech_replacement, competitor_pressure, expansion, market_timing.
+- strength MUST be exactly one of: High, Medium, Low.
+- go_no_go.recommendation MUST be exactly one of: Go, Watch, No-Go.
+- confidence_score MUST be an integer between 0 and 100 and must not exceed the data richness ceiling.
+- strategic_hook must be one crisp sentence suitable for cold outreach.
+- executive_brief must be 3-5 sentences, board-ready, concise, and evidence-based.
+- Prefer 10–14 pages for a normal report, but do not reject or truncate valid reports above 14 pages.
+- Maintain strict page ordering:
+  Page 1: Strategic Positioning
+  Page 2: Executive Summary
+  Page 3: Market Research
+  Page 4: TAM Mapping
+  Page 5: ICP Modeling
+  Page 6: Account Sourcing
+  Page 7: Keywords & Intent
+  Page 8: Engagement Playbook
+  Page 9: Engagement Playbook
+  Page 10+: Revenue Intelligence + Appendix / Methodology / Data Quality
+- Use short paragraphs, compact cards, compact tables, and avoid long unbroken blocks of text.
+- Preserve every valid report section. If pages are missing, include placeholder content with a clear validation notice.
+- Duplicate pages may be merged but retain all valid content and normalize numbering.
+- report_pages must be an array of pages numbered in order.
+- Each page must include a page_title and an ordered sections array.
+- Each section must include section_number (like 1.1, 2.2, 3.4), heading, and content.
+- Return ONLY valid JSON. No markdown, no prose, no code fences. Start with { and end with }.
+
+OUTPUT SCHEMA:
+{
+  "signal_summary": [{"signal_type":"growth","signal_description":"...","strength":"High"}],
+  "why_now_analysis":"...",
+  "mcc_view":{"market":"...","client":"...","competitor":"..."},
+  "strategic_hook":"...",
+  "persona_priority":{"persona":"...","reason":"..."},
+  "go_no_go":{"recommendation":"Go","reason":"..."},
+  "confidence_score":82,
+  "executive_brief":"...",
+  "report_pages":[
+    {"page_number":1,"page_title":"Strategic Positioning","sections":[{"section_number":"1.1","heading":"Company Positioning","content":"..."}]},
+    {"page_number":2,"page_title":"Executive Summary","sections":[{"section_number":"2.1","heading":"Opportunity Overview","content":"..."}]},
+    {"page_number":3,"page_title":"Market Research","sections":[{"section_number":"3.1","heading":"Market Context","content":"..."}]}
+  ],
+  "full_report_text":"Optional multi-page report summary string"
+}`;
+}
+
+function parseStep7(rawText) {
+  if (!rawText) return null;
+  const clean = rawText.replace(/```json|```/g, '').trim();
+  try { return JSON.parse(clean); } catch {}
+  const m = clean.match(/\{[\s\S]*\}/);
+  if (!m) return null;
+  try { return JSON.parse(m[0]); } catch {}
+  // Handle truncation
+  let s = m[0];
+  const opens  = (s.match(/\{/g) || []).length;
+  const closes = (s.match(/\}/g) || []).length;
+  if (opens > closes) {
+    s = s + '}'.repeat(opens - closes);
+    try { return JSON.parse(s); } catch {}
+  }
+  return null;
+}
+
+// ── Prompt builder ───────────────────────────────────────────────
+function buildStepPrompt(step, company, industry, priorSteps, companyProfile, enrichmentContext) {
+  const ind  = industry ? ` in the ${industry} industry` : '';
+  const sourceInstructions = `\nSOURCE ATTRIBUTION: include these metadata fields in your JSON output exactly as named: _source_context, _profile_source, _confidence_basis, _rag_enabled, _missing_evidence, _evidence_summary, _ai_estimate_fields, _verified_fields. If verified profile evidence is present, _profile_source must be "verified_company_profile". If verified evidence is missing, _profile_source must be "ai_estimate_validate_manually". When a value is derived from a prior phase, use "derived from Step X output". Add step-specific fields where relevant, such as _source_company_overview, _source_market_position, _source_growth_signals, _source_tam_size_estimate, _source_primary_icp, _source_filter_criteria, _source_primary_keywords, _source_email_angles, _source_go_no_go. Keep metadata compact and JSON-safe.`;
+  const base = `You are a B2B GTM opportunity qualification analyst. CRITICAL: Return ONLY a valid JSON object. No markdown. No code fences. Start with { end with }. Use verified EVIDENCE LAYER facts first. If verified evidence is missing for a field, write "missing data" — do NOT invent source-backed facts.${sourceInstructions}`;
+
+  // ── EVIDENCE LAYER: enrichment > scraped profile > benchmark fallback ──
+  let evidenceBlock;
+  if (enrichmentContext && enrichmentContext.sourceQuality !== 'none') {
+    evidenceBlock = `\n${formatEnrichmentForPrompt(enrichmentContext)}\n`;
+  } else if (companyProfile && companyProfile.extraction_confidence !== 'LOW' && companyProfile.company_overview) {
+    const benchmarkSupplement = (step === 2) ? `\n${formatBenchmarkOnlyPrompt(industry)}` : '';
+    evidenceBlock = `\nEVIDENCE LAYER (source: scraped_profile):\nCompany overview: ${companyProfile.company_overview}\nServices: ${(companyProfile.services||[]).join(', ')||'unknown'}\nTarget market: ${companyProfile.target_market||'unknown'}\nTech stack: ${(companyProfile.tech_stack_hints||[]).join(', ')||'unknown'}\n\nRULE: Use the EVIDENCE LAYER above as ground truth. Fields with no evidence must use "missing data".${benchmarkSupplement}\n`;
+  } else {
+    const benchmark = step === 2 ? `\n${formatBenchmarkOnlyPrompt(industry)}` : '';
+    evidenceBlock = `\nEVIDENCE LAYER: No verified company profile available.${benchmark}\nRULE: All output is AI estimation. Mark _profile_source as "ai_estimate_validate_manually". Do not invent source-backed facts.\n`;
+  }
+
+  // ── Build prior phase context for chaining ──
+  const phaseCtx = buildPhaseContext(step, priorSteps);
+
+  const prompts = {
+
+    // ════════════════════════════════════════════════
+    // PHASE 1 — SIGNAL EXTRACTION
+    // ════════════════════════════════════════════════
+    1:`${base}${evidenceBlock}
+PHASE 1 — SIGNAL EXTRACTION for "${company}"${ind}.
+
+Your ONLY job: extract real, observable business signals. Do NOT score. Do NOT conclude. Do NOT invent.
+If a signal category has no evidence, use "missing data" as the value.
+
+Group signals into 4 categories:
+1. DEMAND SIGNALS: hiring, expansion, product launches, partnerships, funding
+2. MARKET TIMING: growth trends, competitive pressure, regulation, technology shifts
+3. ICP FIT: who they sell to, how well they match a B2B sales-team-equipped buyer
+4. DATA COMPLETENESS: what information is available vs missing
+
+Rules:
+- Every signal must be a real, observable fact
+- If no evidence exists for a category, set to "missing data"
+- No scoring, no summaries, no conclusions
+- swot must be derived only from signals already extracted — no new invention
+
+Return exact JSON:
+{"demand_signals":[{"signal":"observable fact","type":"hiring|expansion|product_launch|partnership|funding","strength":"High|Medium|Low"}],"market_timing":[{"signal":"observable fact","category":"growth|competition|regulation|trend","strength":"High|Medium|Low"}],"icp_fit":{"target_description":"who they sell to, or missing data","fit_indicators":["evidence of fit"],"mismatches":["evidence of mismatch, or missing data"]},"data_completeness":{"available":["fields with real data"],"missing":["missing data: field name"]},"swot":{"strengths":["derive from high-strength demand signals and ICP fit indicators"],"weaknesses":["derive from data_completeness.missing and ICP mismatches"],"opportunities":["derive from high-strength market timing signals"],"threats":["derive from low ICP fit, competitive signals, or missing data gaps"]},"section_context":"one sentence on why signal extraction matters first","analyst_insight":"one specific observation about signal quality for this company"}`,
+
+    // ════════════════════════════════════════════════
+    // PHASE 2 — SCORING
+    // ════════════════════════════════════════════════
+    2:`${base}${evidenceBlock}
+PHASE 2 — SCORING for "${company}"${ind}.
+
+Phase 1 extracted signals:
+${phaseCtx}
+
+Your ONLY job: score the signals. No new assumptions.
+
+Scoring buckets (must sum to total_score exactly):
+- Demand signals:    max 40 points
+- Market timing:     max 25 points
+- ICP fit:           max 20 points
+- Data completeness: max 15 points
+
+Rules:
+- Strong, specific signal = full points
+- Partial/vague signal = proportional points
+- "missing data" = 0 points, no exceptions
+- total_score = exact arithmetic sum
+- Show exact calculation string: "X + Y + Z + W = total"
+
+Return exact JSON:
+{"demand_score":{"score":0,"max":40,"rationale":"specific reason from Phase 1","sub_breakdown":"e.g. hiring: +12, expansion: +10"},"market_timing_score":{"score":0,"max":25,"rationale":"specific reason from Phase 1","sub_breakdown":"e.g. growth trend: +10, competition: +8"},"icp_fit_score":{"score":0,"max":20,"rationale":"specific reason from Phase 1","sub_breakdown":"e.g. target match: +12"},"data_completeness_score":{"score":0,"max":15,"rationale":"fields present vs missing","sub_breakdown":"e.g. 8 of 12 fields present: +10"},"total_score":0,"score_verification":"X + Y + Z + W = total","section_context":"one sentence on why rigorous scoring prevents over-qualifying","analyst_insight":"one insight on scoring gaps and what data would improve it"}`,
+
+    // ════════════════════════════════════════════════
+    // PHASE 3 — VERDICT
+    // ════════════════════════════════════════════════
+    3:`${base}
+PHASE 3 — VERDICT for "${company}"${ind}.
+
+Prior phases:
+${phaseCtx}
+
+Your ONLY job: assign verdict strictly from scores. No opinion overrides.
+
+Verdict rules (follow exactly):
+- GO: total_score >= 70 AND demand is strong AND ICP fit is strong
+- CONDITIONAL GO: total_score 55-69, OR one major fixable gap exists
+- NO GO: total_score < 55 OR demand is weak
+
+verdict must be exactly: "GO", "CONDITIONAL GO", or "NO GO"
+
+Return exact JSON:
+{"verdict":"GO|CONDITIONAL GO|NO GO","verdict_reasoning":"specific reasoning citing scores — no opinion","score_basis":"Total: X/100 (Demand: A/40 · Timing: B/25 · ICP: C/20 · Data: D/15)","demand_assessment":"strong|partial|weak","icp_assessment":"strong|partial|weak","conditions":["condition if CONDITIONAL GO — empty array if GO or NO GO"],"what_would_change_verdict":"single data point that would flip the verdict","section_context":"one sentence on why verdict must follow scores","analyst_insight":"one honest observation about this verdict's strength"}`,
+
+    // ════════════════════════════════════════════════
+    // PHASE 4 — DEAL LENS
+    // ════════════════════════════════════════════════
+    4:`${base}
+PHASE 4 — DEAL LENS for "${company}"${ind}.
+
+Prior phases:
+${phaseCtx}
+
+Your job: convert verified signals into practical sales direction.
+
+Rules:
+- Every element must trace back to a Phase 1 signal
+- No generic statements
+- Use exact job titles
+- Clearly label deal size estimates
+- solution_angle must be: cost_saving, growth, efficiency, compliance, or risk_reduction
+
+Return exact JSON:
+{"target_roles":["Exact Title 1","Exact Title 2","Exact Title 3"],"core_problem":"specific evidence-backed problem from signals","solution_angle":"cost_saving|growth|efficiency|compliance|risk_reduction","solution_pitch":"2-3 sentences tied directly to signals — industry-neutral","why_now":"specific reason from market timing or demand signal — not generic","estimated_deal_size":{"range":"$X – $Y","is_estimate":true,"basis":"reasoning: company size, deal type, signals"},"sales_approach":"enterprise|mid_market|partnership|direct","approach_rationale":"why this approach fits based on signals","section_context":"one sentence on why deal lens must come from signals","analyst_insight":"one revenue-specific observation"}`,
+
+    // ════════════════════════════════════════════════
+    // PHASE 5 — RISKS & CONFIDENCE
+    // ════════════════════════════════════════════════
+    5:`${base}
+PHASE 5 — RISKS & CONFIDENCE for "${company}"${ind}.
+
+Prior phases:
+${phaseCtx}
+
+Your job: identify genuine uncertainties. Every risk from missing or weak signals.
+
+Rules:
+- Each risk must come from a specific missing or weak signal in Phase 1
+- No generic risks ("market may change")
+- confidence_score is a number 0-100, capped by data_completeness_score from Phase 2
+
+Return exact JSON:
+{"key_risks":[{"risk":"specific risk description","source":"exact missing or weak signal","impact":"high|medium|low","mitigation":"what would resolve this risk"}],"confidence_level":"high|medium|low","confidence_score":0,"confidence_reasoning":"explanation linking confidence to data completeness","validation_needed":["specific action that would validate this opportunity"],"section_context":"one sentence on why data gaps drive confidence not gut feel","analyst_insight":"one honest assessment of the biggest uncertainty"}`,
+
+    // ════════════════════════════════════════════════
+    // PHASE 6 — FINAL OUTPUT
+    // ════════════════════════════════════════════════
+    6:`${base}
+PHASE 6 — FINAL OUTPUT for "${company}"${ind}.
+
+ALL prior phases:
+${phaseCtx}
+
+Your job: produce the final structured output. Combine all phases.
+
+Rules:
+- Do NOT change scores or verdicts from prior phases
+- Do NOT add new assumptions
+- Everything must be consistent with prior phases
+- executive_brief: 3-5 sentences, board-ready, no jargon
+- signal_highlights: the 3 strongest real signals from Phase 1
+
+Return exact JSON:
+{"signal_highlights":[{"signal":"top signal 1","type":"demand|timing|icp","strength":"High|Medium|Low"},{"signal":"top signal 2","type":"demand|timing|icp","strength":"High|Medium|Low"},{"signal":"top signal 3","type":"demand|timing|icp","strength":"High|Medium|Low"}],"score_breakdown":{"demand":0,"market_timing":0,"icp_fit":0,"data_completeness":0,"total":0,"verification":"X + Y + Z + W = total"},"verdict":"GO|CONDITIONAL GO|NO GO","deal_lens_summary":"2-sentence summary of who to target, problem, and why now","risks_summary":"2-sentence summary of key risk and resolution","confidence_note":"confidence score and what it means for next steps","executive_brief":"3-5 sentence board-ready opportunity summary","recommended_next_action":"single most important next step","section_context":"one sentence on why final output must be consistent","analyst_insight":"one strategic observation tying the full analysis together"}`,
+  };
+
+  return prompts[step];
+}
+
+
+// ── Build compressed prior phase context for chaining ──────────
+function buildPhaseContext(step, steps) {
+  const labels = {1:'PHASE 1 — Signal Extraction',2:'PHASE 2 — Scoring',3:'PHASE 3 — Verdict',4:'PHASE 4 — Deal Lens',5:'PHASE 5 — Risks'};
+  const PLACEHOLDER_RE = [/^AI-inferred — validate$/i,/^Demo placeholder — requires validation$/i,/^Source data missing$/i,/^missing data$/i];
+  function stripPlaceholders(value) {
+    if (value === null || value === undefined) return '[no data]';
+    if (typeof value === 'string') {
+      const t = value.trim();
+      if (PLACEHOLDER_RE.some(p => p.test(t))) return '[no data]';
+      return value;
+    }
+    if (Array.isArray(value)) {
+      const clean = value.map(stripPlaceholders).filter(v => v !== '[no data]' || value.length === 1);
+      return clean.length > 0 ? clean : ['[no data — regenerate this step]'];
+    }
+    if (typeof value === 'object') {
+      const clean = {};
+      for (const [k,v] of Object.entries(value)) {
+        if (k.startsWith('_')) continue;
+        clean[k] = stripPlaceholders(v);
+      }
+      return clean;
+    }
+    return value;
+  }
+  return Array.from({length:step-1},(_,i)=>i+1)
+    .filter(i=>steps[i] && Object.keys(steps[i]).length > 0)
+    .map(i=>`[${labels[i]}]\n${JSON.stringify(stripPlaceholders(steps[i]),null,1)}`)
+    .join('\n\n') || 'No prior phase data available — this is Step 1.';
+}
+
+// Kept for backward compat if referenced elsewhere
+function buildContext(step, steps) { return buildPhaseContext(step, steps); }
+function buildCompressedCtx(steps) { return buildPhaseContext(6, steps); }
+
+const SCHEMAS = {
+  1:['demand_signals','market_timing','icp_fit','data_completeness','swot','section_context','analyst_insight'],
+  2:['demand_score','market_timing_score','icp_fit_score','data_completeness_score','total_score','score_verification','section_context','analyst_insight'],
+  3:['verdict','verdict_reasoning','score_basis','demand_assessment','icp_assessment','section_context','analyst_insight'],
+  4:['target_roles','core_problem','solution_angle','solution_pitch','why_now','estimated_deal_size','sales_approach','section_context','analyst_insight'],
+  5:['key_risks','confidence_level','confidence_score','validation_needed','section_context','analyst_insight'],
+  6:['signal_highlights','score_breakdown','verdict','deal_lens_summary','risks_summary','confidence_note','executive_brief','recommended_next_action','section_context','analyst_insight'],
+};
+
+async function parseWithRetry(rawText, step, originalPrompt, openaiKey) {
+  const parse = text => {
+    if (!text) return null;
+    // Remove markdown fences
+    const clean = text.replace(/```json|```/g,'').trim();
+    // Try direct parse first
+    try { return JSON.parse(clean); } catch {}
+    // Extract largest JSON object
+    const m = clean.match(/\{[\s\S]*\}/);
+    if (!m) return null;
+    try { return JSON.parse(m[0]); } catch {}
+    // Handle truncated JSON: try to close unclosed structure
+    let s = m[0];
+    const opens = (s.match(/\{/g)||[]).length;
+    const closes = (s.match(/\}/g)||[]).length;
+    if (opens > closes) {
+      s = s + '}'.repeat(opens - closes);
+      try { return JSON.parse(s); } catch {}
+    }
+    // Last resort: extract field by field
+    const result = {};
+    const fieldPattern = /"(\w+)"\s*:\s*("(?:[^"\\]|\\.)*"|\[[^\]]*\]|\{[^}]*\}|[^,}]+)/g;
+    let match;
+    while ((match = fieldPattern.exec(s)) !== null) {
+      try { result[match[1]] = JSON.parse(match[2]); } catch { result[match[1]] = match[2].replace(/^"|"$/g,''); }
+    }
+    return Object.keys(result).length > 0 ? result : null;
+  };
+
+  let parsed = parse(rawText);
+  if (!parsed) return null;
+
+  const missing = (SCHEMAS[step]||[]).filter(k => !(k in parsed));
+  if (missing.length === 0) return parsed;
+
+  // One retry with explicit field reminder — routed through provider fallback chain
+  // (retryWithProvider will try OpenAI first, then Gemini if OpenAI fails again)
+  try {
+    const retryResult = await retryWithProvider(step, originalPrompt, missing, { OPENAI_API_KEY: openaiKey });
+    if (!retryResult.error && retryResult.rawText) {
+      return parse(retryResult.rawText) || retryResult.parsed || parsed;
+    }
+  } catch { /* ignore retry failure — return best-effort parsed */ }
+  return parsed;
+}
+
+function augmentStepOutput(data, step, companyProfile, priorSteps) {
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return data;
+
+  const output = { ...data };
+  const hasVerified = companyProfile && companyProfile.extraction_confidence !== 'LOW' && companyProfile.company_overview;
+  const profileSource = hasVerified ? 'verified_company_profile' : 'ai_estimate_validate_manually';
+  const priorStep = priorSteps && Object.keys(priorSteps).length
+    ? Math.max(...Object.keys(priorSteps).map(n => Number(n)))
+    : null;
+  const sourceContext = hasVerified
+    ? 'Verified profile evidence is available and should be used first.'
+    : priorStep
+      ? `Derived from Step ${priorStep} output and AI estimation.`
+      : 'No verified profile evidence available; output is an AI estimate and should be validated manually.';
+  const confidenceBasis = hasVerified
+    ? 'Verified company profile evidence'
+    : 'AI estimate based on prior GTM context; validate manually.';
+  const missingEvidence = hasVerified
+    ? 'none'
+    : Array.isArray(data.data_completeness?.missing) && data.data_completeness.missing.length
+      ? data.data_completeness.missing.filter(Boolean).join(', ')
+      : 'verified company profile evidence and supporting source data';
+  const evidenceSummary = hasVerified
+    ? 'Core content is grounded in verified company profile evidence.'
+    : priorStep
+      ? `Some content is derived from Step ${priorStep} output; verified profile evidence is missing.`
+      : 'No verified profile evidence is available; output is an AI estimate and should be validated manually.';
+  const verifiedFields = hasVerified
+    ? ['company_overview','services','industry','target_market','tech_stack','value_props']
+    : [];
+  const aiEstimateFields = [];
+  if (!hasVerified) {
+    aiEstimateFields.push('company profile', 'market assumptions');
+    if (priorStep) aiEstimateFields.push(`derived from Step ${priorStep} output`);
+  }
+
+  if (typeof output.confidence_score === 'number') {
+    output.confidence_score = Math.round(output.confidence_score);
+  } else if (typeof output.confidence_score === 'string' && !Number.isNaN(Number(output.confidence_score))) {
+    output.confidence_score = Math.round(Number(output.confidence_score));
+  }
+
+  output._source_context = sourceContext;
+  output._profile_source = profileSource;
+  output._confidence_basis = confidenceBasis;
+  output._rag_enabled = true;
+  output._missing_evidence = missingEvidence || 'none';
+  output._evidence_summary = evidenceSummary;
+  output._verified_fields = verifiedFields;
+  output._ai_estimate_fields = aiEstimateFields;
+
+  const sourceText = hasVerified
+    ? 'verified_company_profile'
+    : priorStep
+      ? `derived_from_step_${priorStep}_output`
+      : 'ai_estimate_validate_manually';
+
+  switch (step) {
+    case 1:
+      output._source_company_overview = sourceText;
+      output._source_market_position = sourceText;
+      output._source_growth_signals = sourceText;
+      break;
+    case 2:
+      output._source_tam_size_estimate = sourceText;
+      output._source_growth_rate = sourceText;
+      output._source_market_segments = sourceText;
+      output._tam_assumption_notes = sourceText;
+      break;
+    case 3:
+      output._source_primary_icp = sourceText;
+      output._source_secondary_icp = sourceText;
+      output._source_buying_triggers = sourceText;
+      output._icp_assumption_notes = sourceText;
+      break;
+    case 4:
+      output._source_filter_criteria = sourceText;
+      output._source_recommended_databases = sourceText;
+      output._account_assumption_notes = sourceText;
+      break;
+    case 5:
+      output._source_primary_keywords = sourceText;
+      output._source_intent_signals = sourceText;
+      output._keyword_assumption_notes = sourceText;
+      break;
+    case 6:
+      output._source_email_angles = sourceText;
+      output._source_value_proposition = sourceText;
+      output._messaging_assumption_notes = sourceText;
+      break;
+    default:
+      break;
+  }
+
+  return output;
+}
+
+// ── Score batch ──────────────────────────────────────────────────
+async function scoreBatch(leads, icpCtx, openaiKey) {
+  const prompt = `Score these B2B leads 0-100.
+${icpCtx?`ICP:\n${icpCtx}\n`:''}
+Leads:
+${leads.map((l,i)=>`${i}. ${l.name||'?'} | ${l.title||'?'} | ${l.company||'?'}`).join('\n')}
+Return ONLY JSON array: [{"index":0,"score":<integer 0-100>,"priority":"HIGH|MEDIUM|LOW","reason":"one sentence"},...] Priority: HIGH(≥75) MEDIUM(50-74) LOW(<50). Score each lead individually based on their actual title and company — do NOT use the same score for all leads.`;
+
+  try {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+      method:'POST', headers:{'Content-Type':'application/json','Authorization':`Bearer ${openaiKey}`},
+      body: JSON.stringify({ model:'gpt-4o-mini', temperature:0.1, max_tokens:600,
+        messages:[{role:'system',content:'Return ONLY valid JSON array.'},{role:'user',content:prompt}] }),
+    });
+    const d = await res.json();
+    const r = d.choices?.[0]?.message?.content||'[]';
+    const c = r.replace(/```json|```/g,'').trim();
+    const m = c.match(/\[[\s\S]*\]/);
+    const s = JSON.parse(m?m[0]:c);
+    return leads.map((l,i)=>{const sc=s.find(x=>x.index===i)||{score:50,priority:'MEDIUM',reason:'N/A'};return{...l,icp_score:sc.score,priority:sc.priority,score_reason:sc.reason};});
+  } catch { return leads.map(l=>({...l,icp_score:50,priority:'MEDIUM',score_reason:'Scoring unavailable'})); }
+}
+
+// ── Supabase sub-table savers — FIX: all use resolution=merge-duplicates ────
+const UPSERT = 'return=representation,resolution=merge-duplicates';
+async function saveICP(sid, uid, co, d, url, key) {
+  try { await sbFetch(url,key,'icp_profiles','POST',JSON.stringify({strategy_id:sid,user_id:uid,company_name:co,primary_icp:d.primary_icp,secondary_icp:d.secondary_icp,firmographics:d.firmographics,buying_triggers:d.buying_triggers,core_pain_points:d.core_pain_points,decision_makers:d.decision_makers,deal_cycle:d.deal_cycle,objections:d.objections}),'?on_conflict=strategy_id',UPSERT); } catch {}
+}
+async function saveKeywords(sid, uid, co, d, url, key) {
+  try { await sbFetch(url,key,'keywords','POST',JSON.stringify({strategy_id:sid,user_id:uid,company_name:co,primary_keywords:d.primary_keywords,secondary_keywords:d.secondary_keywords,boolean_query:d.boolean_query,linkedin_search:d.linkedin_search_strings,intent_signals:d.intent_signals,content_topics:d.content_topics}),'?on_conflict=strategy_id',UPSERT); } catch {}
+}
+async function saveMessaging(sid, uid, co, d, url, key) {
+  try { await sbFetch(url,key,'messaging_sequences','POST',JSON.stringify({strategy_id:sid,user_id:uid,company_name:co,email_1:d.email_1,email_2:d.email_2,email_3:d.email_3,follow_up:d.follow_up_sequence}),'?on_conflict=strategy_id',UPSERT); } catch {}
+}
+
+// ── Rate limit helpers ───────────────────────────────────────────
+async function isHourlyLimitExceeded(userId, url, key) {
+  try {
+    const ws  = new Date(); ws.setMinutes(0,0,0);
+    const res = await sbFetch(url,key,'rate_limits','GET',null,`?user_id=eq.${userId}&window_start=eq.${ws.toISOString()}&limit=1`);
+    const d   = await res.json();
+    return d.length > 0 && d[0].tokens_used >= HOURLY_TOKEN_LIMIT;
+  } catch { return false; }
+}
+
+async function bumpHourlyTokens(userId, tokens, url, key) {
+  try {
+    const ws = new Date(); ws.setMinutes(0,0,0);
+    await sbFetch(url,key,'rate_limits','POST',JSON.stringify({user_id:userId,window_start:ws.toISOString(),request_count:1,tokens_used:tokens}),'?on_conflict=user_id,window_start',UPSERT);
+  } catch {}
+}
+
+async function logRun(userId, strategyId, runType, step, company, tokens, duration, cacheHit, url, key) {
+  try {
+    await sbFetch(url,key,'analysis_runs','POST',JSON.stringify({user_id:userId,strategy_id:strategyId,run_type:runType,step_number:step,company_name:company,tokens_used:tokens,cost_usd:tokens*COST_PER_TOKEN,model:'gpt-4o-mini',cache_hit:cacheHit,duration_ms:duration}));
+  } catch {}
+}
+
+// ── Helpers ──────────────────────────────────────────────────────
+async function hash(str) {
+  const d = new TextEncoder().encode(str);
+  const h = await crypto.subtle.digest('SHA-256',d);
+  return Array.from(new Uint8Array(h)).map(b=>b.toString(16).padStart(2,'0')).join('').slice(0,16);
+}
+
+// FIX: Added optional `prefer` param — upserts need 'resolution=merge-duplicates'
+// Without it Supabase does INSERT OR IGNORE, silently dropping all step updates
+// after the first save. Steps 2-6 never persisted. steps_completed stuck at 1.
+const sbFetch = (url, key, table, method, body, qs = '', prefer = null) =>
+  fetch(`${url}/rest/v1/${table}${qs}`, {
+    method,
+    headers:{ 'Content-Type':'application/json', apikey:key, Authorization:`Bearer ${key}`,
+      Prefer: prefer ?? (method==='POST' ? 'return=representation' : 'return=minimal') },
+    body: body||undefined,
+  });
+
+export async function onRequestOptions(context) {
+  return new Response(null, { status: 204, headers: corsHeaders(context.env) });
+}
